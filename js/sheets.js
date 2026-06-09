@@ -1,66 +1,116 @@
 /* ═══════════════════════════════════════════════
    SHITS LEAGUE — sheets.js
-   Lee clasificación/goles/asistencias desde Google Sheets API pública.
-   La hoja debe estar publicada en "Compartir → Publicar en la web".
+   Lee todos los datos desde Google Sheets API pública.
+   Escribe via Google Apps Script (gasPost).
 ═══════════════════════════════════════════════ */
 
-// TODO: reemplaza con el ID real de tu hoja de cálculo
-const SHEETS_ID  = 'TU_SPREADSHEET_ID';
-const SHEETS_KEY = 'TU_API_KEY';
+const SHEETS_ID  = '1EHGrFt2Y3QDCOdSV3fVgWvspzXYcir4SmDxOezdSLRY';
+const SHEETS_KEY = 'AIzaSyC5TLnk-zGTAia4HZNvv77PgY2FtXYfhdc';
+const GAS_URL    = 'https://script.google.com/macros/s/AKfycbzMsnYd3YJ843TxnmCpuYKCCQ0u0d-p3XJvXLQrrQrvA5tb6E10AwRRBqgPWr_p0p2XaA/exec';
+const GAS_SECRET = 'pissleague';
 
-// Nombre exacto de las hojas dentro del spreadsheet
-const SHEET_CLASIFICACION = 'Clasificacion';
+// Nombre exacto de las pestañas en el spreadsheet
+const SHEET_JUGADORES     = 'Jugadores';
+const SHEET_JORNADAS      = 'Jornadas';
 const SHEET_GOLES         = 'Goles';
 const SHEET_ASISTENCIAS   = 'Asistencias';
+const SHEET_CLASIFICACION = 'Clasificacion'; // backup opcional
+
+// ── Core ──────────────────────────────────────────────────────────────────
 
 function sheetsUrl(sheetName) {
   return `https://sheets.googleapis.com/v4/spreadsheets/${SHEETS_ID}/values/${encodeURIComponent(sheetName)}?key=${SHEETS_KEY}`;
 }
 
-// Devuelve array de objetos a partir de la respuesta de Sheets API
-// Asume que la primera fila son cabeceras
+// Fila 1 = cabeceras → devuelve array de objetos
 function parseSheet(data) {
   const [headers, ...rows] = data.values || [];
   if (!headers) return [];
-  return rows.map(row =>
-    Object.fromEntries(headers.map((h, i) => [h.trim(), row[i]?.trim() ?? '']))
-  );
+  return rows
+    .filter(row => row.some(c => c !== ''))  // ignora filas vacías
+    .map(row => Object.fromEntries(
+      headers.map((h, i) => [h.trim(), (row[i] ?? '').toString().trim()])
+    ));
 }
 
-// Carga los datos de clasificación desde Sheets.
-// Si falla o no está configurado, devuelve null para usar los datos locales.
-async function fetchClasificacion() {
-  if (SHEETS_ID === 'TU_SPREADSHEET_ID') return null;
+async function sheetsFetch(sheetName) {
+  const res = await fetch(sheetsUrl(sheetName), { cache: 'no-store' });
+  if (!res.ok) throw new Error(`HTTP ${res.status} al leer "${sheetName}"`);
+  return parseSheet(await res.json());
+}
+
+// ── Jugadores ─────────────────────────────────────────────────────────────
+// Pestaña: nombre | rating | pos | bandera | pj | mvp | carta_url
+async function fetchJugadores() {
   try {
-    const res  = await fetch(sheetsUrl(SHEET_CLASIFICACION));
-    const json = await res.json();
-    return parseSheet(json);
+    const rows = await sheetsFetch(SHEET_JUGADORES);
+    return rows.map(r => ({
+      nombre:  r.nombre  || '',
+      media:   parseInt(r.rating) || 0,
+      pos:     r.pos     || '',
+      bandera: r.bandera || '🏳️',
+      img:     r.carta_url || '',
+      stats: {
+        pj:          parseInt(r.pj)  || 0,
+        mvp:         parseInt(r.mvp) || 0,
+        goles:       0,  // se sobreescribe con pestaña Goles
+        asistencias: 0,  // se sobreescribe con pestaña Asistencias
+        pts:         0,  // calculado = goles + asistencias
+      },
+    }));
   } catch (e) {
-    console.warn('[sheets] No se pudo cargar la clasificación:', e);
+    console.warn('[sheets] fetchJugadores:', e);
     return null;
   }
 }
 
+// ── Jornadas ──────────────────────────────────────────────────────────────
+// Pestaña: numero | fecha | local | goles_local | visitante | goles_visitante | mensaje | video_url | amistoso | imagen_url
+async function fetchJornadas() {
+  try {
+    const rows = await sheetsFetch(SHEET_JORNADAS);
+    return rows.map(r => ({
+      numero:          r.numero ? parseInt(r.numero) : null,
+      fecha:           r.fecha        || '',
+      local:           r.local        || '',
+      goles_local:     parseInt(r.goles_local)     || 0,
+      visitante:       r.visitante    || '',
+      goles_visitante: parseInt(r.goles_visitante) || 0,
+      mensaje:         r.mensaje      || '',
+      video_url:       r.video_url    || null,
+      amistoso:        r.amistoso === 'TRUE',
+      imagen:          r.imagen_url   || null,
+    }));
+  } catch (e) {
+    console.warn('[sheets] fetchJornadas:', e);
+    return null;
+  }
+}
+
+// ── Goles / Asistencias ───────────────────────────────────────────────────
+// Pestaña Goles:       nombre | goles
+// Pestaña Asistencias: nombre | asistencias
 async function fetchGoles() {
-  if (SHEETS_ID === 'TU_SPREADSHEET_ID') return null;
-  try {
-    const res  = await fetch(sheetsUrl(SHEET_GOLES));
-    const json = await res.json();
-    return parseSheet(json);
-  } catch (e) {
-    console.warn('[sheets] No se pudo cargar goles:', e);
-    return null;
-  }
+  try { return await sheetsFetch(SHEET_GOLES); }
+  catch (e) { console.warn('[sheets] fetchGoles:', e); return null; }
 }
 
 async function fetchAsistencias() {
-  if (SHEETS_ID === 'TU_SPREADSHEET_ID') return null;
-  try {
-    const res  = await fetch(sheetsUrl(SHEET_ASISTENCIAS));
-    const json = await res.json();
-    return parseSheet(json);
-  } catch (e) {
-    console.warn('[sheets] No se pudo cargar asistencias:', e);
-    return null;
-  }
+  try { return await sheetsFetch(SHEET_ASISTENCIAS); }
+  catch (e) { console.warn('[sheets] fetchAsistencias:', e); return null; }
+}
+
+async function fetchClasificacion() {
+  try { return await sheetsFetch(SHEET_CLASIFICACION); }
+  catch (e) { return null; }
+}
+
+// ── Escritura via Apps Script ─────────────────────────────────────────────
+async function gasPost(payload) {
+  const res = await fetch(GAS_URL, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ secret: GAS_SECRET, ...payload }),
+  });
+  return res.json();
 }

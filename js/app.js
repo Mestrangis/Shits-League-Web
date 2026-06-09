@@ -10,12 +10,37 @@ let STATE = {
 
 /* ── Datos ───────────────────────────────────────────────────────────────── */
 async function loadData() {
-  const [jr, pr] = await Promise.all([
-    fetch('data/jornadas.json'),
-    fetch('data/jugadores.json'),
+  // Todo desde Sheets en paralelo — cero archivos locales de datos
+  const [jugadores, jornadas, goles, asistencias] = await Promise.all([
+    fetchJugadores(),
+    fetchJornadas(),
+    fetchGoles(),
+    fetchAsistencias(),
   ]);
-  STATE.jornadas  = (await jr.json()).jornadas  || [];
-  STATE.jugadores = (await pr.json()).jugadores || [];
+
+  STATE.jugadores = jugadores || [];
+  STATE.jornadas  = jornadas  || [];
+
+  // Combinar goles individuales en el objeto jugador
+  if (goles) {
+    goles.forEach(row => {
+      const j = STATE.jugadores.find(p => p.nombre === row.nombre);
+      if (j) j.stats.goles = parseInt(row.goles) || 0;
+    });
+  }
+
+  // Combinar asistencias
+  if (asistencias) {
+    asistencias.forEach(row => {
+      const j = STATE.jugadores.find(p => p.nombre === row.nombre);
+      if (j) j.stats.asistencias = parseInt(row.asistencias) || 0;
+    });
+  }
+
+  // pts = goles + asistencias (siempre calculado)
+  STATE.jugadores.forEach(j => {
+    j.stats.pts = j.stats.goles + j.stats.asistencias;
+  });
 }
 
 /* ── Hero section (siempre visible) ─────────────────────────────────────── */
