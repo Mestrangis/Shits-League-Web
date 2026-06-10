@@ -121,9 +121,9 @@ async function fetchClasificacion() {
 // ── Escritura via Apps Script ─────────────────────────────────────────────
 async function gasPost(payload) {
   const res = await fetch(GAS_URL, {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ secret: GAS_SECRET, ...payload }),
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify({ secret: GAS_SECRET, ...payload }),
   });
   return res.json();
 }
