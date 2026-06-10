@@ -17,7 +17,7 @@
   <!-- TOPBAR — sticky top:0 -->
   <header class="topbar">
     <div class="topbar__logo">
-      <span class="topbar__logo-icon">💩</span>
+      <img class="topbar__logo-icon" src="assets/logo-s-green.png" alt="Shits League">
       <div class="topbar__logo-wordmark">
         <span class="topbar__logo-shits">SHITS</span>
         <span class="topbar__logo-league">LEAGUE</span>
@@ -138,7 +138,7 @@
       var val = document.getElementById('adminPassword').value;
       if (btoa(val) === _K) {
         sessionStorage.setItem('sl_admin', '1');
-        window.location.href = '/admin/';
+        window.location.href = 'admin/';
       } else {
         document.getElementById('adminLoginError').hidden = false;
         document.getElementById('adminPassword').value = '';

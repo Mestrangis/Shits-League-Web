@@ -73,8 +73,9 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
   gap: 11px;
 }
 .topbar__logo-icon {
-  font-size: 1.6rem;
-  line-height: 1;
+  height: 2.2rem;
+  width: auto;
+  display: block;
   filter: drop-shadow(0 0 10px rgba(31,224,101,0.55));
 }
 .topbar__logo-wordmark {

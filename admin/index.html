@@ -5,6 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin — Shits League</title>
   <meta name="robots" content="noindex, nofollow">
+  <script>
+    if (sessionStorage.getItem('sl_admin') !== '1') {
+      window.location.replace('../');
+      throw new Error('redirect');
+    }
+  </script>
   <link rel="stylesheet" href="../css/main.css">
   <link rel="stylesheet" href="admin.css">
 </head>
@@ -14,7 +20,7 @@
 
   <header class="topbar">
     <div class="topbar__logo">
-      <span class="topbar__logo-icon">💩</span>
+      <img class="topbar__logo-icon" src="../assets/logo-s-green.png" alt="Shits League">
       <div class="topbar__logo-wordmark">
         <span class="topbar__logo-shits">SHITS</span>
         <span class="topbar__logo-league">LEAGUE</span>
