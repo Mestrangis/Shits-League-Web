@@ -6,7 +6,7 @@
 
 const SHEETS_ID  = '1EHGrFt2Y3QDCOdSV3fVgWvspzXYcir4SmDxOezdSLRY';
 const SHEETS_KEY = 'AIzaSyC5TLnk-zGTAia4HZNvv77PgY2FtXYfhdc';
-const GAS_URL    = 'https://script.google.com/macros/s/AKfycbxsRzPPbEqcqSTYIt8FLocST7wIYqqFIIjzMmacztn4IeIF7E9QNNj781qnPgqNLafphA/exec';
+const GAS_URL    = 'https://script.google.com/macros/s/AKfycbyH2bmbHoit5EoLl_f98Bb6DdvUYT7onh1Vn2b_sXnv28f304mJyLtbUaJ5kNAv8gxktw/exec';
 const GAS_SECRET = 'pissleague';
 
 // Nombre exacto de las pestañas en el spreadsheet

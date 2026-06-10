@@ -51,26 +51,30 @@ function addJornada(ss, body) {
   const jugadoresVisitante = body.jugadores_visitante || [];
   const capitanLocal       = body.capitan_local       || '';
   const capitanVisitante   = body.capitan_visitante   || '';
+  const isAmistoso = body.amistoso === true || body.amistoso === 'TRUE';
 
   // Pestaña Jornadas:
   // numero | fecha | local | goles_local | visitante | goles_visitante |
   // jugadores_local | capitan_local | jugadores_visitante | capitan_visitante |
   // mensaje | video_url | amistoso | imagen_url
-  ss.getSheetByName('Jornadas').appendRow([
+  const sh  = ss.getSheetByName('Jornadas');
+  const row = sh.getLastRow() + 1;
+  sh.getRange(row, 1, 1, 14).setValues([[
     body.numero, body.fecha, body.local, body.goles_local,
     body.visitante, body.goles_visitante,
     jugadoresLocal.join(','), capitanLocal,
     jugadoresVisitante.join(','), capitanVisitante,
     body.mensaje || '', body.video_url || '',
-    body.amistoso ? 'TRUE' : 'FALSE',
+    isAmistoso ? 'TRUE' : 'FALSE',
     body.imagen_url || '',
-  ]);
+  ]]);
 
-  if (body.amistoso) {
-    // Amistoso: solo cuenta para partidos jugados, no afecta a la clasificación
-    incrementPj(ss, jugadoresLocal.concat(jugadoresVisitante));
-    return;
-  }
+  // Forzar texto plano en fecha y amistoso (evita que Sheets las convierta
+  // a fecha/booleano nativos, lo que rompe la lectura posterior vía API).
+  sh.getRange(row, 2).setNumberFormat('@').setValue(String(body.fecha));
+  sh.getRange(row, 13).setNumberFormat('@').setValue(isAmistoso ? 'TRUE' : 'FALSE');
+
+  if (isAmistoso) return; // Amistoso: solo se guarda la fila, no afecta a nada más
 
   const gl = Number(body.goles_local), gv = Number(body.goles_visitante);
   let resultLocal, resultVisitante;
@@ -110,16 +114,6 @@ function applyResultado(ss, jugadores, capitan, resultado) {
 
     sh.getRange(r, COL_JUG.pts).setValue(Number(data[i][COL_JUG.pts - 1]) + ptsGanados);
     sh.getRange(r, COL_JUG.pj).setValue(Number(data[i][COL_JUG.pj - 1]) + 1);
-  });
-}
-
-// ── Suma 1 a "pj" de cada jugador (usado en amistosos) ────────────────────────
-function incrementPj(ss, jugadores) {
-  const sh   = ss.getSheetByName('Jugadores');
-  const data = sh.getDataRange().getValues();
-  jugadores.forEach(function (nombre) {
-    const i = data.findIndex(function (r) { return r[0] === nombre; });
-    if (i > 0) sh.getRange(i + 1, COL_JUG.pj).setValue(Number(data[i][COL_JUG.pj - 1]) + 1);
   });
 }
 

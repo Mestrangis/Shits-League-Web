@@ -216,36 +216,38 @@ function bindPartidoForm() {
         amistoso:         amistoso ? 'TRUE' : 'FALSE',
       });
 
-      // 2. Goles individuales
-      const rows = document.querySelectorAll('#stats-table .stats-row');
-      const golesData = [], asistenciasData = [];
-      rows.forEach(function (row) {
-        const nombre      = row.dataset.nombre;
-        const goles       = parseInt(row.querySelector('[name="goles"]').value)       || 0;
-        const asistencias = parseInt(row.querySelector('[name="asistencias"]').value) || 0;
-        if (goles       > 0) golesData.push({ nombre, goles });
-        if (asistencias > 0) asistenciasData.push({ nombre, asistencias });
-      });
-
-      if (golesData.length) {
-        setStatus(status, '⚽ Guardando goles…');
-        await gasPost({
-          action: 'addGoles',
-          goles: golesData.map(function (d) { return { nombre: d.nombre, cantidad: d.goles }; }),
+      // 2. Goles, asistencias y MVP — solo si NO es amistoso
+      if (!amistoso) {
+        const rows = document.querySelectorAll('#stats-table .stats-row');
+        const golesData = [], asistenciasData = [];
+        rows.forEach(function (row) {
+          const nombre      = row.dataset.nombre;
+          const goles       = parseInt(row.querySelector('[name="goles"]').value)       || 0;
+          const asistencias = parseInt(row.querySelector('[name="asistencias"]').value) || 0;
+          if (goles       > 0) golesData.push({ nombre, goles });
+          if (asistencias > 0) asistenciasData.push({ nombre, asistencias });
         });
-      }
-      if (asistenciasData.length) {
-        setStatus(status, '🅰️ Guardando asistencias…');
-        await gasPost({
-          action: 'addAsistencias',
-          asistencias: asistenciasData.map(function (d) { return { nombre: d.nombre, cantidad: d.asistencias }; }),
-        });
-      }
 
-      // 3. MVP
-      if (mvp) {
-        setStatus(status, '🏆 Guardando MVP…');
-        await gasPost({ action: 'addMvp', nombre: mvp });
+        if (golesData.length) {
+          setStatus(status, '⚽ Guardando goles…');
+          await gasPost({
+            action: 'addGoles',
+            goles: golesData.map(function (d) { return { nombre: d.nombre, cantidad: d.goles }; }),
+          });
+        }
+        if (asistenciasData.length) {
+          setStatus(status, '🅰️ Guardando asistencias…');
+          await gasPost({
+            action: 'addAsistencias',
+            asistencias: asistenciasData.map(function (d) { return { nombre: d.nombre, cantidad: d.asistencias }; }),
+          });
+        }
+
+        // 3. MVP
+        if (mvp) {
+          setStatus(status, '🏆 Guardando MVP…');
+          await gasPost({ action: 'addMvp', nombre: mvp });
+        }
       }
 
       setStatus(status, '✅ Partido guardado correctamente', 'ok');
