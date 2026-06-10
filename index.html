@@ -71,10 +71,87 @@
     <div class="footer__text">SHITS LEAGUE · TEMPORADA 2025 / 2026</div>
   </footer>
 
+  <!-- ADMIN LOGIN MODAL (oculto, acceso por triple-click en logo) -->
+  <div id="adminModal" class="modal" role="dialog" aria-modal="true" aria-label="Acceso administrador">
+    <div class="modal__backdrop" id="adminModalBackdrop"></div>
+    <div class="modal__box admin-login-box">
+      <div class="admin-login__icon">🔒</div>
+      <h2 class="admin-login__title">ACCESO RESTRINGIDO</h2>
+      <input type="password" id="adminPassword" class="admin-login__input" placeholder="Contraseña" autocomplete="off">
+      <div id="adminLoginError" class="admin-login__error" hidden>Contraseña incorrecta</div>
+      <button class="admin-login__btn" id="adminLoginBtn">ENTRAR</button>
+    </div>
+  </div>
+
+  <style>
+    .admin-login-box { max-width: 360px; padding: 2.5rem 2rem; text-align: center; }
+    .admin-login__icon { font-size: 2.4rem; margin-bottom: 1rem; filter: drop-shadow(0 0 12px rgba(31,224,101,.4)); }
+    .admin-login__title { font-family: 'Anton', sans-serif; font-size: 1.5rem; letter-spacing: .1em; color: #fff; margin-bottom: 1.5rem; }
+    .admin-login__input {
+      width: 100%; padding: .75rem 1rem; margin-bottom: .75rem;
+      background: rgba(14,32,22,.8); border: 1px solid rgba(31,224,101,.28); border-radius: 10px;
+      color: #E8FBEF; font-family: 'Sora', sans-serif; font-size: 1rem;
+      outline: none; transition: border-color .2s;
+    }
+    .admin-login__input:focus { border-color: var(--verde); }
+    .admin-login__error { color: #ff6b6b; font-size: .82rem; margin-bottom: .75rem; }
+    .admin-login__btn {
+      width: 100%; padding: .75rem; border: none; border-radius: 10px; cursor: pointer;
+      background: var(--verde); color: #06140D; font-family: 'Anton', sans-serif;
+      font-size: 1rem; letter-spacing: .12em; transition: opacity .2s;
+    }
+    .admin-login__btn:hover { opacity: .88; }
+  </style>
+
   <script src="js/ui.js"></script>
   <script src="js/sheets.js"></script>
   <script src="js/cloudinary.js"></script>
   <script src="js/calendar.js"></script>
   <script src="js/app.js"></script>
+  <script>
+  (function () {
+    const _K = 'cGlzc2xlYWd1ZQ=='; // btoa('pissleague')
+    let _c = 0, _t;
+
+    document.querySelector('.topbar__logo').addEventListener('click', function () {
+      _c++;
+      clearTimeout(_t);
+      _t = setTimeout(function () { _c = 0; }, 600);
+      if (_c >= 3) { _c = 0; _openAdminModal(); }
+    });
+
+    function _openAdminModal() {
+      var m = document.getElementById('adminModal');
+      m.classList.add('open');
+      document.body.style.overflow = 'hidden';
+      setTimeout(function () { document.getElementById('adminPassword').focus(); }, 50);
+    }
+
+    function _closeAdminModal() {
+      document.getElementById('adminModal').classList.remove('open');
+      document.body.style.overflow = '';
+      document.getElementById('adminPassword').value = '';
+      document.getElementById('adminLoginError').hidden = true;
+    }
+
+    function _tryLogin() {
+      var val = document.getElementById('adminPassword').value;
+      if (btoa(val) === _K) {
+        sessionStorage.setItem('sl_admin', '1');
+        window.location.href = '/admin/';
+      } else {
+        document.getElementById('adminLoginError').hidden = false;
+        document.getElementById('adminPassword').value = '';
+        document.getElementById('adminPassword').focus();
+      }
+    }
+
+    document.getElementById('adminLoginBtn').addEventListener('click', _tryLogin);
+    document.getElementById('adminPassword').addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') _tryLogin();
+    });
+    document.getElementById('adminModalBackdrop').addEventListener('click', _closeAdminModal);
+  })();
+  </script>
 </body>
 </html>

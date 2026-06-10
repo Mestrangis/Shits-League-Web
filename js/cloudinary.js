@@ -5,7 +5,7 @@
 ═══════════════════════════════════════════════ */
 
 const CLOUDINARY_CLOUD  = 'dnd3g3zgm';    // p.ej. 'shitsleague'
-const CLOUDINARY_PRESET = 'TU_UPLOAD_PRESET'; // preset unsigned en Cloudinary
+const CLOUDINARY_PRESET = 'ml_default'; // preset unsigned en Cloudinary
 
 /**
  * Sube un File/Blob a Cloudinary.

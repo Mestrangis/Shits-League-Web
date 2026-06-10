@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin — Shits League</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+  <div id="bubbles" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <div class="topbar__logo">
+      <span class="topbar__logo-icon">💩</span>
+      <div class="topbar__logo-wordmark">
+        <span class="topbar__logo-shits">SHITS</span>
+        <span class="topbar__logo-league">LEAGUE</span>
+      </div>
+    </div>
+    <div class="topbar__admin-nav">
+      <a href="../" class="topbar__back">← Volver</a>
+      <div class="topbar__season admin-badge">
+        <span class="topbar__season-dot"></span>
+        ADMIN
+      </div>
+      <button class="btn-logout" id="btn-logout">Cerrar sesión</button>
+    </div>
+  </header>
+
+  <main class="admin-main">
+
+    <!-- ── REGISTRAR PARTIDO ── -->
+    <section class="admin-section" id="section-partido">
+      <div class="sh">
+        <span class="sh__title">REGISTRAR PARTIDO</span>
+        <div class="sh__line"></div>
+      </div>
+
+      <form id="form-partido" autocomplete="off">
+
+        <!-- Básicos -->
+        <div class="admin-row">
+          <div class="admin-field">
+            <label for="p-numero">Jornada nº</label>
+            <input type="number" id="p-numero" placeholder="12" min="1">
+          </div>
+          <div class="admin-field">
+            <label for="p-fecha">Fecha</label>
+            <input type="date" id="p-fecha">
+          </div>
+          <div class="admin-field admin-field--check">
+            <label class="check-label">
+              <input type="checkbox" id="p-amistoso">
+              Amistoso
+            </label>
+          </div>
+        </div>
+
+        <!-- Equipos -->
+        <div class="admin-teams">
+          <div class="admin-team">
+            <label for="p-local">Equipo local</label>
+            <input type="text" id="p-local" placeholder="Nombre / capitán">
+            <input type="number" id="p-goles-local" placeholder="Goles" min="0">
+          </div>
+          <div class="admin-teams__sep">VS</div>
+          <div class="admin-team">
+            <label for="p-visitante">Equipo visitante</label>
+            <input type="text" id="p-visitante" placeholder="Nombre / capitán">
+            <input type="number" id="p-goles-visitante" placeholder="Goles" min="0">
+          </div>
+        </div>
+
+        <!-- Stats individuales -->
+        <div class="sh sh--sub">
+          <span class="sh__title">ESTADÍSTICAS INDIVIDUALES</span>
+          <div class="sh__line"></div>
+          <span class="sh__sub">Solo rellena quienes anotaron o asistieron</span>
+        </div>
+        <div id="stats-table" class="stats-table">
+          <p class="empty">Cargando jugadores…</p>
+        </div>
+
+        <!-- MVP -->
+        <div class="admin-row">
+          <div class="admin-field admin-field--wide">
+            <label for="p-mvp">MVP del partido</label>
+            <select id="p-mvp">
+              <option value="">— Sin MVP —</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Mensaje -->
+        <div class="admin-field admin-field--full">
+          <label for="p-mensaje">Mensaje del partido</label>
+          <textarea id="p-mensaje" rows="3" placeholder="Noche épica donde **Marcos** selló la victoria con un doblete…"></textarea>
+          <span class="field-hint">Usa **Nombre** para resaltar jugadores en la crónica</span>
+        </div>
+
+        <!-- Vídeo -->
+        <div class="admin-row">
+          <div class="admin-field admin-field--wide">
+            <label for="p-video">URL vídeo (YouTube)</label>
+            <input type="url" id="p-video" placeholder="https://youtu.be/...">
+          </div>
+        </div>
+
+        <!-- Imagen resultado -->
+        <div class="admin-field admin-field--full">
+          <label>Imagen del resultado</label>
+          <div class="upload-zone" id="upload-resultado-zone">
+            <input type="file" id="upload-resultado-file" accept="image/*" hidden>
+            <span class="upload-zone__icon">🖼️</span>
+            <span class="upload-zone__text">Arrastra aquí o haz clic para subir</span>
+            <span class="upload-zone__hint">Se sube a Cloudinary automáticamente</span>
+          </div>
+          <input type="url" id="p-imagen" placeholder="O pega la URL directamente…">
+          <div id="upload-resultado-preview" class="upload-preview" hidden></div>
+        </div>
+
+        <!-- Submit -->
+        <div class="admin-actions">
+          <button type="submit" class="btn-primary" id="btn-guardar-partido">
+            <span>GUARDAR PARTIDO</span>
+          </button>
+          <div id="partido-status" class="status-msg"></div>
+        </div>
+
+      </form>
+    </section>
+
+    <!-- ── GESTIÓN DE JUGADORES ── -->
+    <section class="admin-section" id="section-jugadores">
+      <div class="sh">
+        <span class="sh__title">GESTIÓN DE JUGADORES</span>
+        <div class="sh__line"></div>
+      </div>
+      <div id="jugadores-grid" class="jugadores-grid">
+        <p class="empty">Cargando jugadores…</p>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="../js/sheets.js"></script>
+  <script src="../js/cloudinary.js"></script>
+  <script src="admin.js"></script>
+</body>
+</html>
