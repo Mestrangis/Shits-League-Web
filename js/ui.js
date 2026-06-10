@@ -99,7 +99,7 @@ function renderLastMatch(j) {
       </div>
       <div class="last-match__score-grid">
         <div class="last-match__team ${ltClass}">
-          <span class="last-match__team-icon">💩</span>
+          <img class="last-match__team-icon" src="assets/logo-s-green2.png" alt="">
           <span class="last-match__team-name">${j.local} <span class="cap">C</span></span>
         </div>
         <div class="last-match__goals">
@@ -108,7 +108,7 @@ function renderLastMatch(j) {
           <span class="last-match__goal ${vgClass}">${gv}</span>
         </div>
         <div class="last-match__team ${vtClass}">
-          <span class="last-match__team-icon">🤝</span>
+          <img class="last-match__team-icon" src="assets/logo-s-black.png" alt="">
           <span class="last-match__team-name">${j.visitante} <span class="cap">C</span></span>
         </div>
       </div>

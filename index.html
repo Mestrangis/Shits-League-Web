@@ -7,6 +7,8 @@
   <meta name="description" content="La liga de fútbol más competitiva del barrio. Clasificación, estadísticas, plantilla y resultados.">
   <meta name="theme-color" content="#06140D">
   <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="assets/logo-s-green.png" type="image/png">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
   <link rel="stylesheet" href="css/main.css">
 </head>
 <body>
@@ -152,6 +154,11 @@
     });
     document.getElementById('adminModalBackdrop').addEventListener('click', _closeAdminModal);
   })();
+  </script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js');
+    }
   </script>
 </body>
 </html>

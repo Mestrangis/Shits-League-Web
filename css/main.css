@@ -247,8 +247,9 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
   text-align: center;
 }
 .last-match__team-icon {
-  font-size: 2.4rem;
-  line-height: 1;
+  width: 4.4rem;
+  height: 4.4rem;
+  object-fit: contain;
 }
 .last-match__team--winner .last-match__team-icon {
   filter: drop-shadow(rgba(31,224,101,.5) 0 0 10px);
@@ -701,8 +702,42 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
    RESPONSIVE
 ═══════════════════════════════════════════════ */
 @media (max-width: 760px) {
-  .hero-section { grid-template-columns: 1fr; }
-  .last-match { display: none; }
+  .hero-section {
+    display: flex;
+    flex-direction: column;
+  }
+  /* "desenvuelve" .hero__left para poder reordenar sus hijos junto con .last-match */
+  .hero__left { display: contents; }
+
+  .hero__eyebrow { order: 1; }
+  .hero__title   { order: 2; width: 100%; }
+  .hero__title-shits {
+    font-size: clamp(72px, 20vw, 108px);
+  }
+  .hero__title-league {
+    font-size: clamp(32px, 9.5vw, 52px);
+    letter-spacing: clamp(6px, 2.6vw, 18px);
+  }
+  .hero__desc { order: 3; }
+
+  .last-match {
+    order: 4;
+    display: block;
+  }
+
+  .hero__counters {
+    order: 5;
+    flex-wrap: nowrap;
+    gap: 6px;
+  }
+  .hero__counter {
+    flex: 1;
+    justify-content: center;
+    gap: 5px;
+    padding: 9px 6px;
+  }
+  .hero__counter-num { font-size: 18px; }
+  .hero__counter-lbl { font-size: 9px; letter-spacing: .4px; white-space: nowrap; }
 }
 @media (max-width: 640px) {
   :root { --topbar-h: 54px; }
