@@ -229,7 +229,7 @@ function renderClasificacion(jugadores) {
           <span class="ranking-row__name">${j.nombre}</span>
           <span class="ranking-row__flag">${j.bandera}</span>
           <span class="ranking-row__pos">${j.pos}</span>
-          <span style="margin-left:auto;font-size:10px;color:#6E9D81;font-weight:600">${j.stats.pj} PJ · ${j.stats.goles} G · ${j.stats.asistencias} A</span>
+          <span style="margin-left:auto;font-size:10px;color:#6E9D81;font-weight:600">${j.stats.pj} PJ · ${j.stats.victorias}V ${j.stats.empates}E ${j.stats.derrotas}D</span>
         </div>
         <div class="ranking-row__bar-bg">
           <div class="ranking-row__bar" style="width:${Math.round((j.stats.pts/maxPts)*100)}%"></div>
@@ -370,6 +370,9 @@ function buildModalJugador(j) {
       </div>
       <div class="player-modal__stats">
         <div class="player-modal__stat"><div class="player-modal__stat-val">${j.stats.pj}</div><div class="player-modal__stat-lbl">Partidos</div></div>
+        <div class="player-modal__stat"><div class="player-modal__stat-val">${j.stats.victorias}</div><div class="player-modal__stat-lbl">Victorias</div></div>
+        <div class="player-modal__stat"><div class="player-modal__stat-val">${j.stats.empates}</div><div class="player-modal__stat-lbl">Empates</div></div>
+        <div class="player-modal__stat"><div class="player-modal__stat-val">${j.stats.derrotas}</div><div class="player-modal__stat-lbl">Derrotas</div></div>
         <div class="player-modal__stat"><div class="player-modal__stat-val">${j.stats.goles}</div><div class="player-modal__stat-lbl">Goles</div></div>
         <div class="player-modal__stat"><div class="player-modal__stat-val">${j.stats.asistencias}</div><div class="player-modal__stat-lbl">Asistencias</div></div>
         <div class="player-modal__stat"><div class="player-modal__stat-val">${j.stats.mvp}</div><div class="player-modal__stat-lbl">MVPs</div></div>

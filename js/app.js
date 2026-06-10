@@ -37,10 +37,7 @@ async function loadData() {
     });
   }
 
-  // pts = goles + asistencias (siempre calculado)
-  STATE.jugadores.forEach(j => {
-    j.stats.pts = j.stats.goles + j.stats.asistencias;
-  });
+  // pts viene directamente de la pestaña Jugadores (sistema de victorias/empates/derrotas + bonus capitán)
 }
 
 /* ── Hero section (siempre visible) ─────────────────────────────────────── */

@@ -6,7 +6,7 @@
 
 const SHEETS_ID  = '1EHGrFt2Y3QDCOdSV3fVgWvspzXYcir4SmDxOezdSLRY';
 const SHEETS_KEY = 'AIzaSyC5TLnk-zGTAia4HZNvv77PgY2FtXYfhdc';
-const GAS_URL    = 'https://script.google.com/macros/s/AKfycbzqlFu6uO5VU5JRtIjwa5iNWsNvSB3dUXfXgOKABGZRKHu1LyOSqvy6t7T2fCU6KiRxsQ/exec';
+const GAS_URL    = 'https://script.google.com/macros/s/AKfycbxsRzPPbEqcqSTYIt8FLocST7wIYqqFIIjzMmacztn4IeIF7E9QNNj781qnPgqNLafphA/exec';
 const GAS_SECRET = 'pissleague';
 
 // Nombre exacto de las pestañas en el spreadsheet
@@ -40,7 +40,7 @@ async function sheetsFetch(sheetName) {
 }
 
 // ── Jugadores ─────────────────────────────────────────────────────────────
-// Pestaña: nombre | rating | pos | bandera | pj | mvp | carta_url
+// Pestaña: nombre | rating | pos | bandera | pj | victorias | empates | derrotas | mvp | pts | carta_url
 async function fetchJugadores() {
   try {
     const rows = await sheetsFetch(SHEET_JUGADORES);
@@ -51,11 +51,14 @@ async function fetchJugadores() {
       bandera: r.bandera || '🏳️',
       img:     r.carta_url || '',
       stats: {
-        pj:          parseInt(r.pj)  || 0,
-        mvp:         parseInt(r.mvp) || 0,
+        pj:          parseInt(r.pj)        || 0,
+        victorias:   parseInt(r.victorias) || 0,
+        empates:     parseInt(r.empates)   || 0,
+        derrotas:    parseInt(r.derrotas)  || 0,
+        mvp:         parseInt(r.mvp)       || 0,
+        pts:         parseInt(r.pts)       || 0,  // calculado por el sistema de V/E/D + bonus capitán
         goles:       0,  // se sobreescribe con pestaña Goles
         asistencias: 0,  // se sobreescribe con pestaña Asistencias
-        pts:         0,  // calculado = goles + asistencias
       },
     }));
   } catch (e) {
@@ -65,7 +68,9 @@ async function fetchJugadores() {
 }
 
 // ── Jornadas ──────────────────────────────────────────────────────────────
-// Pestaña: numero | fecha | local | goles_local | visitante | goles_visitante | mensaje | video_url | amistoso | imagen_url
+// Pestaña: numero | fecha | local | goles_local | visitante | goles_visitante |
+//          jugadores_local | capitan_local | jugadores_visitante | capitan_visitante |
+//          mensaje | video_url | amistoso | imagen_url
 async function fetchJornadas() {
   try {
     const rows = await sheetsFetch(SHEET_JORNADAS);
@@ -76,6 +81,10 @@ async function fetchJornadas() {
       goles_local:     parseInt(r.goles_local)     || 0,
       visitante:       r.visitante    || '',
       goles_visitante: parseInt(r.goles_visitante) || 0,
+      jugadores_local:     splitNombres(r.jugadores_local),
+      capitan_local:       r.capitan_local     || '',
+      jugadores_visitante: splitNombres(r.jugadores_visitante),
+      capitan_visitante:   r.capitan_visitante || '',
       mensaje:         r.mensaje      || '',
       video_url:       r.video_url    || null,
       amistoso:        r.amistoso === 'TRUE',
@@ -85,6 +94,10 @@ async function fetchJornadas() {
     console.warn('[sheets] fetchJornadas:', e);
     return null;
   }
+}
+
+function splitNombres(str) {
+  return (str || '').split(',').map(s => s.trim()).filter(Boolean);
 }
 
 // ── Goles / Asistencias ───────────────────────────────────────────────────

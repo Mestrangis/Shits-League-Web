@@ -63,14 +63,22 @@
         <div class="admin-teams">
           <div class="admin-team">
             <label for="p-local">Equipo local</label>
-            <input type="text" id="p-local" placeholder="Nombre / capitán">
+            <input type="text" id="p-local" placeholder="Nombre del equipo">
             <input type="number" id="p-goles-local" placeholder="Goles" min="0">
+            <span class="field-hint">Selecciona jugadores y marca el capitán (★)</span>
+            <div class="team-players" id="team-local">
+              <p class="empty">Cargando jugadores…</p>
+            </div>
           </div>
           <div class="admin-teams__sep">VS</div>
           <div class="admin-team">
             <label for="p-visitante">Equipo visitante</label>
-            <input type="text" id="p-visitante" placeholder="Nombre / capitán">
+            <input type="text" id="p-visitante" placeholder="Nombre del equipo">
             <input type="number" id="p-goles-visitante" placeholder="Goles" min="0">
+            <span class="field-hint">Selecciona jugadores y marca el capitán (★)</span>
+            <div class="team-players" id="team-visitante">
+              <p class="empty">Cargando jugadores…</p>
+            </div>
           </div>
         </div>
 

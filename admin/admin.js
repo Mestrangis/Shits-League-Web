@@ -28,6 +28,8 @@ async function init() {
 
   renderStatsTable();
   renderMvpSelect();
+  renderTeamPlayers('local');
+  renderTeamPlayers('visitante');
   renderJugadoresGrid();
   bindPartidoForm();
   bindUploadResultado();
@@ -111,6 +113,53 @@ function renderMvpSelect() {
   });
 }
 
+// ── Selectores de jugadores por equipo (con capitán) ─────────────────────────
+function renderTeamPlayers(team) {
+  const el = document.getElementById('team-' + team);
+  if (!JUGADORES.length) {
+    el.innerHTML = '<p class="empty">No se pudieron cargar los jugadores.</p>';
+    return;
+  }
+
+  el.innerHTML = JUGADORES.map(function (j) {
+    return '<label class="team-player">' +
+      '<input type="checkbox" class="team-player__check" data-team="' + team + '" data-nombre="' + j.nombre + '">' +
+      '<span class="team-player__name">' + j.bandera + ' ' + j.nombre + '</span>' +
+      '<input type="radio" class="team-player__cap" name="cap-' + team + '" data-nombre="' + j.nombre + '" disabled title="Capitán ★">' +
+    '</label>';
+  }).join('');
+
+  el.querySelectorAll('.team-player__check').forEach(function (chk) {
+    chk.addEventListener('change', function () {
+      const row = chk.closest('.team-player');
+      const cap = row.querySelector('.team-player__cap');
+      cap.disabled = !chk.checked;
+      if (!chk.checked && cap.checked) cap.checked = false;
+    });
+  });
+}
+
+// Devuelve { jugadores: [...nombres], capitan: 'nombre' | '' }
+function getTeamSelection(team) {
+  const el = document.getElementById('team-' + team);
+  const jugadores = [];
+  let capitan = '';
+  el.querySelectorAll('.team-player__check:checked').forEach(function (chk) {
+    jugadores.push(chk.dataset.nombre);
+  });
+  const capInput = el.querySelector('.team-player__cap:checked');
+  if (capInput) capitan = capInput.dataset.nombre;
+  return { jugadores, capitan };
+}
+
+function resetTeamPlayers() {
+  ['local', 'visitante'].forEach(function (team) {
+    const el = document.getElementById('team-' + team);
+    el.querySelectorAll('.team-player__check').forEach(function (chk) { chk.checked = false; });
+    el.querySelectorAll('.team-player__cap').forEach(function (cap) { cap.checked = false; cap.disabled = true; });
+  });
+}
+
 // ── Partido form submit ───────────────────────────────────────────────────────
 function bindPartidoForm() {
   document.getElementById('form-partido').addEventListener('submit', async function (e) {
@@ -142,6 +191,14 @@ function bindPartidoForm() {
       if (!local)     throw new Error('El nombre del equipo local es obligatorio');
       if (!visitante) throw new Error('El nombre del equipo visitante es obligatorio');
 
+      const localSel     = getTeamSelection('local');
+      const visitanteSel = getTeamSelection('visitante');
+
+      if (!localSel.jugadores.length)     throw new Error('Selecciona al menos un jugador del equipo local');
+      if (!visitanteSel.jugadores.length) throw new Error('Selecciona al menos un jugador del equipo visitante');
+      if (!localSel.capitan)              throw new Error('Marca el capitán del equipo local');
+      if (!visitanteSel.capitan)          throw new Error('Marca el capitán del equipo visitante');
+
       // 1. Jornada
       setStatus(status, '📋 Guardando jornada…');
       await gasPost({
@@ -150,6 +207,10 @@ function bindPartidoForm() {
         fecha,
         local,            goles_local,
         visitante,        goles_visitante,
+        jugadores_local:     localSel.jugadores,
+        capitan_local:       localSel.capitan,
+        jugadores_visitante: visitanteSel.jugadores,
+        capitan_visitante:   visitanteSel.capitan,
         mensaje,          video_url,
         imagen_url,
         amistoso:         amistoso ? 'TRUE' : 'FALSE',
@@ -211,6 +272,7 @@ function resetPartidoForm() {
   document.querySelectorAll('#stats-table .stats-input').forEach(function (inp) {
     inp.value = '0';
   });
+  resetTeamPlayers();
   // Reset imagen preview
   const preview = document.getElementById('upload-resultado-preview');
   preview.innerHTML = '';
