@@ -6,15 +6,12 @@
 
 const SHEETS_ID  = '1EHGrFt2Y3QDCOdSV3fVgWvspzXYcir4SmDxOezdSLRY';
 const SHEETS_KEY = 'AIzaSyC5TLnk-zGTAia4HZNvv77PgY2FtXYfhdc';
-const GAS_URL    = 'https://script.google.com/macros/s/AKfycbyH2bmbHoit5EoLl_f98Bb6DdvUYT7onh1Vn2b_sXnv28f304mJyLtbUaJ5kNAv8gxktw/exec';
+const GAS_URL    = 'https://script.google.com/macros/s/AKfycbx98ycukj9M4_EMaxg4yJ6NxuGrx80fvDQ-mgD-uXHEeAmgb1PSCm9ePDCpgJ3T4ergCg/exec';
 const GAS_SECRET = 'pissleague';
 
-// Nombre exacto de las pestañas en el spreadsheet 
-const SHEET_JUGADORES     = 'Jugadores';
-const SHEET_JORNADAS      = 'Jornadas';
-const SHEET_GOLES         = 'Goles';
-const SHEET_ASISTENCIAS   = 'Asistencias';
-const SHEET_CLASIFICACION = 'Clasificacion'; // backup opcional
+// Nombre exacto de las pestañas en el spreadsheet
+const SHEET_JUGADORES = 'Jugadores';
+const SHEET_JORNADAS  = 'Jornadas';
 
 // ── Core ──────────────────────────────────────────────────────────────────
 
@@ -40,7 +37,7 @@ async function sheetsFetch(sheetName) {
 }
 
 // ── Jugadores ─────────────────────────────────────────────────────────────
-// Pestaña: nombre | rating | pos | bandera | pj | victorias | empates | derrotas | mvp | pts | carta_url
+// Pestaña: nombre | rating | pos | bandera | carta_url | alias
 async function fetchJugadores() {
   try {
     const rows = await sheetsFetch(SHEET_JUGADORES);
@@ -50,16 +47,7 @@ async function fetchJugadores() {
       pos:     r.pos     || '',
       bandera: r.bandera || '🏳️',
       img:     r.carta_url || '',
-      stats: {
-        pj:          parseInt(r.pj)        || 0,
-        victorias:   parseInt(r.victorias) || 0,
-        empates:     parseInt(r.empates)   || 0,
-        derrotas:    parseInt(r.derrotas)  || 0,
-        mvp:         parseInt(r.mvp)       || 0,
-        pts:         parseInt(r.pts)       || 0,  // calculado por el sistema de V/E/D + bonus capitán
-        goles:       0,  // se sobreescribe con pestaña Goles
-        asistencias: 0,  // se sobreescribe con pestaña Asistencias
-      },
+      alias:   splitNombres(r.alias),
     }));
   } catch (e) {
     console.warn('[sheets] fetchJugadores:', e);
@@ -70,7 +58,7 @@ async function fetchJugadores() {
 // ── Jornadas ──────────────────────────────────────────────────────────────
 // Pestaña: numero | fecha | local | goles_local | visitante | goles_visitante |
 //          jugadores_local | capitan_local | jugadores_visitante | capitan_visitante |
-//          mensaje | video_url | amistoso | imagen_url
+//          goleadores | asistentes | mensaje | video_url | amistoso | imagen_url | mvp
 async function fetchJornadas() {
   try {
     const rows = await sheetsFetch(SHEET_JORNADAS);
@@ -85,10 +73,13 @@ async function fetchJornadas() {
       capitan_local:       r.capitan_local     || '',
       jugadores_visitante: splitNombres(r.jugadores_visitante),
       capitan_visitante:   r.capitan_visitante || '',
+      goleadores:      splitPares(r.goleadores),
+      asistentes:      splitPares(r.asistentes),
       mensaje:         r.mensaje      || '',
       video_url:       r.video_url    || null,
       amistoso:        r.amistoso === 'TRUE',
       imagen:          r.imagen_url   || null,
+      mvp:             r.mvp          || '',
     }));
   } catch (e) {
     console.warn('[sheets] fetchJornadas:', e);
@@ -100,22 +91,12 @@ function splitNombres(str) {
   return (str || '').split(',').map(s => s.trim()).filter(Boolean);
 }
 
-// ── Goles / Asistencias ───────────────────────────────────────────────────
-// Pestaña Goles:       nombre | goles
-// Pestaña Asistencias: nombre | asistencias
-async function fetchGoles() {
-  try { return await sheetsFetch(SHEET_GOLES); }
-  catch (e) { console.warn('[sheets] fetchGoles:', e); return null; }
-}
-
-async function fetchAsistencias() {
-  try { return await sheetsFetch(SHEET_ASISTENCIAS); }
-  catch (e) { console.warn('[sheets] fetchAsistencias:', e); return null; }
-}
-
-async function fetchClasificacion() {
-  try { return await sheetsFetch(SHEET_CLASIFICACION); }
-  catch (e) { return null; }
+// "Nico:2,Markis:1" → [{ nombre: 'Nico', cantidad: 2 }, { nombre: 'Markis', cantidad: 1 }]
+function splitPares(str) {
+  return (str || '').split(',').map(s => s.trim()).filter(Boolean).map(par => {
+    const [nombre, cantidad] = par.split(':');
+    return { nombre: (nombre || '').trim(), cantidad: parseInt(cantidad) || 0 };
+  });
 }
 
 // ── Escritura via Apps Script ─────────────────────────────────────────────

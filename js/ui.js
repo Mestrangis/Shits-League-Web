@@ -100,7 +100,7 @@ function renderLastMatch(j) {
       <div class="last-match__score-grid">
         <div class="last-match__team ${ltClass}">
           <img class="last-match__team-icon" src="assets/logo-s-green2.png" alt="">
-          <span class="last-match__team-name">${j.local} <span class="cap">C</span></span>
+          <span class="last-match__team-name">${j.local}${j.amistoso ? '' : ' <span class="cap">C</span>'}</span>
         </div>
         <div class="last-match__goals">
           <span class="last-match__goal ${lgClass}">${gl}</span>
@@ -109,7 +109,7 @@ function renderLastMatch(j) {
         </div>
         <div class="last-match__team ${vtClass}">
           <img class="last-match__team-icon" src="assets/logo-s-black.png" alt="">
-          <span class="last-match__team-name">${j.visitante} <span class="cap">C</span></span>
+          <span class="last-match__team-name">${j.visitante}${j.amistoso ? '' : ' <span class="cap">C</span>'}</span>
         </div>
       </div>
       ${j.mensaje ? `<div class="last-match__msg">${fmtMsg(j.mensaje)}</div>` : ''}
@@ -348,8 +348,35 @@ function buildModalPartido(j) {
         <div class="modal__teams">${j.local} <span style="color:rgba(31,224,101,.3)">·vs·</span> ${j.visitante}</div>
         <div class="modal__score">${j.goles_local} – ${j.goles_visitante}</div>
       </div>
+      ${j.mvp ? `<div class="modal__mvp">🏆 MVP: <span>${j.mvp}</span></div>` : ''}
+      ${buildGoleadoresAsistentes(j)}
       ${j.mensaje ? `<div class="modal__msg">${fmtMsg(j.mensaje)}</div>` : ''}
       ${videoHtml}
+    </div>
+  `;
+}
+
+function buildGoleadoresAsistentes(j) {
+  if (!j.goleadores.length && !j.asistentes.length) return '';
+
+  const list = (arr) => arr
+    .map(p => `<span class="modal__stat-item">${p.nombre}${p.cantidad > 1 ? ` <b>x${p.cantidad}</b>` : ''}</span>`)
+    .join('');
+
+  return `
+    <div class="modal__goles-asis">
+      ${j.goleadores.length ? `
+        <div class="modal__stat-group">
+          <span class="modal__stat-label">⚽ Goles</span>
+          <div class="modal__stat-list">${list(j.goleadores)}</div>
+        </div>
+      ` : ''}
+      ${j.asistentes.length ? `
+        <div class="modal__stat-group">
+          <span class="modal__stat-label">🅰️ Asistencias</span>
+          <div class="modal__stat-list">${list(j.asistentes)}</div>
+        </div>
+      ` : ''}
     </div>
   `;
 }

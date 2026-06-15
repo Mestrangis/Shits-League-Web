@@ -11,33 +11,87 @@ let STATE = {
 /* ── Datos ───────────────────────────────────────────────────────────────── */
 async function loadData() {
   // Todo desde Sheets en paralelo — cero archivos locales de datos
-  const [jugadores, jornadas, goles, asistencias] = await Promise.all([
+  const [jugadores, jornadas] = await Promise.all([
     fetchJugadores(),
     fetchJornadas(),
-    fetchGoles(),
-    fetchAsistencias(),
   ]);
 
-  STATE.jugadores = jugadores || [];
   STATE.jornadas  = jornadas  || [];
+  STATE.jugadores = calcularStats(jugadores || [], STATE.jornadas);
+}
 
-  // Combinar goles individuales en el objeto jugador
-  if (goles) {
-    goles.forEach(row => {
-      const j = STATE.jugadores.find(p => p.nombre === row.nombre);
-      if (j) j.stats.goles = parseInt(row.goles) || 0;
+/* ── Normalización de nombres ────────────────────────────────────────────── */
+// Minúsculas, sin tildes/diacríticos y sin espacios sobrantes
+function normalizarNombre(str) {
+  return (str || '')
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+/* ── Cálculo de estadísticas ─────────────────────────────────────────────── */
+// Jornadas es la única fuente de verdad. Recorremos todas las jornadas
+// (incluyendo amistosos para el PJ) y derivamos las stats de cada jugador.
+// jugadores no registrados (alias desconocido) se ignoran sin romper el cálculo.
+function calcularStats(jugadores, jornadas) {
+  const stats = {};
+  const alias = {}; // nombre normalizado (propio o alias) → nombre canónico
+
+  jugadores.forEach(j => {
+    stats[j.nombre] = { pj: 0, victorias: 0, empates: 0, derrotas: 0, pts: 0, mvp: 0, goles: 0, asistencias: 0 };
+    alias[normalizarNombre(j.nombre)] = j.nombre;
+    (j.alias || []).forEach(a => { alias[normalizarNombre(a)] = j.nombre; });
+  });
+
+  function resolver(nombre) {
+    return alias[normalizarNombre(nombre)] || null;
+  }
+
+  function aplicarResultado(nombres, capitan, resultado) {
+    nombres.forEach(nombreRaw => {
+      const nombre = resolver(nombreRaw);
+      const s = nombre && stats[nombre];
+      if (!s) return;
+      const esCapitan = nombre === resolver(capitan);
+      if (resultado === 'win') {
+        s.victorias++;
+        s.pts += esCapitan ? 7 : 3;
+      } else if (resultado === 'draw') {
+        s.empates++;
+        s.pts += esCapitan ? 4 : 1;
+      } else {
+        s.derrotas++;
+        s.pts += esCapitan ? 2 : 0;
+      }
     });
   }
 
-  // Combinar asistencias
-  if (asistencias) {
-    asistencias.forEach(row => {
-      const j = STATE.jugadores.find(p => p.nombre === row.nombre);
-      if (j) j.stats.asistencias = parseInt(row.asistencias) || 0;
+  jornadas.forEach(j => {
+    // PJ cuenta en cualquier jornada, incluidos amistosos
+    [...j.jugadores_local, ...j.jugadores_visitante].forEach(nombreRaw => {
+      const nombre = resolver(nombreRaw);
+      if (nombre) stats[nombre].pj++;
     });
-  }
 
-  // pts viene directamente de la pestaña Jugadores (sistema de victorias/empates/derrotas + bonus capitán)
+    if (j.amistoso) return; // el resto de stats solo cuenta en jornadas de liga
+
+    const gl = j.goles_local, gv = j.goles_visitante;
+    let resultLocal, resultVisitante;
+    if (gl > gv)      { resultLocal = 'win';  resultVisitante = 'loss'; }
+    else if (gl < gv) { resultLocal = 'loss'; resultVisitante = 'win';  }
+    else              { resultLocal = 'draw'; resultVisitante = 'draw'; }
+
+    aplicarResultado(j.jugadores_local,     j.capitan_local,     resultLocal);
+    aplicarResultado(j.jugadores_visitante, j.capitan_visitante, resultVisitante);
+
+    const mvp = resolver(j.mvp);
+    if (mvp) stats[mvp].mvp++;
+
+    j.goleadores.forEach(g => { const n = resolver(g.nombre); if (n) stats[n].goles += g.cantidad; });
+    j.asistentes.forEach(a => { const n = resolver(a.nombre); if (n) stats[n].asistencias += a.cantidad; });
+  });
+
+  return jugadores.map(j => ({ ...j, stats: stats[j.nombre] }));
 }
 
 /* ── Hero section (siempre visible) ─────────────────────────────────────── */

@@ -171,62 +171,28 @@ input:disabled { opacity: .4; cursor: not-allowed; }
   accent-color: var(--verde); cursor: pointer;
 }
 .team-player__name { flex: 1; }
+.team-player__stat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.team-player__goles,
+.team-player__asis {
+  width: 38px !important;
+  text-align: center;
+  padding: 4px 6px !important;
+  font-family: 'Anton', sans-serif !important;
+  font-size: 13px !important;
+  color: var(--verde) !important;
+}
 .team-player__cap {
   width: 18px; height: 18px; flex-shrink: 0;
   accent-color: #FFD24A; cursor: pointer;
 }
 .team-player__cap:disabled { opacity: .25; cursor: not-allowed; }
-
-/* ── Stats table ── */
-.stats-table {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-bottom: 24px;
-}
-.stats-row {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: center;
-  gap: 16px;
-  background: rgba(11,26,17,.5);
-  border: 1px solid rgba(31,224,101,.08);
-  border-radius: 10px;
-  padding: 10px 14px;
-  transition: border-color .2s;
-}
-.stats-row:hover { border-color: rgba(31,224,101,.2); }
-.stats-row__name {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  font-weight: 600;
-}
-.stats-row__pos {
-  font-size: 9px; font-weight: 700; letter-spacing: .1em;
-  color: #6E9D81; border: 1px solid rgba(31,224,101,.2);
-  border-radius: 4px; padding: 2px 5px;
-}
-.stats-row__inputs {
-  display: flex;
-  gap: 10px;
-}
-.stats-input-label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-}
-.stats-input-label span { font-size: 16px; }
-.stats-input {
-  width: 56px !important;
-  text-align: center;
-  padding: 7px 8px !important;
-  font-family: 'Anton', sans-serif !important;
-  font-size: 16px !important;
-  color: var(--verde) !important;
-}
+body.is-amistoso .team-player__cap { display: none; }
 
 /* ── Upload zone ── */
 .upload-zone {
@@ -397,7 +363,6 @@ input:disabled { opacity: .4; cursor: not-allowed; }
 @media (max-width: 640px) {
   .admin-teams { grid-template-columns: 1fr; }
   .admin-teams__sep { text-align: center; margin-top: 0; }
-  .stats-row { grid-template-columns: 1fr; gap: 8px; }
   .jugadores-grid { grid-template-columns: 1fr; }
   .jugador-card { grid-template-columns: 90px 1fr; }
 }

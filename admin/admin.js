@@ -26,7 +26,6 @@ async function init() {
     console.error('[admin] fetchJugadores:', e);
   }
 
-  renderStatsTable();
   renderMvpSelect();
   renderTeamPlayers('local');
   renderTeamPlayers('visitante');
@@ -65,41 +64,22 @@ function initBubbles() {
   });
 }
 
-// ── Amistoso toggle (oculta el número de jornada) ────────────────────────────
+// ── Amistoso toggle (oculta el número de jornada y los capitanes) ────────────
 function bindAmistoso() {
   document.getElementById('p-amistoso').addEventListener('change', function () {
+    const checked  = this.checked;
     const numField = document.getElementById('p-numero');
-    numField.disabled = this.checked;
-    if (this.checked) numField.value = '';
-  });
-}
+    numField.disabled = checked;
+    if (checked) numField.value = '';
 
-// ── Stats table ───────────────────────────────────────────────────────────────
-function renderStatsTable() {
-  const el = document.getElementById('stats-table');
-  if (!JUGADORES.length) {
-    el.innerHTML = '<p class="empty">No se pudieron cargar los jugadores. Revisa la conexión con Sheets.</p>';
-    return;
-  }
-  el.innerHTML = JUGADORES.map(function (j) {
-    return '<div class="stats-row" data-nombre="' + j.nombre + '">' +
-      '<div class="stats-row__name">' +
-        '<span>' + j.bandera + '</span>' +
-        '<strong>' + j.nombre + '</strong>' +
-        '<span class="stats-row__pos">' + j.pos + '</span>' +
-      '</div>' +
-      '<div class="stats-row__inputs">' +
-        '<label class="stats-input-label">' +
-          '<span>⚽</span>' +
-          '<input type="number" class="stats-input" name="goles" min="0" max="20" value="0">' +
-        '</label>' +
-        '<label class="stats-input-label">' +
-          '<span>🅰️</span>' +
-          '<input type="number" class="stats-input" name="asistencias" min="0" max="20" value="0">' +
-        '</label>' +
-      '</div>' +
-    '</div>';
-  }).join('');
+    document.body.classList.toggle('is-amistoso', checked);
+    ['local', 'visitante'].forEach(function (team) {
+      const el = document.getElementById('team-' + team);
+      el.querySelectorAll('.team-player__cap').forEach(function (cap) {
+        if (checked) cap.checked = false;
+      });
+    });
+  });
 }
 
 // ── MVP select ────────────────────────────────────────────────────────────────
@@ -125,31 +105,54 @@ function renderTeamPlayers(team) {
     return '<label class="team-player">' +
       '<input type="checkbox" class="team-player__check" data-team="' + team + '" data-nombre="' + j.nombre + '">' +
       '<span class="team-player__name">' + j.bandera + ' ' + j.nombre + '</span>' +
+      '<span class="team-player__stat" title="Goles">⚽<input type="number" class="team-player__goles" min="0" max="20" value="0" disabled></span>' +
+      '<span class="team-player__stat" title="Asistencias">🅰️<input type="number" class="team-player__asis" min="0" max="20" value="0" disabled></span>' +
       '<input type="radio" class="team-player__cap" name="cap-' + team + '" data-nombre="' + j.nombre + '" disabled title="Capitán ★">' +
     '</label>';
   }).join('');
 
   el.querySelectorAll('.team-player__check').forEach(function (chk) {
     chk.addEventListener('change', function () {
-      const row = chk.closest('.team-player');
-      const cap = row.querySelector('.team-player__cap');
-      cap.disabled = !chk.checked;
-      if (!chk.checked && cap.checked) cap.checked = false;
+      const row    = chk.closest('.team-player');
+      const cap    = row.querySelector('.team-player__cap');
+      const goles  = row.querySelector('.team-player__goles');
+      const asis   = row.querySelector('.team-player__asis');
+      cap.disabled   = !chk.checked || document.body.classList.contains('is-amistoso');
+      goles.disabled = !chk.checked;
+      asis.disabled  = !chk.checked;
+      if (!chk.checked) {
+        if (cap.checked) cap.checked = false;
+        goles.value = '0';
+        asis.value  = '0';
+      }
     });
   });
 }
 
-// Devuelve { jugadores: [...nombres], capitan: 'nombre' | '' }
+// Devuelve { jugadores, capitan, goleadores, asistentes }
+// goleadores/asistentes: arrays de "Nombre:cantidad" (solo cantidad > 0)
 function getTeamSelection(team) {
   const el = document.getElementById('team-' + team);
-  const jugadores = [];
+  const jugadores   = [];
+  const goleadores  = [];
+  const asistentes  = [];
   let capitan = '';
+
   el.querySelectorAll('.team-player__check:checked').forEach(function (chk) {
-    jugadores.push(chk.dataset.nombre);
+    const row    = chk.closest('.team-player');
+    const nombre = chk.dataset.nombre;
+    jugadores.push(nombre);
+
+    const goles = parseInt(row.querySelector('.team-player__goles').value) || 0;
+    const asis  = parseInt(row.querySelector('.team-player__asis').value)  || 0;
+    if (goles > 0) goleadores.push(nombre + ':' + goles);
+    if (asis  > 0) asistentes.push(nombre + ':' + asis);
   });
+
   const capInput = el.querySelector('.team-player__cap:checked');
   if (capInput) capitan = capInput.dataset.nombre;
-  return { jugadores, capitan };
+
+  return { jugadores, capitan, goleadores, asistentes };
 }
 
 function resetTeamPlayers() {
@@ -157,6 +160,10 @@ function resetTeamPlayers() {
     const el = document.getElementById('team-' + team);
     el.querySelectorAll('.team-player__check').forEach(function (chk) { chk.checked = false; });
     el.querySelectorAll('.team-player__cap').forEach(function (cap) { cap.checked = false; cap.disabled = true; });
+    el.querySelectorAll('.team-player__goles, .team-player__asis').forEach(function (inp) {
+      inp.value = '0';
+      inp.disabled = true;
+    });
   });
 }
 
@@ -196,10 +203,13 @@ function bindPartidoForm() {
 
       if (!localSel.jugadores.length)     throw new Error('Selecciona al menos un jugador del equipo local');
       if (!visitanteSel.jugadores.length) throw new Error('Selecciona al menos un jugador del equipo visitante');
-      if (!localSel.capitan)              throw new Error('Marca el capitán del equipo local');
-      if (!visitanteSel.capitan)          throw new Error('Marca el capitán del equipo visitante');
+      if (!amistoso && !localSel.capitan)     throw new Error('Marca el capitán del equipo local');
+      if (!amistoso && !visitanteSel.capitan) throw new Error('Marca el capitán del equipo visitante');
 
-      // 1. Jornada
+      const goleadores = [].concat(localSel.goleadores, visitanteSel.goleadores).join(',');
+      const asistentes = [].concat(localSel.asistentes, visitanteSel.asistentes).join(',');
+
+      // Jornada
       setStatus(status, '📋 Guardando jornada…');
       await gasPost({
         action:           'addJornada',
@@ -208,47 +218,15 @@ function bindPartidoForm() {
         local,            goles_local,
         visitante,        goles_visitante,
         jugadores_local:     localSel.jugadores,
-        capitan_local:       localSel.capitan,
+        capitan_local:       amistoso ? '' : localSel.capitan,
         jugadores_visitante: visitanteSel.jugadores,
-        capitan_visitante:   visitanteSel.capitan,
+        capitan_visitante:   amistoso ? '' : visitanteSel.capitan,
+        goleadores,       asistentes,
         mensaje,          video_url,
         imagen_url,
         amistoso:         amistoso ? 'TRUE' : 'FALSE',
+        mvp,
       });
-
-      // 2. Goles, asistencias y MVP — solo si NO es amistoso
-      if (!amistoso) {
-        const rows = document.querySelectorAll('#stats-table .stats-row');
-        const golesData = [], asistenciasData = [];
-        rows.forEach(function (row) {
-          const nombre      = row.dataset.nombre;
-          const goles       = parseInt(row.querySelector('[name="goles"]').value)       || 0;
-          const asistencias = parseInt(row.querySelector('[name="asistencias"]').value) || 0;
-          if (goles       > 0) golesData.push({ nombre, goles });
-          if (asistencias > 0) asistenciasData.push({ nombre, asistencias });
-        });
-
-        if (golesData.length) {
-          setStatus(status, '⚽ Guardando goles…');
-          await gasPost({
-            action: 'addGoles',
-            goles: golesData.map(function (d) { return { nombre: d.nombre, cantidad: d.goles }; }),
-          });
-        }
-        if (asistenciasData.length) {
-          setStatus(status, '🅰️ Guardando asistencias…');
-          await gasPost({
-            action: 'addAsistencias',
-            asistencias: asistenciasData.map(function (d) { return { nombre: d.nombre, cantidad: d.asistencias }; }),
-          });
-        }
-
-        // 3. MVP
-        if (mvp) {
-          setStatus(status, '🏆 Guardando MVP…');
-          await gasPost({ action: 'addMvp', nombre: mvp });
-        }
-      }
 
       setStatus(status, '✅ Partido guardado correctamente', 'ok');
       resetPartidoForm();
@@ -270,10 +248,7 @@ function setStatus(el, msg, type) {
 function resetPartidoForm() {
   document.getElementById('form-partido').reset();
   prefillFecha();
-  // Reset stats inputs a 0 (reset nativo los pone a '' para number, así que lo forzamos)
-  document.querySelectorAll('#stats-table .stats-input').forEach(function (inp) {
-    inp.value = '0';
-  });
+  document.body.classList.remove('is-amistoso');
   resetTeamPlayers();
   // Reset imagen preview
   const preview = document.getElementById('upload-resultado-preview');
@@ -349,8 +324,6 @@ function renderJugadoresGrid() {
           '<label>Rating<input type="number" class="jf-rating" value="' + j.media + '" min="0" max="99"></label>' +
           '<label>Pos<input type="text" class="jf-pos" value="' + j.pos + '" maxlength="3"></label>' +
           '<label>Bandera<input type="text" class="jf-bandera" value="' + j.bandera + '" maxlength="8"></label>' +
-          '<label>PJ<input type="number" class="jf-pj" value="' + j.stats.pj + '" min="0"></label>' +
-          '<label>MVP<input type="number" class="jf-mvp" value="' + j.stats.mvp + '" min="0"></label>' +
         '</div>' +
         '<div class="jugador-card__actions">' +
           '<button type="button" class="btn-secondary save-jugador-btn" data-nombre="' + j.nombre + '">Guardar cambios</button>' +
@@ -426,8 +399,6 @@ function bindJugadoresEvents(grid) {
           rating:  parseInt(card.querySelector('.jf-rating').value)  || 0,
           pos:     card.querySelector('.jf-pos').value.trim(),
           bandera: card.querySelector('.jf-bandera').value.trim(),
-          pj:      parseInt(card.querySelector('.jf-pj').value)       || 0,
-          mvp:     parseInt(card.querySelector('.jf-mvp').value)      || 0,
         });
         statusEl.textContent = '✅ Guardado';
         statusEl.className   = 'jugador-save-status status-ok';

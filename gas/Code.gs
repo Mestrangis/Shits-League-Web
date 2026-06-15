@@ -7,19 +7,13 @@
 const SECRET = 'pissleague';
 
 // Columnas de la pestaña "Jugadores" (1-indexed)
-// nombre | rating | pos | bandera | pj | victorias | empates | derrotas | mvp | pts | carta_url
+// nombre | rating | pos | bandera | carta_url
 const COL_JUG = {
   nombre:    1,
   rating:    2,
   pos:       3,
   bandera:   4,
-  pj:        5,
-  victorias: 6,
-  empates:   7,
-  derrotas:  8,
-  mvp:       9,
-  pts:       10,
-  carta_url: 11,
+  carta_url: 5,
 };
 
 function doGet(e) {
@@ -33,11 +27,8 @@ function doPost(e) {
 
     const ss = SpreadsheetApp.getActiveSpreadsheet();
 
-    if (body.action === 'addJornada')      addJornada(ss, body);
-    if (body.action === 'addGoles')        addGoles(ss, body);
-    if (body.action === 'addAsistencias')  addAsistencias(ss, body);
-    if (body.action === 'updateJugador')   updateJugador(ss, body);
-    if (body.action === 'addMvp')          addMvp(ss, body);
+    if (body.action === 'addJornada')    addJornada(ss, body);
+    if (body.action === 'updateJugador') updateJugador(ss, body);
 
     return json({ ok: true });
   } catch (err) {
@@ -45,101 +36,35 @@ function doPost(e) {
   }
 }
 
-// ── Añadir jornada + aplicar sistema de puntuación ───────────────────────────
+// ── Añadir jornada ────────────────────────────────────────────────────────
+// Pestaña Jornadas:
+// numero | fecha | local | goles_local | visitante | goles_visitante |
+// jugadores_local | capitan_local | jugadores_visitante | capitan_visitante |
+// goleadores | asistentes | mensaje | video_url | amistoso | imagen_url | mvp
 function addJornada(ss, body) {
-  const jugadoresLocal     = body.jugadores_local     || [];
-  const jugadoresVisitante = body.jugadores_visitante || [];
-  const capitanLocal       = body.capitan_local       || '';
-  const capitanVisitante   = body.capitan_visitante   || '';
   const isAmistoso = body.amistoso === true || body.amistoso === 'TRUE';
 
-  // Pestaña Jornadas:
-  // numero | fecha | local | goles_local | visitante | goles_visitante |
-  // jugadores_local | capitan_local | jugadores_visitante | capitan_visitante |
-  // mensaje | video_url | amistoso | imagen_url
   const sh  = ss.getSheetByName('Jornadas');
   const row = sh.getLastRow() + 1;
-  sh.getRange(row, 1, 1, 14).setValues([[
+  sh.getRange(row, 1, 1, 17).setValues([[
     body.numero, body.fecha, body.local, body.goles_local,
     body.visitante, body.goles_visitante,
-    jugadoresLocal.join(','), capitanLocal,
-    jugadoresVisitante.join(','), capitanVisitante,
+    (body.jugadores_local || []).join(','), body.capitan_local || '',
+    (body.jugadores_visitante || []).join(','), body.capitan_visitante || '',
+    body.goleadores || '', body.asistentes || '',
     body.mensaje || '', body.video_url || '',
     isAmistoso ? 'TRUE' : 'FALSE',
     body.imagen_url || '',
+    body.mvp || '',
   ]]);
 
   // Forzar texto plano en fecha y amistoso (evita que Sheets las convierta
   // a fecha/booleano nativos, lo que rompe la lectura posterior vía API).
   sh.getRange(row, 2).setNumberFormat('@').setValue(String(body.fecha));
-  sh.getRange(row, 13).setNumberFormat('@').setValue(isAmistoso ? 'TRUE' : 'FALSE');
-
-  if (isAmistoso) return; // Amistoso: solo se guarda la fila, no afecta a nada más
-
-  const gl = Number(body.goles_local), gv = Number(body.goles_visitante);
-  let resultLocal, resultVisitante;
-  if (gl > gv)      { resultLocal = 'win';  resultVisitante = 'loss'; }
-  else if (gl < gv) { resultLocal = 'loss'; resultVisitante = 'win';  }
-  else              { resultLocal = 'draw'; resultVisitante = 'draw'; }
-
-  applyResultado(ss, jugadoresLocal,     capitanLocal,     resultLocal);
-  applyResultado(ss, jugadoresVisitante, capitanVisitante, resultVisitante);
+  sh.getRange(row, 15).setNumberFormat('@').setValue(isAmistoso ? 'TRUE' : 'FALSE');
 }
 
-// ── Aplica victorias/empates/derrotas + puntos (con bonus capitán) ───────────
-// Victoria → 3 pts jugador normal, 7 pts capitán
-// Empate   → 1 pt  jugador normal, 4 pts capitán
-// Derrota  → 0 pts jugador normal, 2 pts capitán
-function applyResultado(ss, jugadores, capitan, resultado) {
-  const sh   = ss.getSheetByName('Jugadores');
-  const data = sh.getDataRange().getValues();
-
-  jugadores.forEach(function (nombre) {
-    const i = data.findIndex(function (r) { return r[0] === nombre; });
-    if (i <= 0) return; // -1 = no encontrado, 0 = cabecera
-    const r = i + 1;
-    const isCapitan = nombre === capitan;
-    let ptsGanados = 0;
-
-    if (resultado === 'win') {
-      ptsGanados = isCapitan ? 7 : 3;
-      sh.getRange(r, COL_JUG.victorias).setValue(Number(data[i][COL_JUG.victorias - 1]) + 1);
-    } else if (resultado === 'draw') {
-      ptsGanados = isCapitan ? 4 : 1;
-      sh.getRange(r, COL_JUG.empates).setValue(Number(data[i][COL_JUG.empates - 1]) + 1);
-    } else {
-      ptsGanados = isCapitan ? 2 : 0;
-      sh.getRange(r, COL_JUG.derrotas).setValue(Number(data[i][COL_JUG.derrotas - 1]) + 1);
-    }
-
-    sh.getRange(r, COL_JUG.pts).setValue(Number(data[i][COL_JUG.pts - 1]) + ptsGanados);
-    sh.getRange(r, COL_JUG.pj).setValue(Number(data[i][COL_JUG.pj - 1]) + 1);
-  });
-}
-
-// ── Sumar goles ────────────────────────────────────────────────────────────────
-// body.goles = [{ nombre, cantidad }, ...]
-function addGoles(ss, body) {
-  const sh   = ss.getSheetByName('Goles');
-  const data = sh.getDataRange().getValues();
-  (body.goles || []).forEach(function (item) {
-    const i = data.findIndex(function (r) { return r[0] === item.nombre; });
-    if (i > 0) sh.getRange(i + 1, 2).setValue(Number(data[i][1]) + Number(item.cantidad));
-  });
-}
-
-// ── Sumar asistencias ────────────────────────────────────────────────────────
-// body.asistencias = [{ nombre, cantidad }, ...]
-function addAsistencias(ss, body) {
-  const sh   = ss.getSheetByName('Asistencias');
-  const data = sh.getDataRange().getValues();
-  (body.asistencias || []).forEach(function (item) {
-    const i = data.findIndex(function (r) { return r[0] === item.nombre; });
-    if (i > 0) sh.getRange(i + 1, 2).setValue(Number(data[i][1]) + Number(item.cantidad));
-  });
-}
-
-// ── Actualizar jugador (rating, pos, bandera, pj, mvp, carta_url) ─────────────
+// ── Actualizar jugador (rating, pos, bandera, carta_url) ─────────────────────
 function updateJugador(ss, body) {
   const sh   = ss.getSheetByName('Jugadores');
   const data = sh.getDataRange().getValues();
@@ -149,17 +74,7 @@ function updateJugador(ss, body) {
   if (body.rating    !== undefined) sh.getRange(r, COL_JUG.rating).setValue(body.rating);
   if (body.pos       !== undefined) sh.getRange(r, COL_JUG.pos).setValue(body.pos);
   if (body.bandera   !== undefined) sh.getRange(r, COL_JUG.bandera).setValue(body.bandera);
-  if (body.pj        !== undefined) sh.getRange(r, COL_JUG.pj).setValue(body.pj);
-  if (body.mvp       !== undefined) sh.getRange(r, COL_JUG.mvp).setValue(body.mvp);
   if (body.carta_url !== undefined) sh.getRange(r, COL_JUG.carta_url).setValue(body.carta_url);
-}
-
-// ── Sumar 1 MVP a un jugador ───────────────────────────────────────────────────
-function addMvp(ss, body) {
-  const sh   = ss.getSheetByName('Jugadores');
-  const data = sh.getDataRange().getValues();
-  const i = data.findIndex(function (r) { return r[0] === body.nombre; });
-  if (i > 0) sh.getRange(i + 1, COL_JUG.mvp).setValue(Number(data[i][COL_JUG.mvp - 1]) + 1);
 }
 
 function json(obj) {
