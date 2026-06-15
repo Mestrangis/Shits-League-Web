@@ -3,21 +3,24 @@
 ═══════════════════════════════════════════════ */
 
 let STATE = {
-  jugadores:  [],
-  jornadas:   [],
-  activeTab:  'resumen',
+  jugadores:        [],
+  jornadas:         [],
+  activeTab:        'inicio',
+  proximosPartidos: [],
 };
 
 /* ── Datos ───────────────────────────────────────────────────────────────── */
 async function loadData() {
   // Todo desde Sheets en paralelo — cero archivos locales de datos
-  const [jugadores, jornadas] = await Promise.all([
+  const [jugadores, jornadas, proximos] = await Promise.all([
     fetchJugadores(),
     fetchJornadas(),
+    fetchProximosPartidos(5),
   ]);
 
-  STATE.jornadas  = jornadas  || [];
-  STATE.jugadores = calcularStats(jugadores || [], STATE.jornadas);
+  STATE.jornadas         = jornadas  || [];
+  STATE.jugadores        = calcularStats(jugadores || [], STATE.jornadas);
+  STATE.proximosPartidos = proximos || [];
 }
 
 /* ── Normalización de nombres ────────────────────────────────────────────── */
@@ -67,13 +70,12 @@ function calcularStats(jugadores, jornadas) {
   }
 
   jornadas.forEach(j => {
-    // PJ cuenta en cualquier jornada, incluidos amistosos
+    if (j.amistoso) return; // PJ y el resto de stats solo cuentan en jornadas de liga
+
     [...j.jugadores_local, ...j.jugadores_visitante].forEach(nombreRaw => {
       const nombre = resolver(nombreRaw);
       if (nombre) stats[nombre].pj++;
     });
-
-    if (j.amistoso) return; // el resto de stats solo cuenta en jornadas de liga
 
     const gl = j.goles_local, gv = j.goles_visitante;
     let resultLocal, resultVisitante;
@@ -134,6 +136,9 @@ function renderTabIfNeeded(name) {
   if (!panel || panel.dataset.rendered) return;
 
   switch (name) {
+    case 'inicio':
+      panel.innerHTML = renderInicio(STATE.proximosPartidos);
+      break;
     case 'resumen':
       panel.innerHTML = renderResumen(STATE.jugadores, STATE.jornadas);
       break;
@@ -157,6 +162,9 @@ function renderTabIfNeeded(name) {
 
 /* ── Eventos de panel ────────────────────────────────────────────────────── */
 function bindPanel(panel, name) {
+  if (name === 'inicio') {
+    startCountdown(STATE.proximosPartidos[0]?.fecha);
+  }
   if (name === 'resumen') {
     panel.querySelectorAll('.result-row').forEach(row => {
       const fn = () => openModalPartido(row.dataset.jornada, row.dataset.fecha);
@@ -171,6 +179,38 @@ function bindPanel(panel, name) {
       card.addEventListener('keydown', e => { if (e.key==='Enter'||e.key===' '){e.preventDefault();fn();} });
     });
   }
+}
+
+/* ── Cuenta atrás (pestaña Inicio) ───────────────────────────────────────── */
+function startCountdown(fechaIso) {
+  const el = document.getElementById('countdown');
+  if (!el || !fechaIso) return;
+
+  const target = new Date(fechaIso).getTime();
+  if (isNaN(target)) return;
+
+  let timer = null;
+  function tick() {
+    const diff = target - Date.now();
+    if (diff <= 0) {
+      el.innerHTML = `<span class="countdown__unit"><span class="countdown__num">¡Ya!</span></span>`;
+      if (timer) clearInterval(timer);
+      return;
+    }
+    const dias  = Math.floor(diff / 86400000);
+    const horas = Math.floor((diff % 86400000) / 3600000);
+    const mins  = Math.floor((diff % 3600000) / 60000);
+    const segs  = Math.floor((diff % 60000) / 1000);
+    el.innerHTML = `
+      <span class="countdown__unit"><span class="countdown__num">${dias}</span><span class="countdown__lbl">días</span></span>
+      <span class="countdown__unit"><span class="countdown__num">${horas}</span><span class="countdown__lbl">horas</span></span>
+      <span class="countdown__unit"><span class="countdown__num">${mins}</span><span class="countdown__lbl">min</span></span>
+      <span class="countdown__unit"><span class="countdown__num">${segs}</span><span class="countdown__lbl">seg</span></span>
+    `;
+  }
+
+  tick();
+  timer = setInterval(tick, 1000);
 }
 
 /* ── Modal partido ───────────────────────────────────────────────────────── */
@@ -245,7 +285,7 @@ async function init() {
   }
 
   initHero();
-  renderTabIfNeeded('resumen');
+  renderTabIfNeeded('inicio');
 }
 
 document.addEventListener('DOMContentLoaded', init);

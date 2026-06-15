@@ -40,6 +40,166 @@ function rowClass(i) {
 }
 
 /* ═══════════════════════════════════════════════
+   INICIO TAB
+═══════════════════════════════════════════════ */
+
+// Enlaces de la pestaña Inicio — fáciles de actualizar/ampliar
+const DESCARGAS = [
+  { titulo: 'Reglamento de la liga', url: 'assets/reglamento.pdf' },
+  { titulo: 'Acta de partido', url: 'assets/acta.pdf' },
+];
+
+// URL completa de la playlist de YouTube (la que se ve en la barra de direcciones)
+const YOUTUBE_PLAYLIST_URL = 'https://youtube.com/playlist?list=PLTptgVdQcUSUE0YFK4LhRHxyxqTH96nJh&si=cMLi67cImjm7jOeQ';
+// URL completa de la playlist de Spotify (botón "Compartir" → "Copiar enlace a playlist")
+const SPOTIFY_PLAYLIST_URL = 'https://open.spotify.com/playlist/47foBKbxS1UD0MrcnQ3zhV?si=mZv7A-lZTMG4jrN6qVqOcg';
+
+function renderInicio(proximosPartidos) {
+  return `
+    ${renderProximosPartidos(proximosPartidos)}
+    ${renderYoutubeCard()}
+    ${renderSpotifyCard()}
+    ${renderDescargas()}
+  `;
+}
+
+function renderProximosPartidos(partidos) {
+  const lista = (partidos || []).slice()
+    .sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+
+  const body = lista.length
+    ? renderProximosLista(lista)
+    : `<div class="empty">Sin próximos partidos programados</div>`;
+
+  return `
+    <section class="inicio-block inicio-block--proximo">
+      <div class="sh">
+        <span class="sh__title">PRÓXIMOS PARTIDOS</span>
+        <span class="sh__line"></span>
+      </div>
+      ${body}
+    </section>
+  `;
+}
+
+function renderProximosLista(lista) {
+  const [destacado, ...resto] = lista;
+  const fecha = destacado.fecha ? destacado.fecha.split('T')[0] : '';
+  const hora  = destacado.fecha && destacado.fecha.includes('T') ? destacado.fecha.split('T')[1].slice(0,5) : '';
+
+  const restoHtml = resto.length ? `
+    <div class="proximos-list">
+      ${resto.map(p => {
+        const f = p.fecha ? p.fecha.split('T')[0] : '';
+        const h = p.fecha && p.fecha.includes('T') ? p.fecha.split('T')[1].slice(0,5) : '';
+        return `
+          <div class="proximos-list__item">
+            <span class="proximos-list__titulo">${p.titulo || 'Partido'}</span>
+            <span class="proximos-list__fecha">${fmtFechaCorta(f)}${h ? ` · ${h}` : ''}</span>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  ` : '';
+
+  return `
+    <div class="proximo-partido">
+      <div class="proximo-partido__info">
+        <div class="proximo-partido__titulo">${destacado.titulo || 'Próxima jornada'}</div>
+        <div class="proximo-partido__fecha">${fmtFechaLarga(fecha)}${hora ? ` · ${hora}` : ''}</div>
+        ${destacado.lugar ? `<div class="proximo-partido__lugar">📍 ${destacado.lugar}</div>` : ''}
+      </div>
+      <div class="countdown" id="countdown"></div>
+    </div>
+    ${restoHtml}
+  `;
+}
+
+function renderDescargas() {
+  const items = DESCARGAS.map(d => `
+    <a class="descarga-item" href="${d.url}" target="_blank" rel="noopener" download>
+      <span class="descarga-item__icon">📄</span>
+      <span class="descarga-item__titulo">${d.titulo}</span>
+      <span class="descarga-item__arrow">↓</span>
+    </a>
+  `).join('');
+
+  return `
+    <section class="inicio-block">
+      <div class="sh">
+        <span class="sh__title">DESCARGAS</span>
+        <span class="sh__line"></span>
+      </div>
+      <div class="descargas-list">${items}</div>
+    </section>
+  `;
+}
+
+function youtubePlaylistEmbed(url) {
+  if (url.includes('TU_PLAYLIST_ID')) return null;
+  const m = url.match(/list=([A-Za-z0-9_-]+)/);
+  return m ? `https://www.youtube.com/embed/videoseries?list=${m[1]}` : null;
+}
+
+function spotifyPlaylistEmbed(url) {
+  if (url.includes('TU_PLAYLIST_ID')) return null;
+  const m = url.match(/playlist\/([A-Za-z0-9]+)/);
+  return m ? `https://open.spotify.com/embed/playlist/${m[1]}?utm_source=generator&theme=0` : null;
+}
+
+function renderYoutubeCard() {
+  const embed = youtubePlaylistEmbed(YOUTUBE_PLAYLIST_URL);
+
+  return `
+    <section class="inicio-block">
+      <div class="sh">
+        <span class="sh__title">VÍDEOS</span>
+        <span class="sh__line"></span>
+      </div>
+      ${embed ? `
+        <div class="media-embed media-embed--youtube">
+          <iframe src="${embed}" title="Playlist de YouTube" loading="lazy" allowfullscreen></iframe>
+        </div>
+      ` : ''}
+      <a class="media-card media-card--youtube" href="${YOUTUBE_PLAYLIST_URL}" target="_blank" rel="noopener">
+        <span class="media-card__icon">▶</span>
+        <div class="media-card__text">
+          <div class="media-card__title">Resúmenes en YouTube</div>
+          <div class="media-card__sub">Abrir la playlist completa en YouTube</div>
+        </div>
+        <span class="media-card__arrow">→</span>
+      </a>
+    </section>
+  `;
+}
+
+function renderSpotifyCard() {
+  const embed = spotifyPlaylistEmbed(SPOTIFY_PLAYLIST_URL);
+
+  return `
+    <section class="inicio-block">
+      <div class="sh">
+        <span class="sh__title">MÚSICA</span>
+        <span class="sh__line"></span>
+      </div>
+      ${embed ? `
+        <div class="media-embed media-embed--spotify">
+          <iframe src="${embed}" title="Playlist de Spotify" loading="lazy" allow="encrypted-media"></iframe>
+        </div>
+      ` : ''}
+      <a class="media-card media-card--spotify" href="${SPOTIFY_PLAYLIST_URL}" target="_blank" rel="noopener">
+        <span class="media-card__icon">♫</span>
+        <div class="media-card__text">
+          <div class="media-card__title">Playlist de Spotify</div>
+          <div class="media-card__sub">Abrir en Spotify</div>
+        </div>
+        <span class="media-card__arrow">→</span>
+      </a>
+    </section>
+  `;
+}
+
+/* ═══════════════════════════════════════════════
    HERO SECTION  (global, always rendered)
 ═══════════════════════════════════════════════ */
 function renderHeroSection(jugadores, jornadas) {

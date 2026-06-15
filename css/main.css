@@ -800,3 +800,163 @@ button, [role="button"], .modal__backdrop, .tab, .result-row, .card-wrap {
   .cards-grid { grid-template-columns: repeat(2, 1fr); }
   .stat-tiles { grid-template-columns: 1fr 1fr; }
 }
+
+/* ═══════════════════════════════════════════════
+   INICIO TAB
+═══════════════════════════════════════════════ */
+.inicio-block { margin-bottom: 32px; }
+
+/* ── Próximo partido + cuenta atrás ── */
+.proximo-partido {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+  background: linear-gradient(160deg, rgba(16,40,26,.7), rgba(8,24,15,.7));
+  border: 1px solid rgba(31, 224, 101, 0.16);
+  border-radius: 16px;
+  padding: 24px 28px;
+}
+.proximo-partido__titulo {
+  font-family: 'Anton', sans-serif;
+  font-size: 22px;
+  letter-spacing: .04em;
+  color: #fff;
+  margin-bottom: 6px;
+}
+.proximo-partido__fecha {
+  font-size: 14px;
+  color: var(--verde);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.proximo-partido__lugar {
+  font-size: 12px;
+  color: #9DC4AD;
+  margin-top: 6px;
+}
+
+/* ── Lista de próximos partidos (resto, sin destacar) ── */
+.proximos-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 12px;
+}
+.proximos-list__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: rgba(11,26,17,.5);
+  border: 1px solid rgba(31,224,101,.1);
+  border-radius: 10px;
+  padding: 10px 16px;
+  font-size: 13px;
+}
+.proximos-list__titulo { font-weight: 600; color: #E8FBEF; }
+.proximos-list__fecha { color: #6E9D81; font-weight: 600; font-size: 12px; white-space: nowrap; }
+
+/* ── Embeds (YouTube / Spotify) ── */
+.media-embed {
+  border-radius: 16px;
+  overflow: hidden;
+  margin-bottom: 14px;
+  border: 1px solid rgba(31,224,101,.16);
+}
+.media-embed iframe { width: 100%; border: none; display: block; }
+.media-embed--youtube { aspect-ratio: 16/9; }
+.media-embed--youtube iframe { height: 100%; }
+.media-embed--spotify iframe { height: 352px; }
+@media (max-width: 480px) {
+  .media-embed--spotify iframe { height: 280px; }
+}
+.countdown {
+  display: flex;
+  gap: 16px;
+}
+.countdown__unit {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 56px;
+}
+.countdown__num {
+  font-family: 'Anton', sans-serif;
+  font-size: 32px;
+  line-height: 1;
+  color: var(--verde);
+}
+.countdown__lbl {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: #6E9D81;
+  margin-top: 4px;
+}
+
+/* ── Descargas ── */
+.descargas-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.descarga-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(11,26,17,.5);
+  border: 1px solid rgba(31,224,101,.12);
+  border-radius: 12px;
+  padding: 14px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #E8FBEF;
+  transition: border-color .2s, background .2s;
+}
+.descarga-item:hover { border-color: var(--verde); background: rgba(31,224,101,.06); }
+.descarga-item__icon { font-size: 18px; }
+.descarga-item__titulo { flex: 1; }
+.descarga-item__arrow { color: var(--verde); font-family: 'Anton', sans-serif; }
+
+/* ── Media cards (YouTube / Spotify) ── */
+.media-card {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  background: linear-gradient(160deg, rgba(16,40,26,.7), rgba(8,24,15,.7));
+  border: 1px solid rgba(31, 224, 101, 0.16);
+  border-radius: 16px;
+  padding: 22px 26px;
+  transition: border-color .2s, transform .15s;
+}
+.media-card:hover { border-color: var(--verde); transform: translateY(-2px); }
+.media-card__icon {
+  font-size: 28px;
+  width: 56px; height: 56px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  background: rgba(31,224,101,.08);
+  color: var(--verde);
+  flex-shrink: 0;
+}
+.media-card--spotify .media-card__icon { color: #1DB954; background: rgba(29,185,84,.1); }
+.media-card__text { flex: 1; }
+.media-card__title {
+  font-family: 'Anton', sans-serif;
+  font-size: 17px;
+  letter-spacing: .03em;
+  color: #fff;
+}
+.media-card__sub { font-size: 12px; color: #9DC4AD; margin-top: 4px; }
+.media-card__arrow { font-size: 20px; color: var(--verde); }
+
+@media (max-width: 480px) {
+  .proximo-partido { flex-direction: column; align-items: flex-start; }
+  .countdown { gap: 10px; }
+  .countdown__unit { min-width: 48px; }
+  .countdown__num { font-size: 26px; }
+}
