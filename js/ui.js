@@ -52,7 +52,7 @@ const DESCARGAS = [
 // URL completa de la playlist de YouTube (la que se ve en la barra de direcciones)
 const YOUTUBE_PLAYLIST_URL = 'https://youtube.com/playlist?list=PLTptgVdQcUSUE0YFK4LhRHxyxqTH96nJh&si=cMLi67cImjm7jOeQ';
 // URL completa de la playlist de Spotify (botón "Compartir" → "Copiar enlace a playlist")
-const SPOTIFY_PLAYLIST_URL = 'https://open.spotify.com/playlist/47foBKbxS1UD0MrcnQ3zhV?si=mZv7A-lZTMG4jrN6qVqOcg';
+const SPOTIFY_PLAYLIST_URL = 'https://open.spotify.com/playlist/4ED3CETGtGm8VYAhcC4Ok5?si=TRYceS8WTd-7zoKMXp3-Gg';
 
 function renderInicio(proximosPartidos) {
   return `
