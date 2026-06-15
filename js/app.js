@@ -144,7 +144,6 @@ function openModal(id) {
   m.classList.add('open');
   document.body.style.overflow = 'hidden';
   m.querySelector('.modal__backdrop')?.addEventListener('click', () => closeModal(id), { once: true });
-  m.addEventListener('click', e => { if (e.target.closest('.modal__close')) closeModal(id); }, { once: true });
 }
 function closeModal(id) {
   document.getElementById(id)?.classList.remove('open');

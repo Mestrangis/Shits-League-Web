@@ -342,7 +342,6 @@ function buildModalPartido(j) {
 
   return `
     ${imgHtml}
-    <button class="modal__close" aria-label="Cerrar">✕</button>
     <div class="modal__body">
       <span class="modal__tag">${tag} · ${fmtFechaLarga(j.fecha)}</span>
       <div class="modal__score-block">
@@ -357,7 +356,6 @@ function buildModalPartido(j) {
 
 function buildModalJugador(j) {
   return `
-    <button class="modal__close" aria-label="Cerrar">✕</button>
     <div class="player-modal__img-wrap">
       <img src="${j.img}" alt="${j.nombre}" onerror="this.style.opacity='.2'">
     </div>
