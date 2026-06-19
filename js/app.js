@@ -7,6 +7,7 @@ let STATE = {
   jornadas:         [],
   activeTab:        'inicio',
   proximosPartidos: [],
+  season:           '25-26',
 };
 
 /* ── Datos ───────────────────────────────────────────────────────────────── */
@@ -273,10 +274,89 @@ function initBubbles() {
   });
 }
 
+/* ── Selector de temporada ───────────────────────────────────────────────── */
+const ARCHIVE_SEASONS = {
+  '23-24': {
+    label: 'TEMPORADA 23/24',
+    images: [
+      { src: 'assets/clasificación23-24.png', alt: 'Clasificación 23-24' },
+      { src: 'assets/goles23-24.png',             alt: 'Goleadores 23-24' },
+      { src: 'assets/Draft 2024.jpg',             alt: 'Draft 2024' },
+    ],
+  },
+};
+
+function initSeasonSelector() {
+  const toggle = document.getElementById('seasonToggle');
+  const dropdown = document.getElementById('seasonDropdown');
+  if (!toggle || !dropdown) return;
+
+  toggle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    dropdown.classList.toggle('open');
+  });
+  document.addEventListener('click', () => dropdown.classList.remove('open'));
+
+  dropdown.querySelectorAll('.season-dropdown__item').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dropdown.classList.remove('open');
+      switchSeason(btn.dataset.season);
+    });
+  });
+}
+
+function switchSeason(season) {
+  if (season === STATE.season) return;
+  STATE.season = season;
+
+  const label = document.getElementById('seasonLabel');
+  const tabs = document.getElementById('tabs');
+  const main = document.querySelector('.main');
+  const hero = document.getElementById('hero-section');
+  const archiveEl = document.getElementById('archiveSeason');
+  const dropdown = document.getElementById('seasonDropdown');
+
+  dropdown.querySelectorAll('.season-dropdown__item').forEach(b =>
+    b.classList.toggle('active', b.dataset.season === season)
+  );
+
+  const archive = ARCHIVE_SEASONS[season];
+
+  if (archive) {
+    label.textContent = archive.label;
+    tabs.style.display = 'none';
+    hero.style.display = 'none';
+    main.style.display = 'none';
+    archiveEl.hidden = false;
+    archiveEl.innerHTML = `
+      <div class="sh">
+        <span class="sh__title">${archive.label}</span>
+        <span class="sh__line"></span>
+      </div>
+      <div class="archive-season__images">
+        ${archive.images.map(img => `
+          <div class="archive-season__img-wrap">
+            <img src="${img.src}" alt="${img.alt}" loading="lazy">
+          </div>
+        `).join('')}
+      </div>
+    `;
+  } else {
+    label.textContent = 'TEMPORADA 25/26';
+    tabs.style.display = '';
+    hero.style.display = '';
+    main.style.display = '';
+    archiveEl.hidden = true;
+    archiveEl.innerHTML = '';
+  }
+}
+
 /* ── Init ────────────────────────────────────────────────────────────────── */
 async function init() {
   initBubbles();
   initTabs();
+  initSeasonSelector();
 
   try {
     await loadData();
