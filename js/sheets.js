@@ -7,7 +7,7 @@
 const SHEETS_ID  = '1EHGrFt2Y3QDCOdSV3fVgWvspzXYcir4SmDxOezdSLRY';
 const SHEETS_KEY = 'AIzaSyC5TLnk-zGTAia4HZNvv77PgY2FtXYfhdc';
 const GAS_URL    = 'https://script.google.com/macros/s/AKfycbx98ycukj9M4_EMaxg4yJ6NxuGrx80fvDQ-mgD-uXHEeAmgb1PSCm9ePDCpgJ3T4ergCg/exec';
-const GAS_SECRET = 'pissleague';
+const GAS_SECRET = 'pissleague89216420874';
 
 // Nombre exacto de las pestañas en el spreadsheet
 const SHEET_JUGADORES = 'Jugadores';

@@ -4,7 +4,7 @@
    y vuelve a desplegar (Deploy → Manage deployments → New version).
 ═══════════════════════════════════════════════ */
 
-const SECRET = 'pissleague';
+const SECRET = 'pissleague89216420874';
 
 // Columnas de la pestaña "Jugadores" (1-indexed)
 // nombre | rating | pos | bandera | carta_url
