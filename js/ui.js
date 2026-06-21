@@ -287,8 +287,8 @@ function renderResumen(jugadores, jornadas) {
   const totalGoles = jornadas.reduce((s,j) => s + j.goles_local + j.goles_visitante, 0);
   const goleador   = [...jugadores].sort((a,b) => b.stats.goles - a.stats.goles)[0];
   const asistente  = [...jugadores].sort((a,b) => b.stats.asistencias - a.stats.asistencias)[0];
-  const mvpTop     = [...jugadores].sort((a,b) => b.stats.mvp - a.stats.mvp)[0];
   const lastLiga   = ligas[0];
+  const lastMvp    = lastLiga?.mvp || '';
 
   const tiles = `
     <div class="stat-tile">
@@ -308,8 +308,8 @@ function renderResumen(jugadores, jornadas) {
     </div>
     <div class="stat-tile">
       <div class="stat-tile__label">MVP DE LA JORNADA</div>
-      <div class="stat-tile__value" style="font-size:26px;line-height:1.1">${mvpTop ? mvpTop.nombre.slice(0,3).toUpperCase() : '—'}</div>
-      <div class="stat-tile__note">${mvpTop ? mvpTop.nombre + (lastLiga ? ' · J' + lastLiga.numero : '') : ''}</div>
+      <div class="stat-tile__value" style="font-size:26px;line-height:1.1">${lastMvp ? lastMvp.slice(0,3).toUpperCase() : '—'}</div>
+      <div class="stat-tile__note">${lastMvp ? lastMvp + ' · J' + lastLiga.numero : ''}</div>
     </div>
   `;
 
