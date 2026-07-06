@@ -913,7 +913,7 @@ button, [role="button"], .modal__backdrop, .tab, .result-row, .card-wrap {
 .media-embed--youtube iframe { height: 100%; }
 .media-embed--spotify iframe { height: 352px; }
 @media (max-width: 480px) {
-  .media-embed--spotify iframe { height: 280px; }
+  .media-embed--spotify iframe { height: 152px; }
 }
 .countdown {
   display: flex;
