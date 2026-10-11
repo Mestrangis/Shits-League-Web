@@ -8,6 +8,8 @@
 // ⚠️ Pega aquí el App ID de OneSignal (Settings → Keys & IDs).
 // Mientras esté vacío, OneSignal no se carga y no se muestra ningún aviso.
 const ONESIGNAL_APP_ID = 'c3052327-e9b2-4f3a-8a86-964ab853ec62';
+// Safari Web ID (Settings → Push & In-App → Web), necesario para Safari en macOS antiguos
+const ONESIGNAL_SAFARI_WEB_ID = 'web.onesignal.auto.6a76584b-4903-4cb9-b550-82d6a06974fc';
 
 const ONESIGNAL_SDK_URL      = 'https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js';
 const PUSH_DISMISSED_KEY     = 'PUSH_PROMPT_DISMISSED';
@@ -28,6 +30,7 @@ function initPush() {
     try {
       await OneSignal.init({
         appId: ONESIGNAL_APP_ID,
+        safari_web_id: ONESIGNAL_SAFARI_WEB_ID,
         serviceWorkerPath:  `${SITE_BASE.slice(1)}push/onesignal/OneSignalSDKWorker.js`,
         serviceWorkerParam: { scope: `${SITE_BASE}push/onesignal/` },
         notifyButton: { enable: false },
