@@ -1,13 +1,10 @@
 /* ═══════════════════════════════════════════════
    SHITS LEAGUE — sheets.js
    Lee todos los datos desde Google Sheets API pública.
-   Escribe via Google Apps Script (gasPost).
 ═══════════════════════════════════════════════ */
 
 const SHEETS_ID  = '1EHGrFt2Y3QDCOdSV3fVgWvspzXYcir4SmDxOezdSLRY';
 const SHEETS_KEY = 'AIzaSyC5TLnk-zGTAia4HZNvv77PgY2FtXYfhdc';
-const GAS_URL    = 'https://script.google.com/macros/s/AKfycbx98ycukj9M4_EMaxg4yJ6NxuGrx80fvDQ-mgD-uXHEeAmgb1PSCm9ePDCpgJ3T4ergCg/exec';
-const GAS_SECRET = 'pissleague89216420874';
 
 // Nombre exacto de las pestañas en el spreadsheet
 const SHEET_JUGADORES = 'Jugadores';
@@ -97,15 +94,4 @@ function splitPares(str) {
     const [nombre, cantidad] = par.split(':');
     return { nombre: (nombre || '').trim(), cantidad: parseInt(cantidad) || 0 };
   });
-}
-
-// ── Escritura via Apps Script ─────────────────────────────────────────────
-async function gasPost(payload) {
-  await fetch(GAS_URL, {
-    method: 'POST',
-    mode: 'no-cors',
-    headers: { 'Content-Type': 'text/plain' },
-    body: JSON.stringify({ secret: GAS_SECRET, ...payload }),
-  });
-  return { ok: true };
 }

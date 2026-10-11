@@ -288,7 +288,7 @@ function renderResumen(jugadores, jornadas) {
   const goleador   = [...jugadores].sort((a,b) => b.stats.goles - a.stats.goles)[0];
   const asistente  = [...jugadores].sort((a,b) => b.stats.asistencias - a.stats.asistencias)[0];
   const lastLiga   = ligas[0];
-  const lastMvp    = lastLiga?.mvp || '';
+  const lastMvp    = lastLiga?.mvp ? nombreCanonico(lastLiga.mvp) : '';
 
   const tiles = `
     <div class="stat-tile">
@@ -363,13 +363,13 @@ function resultRow(j) {
         ${jLabel}
         <span class="result-row__date">${fmtFechaCorta(j.fecha)}</span>
       </div>
-      <span class="result-row__local ${lc}">${j.local}</span>
+      <span class="result-row__local ${lc}">${nombreCanonico(j.local)}</span>
       <div class="result-row__pill">
         <span style="${pillCss[sc_l]}">${gl}</span>
         <span class="sep">:</span>
         <span style="${pillCss[sc_v]}">${gv}</span>
       </div>
-      <span class="result-row__visitante ${vc}">${j.visitante}</span>
+      <span class="result-row__visitante ${vc}">${nombreCanonico(j.visitante)}</span>
     </article>
   `;
 }
@@ -498,17 +498,17 @@ function buildModalPartido(j) {
 
   const imgHtml = j.imagen
     ? `<img class="modal__img" src="${j.imagen}" alt="Foto del partido">`
-    : `<div class="modal__img-placeholder">${j.local} vs ${j.visitante}</div>`;
+    : `<div class="modal__img-placeholder">${nombreCanonico(j.local)} vs ${nombreCanonico(j.visitante)}</div>`;
 
   return `
     ${imgHtml}
     <div class="modal__body">
       <span class="modal__tag">${tag} · ${fmtFechaLarga(j.fecha)}</span>
       <div class="modal__score-block">
-        <div class="modal__teams">${j.local} <span style="color:rgba(31,224,101,.3)">·vs·</span> ${j.visitante}</div>
+        <div class="modal__teams">${nombreCanonico(j.local)} <span style="color:rgba(31,224,101,.3)">·vs·</span> ${nombreCanonico(j.visitante)}</div>
         <div class="modal__score">${j.goles_local} – ${j.goles_visitante}</div>
       </div>
-      ${j.mvp ? `<div class="modal__mvp">🏆 MVP: <span>${j.mvp}</span></div>` : ''}
+      ${j.mvp ? `<div class="modal__mvp">🏆 MVP: <span>${nombreCanonico(j.mvp)}</span></div>` : ''}
       ${buildGoleadoresAsistentes(j)}
       ${j.mensaje ? `<div class="modal__msg">${fmtMsg(j.mensaje)}</div>` : ''}
       ${videoHtml}
@@ -520,7 +520,7 @@ function buildGoleadoresAsistentes(j) {
   if (!j.goleadores.length && !j.asistentes.length) return '';
 
   const list = (arr) => arr
-    .map(p => `<span class="modal__stat-item">${p.nombre}${p.cantidad > 1 ? ` <b>x${p.cantidad}</b>` : ''}</span>`)
+    .map(p => `<span class="modal__stat-item">${nombreCanonico(p.nombre)}${p.cantidad > 1 ? ` <b>x${p.cantidad}</b>` : ''}</span>`)
     .join('');
 
   return `

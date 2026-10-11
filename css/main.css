@@ -1025,3 +1025,141 @@ button, [role="button"], .modal__backdrop, .tab, .result-row, .card-wrap {
   .countdown__unit { min-width: 48px; }
   .countdown__num { font-size: 26px; }
 }
+
+/* ═══════════════════════════════════════════════
+   SESIÓN (topbar) + DIÁLOGOS (login / notificaciones)
+═══════════════════════════════════════════════ */
+.topbar__right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.session-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: #6E9D81;
+  border: 1px solid rgba(31, 224, 101, 0.22);
+  padding: 7px 13px;
+  border-radius: 99px;
+  transition: border-color .2s, color .2s;
+}
+.session-btn:hover { border-color: rgba(31, 224, 101, 0.5); color: #E8FBEF; }
+.session-btn__icon { font-size: 12px; line-height: 1; }
+.session-btn--logged {
+  color: var(--verde);
+  border-color: rgba(31, 224, 101, 0.45);
+  background: rgba(31, 224, 101, 0.08);
+}
+.session-btn--logged { padding: 4px 13px 4px 4px; }
+
+/* Avatar circular: foto del jugador o emoji 👤 de fallback */
+.avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: rgba(14,32,22,.9);
+  border: 1px solid rgba(31,224,101,.45);
+  line-height: 1;
+}
+.avatar img { width: 100%; height: 100%; object-fit: cover; }
+.session-btn__avatar { width: 24px; height: 24px; font-size: 13px; }
+.dialog-box__avatar {
+  width: 96px;
+  height: 96px;
+  margin: 0 auto 1rem;
+  font-size: 2.8rem;
+  border-width: 2px;
+  border-color: var(--verde);
+  box-shadow: 0 0 22px rgba(31,224,101,.35);
+}
+.session-btn__name {
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-transform: uppercase;
+}
+
+.dialog-box {
+  max-width: 380px;
+  padding: 2.25rem 1.75rem 1.75rem;
+  text-align: center;
+}
+.dialog-box__icon {
+  font-size: 2.4rem;
+  margin-bottom: .9rem;
+  filter: drop-shadow(0 0 12px rgba(31,224,101,.4));
+}
+.dialog-box__title {
+  font-family: 'Anton', sans-serif;
+  font-size: 1.5rem;
+  font-weight: 400;
+  letter-spacing: .1em;
+  color: #fff;
+  margin-bottom: .6rem;
+}
+.dialog-box__text {
+  font-size: .88rem;
+  color: #9DC4AD;
+  margin-bottom: 1.25rem;
+}
+.dialog-box__list {
+  list-style: none;
+  text-align: left;
+  display: grid;
+  gap: .5rem;
+  margin: 0 auto 1.5rem;
+  max-width: 280px;
+  font-size: .88rem;
+  color: #E8FBEF;
+}
+.dialog-box__input {
+  width: 100%;
+  padding: .75rem 1rem;
+  margin-bottom: .75rem;
+  background: rgba(14,32,22,.8);
+  border: 1px solid rgba(31,224,101,.28);
+  border-radius: 10px;
+  color: #E8FBEF;
+  font-family: 'Sora', sans-serif;
+  font-size: 1rem;
+  text-align: center;
+  outline: none;
+  transition: border-color .2s;
+}
+.dialog-box__input:focus { border-color: var(--verde); }
+.dialog-box__error { color: #ff6b6b; font-size: .82rem; margin-bottom: .75rem; }
+.dialog-box__btn {
+  display: block;
+  width: 100%;
+  padding: .75rem;
+  border-radius: 10px;
+  background: var(--verde);
+  color: #06140D;
+  font-family: 'Anton', sans-serif;
+  font-size: 1rem;
+  letter-spacing: .12em;
+  transition: opacity .2s;
+}
+.dialog-box__btn:hover { opacity: .88; }
+.dialog-box__btn + .dialog-box__btn { margin-top: .6rem; }
+.dialog-box__btn--ghost {
+  background: transparent;
+  color: #9DC4AD;
+  border: 1px solid rgba(31,224,101,.28);
+}
+
+@media (max-width: 640px) {
+  .topbar__right { gap: 6px; }
+  .session-btn { padding: 7px 10px; gap: 6px; }
+  .session-btn--logged { padding: 4px 10px 4px 4px; }
+  .session-btn__label { display: none; }
+  .session-btn__name { max-width: 80px; }
+}

@@ -8,6 +8,7 @@ let STATE = {
   activeTab:        'inicio',
   proximosPartidos: [],
   season:           '25-26',
+  alias:            {}, // nombre normalizado (propio o alias) → nombre canónico
 };
 
 /* ── Datos ───────────────────────────────────────────────────────────────── */
@@ -20,6 +21,7 @@ async function loadData() {
   ]);
 
   STATE.jornadas         = jornadas  || [];
+  STATE.alias            = construirAlias(jugadores || []);
   STATE.jugadores        = calcularStats(jugadores || [], STATE.jornadas);
   STATE.proximosPartidos = proximos || [];
 }
@@ -33,30 +35,43 @@ function normalizarNombre(str) {
     .trim();
 }
 
-/* ── Cálculo de estadísticas ─────────────────────────────────────────────── */
-// Jornadas es la única fuente de verdad. Recorremos todas las jornadas
-// (incluyendo amistosos para el PJ) y derivamos las stats de cada jugador.
-// jugadores no registrados (alias desconocido) se ignoran sin romper el cálculo.
-function calcularStats(jugadores, jornadas) {
-  const stats = {};
-  const alias = {}; // nombre normalizado (propio o alias) → nombre canónico
-
+// Mapa nombre normalizado (propio o alias) → nombre canónico
+function construirAlias(jugadores) {
+  const alias = {};
   jugadores.forEach(j => {
-    stats[j.nombre] = { pj: 0, victorias: 0, empates: 0, derrotas: 0, pts: 0, mvp: 0, goles: 0, asistencias: 0 };
     alias[normalizarNombre(j.nombre)] = j.nombre;
     (j.alias || []).forEach(a => { alias[normalizarNombre(a)] = j.nombre; });
   });
+  return alias;
+}
 
-  function resolver(nombre) {
-    return alias[normalizarNombre(nombre)] || null;
-  }
+// Nombre canónico o null si no corresponde a ningún jugador registrado
+function resolverNombre(nombre) {
+  return STATE.alias[normalizarNombre(nombre)] || null;
+}
+
+// Para mostrar: nombre canónico si se conoce, si no el original de la hoja
+function nombreCanonico(nombre) {
+  return resolverNombre(nombre) || nombre;
+}
+
+/* ── Cálculo de estadísticas ─────────────────────────────────────────────── */
+// Jornadas es la única fuente de verdad. Recorremos las jornadas de liga
+// (los amistosos no cuentan para ninguna stat, tampoco PJ) y derivamos
+// las stats de cada jugador.
+// jugadores no registrados (alias desconocido) se ignoran sin romper el cálculo.
+function calcularStats(jugadores, jornadas) {
+  const stats = {};
+  jugadores.forEach(j => {
+    stats[j.nombre] = { pj: 0, victorias: 0, empates: 0, derrotas: 0, pts: 0, mvp: 0, goles: 0, asistencias: 0 };
+  });
 
   function aplicarResultado(nombres, capitan, resultado) {
     nombres.forEach(nombreRaw => {
-      const nombre = resolver(nombreRaw);
+      const nombre = resolverNombre(nombreRaw);
       const s = nombre && stats[nombre];
       if (!s) return;
-      const esCapitan = nombre === resolver(capitan);
+      const esCapitan = nombre === resolverNombre(capitan);
       if (resultado === 'win') {
         s.victorias++;
         s.pts += esCapitan ? 7 : 3;
@@ -74,7 +89,7 @@ function calcularStats(jugadores, jornadas) {
     if (j.amistoso) return; // PJ y el resto de stats solo cuentan en jornadas de liga
 
     [...j.jugadores_local, ...j.jugadores_visitante].forEach(nombreRaw => {
-      const nombre = resolver(nombreRaw);
+      const nombre = resolverNombre(nombreRaw);
       if (nombre) stats[nombre].pj++;
     });
 
@@ -87,11 +102,11 @@ function calcularStats(jugadores, jornadas) {
     aplicarResultado(j.jugadores_local,     j.capitan_local,     resultLocal);
     aplicarResultado(j.jugadores_visitante, j.capitan_visitante, resultVisitante);
 
-    const mvp = resolver(j.mvp);
+    const mvp = resolverNombre(j.mvp);
     if (mvp) stats[mvp].mvp++;
 
-    j.goleadores.forEach(g => { const n = resolver(g.nombre); if (n) stats[n].goles += g.cantidad; });
-    j.asistentes.forEach(a => { const n = resolver(a.nombre); if (n) stats[n].asistencias += a.cantidad; });
+    j.goleadores.forEach(g => { const n = resolverNombre(g.nombre); if (n) stats[n].goles += g.cantidad; });
+    j.asistentes.forEach(a => { const n = resolverNombre(a.nombre); if (n) stats[n].asistencias += a.cantidad; });
   });
 
   return jugadores.map(j => ({ ...j, stats: stats[j.nombre] }));
@@ -246,7 +261,7 @@ function closeModal(id) {
 }
 
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { closeModal('modal'); closeModal('playerModal'); }
+  if (e.key === 'Escape') document.querySelectorAll('.modal.open').forEach(m => closeModal(m.id));
 });
 
 /* ── Burbujas ────────────────────────────────────────────────────────────── */
@@ -357,6 +372,7 @@ async function init() {
   initBubbles();
   initTabs();
   initSeasonSelector();
+  initSession();
 
   try {
     await loadData();
@@ -366,6 +382,7 @@ async function init() {
 
   initHero();
   renderTabIfNeeded('inicio');
+  initPush();
 }
 
 document.addEventListener('DOMContentLoaded', init);
