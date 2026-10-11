@@ -13,7 +13,7 @@ const SHEET_JORNADAS  = 'Jornadas';
 const SHEET_VOTACIONES = 'Votaciones';
 
 // Apps Script de votaciones (solo escritura de votos)
-const VOTOS_GAS_URL    = 'https://script.google.com/macros/s/AKfycbx8R5p_PW5ATvcZJzOqA4Iiias3eFfDlmC3sglq2PohbxgFBuSEyU_doWKjzqjQoxLQ3A/exec';
+const VOTOS_GAS_URL    = 'https://script.google.com/macros/s/AKfycbyEujGUhTzs9F9a-5sLUr47yUMmMLBUL8wTnUxk8aRoPlyR_0ukfgSXtUjm8M-MWadkSA/exec';
 const VOTOS_GAS_SECRET = 'pissleague';
 
 // ── Core ──────────────────────────────────────────────────────────────────

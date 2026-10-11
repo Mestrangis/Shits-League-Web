@@ -84,13 +84,21 @@ function posponerPush() {
 }
 
 /* ── Vincular el dispositivo al jugador logueado ─────────────────────────── */
-// Permite segmentar envíos por jugador desde el panel (External ID = nombre)
+// Permite segmentar envíos por jugador desde el panel: External ID = nombre y
+// tag player_name = nombre (p. ej. recordatorio solo a quien no ha votado).
+// En v16 los tags son del usuario, no del dispositivo: al cerrar sesión NO se
+// borra el tag (se le quitaría también en sus otros dispositivos); basta con
+// logout(), que desvincula este dispositivo y lo deja como anónimo sin tags.
 function pushVincularJugador(nombre) {
   if (!ONESIGNAL_APP_ID) return;
   OneSignalDeferred.push(async OneSignal => {
     try {
-      if (nombre) await OneSignal.login(nombre);
-      else        await OneSignal.logout();
+      if (nombre) {
+        await OneSignal.login(nombre);
+        OneSignal.User.addTag('player_name', nombre);
+      } else {
+        await OneSignal.logout();
+      }
     } catch (e) {
       console.warn('[push] No se pudo vincular el jugador:', e);
     }
