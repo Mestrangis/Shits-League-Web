@@ -8,6 +8,8 @@
 const DIAS_SEMANA   = ['DOMINGO','LUNES','MARTES','MIÉRCOLES','JUEVES','VIERNES','SÁBADO'];
 const SWIPE_UMBRAL  = 90; // px de arrastre horizontal para que cuente como voto
 
+let ultimoSwipe = 0; // para no abrir el desglose con el click que sigue a un arrastre
+
 /* ── Helpers ─────────────────────────────────────────────────────────────── */
 // Acepta 'YYYY-MM-DD' y 'DD/MM/YYYY' (formato con el que Sheets devuelve fechas en es-ES)
 function parseFechaVoto(str) {
@@ -71,6 +73,7 @@ function renderVotoInner(v, jugador) {
     ? `${fecha.getDate()} ${MESES[fecha.getMonth()]} ${fecha.getFullYear()}`
     : v.fecha;
   const hora  = v.hora ? v.hora.slice(0, 5) : '';
+  const fechaHora = `${fechaTxt}${hora ? ` · ${hora}` : ''}`;
   const voto  = votoDe(v, jugador);
 
   // Si la imagen no carga se quita y queda el fondo de la paleta
@@ -93,9 +96,7 @@ function renderVotoInner(v, jugador) {
         aria-pressed="${voto === 'si'}" aria-label="Puedo">✓</button>
     </div>` : '';
 
-  const nombres = arr => arr.length
-    ? arr.map(n => `<span class="voto__nombre">${n}</span>`).join('')
-    : '<span class="voto__nadie">Nadie todavía</span>';
+  const nSi = v.jugadores_si.length, nNo = v.jugadores_no.length;
 
   return `
     <div class="${cardClass}">
@@ -104,20 +105,41 @@ function renderVotoInner(v, jugador) {
       <span class="voto-card__stamp voto-card__stamp--no" aria-hidden="true">✗</span>
       <div class="voto-card__lugar">${v.lugar || 'Lugar por decidir'}</div>
       <div class="voto-card__dia">${dia}</div>
-      <div class="voto-card__fecha">${fechaTxt}${hora ? ` · ${hora}` : ''}</div>
+      <div class="voto-card__fecha">${fechaHora}</div>
+      <button class="voto-card__count voto-card__count--no" type="button"
+        aria-label="${nNo} no pueden. Ver quién">✗ ${nNo}</button>
+      <button class="voto-card__count voto-card__count--si" type="button"
+        aria-label="${nSi} pueden. Ver quién">✓ ${nSi}</button>
     </div>
     ${botones}
-    <div class="voto__resumen">
-      <div class="voto__fila voto__fila--si">
-        <span class="voto__count">✓ ${v.jugadores_si.length}</span>
-        <div class="voto__nombres">${nombres(v.jugadores_si)}</div>
-      </div>
-      <div class="voto__fila voto__fila--no">
-        <span class="voto__count">✗ ${v.jugadores_no.length}</span>
-        <div class="voto__nombres">${nombres(v.jugadores_no)}</div>
-      </div>
-    </div>
   `;
+}
+
+/* ── Desglose de votos (modal) ───────────────────────────────────────────── */
+function abrirDesglose(id) {
+  const v = STATE.votaciones.find(x => x.id === id);
+  if (!v) return;
+  const fecha = parseFechaVoto(v.fecha);
+  const titulo = fecha
+    ? `${DIAS_SEMANA[fecha.getDay()]} ${fecha.getDate()} ${MESES[fecha.getMonth()]}`
+    : v.fecha;
+  const hora = v.hora ? ` · ${v.hora.slice(0, 5)}` : '';
+
+  const grupo = (clase, icono, texto, arr) => `
+    <div class="desglose__grupo desglose__grupo--${clase}">
+      <div class="desglose__label">${icono} ${texto} <b>${arr.length}</b></div>
+      <div class="desglose__nombres">${arr.length
+        ? arr.map(n => `<span class="desglose__nombre">${n}</span>`).join('')
+        : '<span class="desglose__nadie">Nadie todavía</span>'}</div>
+    </div>`;
+
+  document.getElementById('votosModalBox').innerHTML = `
+    <h2 class="dialog-box__title">${titulo}${hora}</h2>
+    <p class="dialog-box__text">${v.lugar || 'Lugar por decidir'}</p>
+    ${grupo('si', '✓', 'Pueden', v.jugadores_si)}
+    ${grupo('no', '✗', 'No pueden', v.jugadores_no)}
+  `;
+  openModal('votosModal');
 }
 
 function refrescarVoto(v) {
@@ -151,18 +173,35 @@ function bindVotacion(panel) {
   panel.addEventListener('click', e => {
     const btn = e.target.closest('.voto-btn');
     if (btn) { votar(btn.closest('.voto').dataset.id, btn.dataset.voto); return; }
-    if (e.target.closest('.votacion-login__btn')) openSessionModal();
+    if (e.target.closest('.votacion-login__btn')) { openSessionModal(); return; }
+    // Click en la card o en sus contadores → desglose de nombres
+    const card = e.target.closest('.voto-card');
+    if (card && Date.now() - ultimoSwipe > 300) abrirDesglose(card.closest('.voto').dataset.id);
   });
   panel.addEventListener('pointerdown', iniciarSwipe);
 }
 
+// Pointer events + touch-action: pan-y en la card: el navegador hace el scroll
+// vertical por su cuenta y solo nos manda el gesto horizontal, sin necesidad de
+// listeners de touchmove no pasivos. Pintamos una vez por frame y solo con
+// transform/opacity (composición en GPU, sin layout).
 function iniciarSwipe(e) {
   const card = e.target.closest('.voto-card--swipe');
   if (!card || e.button > 0) return;
 
   const id = card.closest('.voto').dataset.id;
+  const stampSi = card.querySelector('.voto-card__stamp--si');
+  const stampNo = card.querySelector('.voto-card__stamp--no');
   const x0 = e.clientX, y0 = e.clientY;
-  let dx = 0, arrastrando = false;
+  let dx = 0, arrastrando = false, frame = 0;
+
+  function pintar() {
+    frame = 0;
+    const p = Math.max(-1, Math.min(1, dx / SWIPE_UMBRAL));
+    card.style.transform = `translateX(${dx}px) rotate(${dx / 18}deg)`;
+    stampSi.style.opacity = Math.max(0, p);
+    stampNo.style.opacity = Math.max(0, -p);
+  }
 
   function mover(ev) {
     dx = ev.clientX - x0;
@@ -173,10 +212,7 @@ function iniciarSwipe(e) {
       card.classList.add('is-dragging');
       try { card.setPointerCapture(ev.pointerId); } catch { /* puntero ya liberado */ }
     }
-    const p = Math.max(-1, Math.min(1, dx / SWIPE_UMBRAL));
-    card.style.transform = `translateX(${dx}px) rotate(${dx / 18}deg)`;
-    card.style.setProperty('--drag-si', Math.max(0, p));
-    card.style.setProperty('--drag-no', Math.max(0, -p));
+    if (!frame) frame = requestAnimationFrame(pintar);
   }
 
   function soltar() {
@@ -185,10 +221,12 @@ function iniciarSwipe(e) {
     card.removeEventListener('pointercancel', soltar);
     if (!arrastrando) return;
 
+    cancelAnimationFrame(frame);
+    ultimoSwipe = Date.now();
     card.classList.remove('is-dragging');
     card.style.transform = '';
-    card.style.removeProperty('--drag-si');
-    card.style.removeProperty('--drag-no');
+    stampSi.style.opacity = '';
+    stampNo.style.opacity = '';
     if (Math.abs(dx) >= SWIPE_UMBRAL) votar(id, dx > 0 ? 'si' : 'no');
   }
 

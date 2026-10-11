@@ -1205,8 +1205,6 @@ button, [role="button"], .modal__backdrop, .tab, .result-row, .card-wrap {
 .voto { display: flex; flex-direction: column; gap: 12px; }
 
 .voto-card {
-  --drag-si: 0;
-  --drag-no: 0;
   position: relative;
   container-type: inline-size;
   aspect-ratio: 4 / 5;
@@ -1216,8 +1214,12 @@ button, [role="button"], .modal__backdrop, .tab, .result-row, .card-wrap {
   flex-direction: column;
   align-items: center;
   justify-content: space-between;
-  padding: 26px 18px 22px;
+  padding: 26px 18px 62px;
   text-align: center;
+  cursor: pointer;
+  /* Capa propia en GPU: el arrastre solo recompone, no repinta */
+  will-change: transform;
+  touch-action: pan-y;
   border: 1px solid rgba(31,224,101,.28);
   background:
     radial-gradient(120% 70% at 50% 0%, rgba(31,224,101,.28), transparent 62%),
@@ -1248,7 +1250,7 @@ button, [role="button"], .modal__backdrop, .tab, .result-row, .card-wrap {
 }
 .voto-card__lugar, .voto-card__dia, .voto-card__fecha { position: relative; z-index: 2; }
 .voto-card__stamp { z-index: 3; }
-.voto-card--swipe { cursor: grab; touch-action: pan-y; }
+.voto-card--swipe { cursor: grab; }
 .voto-card.is-dragging { cursor: grabbing; transition: none; }
 
 .voto-card__lugar {
@@ -1310,9 +1312,29 @@ button, [role="button"], .modal__backdrop, .tab, .result-row, .card-wrap {
 .voto:has(.voto-btn--si:hover) .voto-card__stamp--si,
 .voto:has(.voto-btn--no:hover) .voto-card__stamp--no { opacity: 1; transform: none; }
 
-/* Durante el arrastre los sellos siguen al dedo */
-.voto-card.is-dragging .voto-card__stamp--si { opacity: var(--drag-si); transform: scale(calc(.7 + .3 * var(--drag-si))); }
-.voto-card.is-dragging .voto-card__stamp--no { opacity: var(--drag-no); transform: scale(calc(.7 + .3 * var(--drag-no))); }
+/* Durante el arrastre la opacidad de los sellos la pone el JS frame a frame */
+.voto-card.is-dragging .voto-card__stamp { transform: none; transition: none; }
+
+/* Contadores en las esquinas inferiores (abren el desglose) */
+.voto-card__count {
+  position: absolute;
+  bottom: 14px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border-radius: 99px;
+  font-family: 'Anton', sans-serif;
+  font-size: 16px;
+  letter-spacing: .04em;
+  background: rgba(6,20,13,.82);
+  border: 1px solid currentColor;
+  transition: background .15s, transform .15s;
+}
+.voto-card__count:hover { transform: scale(1.06); }
+.voto-card__count--no { left: 14px;  color: #ff5a5a; }
+.voto-card__count--si { right: 14px; color: var(--verde); }
 
 .voto__actions {
   display: flex;
@@ -1335,31 +1357,31 @@ button, [role="button"], .modal__backdrop, .tab, .result-row, .card-wrap {
 .voto-btn--si[aria-pressed="true"] { background: var(--verde); color: #06140D; border-color: var(--verde); box-shadow: 0 0 20px rgba(31,224,101,.5); }
 .voto-btn--no[aria-pressed="true"] { background: #ff5a5a;      color: #06140D; border-color: #ff5a5a;      box-shadow: 0 0 20px rgba(255,90,90,.45); }
 
-.voto__resumen {
-  display: grid;
-  gap: 8px;
+/* Modal de desglose de votos */
+.desglose__grupo {
+  text-align: left;
   padding: 12px 14px;
-  border-radius: 14px;
-  background: rgba(14,32,22,.6);
-  border: 1px solid rgba(31,224,101,.14);
+  border-radius: 12px;
+  background: rgba(14,32,22,.7);
+  margin-bottom: 10px;
 }
-.voto__fila { display: flex; align-items: flex-start; gap: 10px; }
-.voto__count {
-  font-family: 'Anton', sans-serif;
-  font-size: 16px;
-  min-width: 42px;
-  line-height: 24px;
+.desglose__label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
 }
-.voto__fila--si .voto__count { color: var(--verde); }
-.voto__fila--no .voto__count { color: #ff5a5a; }
-.voto__nombres { display: flex; flex-wrap: wrap; gap: 5px; }
-.voto__nombre {
-  font-size: 11px;
+.desglose__grupo--si .desglose__label { color: var(--verde); }
+.desglose__grupo--no .desglose__label { color: #ff5a5a; }
+.desglose__nombres { display: flex; flex-wrap: wrap; gap: 6px; }
+.desglose__nombre {
+  font-size: 12px;
   font-weight: 600;
-  padding: 4px 9px;
+  padding: 5px 10px;
   border-radius: 99px;
-  background: rgba(31,224,101,.08);
+  background: rgba(31,224,101,.1);
   color: #E8FBEF;
 }
-.voto__fila--no .voto__nombre { background: rgba(255,90,90,.1); }
-.voto__nadie { font-size: 11px; color: #6E9D81; line-height: 24px; font-style: italic; }
+.desglose__grupo--no .desglose__nombre { background: rgba(255,90,90,.12); }
+.desglose__nadie { font-size: 12px; color: #6E9D81; font-style: italic; }
