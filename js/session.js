@@ -43,7 +43,7 @@ const JUGADORES_FOTOS = {
   "Javier":   "",
   "Jorge":    "https://res.cloudinary.com/dnd3g3zgm/image/upload/v1791741813/IMG-20240621-WA0008_mbjgmj.jpg",
   "Luis":     "",
-  "Mateo":    "https://res.cloudinary.com/dnd3g3zgm/image/upload/v1791741812/apps.56233.14149010387777920.1f9829d6-41d4-4e5f-9e1d-eca24b9a3e17_fkoiil.ico",
+  "Mateo":    "https://res.cloudinary.com/dnd3g3zgm/image/upload/v1791749321/apps.56233.14149010387777920.1f9829d6-41d4-4e5f-9e1d-eca24b9a3e17_fkoiil.png",
   "Nicolás":  "https://res.cloudinary.com/dnd3g3zgm/image/upload/v1791741813/Captura_de_pantalla_2024-06-15_232610_jk5vm4.jpg",
   "Pablo":    "",
   "Pelayo":   "",
@@ -65,6 +65,7 @@ function setSessionPlayer(nombre) {
   } catch { /* sin persistencia: la sesión dura lo que la pestaña */ }
   renderSessionButton(nombre);
   if (typeof pushVincularJugador === 'function') pushVincularJugador(nombre);
+  if (typeof onSessionChange === 'function') onSessionChange(nombre);
 }
 
 async function sha256(texto) {

@@ -48,6 +48,7 @@
   <nav class="tabs" id="tabs" role="tablist" aria-label="Secciones">
     <div class="tabs__inner">
       <button class="tab active" data-tab="inicio"        role="tab" aria-selected="true">Inicio</button>
+      <button class="tab"        data-tab="votacion"      role="tab" aria-selected="false">Votación</button>
       <button class="tab"        data-tab="resumen"       role="tab" aria-selected="false">Resumen</button>
       <button class="tab"        data-tab="clasificacion" role="tab" aria-selected="false">Clasificación</button>
       <button class="tab"        data-tab="goleadores"    role="tab" aria-selected="false">Goleadores</button>
@@ -59,6 +60,7 @@
   <!-- TAB PANELS -->
   <main class="main">
     <div class="tab-panel active" id="panel-inicio"        role="tabpanel"></div>
+    <div class="tab-panel"        id="panel-votacion"      role="tabpanel"></div>
     <div class="tab-panel"        id="panel-resumen"       role="tabpanel"></div>
     <div class="tab-panel"        id="panel-clasificacion" role="tabpanel"></div>
     <div class="tab-panel"        id="panel-goleadores"    role="tabpanel"></div>
@@ -131,6 +133,7 @@
   <script src="js/calendar.js"></script>
   <script src="js/session.js"></script>
   <script src="js/push.js"></script>
+  <script src="js/votacion.js"></script>
   <script src="js/app.js"></script>
   <script>
     if ('serviceWorker' in navigator) {

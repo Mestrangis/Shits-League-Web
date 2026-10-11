@@ -1,6 +1,7 @@
 /* ═══════════════════════════════════════════════
    SHITS LEAGUE — sheets.js
    Lee todos los datos desde Google Sheets API pública.
+   Los votos se escriben via Google Apps Script (postVoto).
 ═══════════════════════════════════════════════ */
 
 const SHEETS_ID  = '1EHGrFt2Y3QDCOdSV3fVgWvspzXYcir4SmDxOezdSLRY';
@@ -9,6 +10,11 @@ const SHEETS_KEY = 'AIzaSyC5TLnk-zGTAia4HZNvv77PgY2FtXYfhdc';
 // Nombre exacto de las pestañas en el spreadsheet
 const SHEET_JUGADORES = 'Jugadores';
 const SHEET_JORNADAS  = 'Jornadas';
+const SHEET_VOTACIONES = 'Votaciones';
+
+// Apps Script de votaciones (solo escritura de votos)
+const VOTOS_GAS_URL    = 'https://script.google.com/macros/s/AKfycbzTmIOCLl4ArFrFA1E-JroStkZGt3V0hdsjkxVKMi_T0E4KkySXbGcOiTT8zhmSAu4Llg/exec';
+const VOTOS_GAS_SECRET = 'pissleague';
 
 // ── Core ──────────────────────────────────────────────────────────────────
 
@@ -82,6 +88,37 @@ async function fetchJornadas() {
     console.warn('[sheets] fetchJornadas:', e);
     return null;
   }
+}
+
+// ── Votaciones ────────────────────────────────────────────────────────────
+// Pestaña: id | fecha | hora | lugar | imagen_url | jugadores_si | jugadores_no
+async function fetchVotaciones() {
+  try {
+    const rows = await sheetsFetch(SHEET_VOTACIONES);
+    return rows.filter(r => r.id).map(r => ({
+      id:           r.id,
+      fecha:        r.fecha      || '',
+      hora:         r.hora       || '',
+      lugar:        r.lugar      || '',
+      imagen:       r.imagen_url || '',
+      jugadores_si: splitNombres(r.jugadores_si),
+      jugadores_no: splitNombres(r.jugadores_no),
+    }));
+  } catch (e) {
+    console.warn('[sheets] fetchVotaciones:', e);
+    return null;
+  }
+}
+
+// voto: 'si' | 'no'. Con no-cors la respuesta es opaca: no sabemos si el
+// Apps Script lo guardó, solo si la petición salió. La UI actualiza en optimista.
+async function postVoto(id, nombre, voto) {
+  await fetch(VOTOS_GAS_URL, {
+    method: 'POST',
+    mode: 'no-cors',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify({ secret: VOTOS_GAS_SECRET, action: 'votar', id, nombre, voto }),
+  });
 }
 
 function splitNombres(str) {

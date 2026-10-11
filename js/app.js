@@ -7,6 +7,7 @@ let STATE = {
   jornadas:         [],
   activeTab:        'inicio',
   proximosPartidos: [],
+  votaciones:       [],
   season:           '25-26',
   alias:            {}, // nombre normalizado (propio o alias) → nombre canónico
 };
@@ -14,16 +15,18 @@ let STATE = {
 /* ── Datos ───────────────────────────────────────────────────────────────── */
 async function loadData() {
   // Todo desde Sheets en paralelo — cero archivos locales de datos
-  const [jugadores, jornadas, proximos] = await Promise.all([
+  const [jugadores, jornadas, proximos, votaciones] = await Promise.all([
     fetchJugadores(),
     fetchJornadas(),
     fetchProximosPartidos(5),
+    fetchVotaciones(),
   ]);
 
   STATE.jornadas         = jornadas  || [];
   STATE.alias            = construirAlias(jugadores || []);
   STATE.jugadores        = calcularStats(jugadores || [], STATE.jornadas);
   STATE.proximosPartidos = proximos || [];
+  STATE.votaciones       = votaciones || [];
 }
 
 /* ── Normalización de nombres ────────────────────────────────────────────── */
@@ -120,6 +123,15 @@ function initHero() {
 }
 
 /* ── Tabs ────────────────────────────────────────────────────────────────── */
+const TABS = ['inicio', 'votacion', 'resumen', 'clasificacion', 'goleadores', 'asistentes', 'plantilla'];
+
+// '#votacion' → 'votacion'; null si el hash no es una pestaña.
+// Permite que las notificaciones enlacen a una pestaña concreta.
+function tabDesdeHash() {
+  const name = decodeURIComponent(location.hash.slice(1)).toLowerCase();
+  return TABS.includes(name) ? name : null;
+}
+
 function initTabs() {
   document.querySelectorAll('.tab').forEach(tab => {
     tab.addEventListener('click', () => switchTab(tab.dataset.tab));
@@ -141,6 +153,7 @@ function switchTab(name) {
   );
 
   renderTabIfNeeded(name);
+  history.replaceState(null, '', `#${name}`);
 
   // scroll tab into view on mobile
   document.querySelector(`.tab[data-tab="${name}"]`)
@@ -154,6 +167,9 @@ function renderTabIfNeeded(name) {
   switch (name) {
     case 'inicio':
       panel.innerHTML = renderInicio(STATE.proximosPartidos);
+      break;
+    case 'votacion':
+      panel.innerHTML = renderVotacion(STATE.votaciones, getSessionPlayer());
       break;
     case 'resumen':
       panel.innerHTML = renderResumen(STATE.jugadores, STATE.jornadas);
@@ -180,6 +196,11 @@ function renderTabIfNeeded(name) {
 function bindPanel(panel, name) {
   if (name === 'inicio') {
     startCountdown(STATE.proximosPartidos[0]?.fecha);
+  }
+  if (name === 'votacion' && !panel.dataset.bound) {
+    // Delegación: el panel se re-renderiza al cambiar la sesión, los listeners se quedan
+    bindVotacion(panel);
+    panel.dataset.bound = '1';
   }
   if (name === 'resumen') {
     panel.querySelectorAll('.result-row').forEach(row => {
@@ -382,7 +403,27 @@ async function init() {
 
   initHero();
   renderTabIfNeeded('inicio');
+  const tabInicial = tabDesdeHash();
+  if (tabInicial) {
+    switchTab(tabInicial);
+    // Si se entra con hash (p. ej. desde una notificación), saltamos el hero
+    document.querySelector('.main').scrollIntoView({ block: 'start', behavior: 'instant' });
+  }
+  window.addEventListener('hashchange', () => {
+    const tab = tabDesdeHash();
+    if (tab) switchTab(tab);
+  });
   initPush();
+}
+
+/* ── Cambio de sesión (login / logout) ───────────────────────────────────── */
+// Lo llama session.js; re-renderiza lo que depende del jugador logueado
+function onSessionChange() {
+  const panel = document.getElementById('panel-votacion');
+  if (panel?.dataset.rendered) {
+    panel.dataset.rendered = '';
+    renderTabIfNeeded('votacion');
+  }
 }
 
 document.addEventListener('DOMContentLoaded', init);
