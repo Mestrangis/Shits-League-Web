@@ -393,6 +393,10 @@ button, [role="button"], .modal__backdrop, .tab, .result-row, .card-wrap {
   position: relative;
   z-index: 1;
   scroll-margin-top: calc(var(--topbar-h) + var(--tabs-h));
+  /* Una card de votación arrastrada a la derecha ensanchaba el área desplazable
+     de toda la página en cada frame (a la izquierda no cuenta). clip la recorta
+     sin crear un contenedor de scroll. */
+  overflow-x: clip;
 }
 .tab-panel {
   display: none;
