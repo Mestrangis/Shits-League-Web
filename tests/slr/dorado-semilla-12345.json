@@ -1,0 +1,837 @@
+{
+  "version": "1.0.0",
+  "goles": [
+    2,
+    1
+  ],
+  "penaltis": null,
+  "eventos": [
+    {
+      "jugada": 1,
+      "minuto": 8,
+      "tipo": "inicio_jugada",
+      "saca": "A"
+    },
+    {
+      "jugada": 1,
+      "minuto": 8,
+      "tipo": "posesion",
+      "saca": "A",
+      "fuerzas": [
+        178.3,
+        141.4
+      ],
+      "p": 0.61390329411015,
+      "ganador": "B",
+      "contraataque": true
+    },
+    {
+      "jugada": 1,
+      "minuto": 8,
+      "tipo": "ocasion",
+      "equipo": "B",
+      "fuerzaAtaque": 174.57,
+      "fuerzaDefensa": 99.82,
+      "p": 0.7536016702488236,
+      "exito": true,
+      "contraataque": true
+    },
+    {
+      "jugada": 1,
+      "minuto": 8,
+      "tipo": "tirador",
+      "equipo": "B",
+      "candidatos": [
+        {
+          "carta": "f-carlos",
+          "p": 0.1098137952023905
+        },
+        {
+          "carta": "f-capi",
+          "p": 0.1355725866696179
+        },
+        {
+          "carta": "f-bala",
+          "p": 0.40926320449326287
+        },
+        {
+          "carta": "f-oscar",
+          "p": 0.34535041363472874
+        }
+      ],
+      "elegido": "f-bala"
+    },
+    {
+      "jugada": 1,
+      "minuto": 8,
+      "tipo": "chut",
+      "equipo": "B",
+      "tirador": "f-bala",
+      "portero": "m-muro",
+      "ata": 86,
+      "def": 81,
+      "p": 0.5299133051515369,
+      "gol": true
+    },
+    {
+      "jugada": 2,
+      "minuto": 12,
+      "tipo": "inicio_jugada",
+      "saca": "B"
+    },
+    {
+      "jugada": 2,
+      "minuto": 12,
+      "tipo": "poder",
+      "equipo": "A",
+      "carta": "m-cerebro",
+      "poder": "Cerebro",
+      "momento": "posesion"
+    },
+    {
+      "jugada": 2,
+      "minuto": 12,
+      "tipo": "posesion",
+      "saca": "B",
+      "fuerzas": [
+        205.045,
+        141.4
+      ],
+      "p": 0.3222887504066544,
+      "ganador": "A",
+      "contraataque": true
+    },
+    {
+      "jugada": 2,
+      "minuto": 12,
+      "tipo": "poder",
+      "equipo": "A",
+      "carta": "m-mosq",
+      "poder": "Todos para uno",
+      "momento": "ocasion_ataque"
+    },
+    {
+      "jugada": 2,
+      "minuto": 12,
+      "tipo": "ocasion",
+      "equipo": "A",
+      "fuerzaAtaque": 231.43749999999997,
+      "fuerzaDefensa": 151.29999999999998,
+      "p": 0.7005861214847972,
+      "exito": false,
+      "contraataque": true
+    },
+    {
+      "jugada": 2,
+      "minuto": 12,
+      "tipo": "cansancio",
+      "equipo": "A",
+      "carta": "m-muro",
+      "stat": "DEF",
+      "valor": 77
+    },
+    {
+      "jugada": 3,
+      "minuto": 20,
+      "tipo": "inicio_jugada",
+      "saca": "A"
+    },
+    {
+      "jugada": 3,
+      "minuto": 20,
+      "tipo": "poder",
+      "equipo": "B",
+      "carta": "f-capi",
+      "poder": "Batuta",
+      "momento": "posesion"
+    },
+    {
+      "jugada": 3,
+      "minuto": 20,
+      "tipo": "posesion",
+      "saca": "A",
+      "fuerzas": [
+        178.3,
+        162.60999999999999
+      ],
+      "p": 0.5459265956796614,
+      "ganador": "A",
+      "contraataque": false
+    },
+    {
+      "jugada": 3,
+      "minuto": 20,
+      "tipo": "poder",
+      "equipo": "A",
+      "carta": "m-mosq",
+      "poder": "Todos para uno",
+      "momento": "ocasion_ataque"
+    },
+    {
+      "jugada": 3,
+      "minuto": 20,
+      "tipo": "ocasion",
+      "equipo": "A",
+      "fuerzaAtaque": 201.25,
+      "fuerzaDefensa": 151.29999999999998,
+      "p": 0.6388939027856317,
+      "exito": false,
+      "contraataque": false
+    },
+    {
+      "jugada": 3,
+      "minuto": 20,
+      "tipo": "cansancio",
+      "equipo": "A",
+      "carta": "m-zurdo",
+      "stat": "DEF",
+      "valor": 41
+    },
+    {
+      "jugada": 4,
+      "minuto": 30,
+      "tipo": "inicio_jugada",
+      "saca": "B"
+    },
+    {
+      "jugada": 4,
+      "minuto": 30,
+      "tipo": "poder",
+      "equipo": "B",
+      "carta": "f-capi",
+      "poder": "Batuta",
+      "momento": "posesion"
+    },
+    {
+      "jugada": 4,
+      "minuto": 30,
+      "tipo": "posesion",
+      "saca": "B",
+      "fuerzas": [
+        178.3,
+        162.60999999999999
+      ],
+      "p": 0.45407340432033866,
+      "ganador": "A",
+      "contraataque": true
+    },
+    {
+      "jugada": 4,
+      "minuto": 30,
+      "tipo": "ocasion",
+      "equipo": "A",
+      "fuerzaAtaque": 185.14999999999998,
+      "fuerzaDefensa": 151.29999999999998,
+      "p": 0.5996011174134638,
+      "exito": false,
+      "contraataque": true
+    },
+    {
+      "jugada": 4,
+      "minuto": 30,
+      "tipo": "cansancio",
+      "equipo": "A",
+      "carta": "m-muro",
+      "stat": "CON",
+      "valor": 41
+    },
+    {
+      "jugada": 5,
+      "minuto": 43,
+      "tipo": "inicio_jugada",
+      "saca": "A"
+    },
+    {
+      "jugada": 5,
+      "minuto": 43,
+      "tipo": "poder",
+      "equipo": "A",
+      "carta": "m-cerebro",
+      "poder": "Cerebro",
+      "momento": "posesion"
+    },
+    {
+      "jugada": 5,
+      "minuto": 43,
+      "tipo": "posesion",
+      "saca": "A",
+      "fuerzas": [
+        205.045,
+        141.4
+      ],
+      "p": 0.6777112495933456,
+      "ganador": "A",
+      "contraataque": false
+    },
+    {
+      "jugada": 5,
+      "minuto": 43,
+      "tipo": "ocasion",
+      "equipo": "A",
+      "fuerzaAtaque": 161,
+      "fuerzaDefensa": 151.29999999999998,
+      "p": 0.5310299432381211,
+      "exito": true,
+      "contraataque": false
+    },
+    {
+      "jugada": 5,
+      "minuto": 43,
+      "tipo": "poder",
+      "equipo": "A",
+      "carta": "m-pichichi",
+      "poder": "Pichichi",
+      "momento": "tirador"
+    },
+    {
+      "jugada": 5,
+      "minuto": 43,
+      "tipo": "tirador",
+      "equipo": "A",
+      "candidatos": [
+        {
+          "carta": "m-cerebro",
+          "p": 0.06516979876350772
+        },
+        {
+          "carta": "m-rayo",
+          "p": 0.08098499045484
+        },
+        {
+          "carta": "m-zurdo",
+          "p": 0.06305059810497925
+        },
+        {
+          "carta": "m-pichichi",
+          "p": 0.4943166891430373
+        },
+        {
+          "carta": "m-mosq",
+          "p": 0.2964779235336357
+        }
+      ],
+      "elegido": "m-cerebro"
+    },
+    {
+      "jugada": 5,
+      "minuto": 43,
+      "tipo": "poder",
+      "equipo": "B",
+      "carta": "f-manos",
+      "poder": "Manos de hierro",
+      "momento": "parada"
+    },
+    {
+      "jugada": 5,
+      "minuto": 43,
+      "tipo": "chut",
+      "equipo": "A",
+      "tirador": "m-cerebro",
+      "portero": "f-manos",
+      "ata": 61,
+      "def": 96.6,
+      "p": 0.28507817623516,
+      "gol": true
+    },
+    {
+      "jugada": 6,
+      "minuto": 47,
+      "tipo": "inicio_jugada",
+      "saca": "B"
+    },
+    {
+      "jugada": 6,
+      "minuto": 47,
+      "tipo": "poder",
+      "equipo": "B",
+      "carta": "f-capi",
+      "poder": "Batuta",
+      "momento": "posesion"
+    },
+    {
+      "jugada": 6,
+      "minuto": 47,
+      "tipo": "posesion",
+      "saca": "B",
+      "fuerzas": [
+        178.3,
+        162.60999999999999
+      ],
+      "p": 0.45407340432033866,
+      "ganador": "A",
+      "contraataque": true
+    },
+    {
+      "jugada": 6,
+      "minuto": 47,
+      "tipo": "ocasion",
+      "equipo": "A",
+      "fuerzaAtaque": 185.14999999999998,
+      "fuerzaDefensa": 151.29999999999998,
+      "p": 0.5996011174134638,
+      "exito": true,
+      "contraataque": true
+    },
+    {
+      "jugada": 6,
+      "minuto": 47,
+      "tipo": "poder",
+      "equipo": "A",
+      "carta": "m-pichichi",
+      "poder": "Pichichi",
+      "momento": "tirador"
+    },
+    {
+      "jugada": 6,
+      "minuto": 47,
+      "tipo": "tirador",
+      "equipo": "A",
+      "candidatos": [
+        {
+          "carta": "m-cerebro",
+          "p": 0.06516979876350772
+        },
+        {
+          "carta": "m-rayo",
+          "p": 0.08098499045484
+        },
+        {
+          "carta": "m-zurdo",
+          "p": 0.06305059810497925
+        },
+        {
+          "carta": "m-pichichi",
+          "p": 0.4943166891430373
+        },
+        {
+          "carta": "m-mosq",
+          "p": 0.2964779235336357
+        }
+      ],
+      "elegido": "m-mosq"
+    },
+    {
+      "jugada": 6,
+      "minuto": 47,
+      "tipo": "chut",
+      "equipo": "A",
+      "tirador": "m-mosq",
+      "portero": "f-manos",
+      "ata": 92,
+      "def": 84,
+      "p": 0.545360824742268,
+      "gol": true
+    },
+    {
+      "jugada": 6,
+      "minuto": 47,
+      "tipo": "cansancio",
+      "equipo": "A",
+      "carta": "m-pitbull",
+      "stat": "DEF",
+      "valor": 75
+    },
+    {
+      "jugada": 6,
+      "minuto": 47,
+      "tipo": "cansancio",
+      "equipo": "A",
+      "carta": "m-cerebro",
+      "stat": "DEF",
+      "valor": 48
+    },
+    {
+      "jugada": 6,
+      "minuto": 47,
+      "tipo": "cansancio",
+      "equipo": "A",
+      "carta": "m-pichichi",
+      "stat": "ATA",
+      "valor": 80
+    },
+    {
+      "jugada": 6,
+      "minuto": 47,
+      "tipo": "cansancio",
+      "equipo": "A",
+      "carta": "m-mosq",
+      "stat": "ATA",
+      "valor": 88
+    },
+    {
+      "jugada": 6,
+      "minuto": 47,
+      "tipo": "cansancio",
+      "equipo": "B",
+      "carta": "f-manos",
+      "stat": "CON",
+      "valor": 36
+    },
+    {
+      "jugada": 6,
+      "minuto": 47,
+      "tipo": "cansancio",
+      "equipo": "B",
+      "carta": "f-cerrojo",
+      "stat": "CON",
+      "valor": 66
+    },
+    {
+      "jugada": 6,
+      "minuto": 47,
+      "tipo": "cansancio",
+      "equipo": "B",
+      "carta": "f-carlos",
+      "stat": "CON",
+      "valor": 78
+    },
+    {
+      "jugada": 7,
+      "minuto": 56,
+      "tipo": "inicio_jugada",
+      "saca": "A"
+    },
+    {
+      "jugada": 7,
+      "minuto": 56,
+      "tipo": "poder",
+      "equipo": "A",
+      "carta": "m-cerebro",
+      "poder": "Cerebro",
+      "momento": "posesion"
+    },
+    {
+      "jugada": 7,
+      "minuto": 56,
+      "tipo": "posesion",
+      "saca": "A",
+      "fuerzas": [
+        205.045,
+        138.6
+      ],
+      "p": 0.6863854703773948,
+      "ganador": "B",
+      "contraataque": true
+    },
+    {
+      "jugada": 7,
+      "minuto": 56,
+      "tipo": "ocasion",
+      "equipo": "B",
+      "fuerzaAtaque": 174.57,
+      "fuerzaDefensa": 95.22,
+      "p": 0.7707006369426752,
+      "exito": false,
+      "contraataque": true
+    },
+    {
+      "jugada": 8,
+      "minuto": 65,
+      "tipo": "inicio_jugada",
+      "saca": "B"
+    },
+    {
+      "jugada": 8,
+      "minuto": 65,
+      "tipo": "posesion",
+      "saca": "B",
+      "fuerzas": [
+        178.3,
+        138.6
+      ],
+      "p": 0.3766596046928629,
+      "ganador": "A",
+      "contraataque": true
+    },
+    {
+      "jugada": 8,
+      "minuto": 65,
+      "tipo": "ocasion",
+      "equipo": "A",
+      "fuerzaAtaque": 177.32999999999998,
+      "fuerzaDefensa": 151.29999999999998,
+      "p": 0.5787137812915834,
+      "exito": true,
+      "contraataque": true
+    },
+    {
+      "jugada": 8,
+      "minuto": 65,
+      "tipo": "poder",
+      "equipo": "A",
+      "carta": "m-pichichi",
+      "poder": "Pichichi",
+      "momento": "tirador"
+    },
+    {
+      "jugada": 8,
+      "minuto": 65,
+      "tipo": "tirador",
+      "equipo": "A",
+      "candidatos": [
+        {
+          "carta": "m-cerebro",
+          "p": 0.07016386023796505
+        },
+        {
+          "carta": "m-rayo",
+          "p": 0.08719099428657628
+        },
+        {
+          "carta": "m-zurdo",
+          "p": 0.06788226198781891
+        },
+        {
+          "carta": "m-pichichi",
+          "p": 0.48271830746893446
+        },
+        {
+          "carta": "m-mosq",
+          "p": 0.2920445760187053
+        }
+      ],
+      "elegido": "m-mosq"
+    },
+    {
+      "jugada": 8,
+      "minuto": 65,
+      "tipo": "poder",
+      "equipo": "A",
+      "carta": "m-mosq",
+      "poder": "Francotirador",
+      "momento": "chut"
+    },
+    {
+      "jugada": 8,
+      "minuto": 65,
+      "tipo": "chut",
+      "equipo": "A",
+      "tirador": "m-mosq",
+      "portero": "f-manos",
+      "ata": 101.19999999999999,
+      "def": 84,
+      "p": 0.5920783653534858,
+      "gol": false
+    },
+    {
+      "jugada": 8,
+      "minuto": 65,
+      "tipo": "cansancio",
+      "equipo": "A",
+      "carta": "m-rayo",
+      "stat": "DEF",
+      "valor": 58
+    },
+    {
+      "jugada": 8,
+      "minuto": 65,
+      "tipo": "cansancio",
+      "equipo": "B",
+      "carta": "f-cerrojo",
+      "stat": "CON",
+      "valor": 62
+    },
+    {
+      "jugada": 8,
+      "minuto": 65,
+      "tipo": "cansancio",
+      "equipo": "B",
+      "carta": "f-oscar",
+      "stat": "CON",
+      "valor": 62
+    },
+    {
+      "jugada": 9,
+      "minuto": 74,
+      "tipo": "inicio_jugada",
+      "saca": "A"
+    },
+    {
+      "jugada": 9,
+      "minuto": 74,
+      "tipo": "posesion",
+      "saca": "A",
+      "fuerzas": [
+        178.3,
+        138.6
+      ],
+      "p": 0.623340395307137,
+      "ganador": "B",
+      "contraataque": true
+    },
+    {
+      "jugada": 9,
+      "minuto": 74,
+      "tipo": "ocasion",
+      "equipo": "B",
+      "fuerzaAtaque": 174.57,
+      "fuerzaDefensa": 94.38,
+      "p": 0.7738173914726645,
+      "exito": true,
+      "contraataque": true
+    },
+    {
+      "jugada": 9,
+      "minuto": 74,
+      "tipo": "tirador",
+      "equipo": "B",
+      "candidatos": [
+        {
+          "carta": "f-carlos",
+          "p": 0.1098137952023905
+        },
+        {
+          "carta": "f-capi",
+          "p": 0.1355725866696179
+        },
+        {
+          "carta": "f-bala",
+          "p": 0.40926320449326287
+        },
+        {
+          "carta": "f-oscar",
+          "p": 0.34535041363472874
+        }
+      ],
+      "elegido": "f-carlos"
+    },
+    {
+      "jugada": 9,
+      "minuto": 74,
+      "tipo": "chut",
+      "equipo": "B",
+      "tirador": "f-carlos",
+      "portero": "m-muro",
+      "ata": 63,
+      "def": 77,
+      "p": 0.400990099009901,
+      "gol": false
+    },
+    {
+      "jugada": 9,
+      "minuto": 74,
+      "tipo": "cansancio",
+      "equipo": "A",
+      "carta": "m-pichichi",
+      "stat": "DEF",
+      "valor": 34
+    },
+    {
+      "jugada": 10,
+      "minuto": 89,
+      "tipo": "inicio_jugada",
+      "saca": "B"
+    },
+    {
+      "jugada": 10,
+      "minuto": 89,
+      "tipo": "posesion",
+      "saca": "B",
+      "fuerzas": [
+        178.3,
+        138.6
+      ],
+      "p": 0.3766596046928629,
+      "ganador": "B",
+      "contraataque": false
+    },
+    {
+      "jugada": 10,
+      "minuto": 89,
+      "tipo": "ocasion",
+      "equipo": "B",
+      "fuerzaAtaque": 151.8,
+      "fuerzaDefensa": 94.38,
+      "p": 0.7212095597758661,
+      "exito": false,
+      "contraataque": false
+    },
+    {
+      "jugada": 10,
+      "minuto": 89,
+      "tipo": "cansancio",
+      "equipo": "B",
+      "carta": "f-bala",
+      "stat": "ATA",
+      "valor": 82
+    },
+    {
+      "jugada": 10,
+      "minuto": 90,
+      "tipo": "fin_partido",
+      "goles": [
+        2,
+        1
+      ],
+      "penaltis": null,
+      "estadisticas": {
+        "posesiones": [
+          6,
+          4
+        ],
+        "ocasiones": [
+          3,
+          2
+        ],
+        "cortes": [
+          2,
+          3
+        ],
+        "tiros": [
+          3,
+          2
+        ],
+        "goles": [
+          2,
+          1
+        ],
+        "paradas": [
+          1,
+          1
+        ]
+      }
+    }
+  ],
+  "pr": {
+    "m-muro": 1,
+    "m-pitbull": 2,
+    "m-cerebro": 6.158995815899581,
+    "m-rayo": 1.9832635983263598,
+    "m-zurdo": 1.8577405857740585,
+    "m-pichichi": 0,
+    "m-mosq": 5,
+    "f-manos": 0,
+    "f-cerrojo": 1.5903614457831328,
+    "f-victor": 1.4096385542168675,
+    "f-carlos": 2.938420348058902,
+    "f-capi": 2.0615796519410976,
+    "f-bala": 4,
+    "f-oscar": 0
+  },
+  "estadisticas": {
+    "posesiones": [
+      6,
+      4
+    ],
+    "ocasiones": [
+      3,
+      2
+    ],
+    "cortes": [
+      2,
+      3
+    ],
+    "tiros": [
+      3,
+      2
+    ],
+    "goles": [
+      2,
+      1
+    ],
+    "paradas": [
+      1,
+      1
+    ]
+  }
+}
