@@ -2,7 +2,7 @@
 //   node tests/slr/formaciones.mjs
 // Cada cruce se juega con las semillas 1..10000 en los dos órdenes de local
 // (20.000 partidos por cruce); el resultado de la fila suma ambos órdenes.
-import { simularPartido, VERSION, CONFIG } from '../../js/slr/motor-v1.0.0.js';
+import { simularPartido, VERSION, CONFIG } from '../../js/slr/motor-v1.1.0.js';
 
 const N = 10000;
 const FORMACIONES = CONFIG.FORMACIONES; // 2-2-2, 3-2-1, 1-3-2, 2-3-1, 1-2-3

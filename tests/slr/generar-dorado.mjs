@@ -3,13 +3,13 @@
 // Solo se regenera A PROPÓSITO: si el JSON cambia, es una versión nueva del motor
 // (archivo motor-vX.Y.Z.js nuevo), nunca un cambio sobre la versión publicada.
 import { writeFileSync } from 'node:fs';
-import { simularPartido, VERSION } from '../../js/slr/motor-v1.0.0.js';
+import { simularPartido, VERSION } from '../../js/slr/motor-v1.1.0.js';
 import { marcosFC, losDelFondo } from './cartas-prueba.mjs';
 
 export const SEMILLA_DORADA = 12345;
 
 const salida = simularPartido(marcosFC(), losDelFondo(), SEMILLA_DORADA);
-const ruta = new URL('./dorado-semilla-12345.json', import.meta.url);
+const ruta = new URL('./dorado-v1.1.0-semilla-12345.json', import.meta.url);
 writeFileSync(ruta, JSON.stringify(salida, null, 2) + '\n');
 
 console.log(`Motor v${VERSION} · semilla ${SEMILLA_DORADA} → ${salida.goles.join('-')} · ${salida.eventos.length} eventos`);

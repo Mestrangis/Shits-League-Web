@@ -1,7 +1,7 @@
 // Balance del motor: 10.000 partidos con las semillas 1..10000. Solo informa.
 //   node tests/slr/balance.mjs
 // Referencia de la especificación (sección 5): ~2,3 goles por partido, ~20 % de empates.
-import { simularPartido, VERSION } from '../../js/slr/motor-v1.0.0.js';
+import { simularPartido, VERSION } from '../../js/slr/motor-v1.1.0.js';
 import { marcosFC, losDelFondo, conPrefijo } from './cartas-prueba.mjs';
 
 const N = 10000;

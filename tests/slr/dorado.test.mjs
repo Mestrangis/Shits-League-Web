@@ -5,15 +5,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { simularPartido, simularPronostico, VERSION, CONFIG } from '../../js/slr/motor-v1.0.0.js';
+import { simularPartido, simularPronostico, VERSION, CONFIG } from '../../js/slr/motor-v1.1.0.js';
 import { marcosFC, losDelFondo } from './cartas-prueba.mjs';
 
-const dorado = JSON.parse(readFileSync(new URL('./dorado-semilla-12345.json', import.meta.url), 'utf8'));
+const dorado = JSON.parse(readFileSync(new URL('./dorado-v1.1.0-semilla-12345.json', import.meta.url), 'utf8'));
 
 // Ida y vuelta por JSON: así se compara exactamente lo que se guardaría
 const comoJSON = x => JSON.parse(JSON.stringify(x));
 
-test('semilla 12345: la salida es idéntica al archivo dorado', () => {
+test('v1.1.0, semilla 12345: la salida es idéntica al archivo dorado', () => {
   assert.deepEqual(comoJSON(simularPartido(marcosFC(), losDelFondo(), 12345)), dorado);
 });
 
@@ -30,6 +30,21 @@ test('las alineaciones de entrada no se modifican', () => {
   for (let s = 1; s <= 300; s++) simularPartido(A, B, s);
   assert.deepEqual(A, antesA);
   assert.deepEqual(B, antesB);
+});
+
+test('la posesión usa el duelo lineal y el resto el cuadrático', () => {
+  const r = simularPartido(marcosFC(), losDelFondo(), 12345);
+  assert.equal(CONFIG.POSESION_K, 1);
+  for (const e of r.eventos) {
+    if (e.tipo === 'posesion') {
+      const [fSaca, fRival] = e.saca === 'A' ? e.fuerzas : [e.fuerzas[1], e.fuerzas[0]];
+      assert.equal(e.p, fSaca / (fSaca + fRival));
+    }
+    if (e.tipo === 'ocasion') {
+      const a2 = e.fuerzaAtaque * e.fuerzaAtaque, d2 = e.fuerzaDefensa * e.fuerzaDefensa;
+      assert.equal(e.p, a2 / (a2 + d2));
+    }
+  }
 });
 
 test('estructura de la salida', () => {

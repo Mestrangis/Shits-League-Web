@@ -1,12 +1,14 @@
 // Fórmulas del motor contra los números de la sección 14 de la especificación.
 // El partido narrado allí está hecho a mano (no sale de ninguna semilla), así que
 // aquí se comprueban sus fuerzas y probabilidades una a una.
+// Motor v1.1.0: la posesión usa el duelo lineal A/(A+B), así que sus
+// probabilidades difieren de las del PDF (calculadas con k = 2); las fuerzas no.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  duelo, linea, mulberry32, fuerzaPosesion, fuerzaAtaque, fuerzaDefensa, probabilidadesTirador,
-} from '../../js/slr/motor-v1.0.0.js';
+  duelo, dueloLineal, linea, mulberry32, fuerzaPosesion, fuerzaAtaque, fuerzaDefensa, probabilidadesTirador,
+} from '../../js/slr/motor-v1.1.0.js';
 import { marcosFC, losDelFondo } from './cartas-prueba.mjs';
 
 const TOL_FUERZA = 0.05;
@@ -25,11 +27,11 @@ function marcosConPichichi80() {
 
 const prob = (ruleta, id) => ruleta.find(c => c.id === id).p;
 
-test('posesión: Marcos 178.3 contra Fondo 141.4 → P(Marcos) 0.614', () => {
+test('posesión (lineal): Marcos 178.3 contra Fondo 141.4 → P(Marcos) 0.558', () => {
   const fM = fuerzaPosesion(marcosFC()), fF = fuerzaPosesion(losDelFondo());
   cerca(fM, 178.3, TOL_FUERZA, 'posesión Marcos');
   cerca(fF, 141.4, TOL_FUERZA, 'posesión Fondo');
-  cerca(duelo(fM, fF), 0.614, TOL_PROB, 'P(Marcos)');
+  cerca(dueloLineal(fM, fF), 0.558, TOL_PROB, 'P(Marcos)');
 });
 
 test('ocasión: ataque Marcos 161.0 contra defensa Fondo 151.3 → 0.531', () => {
@@ -65,11 +67,11 @@ test('chut: Carlos 63 contra El Muro 81 → 0.377', () => {
   cerca(duelo(63, 81), 0.377, TOL_PROB, 'P(gol)');
 });
 
-test('posesión con Cerebro y Batuta activos: 205.0 contra 162.6 → P(Fondo) 0.386', () => {
+test('posesión (lineal) con Cerebro y Batuta activos: 205.0 contra 162.6 → P(Fondo) 0.442', () => {
   const fM = fuerzaPosesion(marcosFC()) * 1.15, fF = fuerzaPosesion(losDelFondo()) * 1.15;
   cerca(fM, 205.0, TOL_FUERZA, 'posesión Marcos');
   cerca(fF, 162.6, TOL_FUERZA, 'posesión Fondo');
-  cerca(duelo(fF, fM), 0.386, TOL_PROB, 'P(Fondo)');
+  cerca(dueloLineal(fF, fM), 0.442, TOL_PROB, 'P(Fondo)');
 });
 
 test('Pichichi cansado a 80: ataque 158.2 (no 157.9) × 1.15 × 1.25 = 227.4 contra 151.3 → 0.693', () => {
@@ -103,6 +105,11 @@ test('linea: pesos 1 / 0,7 / 0,5, el cuarto no suma y no muta la entrada', () =>
   assert.equal(linea([]), 0);
 });
 
+test('dueloLineal(70, 70) = 0.5 y es proporcional', () => {
+  assert.equal(dueloLineal(70, 70), 0.5);
+  cerca(dueloLineal(80, 20), 0.8, 1e-12, '80 contra 20');
+});
+
 test('duelo(70, 70) = 0.5 y ejemplos de la sección 5.2', () => {
   assert.equal(duelo(70, 70), 0.5);
   cerca(duelo(80, 70), 0.57, 0.005, '80 contra 70');
@@ -120,7 +127,7 @@ test('mulberry32: misma semilla, misma secuencia; distinta semilla, distinta sec
 });
 
 test('el motor no usa funciones prohibidas para el determinismo', () => {
-  const fuente = readFileSync(new URL('../../js/slr/motor-v1.0.0.js', import.meta.url), 'utf8')
+  const fuente = readFileSync(new URL('../../js/slr/motor-v1.1.0.js', import.meta.url), 'utf8')
     .replace(/\/\*[\s\S]*?\*\//g, '')   // sin comentarios de bloque
     .replace(/\/\/.*$/gm, '');          // sin comentarios de línea
   for (const prohibido of ['Math.random', 'Math.pow', 'Math.exp', 'Math.log', '**', 'Date.now', 'new Date']) {

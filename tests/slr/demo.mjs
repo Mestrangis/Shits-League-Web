@@ -1,6 +1,6 @@
 // Demo: simula un partido y lo narra por consola, jugada a jugada.
 //   node tests/slr/demo.mjs [semilla] [liga|copa]
-import { simularPartido, VERSION } from '../../js/slr/motor-v1.0.0.js';
+import { simularPartido, VERSION } from '../../js/slr/motor-v1.1.0.js';
 import { marcosFC, losDelFondo, CARTAS } from './cartas-prueba.mjs';
 
 const semilla = Number(process.argv[2] ?? 12345);

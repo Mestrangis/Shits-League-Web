@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════
-   SHITS LEAGUE RUSH — motor de partido v1.0.0
+   SHITS LEAGUE RUSH — motor de partido v1.1.0
    Especificación: "Liga de Bolsillo — Especificación del juego", sección 5,
    con las decisiones de docs/slr/DECISIONES.md.
 
@@ -12,10 +12,14 @@
 
    Este archivo NO se modifica una vez publicado: los partidos guardan la
    versión con la que se simularon. Cambiar reglas = archivo nuevo
-   (motor-v1.1.0.js…) y regenerar el test dorado.
+   (motor-v1.2.0.js…) y regenerar el test dorado.
+
+   Cambios respecto a v1.0.0 (que se retiró sin haberse jugado ningún partido):
+   - El duelo de posesión es lineal, P = A / (A + B) (CONFIG.POSESION_K = 1).
+     Ocasión, chut y penaltis siguen con el duelo cuadrático (k = 2).
 ═══════════════════════════════════════════════ */
 
-export const VERSION = '1.0.0';
+export const VERSION = '1.1.0';
 
 function congelar(obj) {
   for (const v of Object.values(obj)) if (v && typeof v === 'object') congelar(v);
@@ -24,6 +28,10 @@ function congelar(obj) {
 
 export const CONFIG = congelar({
   JUGADAS:               10,
+  // Exponente del duelo de posesión: 1 = lineal A/(A+B), 2 = cuadrático como el
+  // resto de duelos. Con k = 2 un tercer medio daba demasiada posesión y las
+  // formaciones de 3 medios dominaban (ver docs/slr/DECISIONES.md).
+  POSESION_K:            1,
   PESOS_LINEA:           [1.0, 0.7, 0.5],  // del cuarto valor en adelante no suman
   PESO_MED_OCASION:      0.3,              // los MED aportan el 30 % de su ATA/DEF a la ocasión
   BONUS_CONTRAATAQUE:    1.15,
@@ -75,6 +83,16 @@ export function duelo(a, b) {
   const a2 = a * a, b2 = b * b;
   return a2 / (a2 + b2);
 }
+
+// Duelo lineal (posesión): probabilidad de que gane la fuerza a contra la b, k = 1.
+export function dueloLineal(a, b) {
+  return a / (a + b);
+}
+
+// Duelo de posesión según CONFIG.POSESION_K (solo se admiten 1 y 2: el motor
+// no puede usar potencias genéricas sin perder el determinismo)
+const dueloPosesion = { 1: dueloLineal, 2: duelo }[CONFIG.POSESION_K];
+if (!dueloPosesion) throw new Error(`[motor] POSESION_K no soportado: ${CONFIG.POSESION_K}`);
 
 // Fuerza de una línea: valores de mayor a menor con pesos 1,0 / 0,7 / 0,5.
 // No muta el array recibido.
@@ -246,7 +264,7 @@ export function simularPartido(A, B, semilla, opciones = {}) {
 
     // 2-3. Posesión: poderes de A y luego de B, después el duelo
     const fPos = [0, 1].map(i => fuerzaPosesion(vista(eq[i])) * multiplicador(eq[i], titulares(eq[i]), 'posesion'));
-    const pSaca = duelo(fPos[saca], fPos[rival]);
+    const pSaca = dueloPosesion(fPos[saca], fPos[rival]);
     const ganaSaca = rng() < pSaca;
     const ata = ganaSaca ? saca : rival, def = 1 - ata, contra = !ganaSaca;
     emitir('posesion', {
