@@ -166,9 +166,11 @@ function switchTab(name, { desde } = {}) {
 
 /* ── Swipe entre pestañas (solo pantallas táctiles) ──────────────────────── */
 const SWIPE_TAB_UMBRAL  = 60; // px horizontales mínimos
-// Zonas donde el gesto horizontal ya tiene otro dueño (cards de votación,
-// nav con scroll horizontal, modales, embeds) o es para escribir
-const SWIPE_TAB_EXCLUIR = '.voto, .tabs, .topbar, .modal, iframe, input, textarea';
+// Zonas donde el gesto horizontal ya tiene otro dueño o es para escribir:
+// - .voto-card--swipe: la card arrastrable en sí (mismo selector con el que
+//   votacion.js arranca el arrastre). Sus botones ✓/✗ y el resto sí navegan.
+// - nav con scroll horizontal, modales, embeds y campos de texto
+const SWIPE_TAB_EXCLUIR = '.voto-card--swipe, .tabs, .topbar, .modal, iframe, input, textarea';
 
 // Touch events y no pointer events: en cuanto el navegador empieza a hacer
 // scroll manda pointercancel y no llegaría el pointerup. Pasivos: no bloquean el scroll.

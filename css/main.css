@@ -603,7 +603,7 @@ button, [role="button"], .modal__backdrop, .tab, .result-row, .card-wrap {
   transform: translateY(-6px) scale(1.04);
   filter: drop-shadow(rgba(31,224,101,.35) 0px 0px 16px) drop-shadow(rgba(0,0,0,.5) 0px 10px 22px);
 }
-.card-wrap img { width: 100%; display: block; }
+.card-wrap img { width: 100%; height: auto; display: block; } /* width/height del HTML reservan la proporción: el lazy loading no carga todas de golpe */
 .card-hint {
   margin: 0 0 22px;
   font-size: 12px;

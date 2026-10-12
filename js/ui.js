@@ -23,6 +23,14 @@ function fmtMsg(msg) {
   return msg.replace(/\*\*(.+?)\*\*/g, '<span class="highlight">$1</span>');
 }
 
+// Las cartas originales son PNG de ~2100px y ~2 MB; en la plantilla se ven a
+// 150-200px. Cloudinary las sirve reescaladas y en formato ligero (WebP/AVIF,
+// conservando la transparencia). La transformación va justo después de /upload/.
+function optimizarCartaUrl(url) {
+  if (!url || !url.includes('cloudinary.com')) return url;
+  return url.replace(/(\/image\/upload\/)/, '$1w_300,f_auto,q_auto/');
+}
+
 function ytEmbed(url) {
   if (!url) return null;
   const m = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([A-Za-z0-9_-]{11})/);
@@ -468,8 +476,8 @@ function renderRankingTab(jugadores, campo, unit, titulo, subtitulo) {
 function renderPlantilla(jugadores) {
   const cards = jugadores.map(j => `
     <div class="card-wrap" data-nombre="${j.nombre}" role="button" tabindex="0" aria-label="Ver ficha de ${j.nombre}">
-      <img src="${j.img}" alt="${j.nombre}" loading="lazy"
-        onerror="this.style.opacity='0.25'">
+      <img src="${optimizarCartaUrl(j.img)}" alt="${j.nombre}" loading="lazy"
+        width="300" height="343" onerror="this.style.opacity='0.25'">
     </div>
   `).join('');
 
