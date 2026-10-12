@@ -11,6 +11,13 @@ const SWIPE_UMBRAL  = 90; // px de arrastre horizontal para que cuente como voto
 let ultimoSwipe = 0; // para no abrir el desglose con el click que sigue a un arrastre
 
 /* ── Helpers ─────────────────────────────────────────────────────────────── */
+// Las fotos de Cloudinary vienen a 1600px en horizontal; la card es vertical 4:5.
+// Pedimos a Cloudinary el recorte ya hecho al tamaño de la card y en formato
+// ligero (WebP/AVIF): mucho menos que decodificar y mover en la GPU.
+function imagenOptimizada(url) {
+  return url.replace(/(res\.cloudinary\.com\/[^/]+\/image\/upload\/)/, '$1c_fill,w_600,h_750,f_auto,q_auto/');
+}
+
 // Acepta 'YYYY-MM-DD' y 'DD/MM/YYYY' (formato con el que Sheets devuelve fechas en es-ES)
 function parseFechaVoto(str) {
   let m = (str || '').match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
@@ -78,7 +85,7 @@ function renderVotoInner(v, jugador) {
 
   // Si la imagen no carga se quita y queda el fondo de la paleta
   const bg = v.imagen
-    ? `<img class="voto-card__bg" src="${v.imagen}" alt="" draggable="false"
+    ? `<img class="voto-card__bg" src="${imagenOptimizada(v.imagen)}" alt="" draggable="false" decoding="async"
          onerror="this.parentNode.classList.remove('voto-card--img');this.remove()">`
     : '';
   const cardClass = [
@@ -144,7 +151,23 @@ function abrirDesglose(id) {
 
 function refrescarVoto(v) {
   const article = document.querySelector(`.voto[data-id="${CSS.escape(v.id)}"]`);
-  if (article) article.innerHTML = renderVotoInner(v, getSessionPlayer());
+  if (!article) return;
+  article.innerHTML = renderVotoInner(v, getSessionPlayer());
+  predecodificarImagenes(article);
+}
+
+// Decodifica los JPEG antes de permitir el arrastre, para que el navegador no
+// lo haga en mitad de la animación. Si la imagen falla o decode() tarda más de
+// DECODE_MAX_MS (p. ej. con la página en segundo plano), se permite igualmente.
+const DECODE_MAX_MS = 1000;
+
+function predecodificarImagenes(root) {
+  root.querySelectorAll('.voto-card__bg:not([data-ready])').forEach(img => {
+    const limite = new Promise(r => setTimeout(r, DECODE_MAX_MS));
+    Promise.race([img.decode(), limite])
+      .catch(() => {})
+      .finally(() => { img.dataset.ready = '1'; });
+  });
 }
 
 /* ── Votar (optimista) ───────────────────────────────────────────────────── */
@@ -188,8 +211,11 @@ function bindVotacion(panel) {
 function iniciarSwipe(e) {
   const card = e.target.closest('.voto-card--swipe');
   if (!card || e.button > 0) return;
+  const img = card.querySelector('.voto-card__bg');
+  if (img && !img.dataset.ready) return; // aún decodificando
 
-  const id = card.closest('.voto').dataset.id;
+  const voto = card.closest('.voto');
+  const id = voto.dataset.id;
   const stampSi = card.querySelector('.voto-card__stamp--si');
   const stampNo = card.querySelector('.voto-card__stamp--no');
   const x0 = e.clientX, y0 = e.clientY;
@@ -210,6 +236,7 @@ function iniciarSwipe(e) {
       if (Math.abs(dx) < 8 || Math.abs(dx) < Math.abs(ev.clientY - y0)) return;
       arrastrando = true;
       card.classList.add('is-dragging');
+      voto.classList.add('is-active'); // quita content-visibility para que no recorte la card
       try { card.setPointerCapture(ev.pointerId); } catch { /* puntero ya liberado */ }
     }
     if (!frame) frame = requestAnimationFrame(pintar);
@@ -224,13 +251,14 @@ function iniciarSwipe(e) {
     cancelAnimationFrame(frame);
     ultimoSwipe = Date.now();
     card.classList.remove('is-dragging');
+    voto.classList.remove('is-active');
     card.style.transform = '';
     stampSi.style.opacity = '';
     stampNo.style.opacity = '';
     if (Math.abs(dx) >= SWIPE_UMBRAL) votar(id, dx > 0 ? 'si' : 'no');
   }
 
-  card.addEventListener('pointermove', mover);
+  card.addEventListener('pointermove', mover, { passive: true });
   card.addEventListener('pointerup', soltar);
   card.addEventListener('pointercancel', soltar);
 }

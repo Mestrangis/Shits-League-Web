@@ -197,10 +197,13 @@ function bindPanel(panel, name) {
   if (name === 'inicio') {
     startCountdown(STATE.proximosPartidos[0]?.fecha);
   }
-  if (name === 'votacion' && !panel.dataset.bound) {
-    // Delegación: el panel se re-renderiza al cambiar la sesión, los listeners se quedan
-    bindVotacion(panel);
-    panel.dataset.bound = '1';
+  if (name === 'votacion') {
+    predecodificarImagenes(panel);
+    if (!panel.dataset.bound) {
+      // Delegación: el panel se re-renderiza al cambiar la sesión, los listeners se quedan
+      bindVotacion(panel);
+      panel.dataset.bound = '1';
+    }
   }
   if (name === 'resumen') {
     panel.querySelectorAll('.result-row').forEach(row => {

@@ -1202,7 +1202,16 @@ button, [role="button"], .modal__backdrop, .tab, .result-row, .card-wrap {
   grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
   gap: 28px 20px;
 }
-.voto { display: flex; flex-direction: column; gap: 12px; }
+.voto {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  /* Las votaciones fuera de pantalla no se pintan ni se maquetan */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 500px;
+}
+/* content-visibility implica contain: paint → recortaría la card al arrastrarla fuera */
+.voto.is-active { content-visibility: visible; }
 
 .voto-card {
   position: relative;
@@ -1220,6 +1229,10 @@ button, [role="button"], .modal__backdrop, .tab, .result-row, .card-wrap {
   /* Capa propia en GPU: el arrastre solo recompone, no repinta */
   will-change: transform;
   touch-action: pan-y;
+  /* Capa de composición aislada: lo de dentro no afecta al resto de la página */
+  contain: layout style paint;
+  isolation: isolate;
+  backface-visibility: hidden;
   border: 1px solid rgba(31,224,101,.28);
   background:
     radial-gradient(120% 70% at 50% 0%, rgba(31,224,101,.28), transparent 62%),
@@ -1251,7 +1264,12 @@ button, [role="button"], .modal__backdrop, .tab, .result-row, .card-wrap {
 .voto-card__lugar, .voto-card__dia, .voto-card__fecha { position: relative; z-index: 2; }
 .voto-card__stamp { z-index: 3; }
 .voto-card--swipe { cursor: grab; }
-.voto-card.is-dragging { cursor: grabbing; transition: none; }
+.voto-card.is-dragging {
+  cursor: grabbing;
+  transition: none;
+  box-shadow: none !important;
+  filter: none !important;
+}
 
 .voto-card__lugar {
   font-family: 'Anton', sans-serif;
