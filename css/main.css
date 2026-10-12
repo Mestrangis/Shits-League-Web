@@ -409,6 +409,17 @@ button, [role="button"], .modal__backdrop, .tab, .result-row, .card-wrap {
 }
 .tab-panel.active { display: block; }
 
+/* Slide entre pestañas por swipe (app.js → deslizarPaneles) */
+.tab-panel--deslizando { transition: transform .3s ease; }
+.tab-panel--saliendo {
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+}
+
 /* ── Section heading (used in all tabs) ── */
 .sh {
   display: flex;

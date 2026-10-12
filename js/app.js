@@ -141,8 +141,11 @@ function initTabs() {
   });
 }
 
-function switchTab(name) {
+// desde: 'derecha' | 'izquierda' → la pestaña entra deslizándose desde ese lado
+// (solo cuando el cambio viene de un swipe; con click no hay animación)
+function switchTab(name, { desde } = {}) {
   if (name === STATE.activeTab) return;
+  const saliente = document.getElementById(`panel-${STATE.activeTab}`);
   STATE.activeTab = name;
 
   document.querySelectorAll('.tab').forEach(t =>
@@ -153,11 +156,90 @@ function switchTab(name) {
   );
 
   renderTabIfNeeded(name);
+  if (desde) deslizarPaneles(saliente, document.getElementById(`panel-${name}`), desde);
   history.replaceState(null, '', `#${name}`);
 
   // scroll tab into view on mobile
   document.querySelector(`.tab[data-tab="${name}"]`)
     ?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+}
+
+/* ── Swipe entre pestañas (solo pantallas táctiles) ──────────────────────── */
+const SWIPE_TAB_UMBRAL  = 60; // px horizontales mínimos
+// Zonas donde el gesto horizontal ya tiene otro dueño (cards de votación,
+// nav con scroll horizontal, modales, embeds) o es para escribir
+const SWIPE_TAB_EXCLUIR = '.voto, .tabs, .topbar, .modal, iframe, input, textarea';
+
+// Touch events y no pointer events: en cuanto el navegador empieza a hacer
+// scroll manda pointercancel y no llegaría el pointerup. Pasivos: no bloquean el scroll.
+function initSwipeTabs() {
+  if (!window.matchMedia('(pointer: coarse)').matches) return;
+
+  let x0 = 0, y0 = 0, activo = false;
+
+  document.addEventListener('touchstart', e => {
+    activo = e.touches.length === 1
+      && STATE.season === '25-26'             // en temporadas archivadas no hay pestañas
+      && !e.target.closest(SWIPE_TAB_EXCLUIR);
+    if (!activo) return;
+    x0 = e.touches[0].clientX;
+    y0 = e.touches[0].clientY;
+  }, { passive: true });
+
+  document.addEventListener('touchmove', e => {
+    if (e.touches.length > 1) activo = false; // zoom con dos dedos
+  }, { passive: true });
+
+  document.addEventListener('touchcancel', () => { activo = false; }, { passive: true });
+
+  document.addEventListener('touchend', e => {
+    if (!activo) return;
+    activo = false;
+    const t  = e.changedTouches[0];
+    const dx = t.clientX - x0, dy = t.clientY - y0;
+    if (Math.abs(dx) <= SWIPE_TAB_UMBRAL || Math.abs(dx) <= Math.abs(dy)) return;
+
+    // Dedo hacia la izquierda → siguiente pestaña, que entra por la derecha
+    const i = TABS.indexOf(STATE.activeTab) + (dx < 0 ? 1 : -1);
+    if (i < 0 || i >= TABS.length) return;
+    switchTab(TABS[i], { desde: dx < 0 ? 'derecha' : 'izquierda' });
+  }, { passive: true });
+}
+
+let terminarDeslizamiento = null;
+
+// La saliente se queda superpuesta (position absolute) y se va hacia un lado
+// mientras la entrante llega desde el contrario. Al acabar se limpian los
+// transforms para no interferir con el scroll de la pestaña.
+function deslizarPaneles(saliente, entrante, desde) {
+  terminarDeslizamiento?.(); // si había otro deslizamiento a medias, se cierra ya
+
+  const signo = desde === 'derecha' ? 1 : -1;
+  saliente.classList.add('tab-panel--saliendo');
+  entrante.style.transform = `translateX(${signo * 100}%)`;
+  entrante.getBoundingClientRect(); // fija el punto de partida antes de animar
+
+  saliente.classList.add('tab-panel--deslizando');
+  entrante.classList.add('tab-panel--deslizando');
+  saliente.style.transform = `translateX(${-signo * 100}%)`;
+  entrante.style.transform = '';
+
+  function limpiar() {
+    clearTimeout(timer);
+    entrante.removeEventListener('transitionend', alTerminar);
+    saliente.classList.remove('tab-panel--saliendo', 'tab-panel--deslizando');
+    entrante.classList.remove('tab-panel--deslizando');
+    saliente.style.transform = '';
+    entrante.style.transform = '';
+    terminarDeslizamiento = null;
+  }
+  function alTerminar(e) {
+    if (e.target === entrante && e.propertyName === 'transform') limpiar();
+  }
+
+  entrante.addEventListener('transitionend', alTerminar);
+  const timer = setTimeout(limpiar, 450); // por si transitionend no llega
+  terminarDeslizamiento = limpiar;
 }
 
 function renderTabIfNeeded(name) {
@@ -397,6 +479,7 @@ async function init() {
   initTabs();
   initSeasonSelector();
   initSession();
+  initSwipeTabs();
 
   try {
     await loadData();
