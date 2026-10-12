@@ -149,11 +149,29 @@ function abrirDesglose(id) {
   openModal('votosModal');
 }
 
+// Actualiza la card existente en vez de re-renderizarla: si se reemplazara el
+// elemento, la card que vuelve al centro tras el swipe aparecería de golpe sin
+// su transición de rebote.
 function refrescarVoto(v) {
   const article = document.querySelector(`.voto[data-id="${CSS.escape(v.id)}"]`);
   if (!article) return;
-  article.innerHTML = renderVotoInner(v, getSessionPlayer());
-  predecodificarImagenes(article);
+  const voto = votoDe(v, getSessionPlayer());
+  const nSi = v.jugadores_si.length, nNo = v.jugadores_no.length;
+
+  const card = article.querySelector('.voto-card');
+  card.classList.toggle('voto-card--si', voto === 'si');
+  card.classList.toggle('voto-card--no', voto === 'no');
+
+  const countSi = card.querySelector('.voto-card__count--si');
+  const countNo = card.querySelector('.voto-card__count--no');
+  countSi.textContent = `✓ ${nSi}`;
+  countNo.textContent = `✗ ${nNo}`;
+  countSi.setAttribute('aria-label', `${nSi} pueden. Ver quién`);
+  countNo.setAttribute('aria-label', `${nNo} no pueden. Ver quién`);
+
+  article.querySelectorAll('.voto-btn').forEach(btn =>
+    btn.setAttribute('aria-pressed', String(btn.dataset.voto === voto))
+  );
 }
 
 // Decodifica los JPEG antes de permitir el arrastre, para que el navegador no
