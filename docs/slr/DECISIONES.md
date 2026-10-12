@@ -20,6 +20,9 @@ Decisiones que prevalecen sobre los documentos «Liga de Bolsillo — Especifica
 - Arquitectura: todas las escrituras van por funciones de Postgres (`slr_*`, SECURITY DEFINER) que reciben el token de sesión, lo validan y hacen la operación en una sola transacción. Las Edge Functions quedan solo para simular partidos. RLS activado en todas las tablas. En el repo solo está la clave pública.
 - Login: el mismo código de Shits League, comprobado en el servidor con su hash; sesiones con token.
 - Catálogo beta: ~283 cartas genéricas sin imagen (marca `beta`) para probar el juego; se sustituirán o editarán cuando exista el catálogo real. Son cartas normales a todos los efectos.
+- El mercado funciona en ligas en preparación y en curso.
+- Una elección de sobre pendiente bloquea las demás operaciones de mercado de ese usuario.
+- Con el catálogo beta, la economía (precios de sobres, saldo y salario) no es representativa; se ajustará con el catálogo real desde `ligas.config`.
 
 ## Decisiones de implementación del motor (v1.0.0, vigentes en v1.1.0)
 
@@ -59,6 +62,25 @@ Puntos que ni la especificación ni el encargo fijaban del todo y que el motor r
 - **Campos añadidos a la sección 11.2:** `usuarios.es_bot`, `ventas.comprador_id` y `resuelta_en`, `sobres_abiertos.elegida` y `estado` (sobre de elección), `notificaciones.liga_id`, `disenos_carta.beta`; vía de álbum `intercambio`. `usuarios` no tiene email (el login es por código).
 - **Migraciones generadas:** `20261012230200_slr_usuarios.sql` (de `supabase/seed/generar-usuarios.mjs`, que lee `js/session.js`) y `20261012230300_slr_catalogo_beta.sql` (de `supabase/seed/generar-catalogo.mjs`, determinista con semilla 20261012). No se editan a mano.
 - **Riesgo conocido:** los hashes de los códigos de los 18 jugadores ya son públicos en `js/session.js`, y los códigos siguen un patrón corto, así que alguien con interés podría sacarlos probando combinaciones sin tocar el servidor. Los bots usan códigos aleatorios de 96 bits, imposibles de adivinar.
+
+## Decisiones de implementación del mercado (paso 3)
+
+- **Orden de comprobaciones de toda operación:** sesión → liga de la carta → `preparar_operacion` (es miembro, la liga está en preparación o en curso, `liga_bloqueada()` es falso y no tiene una elección de sobre pendiente) → propiedad → hueco → dinero. Todo cambio de saldo pasa por `mover_dinero` y el banco no tiene cuenta: lo que se le paga desaparece.
+- **Una elección de sobre pendiente ocupa un hueco de la plantilla.** Así la carta elegida siempre cabe, aunque mientras tanto se resuelva una subasta a favor de ese usuario.
+- **Elecciones caducadas:** además de la tarea de cada 5 minutos, se resuelven en cuanto el usuario intenta otra operación de mercado (no tiene que esperar al cron).
+- **Sobre de elección:** si las dos primeras candidatas son individuales, la tercera se fuerza a dúo o superior (si queda alguna libre). Si se elige fuera de plazo, se entrega la primera y la respuesta lo indica (`automatica: true`).
+- **Garantía premium:** se aplica cuando `contador_garantia_premium` es ≥ `garantia_tras` (2 en la config).
+- **Variantes:** la tirada de variante solo se hace cuando sale un ejemplar normal; el especial que se crea queda en la liga para siempre (libre o con dueño). Dentro de un sobre no pueden salir a la vez el normal y un especial del mismo diseño.
+- **Efecto de reciclar especiales:** como un especial vendido al banco vuelve al bombo como un ejemplar más, cuantos más sobres se abren y más se vende al banco, más especiales hay libres y más salen (y cada ejemplar extra de un diseño también aumenta la probabilidad de ese diseño). En el informe de 300 sobres por tipo (vendiendo todo al banco) el foil del básico salió el 16,7 % frente al 3 % configurado. En una liga real hay mucha menos rotación, pero conviene vigilarlo.
+- **Subastas:** puja mínima = valor de la carta; una puja por equipo y subasta (se puede modificar o retirar); se puede pujar por encima del saldo. En empate gana el peor clasificado (puntos, diferencia de goles y goles a favor, de menos a más) y después la puja que llegó antes a ese importe (`actualizada_en`). Las pujas se publican en el historial al resolverse.
+- **Tanda diaria:** se abre en la primera pasada del cron tras la medianoche local de la liga (la fecha se calcula con su zona horaria, así que el cambio de hora no la duplica ni la salta); dura 24 h desde que se abre. Una liga nueva tiene su primera tanda en la siguiente pasada del cron.
+- **Ofertas:** la acepta siempre el destinatario; si la carta es suya vende y si es del que la envió (contraoferta del dueño) compra. Una oferta vencida que el cron aún no ha procesado se marca como caducada al intentar aceptarla y se devuelve `{error}` en lugar de lanzar, para que el cambio de estado no se pierda. Las ofertas y propuestas de intercambio no van al historial público hasta que se completan.
+- **Intercambios:** al menos una carta por cada lado. Al aceptar, primero se cobran y después se pagan las monedas (si alguien acaba en negativo, no se hace nada); si alguna carta ya no es de quien la ofrecía, el intercambio se cancela. La comprobación de plantilla máxima se aplaza al final de la transacción porque en mitad del cambio un equipo puede tener una carta de más.
+- **Venta al banco** de una carta en venta: se permite y cancela la venta.
+- **Una carta que sale de un equipo puede seguir en su alineación guardada:** el hueco se resolverá en el cierre de jornada (paso 4, sección 4.6).
+- **Funciones añadidas al encargo:** `slr_retirar_oferta`, `slr_retirar_intercambio` (el que propone puede retirarlos) y `slr_prueba_desblindar` (solo admin de liga de prueba; sin ella no se puede probar una cláusula sin esperar 7 días).
+- **Tareas y ligas de prueba:** `slr_tareas_mercado` no se puede llamar desde fuera (excepción al prefijo `slr_`: la ejecuta el cron). Sin liga indicada procesa todas las ligas menos las de prueba; las de prueba solo avanzan con `slr_prueba_tareas`, para poder simular el tiempo sin que el cron real interfiera.
+- **Migraciones aplicadas no se editan:** las correcciones van en migraciones nuevas (por ejemplo `20261013000400_slr_correcciones_paso3.sql`).
 
 ## Balance de referencia (motor v1.1.0)
 
