@@ -9,14 +9,12 @@ const DIAS_SEMANA   = ['DOMINGO','LUNES','MARTES','MIÉRCOLES','JUEVES','VIERNES
 const SWIPE_UMBRAL  = 90; // px de arrastre horizontal para que cuente como voto
 
 let ultimoSwipe = 0; // para no abrir el desglose con el click que sigue a un arrastre
+// Momento del último voto enviado: los refrescos (app.js) no pisan durante un
+// rato el voto optimista que el Apps Script quizá aún no ha escrito
+let ultimoVotoEnviado = 0;
+const VOTO_PENDIENTE_MS = 15000;
 
 /* ── Helpers ─────────────────────────────────────────────────────────────── */
-// Las fotos de Cloudinary vienen a 1600px en horizontal; la card es vertical 4:5.
-// Pedimos a Cloudinary el recorte ya hecho al tamaño de la card y en formato
-// ligero (WebP/AVIF): mucho menos que decodificar y mover en la GPU.
-function imagenOptimizada(url) {
-  return url.replace(/(res\.cloudinary\.com\/[^/]+\/image\/upload\/)/, '$1c_fill,w_600,h_750,f_auto,q_auto/');
-}
 
 // Acepta 'YYYY-MM-DD' y 'DD/MM/YYYY' (formato con el que Sheets devuelve fechas en es-ES)
 function parseFechaVoto(str) {
@@ -85,7 +83,7 @@ function renderVotoInner(v, jugador) {
 
   // Si la imagen no carga se quita y queda el fondo de la paleta
   const bg = v.imagen
-    ? `<img class="voto-card__bg" src="${imagenOptimizada(v.imagen)}" alt="" draggable="false" decoding="async"
+    ? `<img class="voto-card__bg" ${attrsImagen(v.imagen, 'c_fill,ar_4:5,')} alt="" draggable="false" decoding="async"
          onerror="this.parentNode.classList.remove('voto-card--img');this.remove()">`
     : '';
   const cardClass = [
@@ -195,6 +193,7 @@ async function votar(id, voto) {
   if (!nombre || !v || votoDe(v, nombre) === voto) return;
 
   const antes = { si: [...v.jugadores_si], no: [...v.jugadores_no] };
+  ultimoVotoEnviado = Date.now();
   aplicarVoto(v, nombre, voto);
   refrescarVoto(v);
 

@@ -23,12 +23,35 @@ function fmtMsg(msg) {
   return msg.replace(/\*\*(.+?)\*\*/g, '<span class="highlight">$1</span>');
 }
 
-// Las cartas originales son PNG de ~2100px y ~2 MB; en la plantilla se ven a
-// 150-200px. Cloudinary las sirve reescaladas y en formato ligero (WebP/AVIF,
-// conservando la transparencia). La transformación va justo después de /upload/.
-function optimizarCartaUrl(url) {
-  if (!url || !url.includes('cloudinary.com')) return url;
-  return url.replace(/(\/image\/upload\/)/, '$1w_300,f_auto,q_auto/');
+/* ── Imágenes de Cloudinary a medida de la pantalla ───────────────────────── */
+// Los originales son enormes (cartas PNG de ~2100px, fotos de 1600px). Pedimos
+// a Cloudinary la imagen al ancho real en pantalla × devicePixelRatio,
+// redondeado al siguiente múltiplo de 100 (pantallas parecidas comparten caché),
+// en formato ligero (WebP/AVIF) y calidad automática.
+// No usamos w_auto/dpr_auto: dependen de Client Hints, que Safari no envía.
+function imagenOptimizada(url, anchoCss, extra = '') {
+  if (!url || !url.includes('res.cloudinary.com')) return url;
+  const w = Math.max(100, Math.ceil(anchoCss * (window.devicePixelRatio || 1) / 100) * 100);
+  return url.replace(/(\/image\/upload\/)/, `$1${extra}w_${w},f_auto,q_auto/`);
+}
+
+// Las plantillas pintan <img data-cld="url original"> sin src (extra: recorte
+// opcional, p. ej. 'c_fill,ar_4:5,'). Una vez en el DOM, ajustarImagenes()
+// mide cada una y le pone su src a medida.
+function attrsImagen(url, extra = '') {
+  return `data-cld="${url}"${extra ? ` data-cld-t="${extra}"` : ''}`;
+}
+
+function ajustarImagenes(root) {
+  const imgs = [...root.querySelectorAll('img[data-cld]')];
+  // Primero se miden todas (una sola maquetación) y luego se escriben los src
+  const anchos = imgs.map(img =>
+    img.getBoundingClientRect().width || img.parentElement?.getBoundingClientRect().width || 600
+  );
+  imgs.forEach((img, i) => {
+    img.src = imagenOptimizada(img.dataset.cld, anchos[i], img.dataset.cldT || '');
+    img.removeAttribute('data-cld');
+  });
 }
 
 function ytEmbed(url) {
@@ -473,13 +496,24 @@ function renderRankingTab(jugadores, campo, unit, titulo, subtitulo) {
 /* ═══════════════════════════════════════════════
    PLANTILLA TAB
 ═══════════════════════════════════════════════ */
+// Carta vacía (mismo lienzo y márgenes que las cartas reales) que hace de
+// skeleton hasta que carga la real; si la real falla, se queda el skeleton.
+const CARTA_VACIA       = 'assets/jugadores/carta-vacia.png';
+const SKELETONS_DEFAULT = 16; // si Sheets no devuelve jugadores
+
 function renderPlantilla(jugadores) {
-  const cards = jugadores.map(j => `
-    <div class="card-wrap" data-nombre="${j.nombre}" role="button" tabindex="0" aria-label="Ver ficha de ${j.nombre}">
-      <img src="${optimizarCartaUrl(j.img)}" alt="${j.nombre}" loading="lazy"
-        width="300" height="343" onerror="this.style.opacity='0.25'">
-    </div>
-  `).join('');
+  const skeleton = `<img class="card-wrap__skeleton" src="${CARTA_VACIA}" alt="" aria-hidden="true" width="300" height="343">`;
+
+  const cards = jugadores.length
+    ? jugadores.map(j => `
+      <div class="card-wrap card-wrap--cargando" data-nombre="${j.nombre}" role="button" tabindex="0" aria-label="Ver ficha de ${j.nombre}">
+        ${skeleton}
+        ${j.img ? `<img class="card-wrap__img" ${attrsImagen(j.img)} alt="${j.nombre}" loading="lazy" width="300" height="343">` : ''}
+      </div>
+    `).join('')
+    : Array.from({ length: SKELETONS_DEFAULT }, () => `
+      <div class="card-wrap card-wrap--cargando" aria-hidden="true">${skeleton}</div>
+    `).join('');
 
   return `
     <div class="sh">
@@ -505,7 +539,7 @@ function buildModalPartido(j) {
       : '';
 
   const imgHtml = j.imagen
-    ? `<img class="modal__img" src="${j.imagen}" alt="Foto del partido">`
+    ? `<img class="modal__img" ${attrsImagen(j.imagen, 'c_fill,ar_16:9,')} alt="Foto del partido">`
     : `<div class="modal__img-placeholder">${nombreCanonico(j.local)} vs ${nombreCanonico(j.visitante)}</div>`;
 
   return `
@@ -552,7 +586,7 @@ function buildGoleadoresAsistentes(j) {
 function buildModalJugador(j) {
   return `
     <div class="player-modal__img-wrap">
-      <img src="${j.img}" alt="${j.nombre}" onerror="this.style.opacity='.2'">
+      <img ${attrsImagen(j.img)} alt="${j.nombre}" onerror="this.style.opacity='.2'">
     </div>
     <div class="player-modal__info">
       <div class="player-modal__name">${j.nombre}</div>

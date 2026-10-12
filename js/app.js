@@ -10,6 +10,8 @@ let STATE = {
   votaciones:       [],
   season:           '25-26',
   alias:            {}, // nombre normalizado (propio o alias) → nombre canónico
+  jugadoresBase:    [], // jugadores tal cual vienen de la hoja (sin stats)
+  ultimaCarga:      0,  // Date.now() de la última carga correcta de Jugadores + Jornadas
 };
 
 /* ── Datos ───────────────────────────────────────────────────────────────── */
@@ -22,11 +24,81 @@ async function loadData() {
     fetchVotaciones(),
   ]);
 
-  STATE.jornadas         = jornadas  || [];
-  STATE.alias            = construirAlias(jugadores || []);
-  STATE.jugadores        = calcularStats(jugadores || [], STATE.jornadas);
-  STATE.proximosPartidos = proximos || [];
-  STATE.votaciones       = votaciones || [];
+  // Si una lectura falla (null) se conservan los datos que ya había: un
+  // refresco sin conexión no debe dejar la web vacía
+  if (jornadas)  STATE.jornadas      = jornadas;
+  if (jugadores) STATE.jugadoresBase = jugadores;
+  STATE.alias     = construirAlias(STATE.jugadoresBase);
+  STATE.jugadores = calcularStats(STATE.jugadoresBase, STATE.jornadas);
+  if (proximos)  STATE.proximosPartidos = proximos;
+  // No pisar un voto optimista que el Apps Script quizá aún no ha escrito
+  if (votaciones && Date.now() - ultimoVotoEnviado > VOTO_PENDIENTE_MS) STATE.votaciones = votaciones;
+  if (jugadores && jornadas) STATE.ultimaCarga = Date.now();
+}
+
+/* ── Recarga y refresco automático ───────────────────────────────────────── */
+const VOTACIONES_REFRESCO_MS = 30000;          // votación abierta y visible
+const DATOS_CADUCAN_MS       = 5 * 60000;      // resto de pestañas con stats
+const TABS_CON_CADUCIDAD     = ['resumen', 'clasificacion', 'goleadores', 'asistentes'];
+
+let recargaEnCurso = null;
+let timerVotaciones = null;
+
+// Vuelve a leer todo y re-renderiza el hero y la pestaña activa; el resto de
+// pestañas se re-renderizan al visitarlas
+function recargarDatos() {
+  if (recargaEnCurso) return recargaEnCurso;
+  recargaEnCurso = (async () => {
+    try {
+      await loadData();
+      initHero();
+      document.querySelectorAll('.tab-panel').forEach(p => { p.dataset.rendered = ''; });
+      renderTabIfNeeded(STATE.activeTab);
+    } catch (e) {
+      console.warn('[app] No se pudieron recargar los datos:', e);
+    } finally {
+      recargaEnCurso = null;
+    }
+  })();
+  return recargaEnCurso;
+}
+
+function recargarSiCaducado() {
+  if (TABS_CON_CADUCIDAD.includes(STATE.activeTab)
+      && Date.now() - STATE.ultimaCarga > DATOS_CADUCAN_MS) recargarDatos();
+}
+
+function rerenderPanel(name) {
+  const panel = document.getElementById(`panel-${name}`);
+  if (!panel?.dataset.rendered) return;
+  panel.dataset.rendered = '';
+  renderTabIfNeeded(name);
+}
+
+// No pisa un arrastre en curso ni un voto recién enviado; solo re-renderiza si
+// algo ha cambiado (evita recargar las imágenes cada 30 s)
+async function refrescarVotaciones() {
+  const ocupado = () => document.querySelector('.voto-card.is-dragging')
+    || Date.now() - ultimoVotoEnviado < VOTO_PENDIENTE_MS;
+  if (ocupado()) return;
+  const nuevas = await fetchVotaciones();
+  if (!nuevas || ocupado()) return;
+  if (JSON.stringify(nuevas) === JSON.stringify(STATE.votaciones)) return;
+  STATE.votaciones = nuevas;
+  rerenderPanel('votacion');
+}
+
+// Intervalo de 30 s solo con la pestaña Votación activa y la página visible
+function actualizarRefrescoVotaciones() {
+  const toca = STATE.activeTab === 'votacion'
+    && STATE.season === '25-26'
+    && document.visibilityState === 'visible';
+  if (toca && !timerVotaciones) {
+    timerVotaciones = setInterval(refrescarVotaciones, VOTACIONES_REFRESCO_MS);
+  } else if (!toca && timerVotaciones) {
+    clearInterval(timerVotaciones);
+    timerVotaciones = null;
+  }
 }
 
 /* ── Normalización de nombres ────────────────────────────────────────────── */
@@ -148,9 +220,11 @@ function switchTab(name, { desde } = {}) {
   const saliente = document.getElementById(`panel-${STATE.activeTab}`);
   STATE.activeTab = name;
 
-  document.querySelectorAll('.tab').forEach(t =>
-    t.classList.toggle('active', t.dataset.tab === name)
-  );
+  document.querySelectorAll('.tab').forEach(t => {
+    const activa = t.dataset.tab === name;
+    t.classList.toggle('active', activa);
+    t.setAttribute('aria-selected', String(activa));
+  });
   document.querySelectorAll('.tab-panel').forEach(p =>
     p.classList.toggle('active', p.id === `panel-${name}`)
   );
@@ -158,6 +232,8 @@ function switchTab(name, { desde } = {}) {
   renderTabIfNeeded(name);
   if (desde) deslizarPaneles(saliente, document.getElementById(`panel-${name}`), desde);
   history.replaceState(null, '', `#${name}`);
+  actualizarRefrescoVotaciones();
+  recargarSiCaducado();
 
   // scroll tab into view on mobile
   document.querySelector(`.tab[data-tab="${name}"]`)
@@ -206,6 +282,50 @@ function initSwipeTabs() {
     if (i < 0 || i >= TABS.length) return;
     switchTab(TABS[i], { desde: dx < 0 ? 'derecha' : 'izquierda' });
   }, { passive: true });
+}
+
+/* ── Pull-to-refresh (solo pantallas táctiles) ───────────────────────────── */
+// En la PWA de iOS no existe el gesto nativo; en Chrome Android el nativo está
+// desactivado con overscroll-behavior-y (recargaría la página entera).
+const PTR_UMBRAL = 70;  // px hacia abajo
+const PTR_MIN_MS = 600; // tiempo mínimo visible del spinner
+
+function initPullToRefresh() {
+  if (!window.matchMedia('(pointer: coarse)').matches) return;
+
+  let x0 = 0, y0 = 0, activo = false;
+
+  document.addEventListener('touchstart', e => {
+    activo = e.touches.length === 1
+      && window.scrollY <= 0                      // ya en lo alto de la página
+      && STATE.season === '25-26'
+      && !document.querySelector('.modal.open');
+    if (!activo) return;
+    x0 = e.touches[0].clientX;
+    y0 = e.touches[0].clientY;
+  }, { passive: true });
+
+  document.addEventListener('touchmove', e => {
+    if (e.touches.length > 1) activo = false;
+  }, { passive: true });
+
+  document.addEventListener('touchcancel', () => { activo = false; }, { passive: true });
+
+  document.addEventListener('touchend', e => {
+    if (!activo) return;
+    activo = false;
+    const t  = e.changedTouches[0];
+    const dx = t.clientX - x0, dy = t.clientY - y0;
+    if (dy > PTR_UMBRAL && dy > Math.abs(dx) && window.scrollY <= 0) refrescarPorGesto();
+  }, { passive: true });
+}
+
+async function refrescarPorGesto() {
+  const spinner = document.getElementById('ptrSpinner');
+  if (spinner.classList.contains('visible')) return;
+  spinner.classList.add('visible');
+  await Promise.all([recargarDatos(), new Promise(r => setTimeout(r, PTR_MIN_MS))]);
+  spinner.classList.remove('visible');
 }
 
 let terminarDeslizamiento = null;
@@ -273,6 +393,7 @@ function renderTabIfNeeded(name) {
   }
 
   panel.dataset.rendered = '1';
+  ajustarImagenes(panel);
   bindPanel(panel, name);
 }
 
@@ -297,7 +418,18 @@ function bindPanel(panel, name) {
     });
   }
   if (name === 'plantilla') {
-    panel.querySelectorAll('.card-wrap').forEach(card => {
+    panel.querySelectorAll('.card-wrap__img').forEach(img => {
+      const wrap = img.closest('.card-wrap');
+      // load/error con la imagen ya en caché pueden haber ocurrido antes de llegar aquí
+      if (img.complete && img.naturalWidth) wrap.classList.replace('card-wrap--cargando', 'card-wrap--lista');
+      img.addEventListener('load', () => wrap.classList.replace('card-wrap--cargando', 'card-wrap--lista'), { once: true });
+      // Si falla, queda el skeleton (sin shimmer) en vez de una imagen rota
+      img.addEventListener('error', () => {
+        wrap.classList.remove('card-wrap--cargando', 'card-wrap--lista');
+        img.remove();
+      }, { once: true });
+    });
+    panel.querySelectorAll('.card-wrap[data-nombre]').forEach(card => {
       const fn = () => openModalJugador(card.dataset.nombre);
       card.addEventListener('click', fn);
       card.addEventListener('keydown', e => { if (e.key==='Enter'||e.key===' '){e.preventDefault();fn();} });
@@ -306,19 +438,21 @@ function bindPanel(panel, name) {
 }
 
 /* ── Cuenta atrás (pestaña Inicio) ───────────────────────────────────────── */
+let countdownTimer = null; // uno solo: Inicio se re-renderiza al recargar datos
+
 function startCountdown(fechaIso) {
+  clearInterval(countdownTimer);
   const el = document.getElementById('countdown');
   if (!el || !fechaIso) return;
 
   const target = new Date(fechaIso).getTime();
   if (isNaN(target)) return;
 
-  let timer = null;
   function tick() {
     const diff = target - Date.now();
     if (diff <= 0) {
       el.innerHTML = `<span class="countdown__unit"><span class="countdown__num">¡Ya!</span></span>`;
-      if (timer) clearInterval(timer);
+      clearInterval(countdownTimer);
       return;
     }
     const dias  = Math.floor(diff / 86400000);
@@ -334,7 +468,7 @@ function startCountdown(fechaIso) {
   }
 
   tick();
-  timer = setInterval(tick, 1000);
+  countdownTimer = setInterval(tick, 1000);
 }
 
 /* ── Modal partido ───────────────────────────────────────────────────────── */
@@ -343,7 +477,9 @@ function openModalPartido(jornadaKey, fecha) {
     ? STATE.jornadas.find(x => x.amistoso && x.fecha === fecha)
     : STATE.jornadas.find(x => String(x.numero) === String(jornadaKey));
   if (!j) return;
-  document.getElementById('modalBox').innerHTML = buildModalPartido(j);
+  const box = document.getElementById('modalBox');
+  box.innerHTML = buildModalPartido(j);
+  ajustarImagenes(box);
   openModal('modal');
 }
 
@@ -351,7 +487,9 @@ function openModalPartido(jornadaKey, fecha) {
 function openModalJugador(nombre) {
   const j = STATE.jugadores.find(x => x.nombre === nombre);
   if (!j) return;
-  document.getElementById('playerModalBox').innerHTML = buildModalJugador(j);
+  const box = document.getElementById('playerModalBox');
+  box.innerHTML = buildModalJugador(j);
+  ajustarImagenes(box);
   openModal('playerModal');
 }
 
@@ -473,6 +611,7 @@ function switchSeason(season) {
     archiveEl.hidden = true;
     archiveEl.innerHTML = '';
   }
+  actualizarRefrescoVotaciones();
 }
 
 /* ── Init ────────────────────────────────────────────────────────────────── */
@@ -482,6 +621,7 @@ async function init() {
   initSeasonSelector();
   initSession();
   initSwipeTabs();
+  initPullToRefresh();
 
   try {
     await loadData();
@@ -501,17 +641,21 @@ async function init() {
     const tab = tabDesdeHash();
     if (tab) switchTab(tab);
   });
+  document.addEventListener('visibilitychange', () => {
+    actualizarRefrescoVotaciones();
+    if (document.visibilityState !== 'visible') return;
+    // Al volver a la app: votaciones al día y stats si llevan más de 5 min
+    if (STATE.activeTab === 'votacion') refrescarVotaciones();
+    recargarSiCaducado();
+  });
+  actualizarRefrescoVotaciones();
   initPush();
 }
 
 /* ── Cambio de sesión (login / logout) ───────────────────────────────────── */
 // Lo llama session.js; re-renderiza lo que depende del jugador logueado
 function onSessionChange() {
-  const panel = document.getElementById('panel-votacion');
-  if (panel?.dataset.rendered) {
-    panel.dataset.rendered = '';
-    renderTabIfNeeded('votacion');
-  }
+  rerenderPanel('votacion');
 }
 
 document.addEventListener('DOMContentLoaded', init);

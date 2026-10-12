@@ -8,6 +8,9 @@
   --verde:       #1FE065;
   --topbar-h:    60px;
   --tabs-h:      52px;
+  /* Altura de la barra de estado en la PWA de iOS (black-translucent + viewport-fit=cover);
+     0 en el resto de casos */
+  --safe-top:    env(safe-area-inset-top, 0px);
 }
 
 /* ── Reset ── */
@@ -16,8 +19,10 @@
   -webkit-tap-highlight-color: transparent;
 }
 /* overscroll-behavior-x: evita que el navegador (Chrome Android) interprete el
-   swipe a la derecha de las cards de votación como gesto de "atrás" */
-html { scroll-behavior: smooth; overscroll-behavior-x: none; }
+   swipe a la derecha de las cards de votación como gesto de "atrás".
+   overscroll-behavior-y: contain desactiva el pull-to-refresh nativo de Chrome
+   Android (recargaría la página entera); usamos el nuestro (app.js). */
+html { scroll-behavior: smooth; overscroll-behavior-x: none; overscroll-behavior-y: contain; }
 body {
   font-family: 'Sora', sans-serif;
   color: #E8FBEF;
@@ -26,6 +31,10 @@ body {
   position: relative;
   overflow-x: hidden;
   overscroll-behavior-x: none;
+  overscroll-behavior-y: contain;
+  /* Con viewport-fit=cover, en horizontal el contenido no se mete bajo el notch */
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
 }
 img { display: block; max-width: 100%; }
 a { color: inherit; text-decoration: none; }
@@ -72,6 +81,7 @@ button, [role="button"], .modal__backdrop, .tab, .result-row, .card-wrap {
   align-items: center;
   justify-content: space-between;
   padding: 13px clamp(16px, 4vw, 40px);
+  padding-top: calc(13px + var(--safe-top));
   background: rgba(6, 20, 13, 0.72);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
@@ -349,7 +359,7 @@ button, [role="button"], .modal__backdrop, .tab, .result-row, .card-wrap {
 ═══════════════════════════════════════════════ */
 .tabs {
   position: sticky;
-  top: var(--topbar-h);
+  top: calc(var(--topbar-h) + var(--safe-top));
   z-index: 30;
   background: rgba(6, 20, 13, 0.82);
   backdrop-filter: blur(12px);
@@ -386,7 +396,11 @@ button, [role="button"], .modal__backdrop, .tab, .result-row, .card-wrap {
   transition: color .2s;
   flex-shrink: 0;
 }
-.tab:hover  { color: #E8FBEF; }
+/* Solo con ratón: en táctil el :hover se queda pegado en el último tab tocado
+   y lo dejaba en blanco aunque se cambiara de pestaña por swipe */
+@media (hover: hover) {
+  .tab:hover { color: #E8FBEF; }
+}
 .tab.active { color: var(--verde); box-shadow: inset 0 -3px 0 var(--verde); }
 
 /* ═══════════════════════════════════════════════
@@ -395,7 +409,7 @@ button, [role="button"], .modal__backdrop, .tab, .result-row, .card-wrap {
 .main {
   position: relative;
   z-index: 1;
-  scroll-margin-top: calc(var(--topbar-h) + var(--tabs-h));
+  scroll-margin-top: calc(var(--topbar-h) + var(--tabs-h) + var(--safe-top));
   /* Una card de votación arrastrada a la derecha ensanchaba el área desplazable
      de toda la página en cada frame (a la izquierda no cuenta). clip la recorta
      sin crear un contenedor de scroll. */
@@ -603,7 +617,41 @@ button, [role="button"], .modal__backdrop, .tab, .result-row, .card-wrap {
   transform: translateY(-6px) scale(1.04);
   filter: drop-shadow(rgba(31,224,101,.35) 0px 0px 16px) drop-shadow(rgba(0,0,0,.5) 0px 10px 22px);
 }
+.card-wrap { position: relative; }
 .card-wrap img { width: 100%; height: auto; display: block; } /* width/height del HTML reservan la proporción: el lazy loading no carga todas de golpe */
+
+/* Skeleton: carta vacía apagada debajo; la real encima con fundido al cargar */
+.card-wrap__skeleton {
+  filter: saturate(.15) brightness(.6);
+  opacity: .5;
+  transition: opacity .3s;
+}
+.card-wrap .card-wrap__img {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  opacity: 0;
+  transition: opacity .3s;
+}
+.card-wrap--lista .card-wrap__img      { opacity: 1; }
+.card-wrap--lista .card-wrap__skeleton { opacity: 0; }
+
+/* Shimmer recortado a la silueta de la carta (máscara con la propia carta vacía) */
+.card-wrap--cargando::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent) no-repeat;
+  background-size: 60% 100%;
+  -webkit-mask: url('../assets/jugadores/carta-vacia.png') center / 100% 100% no-repeat;
+          mask: url('../assets/jugadores/carta-vacia.png') center / 100% 100% no-repeat;
+  animation: carta-shimmer 1.5s linear infinite;
+}
+@keyframes carta-shimmer {
+  from { background-position: -150% 0; }
+  to   { background-position:  250% 0; }
+}
 .card-hint {
   margin: 0 0 22px;
   font-size: 12px;
@@ -774,19 +822,6 @@ button, [role="button"], .modal__backdrop, .tab, .result-row, .card-wrap {
 .player-modal__stat-val { font-family: 'Anton',sans-serif; font-size: 1.3rem; color: var(--verde); line-height: 1; }
 .player-modal__stat-lbl { font-size: .65rem; letter-spacing: .1em; text-transform: uppercase; color: #6E9D81; margin-top: .2rem; }
 
-/* ═══════════════════════════════════════════════
-   FOOTER
-═══════════════════════════════════════════════ */
-.footer {
-  position: relative;
-  z-index: 1;
-  border-top: 1px solid rgba(31,224,101,.12);
-  padding: 28px 16px;
-  text-align: center;
-}
-.footer__icon { font-size: 1.8rem; opacity: .7; margin-bottom: 8px; }
-.footer__text { font-size: 11px; color: #445566; letter-spacing: 1px; }
-
 /* ── Empty state ── */
 .empty { text-align: center; padding: 4rem 2rem; font-family: 'Cormorant Garamond',serif; font-size: 1rem; letter-spacing: .1em; color: #6E9D81; font-style: italic; }
 
@@ -833,7 +868,7 @@ button, [role="button"], .modal__backdrop, .tab, .result-row, .card-wrap {
 }
 @media (max-width: 640px) {
   :root { --topbar-h: 54px; }
-  .topbar { padding: 10px clamp(12px,4vw,24px); }
+  .topbar { padding: 10px clamp(12px,4vw,24px); padding-top: calc(10px + var(--safe-top)); }
   .topbar__season { font-size: 0; gap: 6px; padding: 7px 10px; }
   .topbar__season-dot, .topbar__season-arrow { font-size: 10px; }
   #seasonLabel { font-size: 0; }
@@ -1422,3 +1457,31 @@ button, [role="button"], .modal__backdrop, .tab, .result-row, .card-wrap {
 }
 .desglose__grupo--no .desglose__nombre { background: rgba(255,90,90,.12); }
 .desglose__nadie { font-size: 12px; color: #6E9D81; font-style: italic; }
+
+/* ═══════════════════════════════════════════════
+   PULL-TO-REFRESH  (app.js → refrescarPorGesto)
+═══════════════════════════════════════════════ */
+.ptr-spinner {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 600;
+  width: 46px;
+  height: 46px;
+  margin: -23px 0 0 -23px;
+  border-radius: 50%;
+  border: 3px solid rgba(31,224,101,.2);
+  border-top-color: var(--verde);
+  box-shadow: 0 0 24px rgba(31,224,101,.25);
+  background: rgba(6,20,13,.85);
+  opacity: 0;
+  transform: scale(.6);
+  pointer-events: none;
+  transition: opacity .2s, transform .2s;
+}
+.ptr-spinner.visible {
+  opacity: 1;
+  transform: scale(1);
+  animation: ptr-giro .8s linear infinite;
+}
+@keyframes ptr-giro { to { transform: rotate(360deg); } }

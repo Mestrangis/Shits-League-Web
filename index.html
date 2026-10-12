@@ -2,16 +2,21 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Shits League</title>
   <meta name="description" content="La liga de fútbol más competitiva del barrio. Clasificación, estadísticas, plantilla y resultados.">
   <meta name="theme-color" content="#06140D">
+  <!-- PWA en iOS: barra de estado translúcida sobre la app (el topbar se separa con safe-area-inset-top) -->
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="assets/logo-s-green.png" type="image/png">
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
   <link rel="stylesheet" href="css/main.css">
 </head>
 <body>
+
+  <!-- PULL-TO-REFRESH (app.js → refrescarPorGesto) -->
+  <div class="ptr-spinner" id="ptrSpinner" role="status" aria-label="Actualizando"></div>
 
   <!-- BUBBLES (absolute, behind everything) -->
   <div id="bubbles" aria-hidden="true"></div>
@@ -129,10 +134,6 @@
     </div>
   </div>
 
-  <footer class="footer">
-    <div class="footer__icon">💩</div>
-    <div class="footer__text">SHITS LEAGUE · TEMPORADA 2025 / 2026</div>
-  </footer>
 
   <script src="js/ui.js"></script>
   <script src="js/sheets.js"></script>
