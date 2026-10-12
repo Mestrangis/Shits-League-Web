@@ -96,3 +96,16 @@ export async function invariantes(liga, bots, etiqueta = '') {
 }
 
 export const horas = (fecha, h) => new Date(fecha.getTime() + h * 3600000).toISOString();
+
+// Bombo de plantillas iniciales calculado desde fuera, con el mismo criterio que
+// el servidor: las individuales activas sin el 20 % más caro (desempate por id).
+// Objetivo común = 11 × valor medio del bombo.
+export async function bomboInicial(excluir = 0.20, n = 11) {
+  const ind = (await leer('disenos_carta?select=id,valor&tipo=eq.individual&activo=eq.true&limit=5000')).datos
+    .sort((a, b) => b.valor - a.valor || (a.id < b.id ? -1 : 1));
+  const nCaras = Math.round(ind.length * excluir);
+  const caras = new Set(ind.slice(0, nCaras).map(d => d.id));
+  const resto = ind.slice(nCaras);
+  const objetivo = n * resto.reduce((s, d) => s + d.valor, 0) / resto.length;
+  return { caras, objetivo, umbral: ind[nCaras - 1]?.valor, total: ind.length };
+}

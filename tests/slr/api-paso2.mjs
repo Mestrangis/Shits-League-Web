@@ -6,6 +6,7 @@
 import { readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { SUPABASE_URL, SUPABASE_KEY } from '../../js/slr/config.js';
+import { bomboInicial } from './api-util.mjs';
 
 /* ── Entorno ─────────────────────────────────────────────────────────────── */
 const env = Object.fromEntries(
@@ -55,19 +56,22 @@ async function mediaIndividualesLibres(liga) {
   return { n: valores.length, media: valores.reduce((s, v) => s + v, 0) / valores.length };
 }
 
-async function comprobarEquipo(nombreBot, token, usuarioId, liga, union, media) {
+async function comprobarEquipo(nombreBot, token, usuarioId, liga, union, bombo) {
   const equipo = union.equipo;
   check(equipo.saldo === 5000, `${nombreBot}: saldo inicial 5.000`, `saldo ${equipo.saldo}`);
 
-  const cartas = (await leer(`cartas?select=id,blindada_hasta,multiplicador_clausula,adquirida_en,diseno_id,disenos_carta(tipo,valor,ata,def,con)&equipo_id=eq.${equipo.id}`)).datos;
+  const cartas = (await leer(`cartas?select=id,blindada_hasta,multiplicador_clausula,adquirida_en,diseno_id,disenos_carta(id,tipo,valor,ata,def,con)&equipo_id=eq.${equipo.id}`)).datos;
   check(cartas.length === 11, `${nombreBot}: 11 cartas en la plantilla`, `${cartas.length}`);
   check(cartas.every(c => c.disenos_carta.tipo === 'individual'), `${nombreBot}: todas individuales`);
 
-  const objetivo = 11 * media;
+  const objetivo = bombo.objetivo;
   const total = cartas.reduce((s, c) => s + c.disenos_carta.valor, 0);
+  check(cartas.every(c => !bombo.caras.has(c.disenos_carta.id)),
+    `${nombreBot}: ninguna carta del 20 % más caro (valor ≥ ${bombo.umbral})`);
   check(Math.abs(total - objetivo) <= 0.10 * objetivo,
-    `${nombreBot}: valor total ${total} dentro de ±10 % de 11 × media (${objetivo.toFixed(0)})`,
+    `${nombreBot}: valor total ${total} dentro de ±10 % del objetivo común (${objetivo.toFixed(0)})`,
     `diferencia ${(100 * (total - objetivo) / objetivo).toFixed(1)} %`);
+  check(Math.abs(union.plantilla_inicial.objetivo - objetivo) < 0.01, `${nombreBot}: el servidor usa el mismo objetivo`);
   check(union.plantilla_inicial.dentro === true && union.plantilla_inicial.valor_total === total,
     `${nombreBot}: la función informa del mismo valor total y de que cumple`);
 
@@ -139,17 +143,18 @@ try {
   check(!(await leer(`equipos?liga_id=eq.${ligaId}`)).datos.length, 'crear la liga no crea equipo');
 
   seccion('Unirse: Bot Uno');
+  const bombo = await bomboInicial();
   const m1 = await mediaIndividualesLibres(ligaId);
   const j1 = await rpc('slr_unirse_liga', { token: t1, codigo_invitacion: liga.datos.codigo_invitacion.toLowerCase(), nombre_equipo: 'Bots Uno FC' });
   check(j1.ok, 'Bot Uno se une (código en minúsculas)', j1.mensaje);
-  const e1 = await comprobarEquipo('Bot Uno', t1, u1, ligaId, j1.datos, m1.media);
+  const e1 = await comprobarEquipo('Bot Uno', t1, u1, ligaId, j1.datos, bombo);
 
   seccion('Unirse: Bot Dos');
   const m2 = await mediaIndividualesLibres(ligaId);
   check(m2.n === m1.n - 11, `quedan ${m2.n} individuales libres (11 menos)`);
   const j2 = await rpc('slr_unirse_liga', { token: t2, codigo_invitacion: liga.datos.codigo_invitacion, nombre_equipo: 'Dos Bots CF' });
   check(j2.ok, 'Bot Dos se une', j2.mensaje);
-  const e2 = await comprobarEquipo('Bot Dos', t2, u2, ligaId, j2.datos, m2.media);
+  const e2 = await comprobarEquipo('Bot Dos', t2, u2, ligaId, j2.datos, bombo);
   check(!e1.cartas.some(c => e2.cartas.some(d => d.id === c.id)), 'los dos equipos no comparten ninguna carta');
   rechaza(await rpc('slr_unirse_liga', { token: t2, codigo_invitacion: liga.datos.codigo_invitacion, nombre_equipo: 'Otra vez' }),
     'Ya tienes un equipo', 'unirse dos veces: rechazado');
@@ -162,8 +167,7 @@ try {
     'slr_yo de Bot Dos: su liga (no admin, con código) y su equipo con saldo');
 
   const clas = await leer(`clasificacion?liga_id=eq.${ligaId}`);
-  check(clas.ok && clas.datos.length === 2 && clas.datos.every(f => f.pj === 0 && f.puntos === 0),
-    'la clasificación (vista pública) muestra los dos equipos a cero');
+  check(clas.ok && clas.datos.length === 0, 'la clasificación (por temporada) está vacía antes de la primera temporada');
 
   seccion('Guardar alineación');
   const porStat = (stat, excluir, n) => e1.cartas.filter(c => !excluir.includes(c.id))

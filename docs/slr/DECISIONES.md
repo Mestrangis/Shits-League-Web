@@ -84,6 +84,50 @@ Puntos que ni la especificación ni el encargo fijaban del todo y que el motor r
 - **Tareas y ligas de prueba:** `slr_tareas_mercado` no se puede llamar desde fuera (excepción al prefijo `slr_`: la ejecuta el cron). Sin liga indicada procesa todas las ligas menos las de prueba; las de prueba solo avanzan con `slr_prueba_tareas`, para poder simular el tiempo sin que el cron real interfiera.
 - **Migraciones aplicadas no se editan:** las correcciones van en migraciones nuevas (por ejemplo `20261013000400_slr_correcciones_paso3.sql`).
 
+## Temporadas, jornadas y partidos (paso 4)
+
+### Decisiones de Marcos (prevalecen sobre el PDF)
+
+- **Sin copa:** la sección 6.3 no se implementa.
+- **Calendario:** liga a una vuelta, N−1 jornadas con N equipos; con N impar, N jornadas y cada jornada descansa uno (el que descansa cobra el salario igual). Método del círculo con el orden barajado (jornadas, equipos y quién es local) a partir de una semilla guardada en `temporadas.semilla_calendario`.
+- **Horario por defecto** (configurable por liga): cierre el domingo a las 20:00, simulación justo después y publicación a las 21:00, hora de Madrid. Las horas se calculan siempre como hora local de la liga, así que el cambio de hora no las mueve.
+- **Solo el admin** controla la temporada: `slr_iniciar_temporada` (la jornada 1 es el primer domingo con el cierre al menos 24 h por delante), `slr_terminar_temporada` (en cualquier momento; solo cuentan las jornadas publicadas y las pendientes se cancelan), `slr_pausar` / `slr_reanudar` y `slr_aplazar_jornada` (la próxima jornada pendiente y todas las siguientes se mueven una semana). Al publicar la última jornada la temporada termina sola; la siguiente no empieza sola.
+- **Altas:** nadie se puede unir con una temporada en marcha o en pausa; solo antes de la primera o entre temporadas.
+- **Estados de la liga:** `preparacion` → `en_curso` ⇄ `pausada` → `entre_temporadas` → `en_curso`… Tabla `temporadas` (número, estado, semillas, iniciada/terminada, `terminada_antes`), referenciada por jornadas, partidos y clasificación. La clasificación es por temporada y la final se guarda en `temporadas.clasificacion_final`.
+- **Mercado:** abierto en `preparacion` y `en_curso` salvo entre el cierre y la publicación de una jornada; cerrado en `pausada` y `entre_temporadas` (`liga_bloqueada()`). `slr_tareas_mercado` no abre subastas en una liga cerrada.
+- **Pausa:** cancela las subastas abiertas sin coste y congela el calendario. **Reanudar:** los blindajes vigentes y las caducidades de ofertas e intercambios se alargan lo que duró la pausa; la próxima jornada pendiente pasa al primer domingo con 24 h por delante y las demás se recolocan semana a semana; las subastas vuelven la siguiente medianoche. Pausar y reanudar se apuntan en el historial y se notifican a todos.
+- **Temporada nueva (2.ª en adelante), en una sola transacción:** todas las cartas quedan libres (sin dueño, sin blindaje, cláusula ×1,5, sin tocar); se cancelan ventas, ofertas, intercambios, subastas y sobres pendientes; el saldo vuelve a 5.000 (configurable) con un movimiento `reinicio_temporada`; cada equipo recibe 11 individuales **solo de su álbum en esa liga**: primero exclusivas al azar, luego compartidas con sorteo si hay conflicto, y las que sobran quedan libres (semilla guardada en `semilla_reparto`). Si un equipo no llega a 11 no se falla: se apunta en el historial. Blindaje de 7 días; el álbum no gana entradas. Alineación 2-2-2 por defecto, clasificación nueva y calendario nuevo. En la primera temporada las plantillas son las de unirse; el álbum es permanente.
+- **Ciclo de jornada** (cron cada 5 min, estados idempotentes `programada` → `cerrada` → `simulada` → `publicada`):
+  - *Cierre:* congela las alineaciones con estadísticas efectivas en `partidos.alineaciones_congeladas`. Carta tocada al 85 % redondeado. Carta que ya no es del equipo → el mejor suplente para ese hueco; si no hay, la mejor carta libre de la plantilla; si no, un Canterano 40/40/40. Con menos de 7 cartas se completa con Canteranos. Sin capitán si el capitán ya no está.
+  - *Simulación:* semilla criptográfica (`gen_random_bytes`), 200 simulaciones de pronóstico (semilla+1…+200) y el partido real con el motor v1.1.0. Se guardan goles, p_local, p_visitante, PR, PR esperado, versión del motor y semilla; las lesiones dejan la carta tocada para la siguiente jornada de su equipo. Cobros: salario 1.000, participación 100 (si se guardó o confirmó la alineación desde la jornada anterior; `slr_confirmar_alineacion` solo marca `guardada_en`), bonus sorpresa (7.3) y ojo clínico (7.4: últimos 3 partidos oficiales con el mismo equipo, máximo 3 cartas por equipo).
+  - *Publicación:* el resultado se hace visible, el mercado se reabre, historial y notificaciones. Si era la última jornada, la temporada termina y la liga pasa a `entre_temporadas`.
+  - *Desempate:* puntos, diferencia de goles, goles a favor, enfrentamiento directo y sorteo con `temporadas.semilla_desempate`.
+- **Edge Function `slr-simular`** (Deno) con exactamente `js/slr/motor-v1.1.0.js`. pg_cron la invoca con pg_net; el secreto está en Supabase Vault (`slr_cron_secreto`) y en los secretos de la función (`SLR_CRON_SECRETO`), nunca en el repo. También simula los **amistosos** al instante con las alineaciones guardadas (sin puntos, dinero, lesiones ni cansancio posterior; no cuentan para el ojo clínico; se guardan para poder verlos). Idempotente.
+- **Lecturas:** `slr_jornada`, `slr_partido` (solo publicado o amistoso), `slr_calendario`, `slr_clasificacion(token, liga, temporada)` y el pronóstico (~200 simulaciones contra el próximo rival).
+
+### Plantillas iniciales baratas y equilibradas (añadido de Marcos)
+
+- **Bombo:** las individuales del catálogo activo **sin el 20 % más caro** (`plantilla_inicial_excluir_top: 0.20` en la configuración; el corte son `round(n · 0,20)` cartas por valor descendente). Si no quedan bastantes libres se amplía con las siguientes más baratas, nunca empezando por las caras.
+- **Objetivo común:** 11 × valor medio del bombo, con un margen de ±10 %. Todos los equipos buscan el mismo objetivo.
+- **Primera temporada:** `slr_unirse_liga` reparte del bombo buscando el objetivo. **Temporadas siguientes:** se mantienen las prioridades del álbum (exclusivas, luego compartidas), pero dentro de cada nivel solo cartas del bombo y buscando el mismo objetivo; las caras solo si no hay otra forma de llegar a 11, de la más barata a la más cara.
+- **Requisito para el catálogo real:** con 18 equipos hacen falta 18 × 11 = 198 individuales en el bombo, es decir, unas **250 individuales** en el catálogo (el bombo es el 80 %). Con menos, las últimas plantillas tendrán que tirar de cartas caras.
+- Con el álbum el ±10 % no está garantizado (depende de lo que tenga cada uno): el reparto lo intenta con intercambios dentro del bombo y devuelve `dentro: false` si no lo consigue.
+
+### Decisiones mías
+
+- **Los cobros se calculan al simular pero se pagan al publicar** (`jornadas.cobros`). El saldo es público y, si se pagara al simular, el bonus sorpresa delataría el resultado antes de las 21:00. Lo mismo con las cartas tocadas por lesión: se marcan al publicar.
+- **Amistoso y pronóstico son acciones de la Edge Function** (`{accion: 'amistoso', token, rival_equipo_id}` y `{accion: 'pronostico', token, equipo_id}`), no funciones de Postgres: el motor solo corre en Deno. La función habla con la base de datos a través de funciones `motor_*` que solo puede ejecutar la clave de servicio, y el token de sesión se valida ahí. Se despliega con `--no-verify-jwt` porque la web no usa JWT de Supabase Auth; autorizan el secreto (cron) o el token de sesión (web).
+- **Copia del motor:** la CLI solo empaqueta `supabase/functions`, así que la función importa `supabase/functions/_shared/motor-v1.1.0.js`, copiada con `node supabase/seed/copiar-motor.mjs`. `tests/slr/motor-copia.test.mjs` comprueba que es idéntica byte a byte y que la función importa esa versión.
+- **Participación:** cuenta si la alineación se guardó o confirmó después de publicarse la jornada anterior (o del inicio de la temporada) y no es la automática.
+- **`alineaciones_cerradas()` y `liga_bloqueada()` son distintas:** la primera es solo la ventana cierre→publicación (bloquea guardar alineaciones); la segunda añade pausa, entre temporadas y terminada (bloquea el mercado). Entre temporadas se puede tocar la alineación.
+- **No se puede pausar ni terminar con una jornada en juego** (cerrada o simulada): hay que esperar a que se publique, para no dejar un partido a medias.
+- **Al reanudar** se inserta una tanda vacía de hoy en `tandas_mercado`, para que las subastas vuelvan la siguiente medianoche y no en la siguiente pasada del cron.
+- **Al terminar una temporada** también se cancelan las subastas abiertas (el mercado queda cerrado). Al empezar una nueva se reinicia `contador_garantia_premium`.
+- **Canteranos:** id `canterano-<8 primeros caracteres del equipo>-<n>`; no son cartas, así que no cobran ojo clínico ni quedan tocados.
+- **La clasificación de una temporada** solo incluye equipos creados antes de que empezara.
+- **Funciones de prueba** (solo admin de liga de prueba): `slr_prueba_tareas(token, liga, ahora, simular)` corre también las tareas de jornada con la hora dada (con `simular = false` cierra sin pedir la simulación), `slr_prueba_pausar` / `slr_prueba_reanudar` con hora simulada, `slr_prueba_partidos` (partidos aún sin publicar) y `slr_prueba_fijar_semilla` (fuerza la semilla antes de simular, para provocar una lesión).
+- **pg-safeupdate:** Supabase rechaza `DELETE` sin `WHERE` en las peticiones de la API, incluso sobre tablas temporales; por eso `20261013020400_slr_reparto_safeupdate.sql` usa `where true`.
+
 ## Balance de referencia (motor v1.1.0)
 
 `node tests/slr/balance.mjs`, 10.000 partidos por escenario:
