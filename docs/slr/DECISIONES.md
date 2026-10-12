@@ -17,6 +17,9 @@ Decisiones que prevalecen sobre los documentos «Liga de Bolsillo — Especifica
 - Sobre de elección: requiere 1 hueco libre en la plantilla.
 - Para cualquier adquisición (sobre, subasta, compra, cláusula, intercambio) hace falta tener hueco libre en la plantilla. Si estás a 15, la app ofrece justo antes vender una carta al banco para hacer hueco. En las subastas, que se resuelven a las 00:00 sin el usuario, si el ganador tiene la plantilla llena al resolverse, su puja se anula y gana la siguiente (como dice el PDF); la app avisa de esto al pujar.
 - Motor v1.1.0: la posesión se resuelve con duelo lineal A/(A+B) en vez de cuadrático. Motivo: con k = 2 un tercer medio daba demasiada posesión y las formaciones de 3 medios dominaban (diferencia de 0,50 puntos por partido entre la mejor y la peor formación; con el cambio ~0,2). Un equipo con +10 de media gana ~60 %.
+- Arquitectura: todas las escrituras van por funciones de Postgres (`slr_*`, SECURITY DEFINER) que reciben el token de sesión, lo validan y hacen la operación en una sola transacción. Las Edge Functions quedan solo para simular partidos. RLS activado en todas las tablas. En el repo solo está la clave pública.
+- Login: el mismo código de Shits League, comprobado en el servidor con su hash; sesiones con token.
+- Catálogo beta: ~283 cartas genéricas sin imagen (marca `beta`) para probar el juego; se sustituirán o editarán cuando exista el catálogo real. Son cartas normales a todos los efectos.
 
 ## Decisiones de implementación del motor (v1.0.0, vigentes en v1.1.0)
 
@@ -35,6 +38,27 @@ Puntos que ni la especificación ni el encargo fijaban del todo y que el motor r
 - **Comando de tests:** en Node ≥ 21, `node --test` recibe patrones de fichero y no recorre carpetas, así que el comando es `node --test "tests/slr/*.test.mjs"` (o `node --test` sin argumentos desde la raíz).
 
 - **Versiones:** la v1.0.0 se retiró sin haberse jugado ningún partido con ella (por eso se borró). A partir de la v1.1.0, un archivo de motor publicado no se modifica: cada cambio de reglas es un archivo nuevo con su propio test dorado.
+
+## Decisiones de implementación de la base de datos (paso 2)
+
+- **Qué es público:** desde la web (clave pública) se pueden leer `usuarios`, `disenos_carta`, `ligas` (sin el código de invitación), `equipos` (saldo incluido), `cartas`, `album`, `alineaciones`, `jornadas`, `subastas`, `ventas`, `historial` y la vista `clasificacion`. `partidos` solo cuando su jornada está publicada (antes no se ve ni la semilla ni el resultado).
+- **Qué es privado:** `codigos`, `sesiones`, `pujas`, `ofertas`, `intercambios`, `movimientos`, `sobres_abiertos` y `notificaciones` no tienen ninguna lectura desde fuera; se consultarán con funciones `slr_*` que comprueban el token (de momento `slr_movimientos`).
+- **Código de invitación:** está en `ligas`, pero con privilegio por columnas no se puede leer desde fuera; solo lo devuelve `slr_yo` a los miembros y al admin de la liga. Consecuencia: desde la web, `ligas` se lee indicando columnas (`select=id,nombre,…`), no con `select=*`.
+- **Clave pública:** se usa la nueva `publishable` (`sb_publishable_…`), no la `anon` antigua. Va en la cabecera `apikey`.
+- **Funciones internas** (`sesion_usuario`, `mover_dinero`, `asignar_plantilla_inicial`…) tienen el permiso de ejecución retirado: solo las `slr_*` se pueden llamar por `/rest/v1/rpc`.
+- **Errores:** sesión o código no válidos → `errcode 28000` (HTTP 403); operación rechazada → `P0001` (HTTP 400). Siempre con un mensaje en castellano listo para mostrar.
+- **Sesiones:** caducan tras 180 días sin uso; cada llamada renueva la fecha. `slr_logout` borra la sesión.
+- **Parámetros de las RPC:** se llaman como en el encargo (`token`, `nombre`, `codigo_invitacion`, `nombre_equipo`, `equipo_id`, `formacion`, `huecos`, `banquillo`, `orden_manual`, `capitan_id`, `liga_id`); el JSON de la petición usa esos nombres.
+- **Formato de `huecos`:** `{"por": id, "def": [ids], "med": [ids], "del": [ids]}`, la misma forma que la alineación que recibe el motor.
+- **Plantilla inicial:** se eligen entre las individuales libres que no están reservadas ni en subasta. Objetivo = 11 × valor medio de esas cartas; se prueban hasta 40 muestras al azar y, si ninguna queda dentro del ±10 %, se hacen intercambios voraces (la pareja que más acerca cada vez). Si es imposible, se queda la mejor aproximación. Las altas en una liga se serializan (bloqueo de la fila de la liga) para que dos usuarios no reciban la misma carta.
+- **Alineación por defecto:** 2-2-2; banquillo = las 3 siguientes por OVR; desempates por OVR y después por id. Si el equipo tiene menos de 7 cartas no se crea.
+- **Configuración del sobre de elección:** el PDF no da sus pesos de aparición; de momento usa los del premium (provisional, pendiente de decidir).
+- **Plantilla máxima:** además de comprobarlo cada función, un trigger impide que un equipo pase de `plantilla_maxima` cartas.
+- **Bloqueo por jornada:** `liga_bloqueada(liga)` ya se consulta al guardar la alineación; hoy siempre devuelve `false` y en el paso 4 bloqueará entre el cierre y la publicación.
+- **Borrar una liga** borra también las entradas de álbum de esa liga (solo se usa para pruebas).
+- **Campos añadidos a la sección 11.2:** `usuarios.es_bot`, `ventas.comprador_id` y `resuelta_en`, `sobres_abiertos.elegida` y `estado` (sobre de elección), `notificaciones.liga_id`, `disenos_carta.beta`; vía de álbum `intercambio`. `usuarios` no tiene email (el login es por código).
+- **Migraciones generadas:** `20261012230200_slr_usuarios.sql` (de `supabase/seed/generar-usuarios.mjs`, que lee `js/session.js`) y `20261012230300_slr_catalogo_beta.sql` (de `supabase/seed/generar-catalogo.mjs`, determinista con semilla 20261012). No se editan a mano.
+- **Riesgo conocido:** los hashes de los códigos de los 18 jugadores ya son públicos en `js/session.js`, y los códigos siguen un patrón corto, así que alguien con interés podría sacarlos probando combinaciones sin tocar el servidor. Los bots usan códigos aleatorios de 96 bits, imposibles de adivinar.
 
 ## Balance de referencia (motor v1.1.0)
 

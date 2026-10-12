@@ -1,0 +1,6 @@
+# Supabase CLI (estado local del enlace con el proyecto)
+supabase/.temp/
+supabase/.branches/
+
+# Secretos locales: códigos de los bots de prueba, claves privadas…
+.env.local
