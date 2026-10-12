@@ -278,6 +278,8 @@ try {
     const enSubasta = new Set((await subastasAbiertas(L)).map(s => s.carta_id));
     const sb = await rpcOk('slr_comprar_sobre', { token: B1.token, liga_id: L, tipo: 'basico' });
     check(sb.precio === 1500 && sb.cartas.length === 3, 'sobre básico: 1.500 y 3 cartas');
+    check(sb.cartas.every(c => ['normal', 'foil', 'brillante', 'plateada'].includes(c.acabado) && !('variante' in c)),
+      `las cartas traen su acabado (${sb.cartas.map(c => c.acabado).join(', ')}) y ya no «variante»`);
     check(sb.cartas.every(c => { const a = antes.find(x => x.id === c.id); return !a || (!a.equipo_id && !enSubasta.has(c.id)); }),
       'ninguna tenía dueño ni estaba en subasta');
     const despues = await cartasLiga(L);

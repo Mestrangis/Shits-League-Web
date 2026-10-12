@@ -6,6 +6,12 @@
 // Determinista (mulberry32 del motor con semilla fija): siempre produce el mismo
 // SQL. Valor calculado con js/slr/valor.js. Todas las cartas con beta = true y
 // sin imagen. Los nombres no coinciden con ninguno de los 18 jugadores.
+//
+// Genera dos migraciones:
+//   · 20261012230300_slr_catalogo_beta.sql: los diseños (ya aplicada: no cambia).
+//   · 20261013010100_slr_catalogo_acabados.sql: el acabado de cada diseño
+//     (foil, brillante, plateada; el resto normal), con un generador aparte para
+//     no alterar el catálogo base.
 import { writeFileSync } from 'node:fs';
 import { mulberry32 } from '../../js/slr/motor-v1.1.0.js';
 import { calcularOVR, calcularValor } from '../../js/slr/valor.js';
@@ -13,6 +19,15 @@ import { PODERES } from '../../tests/slr/cartas-prueba.mjs';
 
 const SEMILLA = 20261012;
 const MIGRACION = new URL('../migrations/20261012230300_slr_catalogo_beta.sql', import.meta.url);
+const MIGRACION_ACABADOS = new URL('../migrations/20261013010100_slr_catalogo_acabados.sql', import.meta.url);
+const SEMILLA_ACABADOS = 20261013;
+// Cuántos diseños de cada tipo llevan cada acabado especial
+const ACABADOS = {
+  duo:        { foil: 6, plateada: 3 },
+  trio:       { brillante: 4, foil: 2 },
+  unica:      { foil: 1 },
+  individual: { foil: 4, brillante: 3, plateada: 3 },
+};
 const rng = mulberry32(SEMILLA);
 
 /* ── Utilidades aleatorias ───────────────────────────────────────────────── */
@@ -204,6 +219,36 @@ values
 ${filas.join(',\n')};
 `);
 
+/* ── Acabados (migración aparte) ─────────────────────────────────────────── */
+const rngA = mulberry32(SEMILLA_ACABADOS);
+const barajarA = lista => {
+  const l = [...lista];
+  for (let i = l.length - 1; i > 0; i--) { const j = Math.floor(rngA() * (i + 1)); [l[i], l[j]] = [l[j], l[i]]; }
+  return l;
+};
+for (const d of disenos) d.acabado = 'normal';
+for (const [tipo, reparto] of Object.entries(ACABADOS)) {
+  const candidatos = barajarA(disenos.filter(d => d.tipo === tipo));
+  for (const [acabado, n] of Object.entries(reparto)) {
+    for (let i = 0; i < n; i++) candidatos.shift().acabado = acabado;
+  }
+}
+const especiales = disenos.filter(d => d.acabado !== 'normal');
+const filasAcabado = especiales.map((d, i) =>
+  `  (${lit(d.id)}::uuid, ${lit(d.acabado)})${i < especiales.length - 1 ? ',' : ' '}  -- ${d.tipo}: ${d.nombre}`);
+writeFileSync(MIGRACION_ACABADOS, `-- ═══════════════════════════════════════════════════════════════════════════
+-- SHITS LEAGUE RUSH — acabados del catálogo BETA
+-- GENERADO por supabase/seed/generar-catalogo.mjs (semilla ${SEMILLA_ACABADOS}): no editar a mano.
+-- ${especiales.length} diseños con acabado especial para poder probar la interfaz; el resto, normal.
+-- ═══════════════════════════════════════════════════════════════════════════
+
+update public.disenos_carta d set acabado = v.acabado::public.acabado_carta
+from (values
+${filasAcabado.join('\n')}
+) as v(id, acabado)
+where d.id = v.id;
+`);
+
 /* ── Resumen ─────────────────────────────────────────────────────────────── */
 const rango = (l, k, dec = 1) => `${Math.min(...l.map(x => x[k])).toFixed(dec)}–${Math.max(...l.map(x => x[k])).toFixed(dec)}`;
 console.log(`Catálogo beta: ${disenos.length} diseños (semilla ${SEMILLA}) → ${MIGRACION.pathname.split('/').slice(-3).join('/')}\n`);
@@ -214,6 +259,13 @@ for (const tipo of ['individual', 'duo', 'trio', 'unica']) {
   const conP = l.filter(d => d.poderes.length).length;
   console.log(`${tipo.padEnd(11)} ${String(l.length).padStart(3)}   ${rango(l, 'ovr').padEnd(11)}  ${rango(l, 'valor', 0).padEnd(11)}  ` +
     `${Math.min(...stats)}–${Math.max(...stats)}`.padEnd(9) + `  ${conP} (${[...new Set(l.map(d => d.poderes.length))].sort().join('/')} poderes)`);
+}
+console.log(`
+Acabados: ${['foil', 'brillante', 'plateada'].map(a => `${a} ${disenos.filter(d => d.acabado === a).length}`).join(', ')}` +
+  ` · normal ${disenos.filter(d => d.acabado === 'normal').length}`);
+for (const tipo of ['individual', 'duo', 'trio', 'unica']) {
+  const l = disenos.filter(d => d.tipo === tipo && d.acabado !== 'normal');
+  console.log(`  ${tipo.padEnd(10)} ${l.map(d => `${d.nombre} (${d.acabado})`).join(', ')}`);
 }
 const ind = disenos.filter(d => d.tipo === 'individual');
 const perfilDe = d => (d.DEF >= d.ATA && d.DEF >= d.CON ? 'DEF alta' : d.CON >= d.ATA ? 'CON alta' : 'ATA alta');

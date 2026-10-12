@@ -1,5 +1,5 @@
 // Informe: abre N sobres de cada tipo en una liga de prueba (API real) y cuenta
-// cuántas cartas salen de cada tipo y variante y el valor medio por sobre.
+// cuántas cartas salen de cada tipo y el valor medio por sobre.
 //   node tests/slr/informe-sobres.mjs [N=300]
 // Cada bot abre un tipo de sobre en paralelo. Tras cada sobre vende al banco lo
 // recibido para tener siempre sitio (las cartas vuelven al bombo). En los de
@@ -28,7 +28,7 @@ try {
   }
 
   await Promise.all(bots.map(async b => {
-    b.stats = { cartas: 0, tipos: {}, variantes: {}, valorRecibido: 0, valorCandidatas: 0, garantias: 0 };
+    b.stats = { cartas: 0, tipos: {}, valorRecibido: 0, valorCandidatas: 0, garantias: 0 };
     for (let i = 0; i < N; i++) {
       const s = await rpcOk('slr_comprar_sobre', { token: b.token, liga_id: liga.id, tipo: b.tipo });
       let recibidas = s.cartas;
@@ -43,7 +43,6 @@ try {
       for (const c of s.cartas) {
         b.stats.cartas++;
         b.stats.tipos[c.tipo] = (b.stats.tipos[c.tipo] ?? 0) + 1;
-        b.stats.variantes[c.variante] = (b.stats.variantes[c.variante] ?? 0) + 1;
       }
       b.stats.valorRecibido += recibidas.reduce((acc, c) => acc + c.valor, 0);
       for (const c of recibidas) await rpcOk('slr_vender_banco', { token: b.token, carta_id: c.id });
@@ -58,7 +57,6 @@ try {
     console.log(`Sobre ${b.tipo} (precio ${PRECIO[b.tipo].toLocaleString('es-ES')})${b.tipo === 'eleccion' ? ' — cuenta las 3 candidatas de cada sobre' : ''}`);
     console.log(`  Cartas: ${s.cartas}`);
     console.log(`  Tipo:     ${['individual', 'duo', 'trio', 'unica'].map(t => `${t} ${pct(s.tipos[t] ?? 0, s.cartas)}`).join(' · ')}`);
-    console.log(`  Variante: ${['normal', 'foil', 'brillante', 'plateada'].map(v => `${v} ${pct(s.variantes[v] ?? 0, s.cartas)}`).join(' · ')}`);
     const medio = s.valorRecibido / N;
     console.log(`  Valor medio recibido por sobre: ${medio.toFixed(0)} (${(100 * medio / PRECIO[b.tipo]).toFixed(0)} % del precio)` +
       (b.tipo === 'eleccion' ? ` · eligiendo la de más valor; valor medio de una candidata: ${(s.valorCandidatas / N).toFixed(0)}` : ''));

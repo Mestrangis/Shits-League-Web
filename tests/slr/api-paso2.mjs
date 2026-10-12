@@ -134,8 +134,8 @@ try {
   ligaId = liga.datos.id;
   check(/^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}$/.test(liga.datos.codigo_invitacion), `código de invitación legible: ${liga.datos.codigo_invitacion}`);
   check(liga.datos.cartas === nDisenos, `un ejemplar de cada diseño activo (${liga.datos.cartas} de ${nDisenos})`);
-  const libres = (await leer(`cartas?select=id&liga_id=eq.${ligaId}&equipo_id=is.null&variante=eq.normal`)).datos.length;
-  check(libres === nDisenos, 'todos los ejemplares nacen libres y normales');
+  const libres = (await leer(`cartas?select=id&liga_id=eq.${ligaId}&equipo_id=is.null`)).datos.length;
+  check(libres === nDisenos, 'todos los ejemplares nacen libres');
   check(!(await leer(`equipos?liga_id=eq.${ligaId}`)).datos.length, 'crear la liga no crea equipo');
 
   seccion('Unirse: Bot Uno');

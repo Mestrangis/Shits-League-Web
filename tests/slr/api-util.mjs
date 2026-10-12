@@ -59,8 +59,8 @@ export const seccion = t => console.log(`\n${t}`);
 /* ── Lecturas de estado ──────────────────────────────────────────────────── */
 // Todas las cartas de una liga con su diseño
 export async function cartasLiga(liga) {
-  const r = await leer(`cartas?select=id,diseno_id,variante,equipo_id,blindada_hasta,multiplicador_clausula,reservada_por,` +
-    `disenos_carta(nombre,tipo,valor,ata,def,con)&liga_id=eq.${liga}&limit=5000`);
+  const r = await leer(`cartas?select=id,diseno_id,equipo_id,blindada_hasta,multiplicador_clausula,reservada_por,` +
+    `disenos_carta(nombre,tipo,acabado,valor,ata,def,con)&liga_id=eq.${liga}&limit=5000`);
   if (!r.ok) throw new Error(`cartas: ${r.mensaje}`);
   return r.datos;
 }
@@ -84,7 +84,7 @@ export async function invariantes(liga, bots, etiqueta = '') {
     if (!movs.ok || suma !== s) { ok = false; detalles.push(`${b.nombre}: saldo ${s} ≠ movimientos ${suma}`); }
   }
   const cartas = await cartasLiga(liga);
-  const claves = cartas.map(c => `${c.diseno_id}/${c.variante}`);
+  const claves = cartas.map(c => c.diseno_id); // un ejemplar por diseño
   if (new Set(claves).size !== claves.length) { ok = false; detalles.push('ejemplar repetido'); }
   const porEquipo = {};
   for (const c of cartas) if (c.equipo_id) porEquipo[c.equipo_id] = (porEquipo[c.equipo_id] ?? 0) + 1;
