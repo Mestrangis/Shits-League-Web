@@ -15,7 +15,7 @@ Decisiones que prevalecen sobre los documentos «Liga de Bolsillo — Especifica
 - Las variantes vendidas al banco vuelven al bombo de subastas diarias y de sobres.
 - Una carta que está en el mercado (subasta activa) no puede salir en un sobre. Solo vuelve al bombo de sobres cuando sale del mercado sin dueño.
 - Sobre de elección: requiere 1 hueco libre en la plantilla.
-- Si un sobre da una carta y la plantilla está llena, el usuario elige qué carta suya sale y esa carta se vende al banco automáticamente.
+- Para cualquier adquisición (sobre, subasta, compra, cláusula, intercambio) hace falta tener hueco libre en la plantilla. Si estás a 15, la app ofrece justo antes vender una carta al banco para hacer hueco. En las subastas, que se resuelven a las 00:00 sin el usuario, si el ganador tiene la plantilla llena al resolverse, su puja se anula y gana la siguiente (como dice el PDF); la app avisa de esto al pujar.
 
 ## Decisiones de implementación del motor v1.0.0
 
