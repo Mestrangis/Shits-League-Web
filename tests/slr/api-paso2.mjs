@@ -132,8 +132,11 @@ try {
 
   seccion('Crear liga');
   const nDisenos = (await leer('disenos_carta?select=id&activo=eq.true')).datos.length;
-  const liga = await rpc('slr_crear_liga', { token: t1, nombre: `Prueba API paso 2 · ${new Date().toISOString().slice(0, 16)}` });
-  check(liga.ok, 'Bot Uno crea la liga', liga.mensaje);
+  // La liga real solo la crea el administrador (usuarios.es_admin), y solo una
+  const real = await rpc('slr_crear_liga', { token: t1, nombre: 'Liga real de un bot' });
+  check(!real.ok && /administrador/.test(real.mensaje), 'un bot no puede crear la liga real', real.mensaje);
+  const liga = await rpc('slr_crear_liga_prueba', { token: t1, nombre: `Prueba API paso 2 · ${new Date().toISOString().slice(0, 16)}` });
+  check(liga.ok && liga.datos.es_prueba === true, 'Bot Uno crea una liga de prueba', liga.mensaje);
   if (!liga.ok) throw new Error('Sin liga no se puede seguir');
   ligaId = liga.datos.id;
   check(/^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}$/.test(liga.datos.codigo_invitacion), `código de invitación legible: ${liga.datos.codigo_invitacion}`);

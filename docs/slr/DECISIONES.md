@@ -128,6 +128,30 @@ Puntos que ni la especificación ni el encargo fijaban del todo y que el motor r
 - **Funciones de prueba** (solo admin de liga de prueba): `slr_prueba_tareas(token, liga, ahora, simular)` corre también las tareas de jornada con la hora dada (con `simular = false` cierra sin pedir la simulación), `slr_prueba_pausar` / `slr_prueba_reanudar` con hora simulada, `slr_prueba_partidos` (partidos aún sin publicar) y `slr_prueba_fijar_semilla` (fuerza la semilla antes de simular, para provocar una lesión).
 - **pg-safeupdate:** Supabase rechaza `DELETE` sin `WHERE` en las peticiones de la API, incluso sobre tablas temporales; por eso `20261013020400_slr_reparto_safeupdate.sql` usa `where true`.
 
+## Interfaz base (paso 5, entrega 1)
+
+### Decisiones de Marcos
+
+- **Una única liga.** `usuarios.es_admin` (solo Marcos) y `slr_crear_liga` solo para él y solo si no existe otra liga que no sea de prueba. Los demás se unen con `slr_unirse_liga_principal(token, nombre_equipo)`, con las reglas de `slr_unirse_liga` (solo en preparación o entre temporadas). `slr_yo` devuelve `es_admin` y la liga principal aunque el usuario no tenga equipo.
+- **Las ligas de prueba no cambian:** `slr_crear_liga_prueba` sigue abierta a cualquier usuario (los tests crean siempre sus ligas con ella). `api-paso2` comprueba además que un bot no puede crear la liga real.
+- **Pestaña "Rush"** al final de la barra de Shits League, integrada en el swipe y el estado activo. Es ligera: nada del juego se carga hasta pulsar JUGAR (`import()` de `js/slr/rush.js` y `css/slr.css` inyectado en ese momento).
+- **Login unificado:** el código de Shits League abre también la sesión de Rush (`SLR_TOKEN` en localStorage) sin bloquear el login si el servidor falla. Quien ya tenía sesión confirma el código una vez. Con un 403, o si el nombre de Rush no coincide con el de la sesión, se borra el token y se vuelve a pedir el código. En localhost (y solo ahí) el modal acepta los códigos de los bots validados contra el servidor; en localhost Rush usa la liga de prueba del bot si la tiene.
+- **Modo Rush a pantalla completa** con safe areas, `history.pushState` para que atrás cierre primero hojas y detalles y después salga de Rush, barra inferior de 5 secciones (Mercado "Próximamente") y estilo de la sección 12 (fondo verde muy oscuro, verde neón propio, naranja rival, Anton para títulos y números).
+
+### Decisiones mías
+
+- **Archivos existentes tocados, lo mínimo:** `index.html` (pestaña, panel, un `id` en el texto del modal de sesión, el CSS de la portada y `js/rush-panel.js`), `js/session.js` (puente con Rush en `tryLogin`, `logout` y `openSessionModal`), `js/app.js` (`rush` en `TABS`, render del panel, el modo Rush excluido del swipe y del pull-to-refresh) y `sw.js` (`CACHE_NAME` v3). Todo lo demás es nuevo.
+- **Puente con la sesión en un script clásico** (`js/rush-panel.js`), porque `session.js` y `app.js` no son módulos. Usa `import()` de `js/slr/config.js` para no duplicar la URL ni la clave pública.
+- **Token del bot pendiente:** en localhost el token de un bot no se guarda hasta comprobar que el código corresponde a la sesión actual.
+- **Estado de la portada sin sesión:** se lee de las tablas públicas (liga principal y su próxima jornada); con sesión, de `slr_yo`.
+- **Datos del juego:** la plantilla, las ventas activas, la alineación, la temporada y `publicada_en` de las jornadas se leen de las tablas públicas; el resto, de las funciones `slr_*`. "Confirmada para esta jornada" se calcula igual que el bonus de participación (guardada a mano después de publicarse la jornada anterior o de empezar la temporada).
+- **Guardar también confirma:** guardar la alineación cuenta para el bonus de participación igual que `slr_confirmar_alineacion`, así que con cambios sin guardar solo se ofrece Guardar, y sin cambios, Confirmar.
+- **La alineación se bloquea en la interfaz también con la liga en pausa** (el servidor solo la bloquea en la ventana de cierre).
+- **"Rinde mal aquí":** la stat del hueco está 12 o más puntos por debajo de la mejor stat de la carta. Las fuerzas en vivo usan las stats efectivas (tocada al 85 %); el portero se muestra aparte con su DEF.
+- **El pronóstico usa la alineación guardada** (la Edge Function la lee del servidor), así que con cambios sin guardar el botón pide guardar antes.
+- **La carta** (`js/slr/carta.js` + `.slr-carta` en `css/slr.css`) es independiente de las pantallas: escala con `cqw` (container queries) a cualquier tamaño, marcador con iniciales y siluetas (una por persona en dúos y tríos) en el color del tipo (verde, azul, morado, oro), imagen de Cloudinary recortada 5:7 si existe. Foil: `linear-gradient` con el espectro (hsl 0–360) en `color-dodge` que sigue el dedo (pointermove) o la inclinación (deviceorientation; en iOS se pide permiso al tocar una carta foil), con una leve inclinación 3D y animación de 4 s en reposo. Con `prefers-reduced-motion` no hay animaciones ni inclinación (el dedo sigue moviendo el brillo).
+- **Las notificaciones** de Inicio se marcan como leídas al mostrarse (siguen marcadas como nuevas hasta salir de la pantalla).
+
 ## Balance de referencia (motor v1.1.0)
 
 `node tests/slr/balance.mjs`, 10.000 partidos por escenario:

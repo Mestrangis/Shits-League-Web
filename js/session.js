@@ -52,6 +52,9 @@ const JUGADORES_FOTOS = {
 
 const SESSION_KEY = 'SESSION_PLAYER';
 
+// Si el modal se abrió desde Rush (rush-panel.js), qué hacer al activar Rush
+let sessionParaRush = null;
+
 /* ── Estado de sesión ────────────────────────────────────────────────────── */
 // Jugador logueado o null. localStorage puede no estar disponible (modo privado)
 function getSessionPlayer() {
@@ -106,8 +109,14 @@ function renderSessionButton(nombre) {
   if (nombre) renderAvatar(btn.querySelector('.avatar'), nombre);
 }
 
-function openSessionModal() {
-  const nombre = getSessionPlayer();
+// opciones.alActivarRush: el modal pide el código para activar Rush aunque ya
+// haya sesión, y llama a esa función cuando Rush queda activado
+function openSessionModal(opciones = {}) {
+  sessionParaRush = typeof opciones.alActivarRush === 'function' ? opciones.alActivarRush : null;
+  const nombre = sessionParaRush ? null : getSessionPlayer();
+  document.getElementById('sessionText').textContent = sessionParaRush
+    ? 'Confirma tu código para activar Rush'
+    : 'Introduce tu código de jugador.';
   document.getElementById('sessionLogin').hidden  = !!nombre;
   document.getElementById('sessionLogged').hidden = !nombre;
   if (nombre) {
@@ -134,17 +143,41 @@ async function tryLogin() {
     console.warn('[session] No se pudo verificar el código:', e);
   }
 
-  if (!nombre) {
+  // Rush: en localhost también valen los códigos de los bots (solo contra el servidor)
+  let esBot = false;
+  if (!nombre && typeof rushIdentificarBot === 'function') {
+    nombre = await rushIdentificarBot(input.value);
+    esBot = !!nombre;
+  }
+
+  const fallo = texto => {
+    error.textContent = texto;
     error.hidden = false;
     input.select();
-    return;
-  }
-  setSessionPlayer(nombre);
+  };
+  if (!nombre) return fallo('Código incorrecto');
+
+  const paraRush = sessionParaRush;
+  const actual = getSessionPlayer();
+  if (paraRush && actual && actual !== nombre) return fallo(`Ese no es el código de ${actual}`);
+
+  // Rush usa el mismo código. Sin servidor, Shits League entra igual; solo
+  // se espera cuando el modal se abrió para activar Rush
+  const rushListo = esBot ? Promise.resolve(rushConfirmarBot())
+    : typeof rushActivar === 'function' ? rushActivar(input.value, nombre) : Promise.resolve(false);
+  if (paraRush && !(await rushListo)) return fallo('No se pudo activar Rush. Inténtalo de nuevo.');
+
+  if (!paraRush || nombre !== actual) setSessionPlayer(nombre);
   resetLoginForm();
   closeModal('sessionModal');
+  if (paraRush) {
+    sessionParaRush = null;
+    paraRush();
+  }
 }
 
 function logout() {
+  if (typeof rushCerrarSesion === 'function') rushCerrarSesion();
   setSessionPlayer(null);
   closeModal('sessionModal');
 }

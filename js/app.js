@@ -195,7 +195,7 @@ function initHero() {
 }
 
 /* ── Tabs ────────────────────────────────────────────────────────────────── */
-const TABS = ['inicio', 'votacion', 'resumen', 'clasificacion', 'goleadores', 'asistentes', 'plantilla'];
+const TABS = ['inicio', 'votacion', 'resumen', 'clasificacion', 'goleadores', 'asistentes', 'plantilla', 'rush'];
 
 // '#votacion' → 'votacion'; null si el hash no es una pestaña.
 // Permite que las notificaciones enlacen a una pestaña concreta.
@@ -246,7 +246,8 @@ const SWIPE_TAB_UMBRAL  = 60; // px horizontales mínimos
 // - .voto-card--swipe: la card arrastrable en sí (mismo selector con el que
 //   votacion.js arranca el arrastre). Sus botones ✓/✗ y el resto sí navegan.
 // - nav con scroll horizontal, modales, embeds y campos de texto
-const SWIPE_TAB_EXCLUIR = '.voto-card--swipe, .tabs, .topbar, .modal, iframe, input, textarea';
+// - .slr: el modo Rush a pantalla completa (tiene su propia navegación)
+const SWIPE_TAB_EXCLUIR = '.voto-card--swipe, .tabs, .topbar, .modal, iframe, input, textarea, .slr';
 
 // Touch events y no pointer events: en cuanto el navegador empieza a hacer
 // scroll manda pointercancel y no llegaría el pointerup. Pasivos: no bloquean el scroll.
@@ -299,7 +300,8 @@ function initPullToRefresh() {
     activo = e.touches.length === 1
       && window.scrollY <= 0                      // ya en lo alto de la página
       && STATE.season === '25-26'
-      && !document.querySelector('.modal.open');
+      && !document.querySelector('.modal.open')
+      && !e.target.closest('.slr');               // el modo Rush no recarga la app
     if (!activo) return;
     x0 = e.touches[0].clientX;
     y0 = e.touches[0].clientY;
@@ -390,6 +392,9 @@ function renderTabIfNeeded(name) {
     case 'plantilla':
       panel.innerHTML = renderPlantilla(STATE.jugadores);
       break;
+    case 'rush':
+      panel.innerHTML = renderRushPanel();
+      break;
   }
 
   panel.dataset.rendered = '1';
@@ -402,6 +407,7 @@ function bindPanel(panel, name) {
   if (name === 'inicio') {
     startCountdown(STATE.proximosPartidos[0]?.fecha);
   }
+  if (name === 'rush') bindRushPanel(panel);
   if (name === 'votacion') {
     predecodificarImagenes(panel);
     if (!panel.dataset.bound) {
@@ -656,6 +662,7 @@ async function init() {
 // Lo llama session.js; re-renderiza lo que depende del jugador logueado
 function onSessionChange() {
   rerenderPanel('votacion');
+  rerenderPanel('rush');
 }
 
 document.addEventListener('DOMContentLoaded', init);

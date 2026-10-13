@@ -1,0 +1,261 @@
+/* ═══════════════════════════════════════════════
+   SHITS LEAGUE RUSH — modo Rush (pantalla completa)
+   Lo carga js/rush-panel.js al pulsar JUGAR: abrir({ jugador, pedirCodigo, alSalir }).
+   · Capa por encima de la app, con barra superior (saldo, salir) e inferior
+     (Inicio, Plantilla, Mercado, Liga, Perfil).
+   · history.pushState al entrar: el botón atrás cierra primero las hojas
+     abiertas y después sale de Rush, sin cerrar la app.
+   · El estado del jugador (liga, equipo, cartas, calendario…) vive en `datos`
+     y cada pantalla lo pinta; tras una acción se recarga lo necesario.
+═══════════════════════════════════════════════ */
+import { rpc, leer, alCaducarSesion, borrarToken, ErrorSesion } from './api.js';
+import { esc, miles, crear, fijarRaiz, ajustarCapas, capasAbiertas, toast } from './ui.js';
+import { normalizarCarta, iniciarAcabados, pararAcabados } from './carta.js';
+import * as previa from './pantallas/previa.js';
+import * as inicio from './pantallas/inicio.js';
+import * as plantilla from './pantallas/plantilla.js';
+import * as mercado from './pantallas/mercado.js';
+import * as liga from './pantallas/liga.js';
+import * as perfil from './pantallas/perfil.js';
+import * as alineacion from './pantallas/alineacion.js';
+
+const ES_LOCAL = ['localhost', '127.0.0.1'].includes(location.hostname);
+
+const SECCIONES = [
+  { id: 'inicio',    texto: 'Inicio',    modulo: inicio,
+    icono: '<path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/><path d="M10 19.5v-5h4v5"/>' },
+  { id: 'plantilla', texto: 'Plantilla', modulo: plantilla,
+    icono: '<rect x="3" y="5" width="7" height="10" rx="1.5"/><rect x="14" y="5" width="7" height="10" rx="1.5"/><path d="M6.5 18.5h11"/>' },
+  { id: 'mercado',   texto: 'Mercado',   modulo: mercado,
+    icono: '<path d="M4 9h16l-1.5 10.5h-13z"/><path d="M8.5 9V7a3.5 3.5 0 0 1 7 0v2"/>' },
+  { id: 'liga',      texto: 'Liga',      modulo: liga,
+    icono: '<path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4v1.5A3.5 3.5 0 0 0 7.5 11M17 6h3v1.5a3.5 3.5 0 0 1-3.5 3.5"/><path d="M12 14v3.5M8.5 20h7"/>' },
+  { id: 'perfil',    texto: 'Perfil',    modulo: perfil,
+    icono: '<circle cx="12" cy="8.5" r="4"/><path d="M4 20.5c1.2-4 4.3-6 8-6s6.8 2 8 6"/>' },
+];
+
+/* ── Estado ──────────────────────────────────────────────────────────────── */
+export const datos = {
+  jugador: null,      // nombre de la sesión de Shits League
+  yo: null,           // slr_yo
+  liga: null,         // la liga que se juega (principal, o la de prueba en local)
+  equipo: null,       // equipo propio en esa liga (o null)
+  ligaInfo: null,     // fila pública de la liga (config, estado, pausada_en…)
+  temporada: null,    // fila pública de la temporada actual
+  jornadas: [],       // calendario de la temporada actual
+  cartas: [],         // plantilla propia (normalizada + estado de mercado)
+  alineacion: null,   // fila de alineaciones del equipo
+};
+
+let raiz = null, main = null, seccion = 'inicio', opciones = {}, pintando = 0;
+
+/* ── Consultas derivadas (las usan varias pantallas) ─────────────────────── */
+export const pendientes = () => datos.jornadas.filter(j => ['programada', 'cerrada', 'simulada'].includes(j.estado));
+export const proximaJornada = () => pendientes()[0] ?? null;
+export const enJuego = j => !!j && (j.estado !== 'programada' || new Date(j.cierre_en) <= Date.now());
+export const ventanaCierre = () => enJuego(proximaJornada());
+export const pausada = () => datos.ligaInfo?.estado === 'pausada';
+// Alineación bloqueada: entre cierre y publicación, o con la liga en pausa
+export const alineacionBloqueada = () => ventanaCierre() || pausada();
+export const miPartido = j => j?.partidos.find(p => [p.local.equipo_id, p.visitante.equipo_id].includes(datos.equipo?.id)) ?? null;
+export const configLiga = () => datos.ligaInfo?.config ?? {};
+
+// Una carta está tocada si su lesión afecta a una jornada aún sin publicar
+export function estaTocada(carta) {
+  if (!carta.tocada_en_jornada) return false;
+  const j = datos.jornadas.find(x => x.id === carta.tocada_en_jornada);
+  return !!j && j.estado !== 'publicada';
+}
+
+// Confirmada para la próxima jornada: guardada a mano después de publicarse la anterior
+export function alineacionConfirmada() {
+  const al = datos.alineacion, j = proximaJornada();
+  if (!al || al.automatica || !j) return false;
+  const anterior = datos.jornadas.find(x => x.numero === j.numero - 1);
+  const ref = anterior?.publicada_en ?? datos.temporada?.iniciada_en;
+  return !!ref && new Date(al.guardada_en) > new Date(ref);
+}
+
+/* ── Carga ───────────────────────────────────────────────────────────────── */
+function mismoNombre(a, b) {
+  const n = s => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+  return !!a && n(a) === n(b);
+}
+
+async function cargarYo() {
+  const yo = await rpc('slr_yo', {}, { silencioso: true });
+  if (!mismoNombre(yo.usuario.nombre, datos.jugador)) {
+    // La sesión de Rush es de otra persona: se vuelve a pedir el código
+    borrarToken();
+    throw new ErrorSesion('La sesión de Rush no coincide con la de Shits League');
+  }
+  datos.yo = yo;
+  const prueba = ES_LOCAL ? yo.ligas.find(l => l.es_prueba) : null;
+  datos.liga = prueba ?? (yo.liga_principal ? { ...yo.liga_principal, es_prueba: false } : null);
+  datos.equipo = datos.liga ? yo.equipos.find(e => e.liga_id === datos.liga.id) ?? null : null;
+}
+
+async function cargarCartas() {
+  const eq = datos.equipo.id;
+  const [filas, ventas] = await Promise.all([
+    leer(`cartas?select=id,diseno_id,equipo_id,multiplicador_clausula,blindada_hasta,tocada_en_jornada,adquirida_en,` +
+      `disenos_carta(nombre,tipo,acabado,personas,ata,def,con,valor,poderes,imagen_url,texto)&equipo_id=eq.${eq}`),
+    leer(`ventas?select=id,carta_id,precio&vendedor_id=eq.${eq}&estado=eq.activa`),
+  ]);
+  datos.cartas = filas.map(f => ({
+    ...normalizarCarta(f),
+    multiplicador: Number(f.multiplicador_clausula),
+    clausula: Math.round(f.disenos_carta.valor * Number(f.multiplicador_clausula)),
+    blindada_hasta: f.blindada_hasta && new Date(f.blindada_hasta) > Date.now() ? f.blindada_hasta : null,
+    tocada_en_jornada: f.tocada_en_jornada,
+    adquirida_en: f.adquirida_en,
+    en_venta: ventas.find(v => v.carta_id === f.id) ?? null,
+  }));
+}
+
+async function cargarLiga() {
+  const id = datos.liga.id;
+  const [info] = await leer(`ligas?select=id,nombre,estado,temporada,config,pausada_en&id=eq.${id}`);
+  datos.ligaInfo = info;
+  const [temporada] = await leer(`temporadas?select=id,numero,estado,iniciada_en,terminada_en&liga_id=eq.${id}&order=numero.desc&limit=1`);
+  datos.temporada = temporada ?? null;
+  if (!datos.equipo) { datos.jornadas = []; return; }
+  const [cal, publicadas] = await Promise.all([
+    rpc('slr_calendario', { liga_id: id }),
+    temporada ? leer(`jornadas?select=id,publicada_en&temporada_id=eq.${temporada.id}`) : [],
+  ]);
+  // slr_calendario no trae publicada_en (hace falta para saber si la alineación está confirmada)
+  datos.jornadas = (cal.temporada && cal.temporada.id === temporada?.id ? cal.jornadas : [])
+    .map(j => ({ ...j, publicada_en: publicadas.find(p => p.id === j.id)?.publicada_en ?? null }));
+}
+
+async function cargarAlineacion() {
+  const [al] = await leer(`alineaciones?equipo_id=eq.${datos.equipo.id}`);
+  datos.alineacion = al ?? null;
+}
+
+// partes: 'yo', 'liga', 'cartas', 'alineacion' (sin partes, todo)
+export async function recargar(...partes) {
+  const todo = !partes.length, toca = p => todo || partes.includes(p);
+  if (toca('yo')) await cargarYo();
+  if (!datos.liga) return;
+  const tareas = [];
+  if (toca('liga')) tareas.push(cargarLiga());
+  if (datos.equipo && toca('cartas')) tareas.push(cargarCartas());
+  if (datos.equipo && toca('alineacion')) tareas.push(cargarAlineacion());
+  await Promise.all(tareas);
+  pintarBarra();
+}
+
+/* ── Pintado ─────────────────────────────────────────────────────────────── */
+function pintarBarra() {
+  const saldo = raiz?.querySelector('.slr-barra__saldo');
+  if (!saldo) return;
+  saldo.hidden = !datos.equipo;
+  saldo.innerHTML = datos.equipo ? `<span class="slr-monedas">${miles(datos.equipo.saldo)}</span>` : '';
+  raiz.querySelector('.slr-nav').hidden = !datos.equipo;
+}
+
+export function navegar(id, { arriba = true } = {}) {
+  seccion = id;
+  raiz.querySelectorAll('.slr-nav__item').forEach(b => {
+    const activa = b.dataset.seccion === id;
+    b.classList.toggle('activa', activa);
+    b.setAttribute('aria-current', activa ? 'page' : 'false');
+  });
+  return pintar({ arriba });
+}
+
+export async function pintar({ arriba = false } = {}) {
+  const n = ++pintando;
+  const cont = crear('<div class="slr-pantalla"></div>');
+  const ctx = { navegar, recargar, pintar, datos };
+  try {
+    if (!datos.liga || !datos.equipo) await previa.pintar(cont, ctx);
+    else if (seccion === 'alineacion') await alineacion.pintar(cont, ctx);
+    else await SECCIONES.find(s => s.id === seccion).modulo.pintar(cont, ctx);
+  } catch (e) {
+    if (e instanceof ErrorSesion) return;
+    console.error('[rush]', e);
+    cont.innerHTML = `<div class="slr-vacio"><b>Algo ha fallado</b><p>${esc(e.message)}</p>
+      <button class="slr-btn" type="button" data-reintentar>Reintentar</button></div>`;
+    cont.querySelector('[data-reintentar]').addEventListener('click', () => recargar().then(() => pintar()));
+  }
+  if (n !== pintando || !main) return;  // otra pantalla se pintó mientras tanto
+  main.replaceChildren(cont);
+  if (arriba) main.scrollTop = 0;
+}
+
+function pintarCargando(texto = 'Cargando…') {
+  main.innerHTML = `<div class="slr-cargando"><span class="slr-balon"></span>${esc(texto)}</div>`;
+}
+
+/* ── Abrir y cerrar ──────────────────────────────────────────────────────── */
+function alVolver(e) {
+  const profundidad = e.state?.slr;
+  if (typeof profundidad === 'number') ajustarCapas(profundidad);
+  else cerrar();
+}
+
+function construir() {
+  raiz = crear(`
+    <div class="slr" id="slr" role="application" aria-label="Shits League Rush">
+      <header class="slr-barra">
+        <div class="slr-barra__logo"><span>SL</span><b>RUSH</b></div>
+        <div class="slr-barra__saldo" hidden></div>
+        <button class="slr-barra__salir" type="button">✕ Salir</button>
+      </header>
+      <main class="slr-main"></main>
+      <nav class="slr-nav" hidden>
+        ${SECCIONES.map(s => `
+          <button class="slr-nav__item" type="button" data-seccion="${s.id}">
+            <svg viewBox="0 0 24 24" aria-hidden="true">${s.icono}</svg><span>${s.texto}</span>
+          </button>`).join('')}
+      </nav>
+    </div>`);
+  main = raiz.querySelector('.slr-main');
+  raiz.querySelector('.slr-barra__salir').addEventListener('click', salir);
+  raiz.querySelectorAll('.slr-nav__item').forEach(b => b.addEventListener('click', () => navegar(b.dataset.seccion)));
+  document.body.appendChild(raiz);
+  fijarRaiz(raiz);
+  iniciarAcabados(raiz);
+  document.documentElement.classList.add('slr-abierto');
+  history.pushState({ slr: 0 }, '');
+  window.addEventListener('popstate', alVolver);
+}
+
+export function salir() {
+  history.go(-(capasAbiertas() + 1));   // el popstate cierra Rush
+}
+
+function cerrar() {
+  if (!raiz) return;
+  window.removeEventListener('popstate', alVolver);
+  ajustarCapas(0);
+  pararAcabados();
+  raiz.remove();
+  raiz = main = null;
+  fijarRaiz(null);
+  document.documentElement.classList.remove('slr-abierto');
+  opciones.alSalir?.();
+}
+
+export async function abrir(op) {
+  opciones = op;
+  datos.jugador = op.jugador;
+  alCaducarSesion(() => {
+    if (main) main.innerHTML = '<div class="slr-vacio"><b>Confirma tu código</b><p>Tu sesión de Rush ha caducado.</p></div>';
+    op.pedirCodigo();
+  });
+  if (!raiz) construir();
+  pintarCargando();
+  try {
+    await recargar();
+  } catch (e) {
+    if (e instanceof ErrorSesion) { op.pedirCodigo(); return; }
+    main.innerHTML = `<div class="slr-vacio"><b>No se pudo cargar Rush</b><p>${esc(e.message)}</p></div>`;
+    toast(e.message, 'error');
+    return;
+  }
+  await navegar(seccion);
+}

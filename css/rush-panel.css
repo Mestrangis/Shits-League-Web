@@ -1,0 +1,135 @@
+/* ═══════════════════════════════════════════════
+   SHITS LEAGUE — rush-panel.css
+   Solo la portada de la pestaña "Rush". El modo Rush tiene su propio CSS
+   (css/slr.css), que se inyecta al pulsar JUGAR.
+═══════════════════════════════════════════════ */
+
+.tab--rush { color: #9DEBB8; }
+.tab--rush::after {
+  content: '';
+  display: inline-block;
+  width: 6px; height: 6px;
+  margin-left: 6px;
+  vertical-align: 2px;
+  border-radius: 50%;
+  background: #FF8A3D;
+  box-shadow: 0 0 8px #FF8A3D;
+}
+
+.rush-portada {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 44px 24px 30px;
+  border-radius: 22px;
+  border: 1px solid rgba(31,224,101,.35);
+  background:
+    radial-gradient(120% 80% at 100% 0%, rgba(255,138,61,.16), transparent 55%),
+    radial-gradient(110% 90% at 0% 100%, rgba(31,224,101,.22), transparent 60%),
+    linear-gradient(165deg, #0B2617 0%, #051109 100%);
+  box-shadow: 0 24px 60px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.05);
+  text-align: center;
+}
+/* Rayas de césped en diagonal */
+.rush-portada__fondo {
+  position: absolute;
+  inset: -40%;
+  z-index: -1;
+  background: repeating-linear-gradient(-28deg, rgba(31,224,101,.045) 0 28px, transparent 28px 56px);
+  pointer-events: none;
+}
+
+.rush-portada__marca { display: flex; flex-direction: column; align-items: center; gap: 10px; line-height: .86; }
+.rush-portada__shits {
+  font-family: 'Anton', sans-serif;
+  font-size: 15px;
+  letter-spacing: .5em;
+  margin-right: -.5em;
+  color: #9DC4AD;
+}
+.rush-portada__rush {
+  font-family: 'Anton', sans-serif;
+  font-size: clamp(76px, 24vw, 118px);
+  letter-spacing: .02em;
+  font-style: italic;
+  color: #1FE065;
+  text-shadow: 0 0 22px rgba(31,224,101,.55), 4px 4px 0 #FF8A3D;
+  transform: skewX(-6deg);
+}
+
+.rush-portada__lema {
+  max-width: 380px;
+  margin: 18px auto 22px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: #C9E8D5;
+}
+
+.rush-portada__estado {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  max-width: 100%;
+  padding: 9px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(31,224,101,.25);
+  background: rgba(3,12,7,.55);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #E8FBEF;
+  text-align: left;
+}
+.rush-portada__punto {
+  flex-shrink: 0;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: #6E9D81;
+}
+.rush-portada__estado[data-estado="viva"]    .rush-portada__punto { background: #1FE065; box-shadow: 0 0 10px #1FE065; animation: slglow 1.6s ease-in-out infinite; }
+.rush-portada__estado[data-estado="abierta"] .rush-portada__punto { background: #1FE065; }
+.rush-portada__estado[data-estado="pausa"]   .rush-portada__punto { background: #FF8A3D; }
+
+.rush-portada__jugar {
+  display: block;
+  width: 100%;
+  margin-top: 26px;
+  padding: 18px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #3BF27E, #17C454);
+  color: #04130A;
+  font-family: 'Anton', sans-serif;
+  font-size: 30px;
+  letter-spacing: .14em;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.12) inset, 0 10px 30px rgba(31,224,101,.35);
+  transition: transform .15s, box-shadow .2s, opacity .2s;
+}
+.rush-portada__jugar:active:not(:disabled) { transform: scale(.97); }
+@media (hover: hover) {
+  .rush-portada__jugar:hover:not(:disabled) { box-shadow: 0 0 0 1px rgba(255,255,255,.2) inset, 0 12px 40px rgba(31,224,101,.55); }
+}
+.rush-portada__jugar:disabled {
+  background: rgba(14,32,22,.9);
+  color: #6E9D81;
+  font-size: 18px;
+  letter-spacing: .06em;
+  box-shadow: inset 0 0 0 1px rgba(31,224,101,.2);
+  cursor: default;
+}
+.rush-portada__entrar {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  padding: 13px;
+  border-radius: 12px;
+  border: 1px solid rgba(31,224,101,.4);
+  color: #1FE065;
+  font-family: 'Anton', sans-serif;
+  font-size: 15px;
+  letter-spacing: .12em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rush-portada__estado[data-estado="viva"] .rush-portada__punto { animation: none; }
+}
