@@ -5,6 +5,12 @@
    el texto) y su verde. Verde neón = lo propio; naranja = el rival.
 ═══════════════════════════════════════════════ */
 
+/* Acabados de las cartas: uno por archivo (contrato en js/slr/acabados/index.js) */
+@import url('acabados/foil.css');
+@import url('acabados/brillante.css');
+@import url('acabados/plateada.css');
+
+
 .slr {
   --slr-fondo:     #041009;
   --slr-fondo-2:   #0A1F13;
@@ -316,6 +322,8 @@ html.slr-abierto, html.slr-abierto body { overflow: hidden; }
 .slr-banner--pausa b { color: var(--slr-rival); }
 .slr-banner--cierre { border-color: var(--slr-oro); background: rgba(255,201,74,.09); }
 .slr-banner--cierre b { color: var(--slr-oro); }
+.slr-banner--info { border-color: #6FB6FF; background: rgba(111,182,255,.08); }
+.slr-banner--info b { color: #A9CCFF; }
 
 .slr-saldo {
   display: flex;
@@ -713,9 +721,12 @@ html.slr-abierto, html.slr-abierto body { overflow: hidden; }
   padding: 10px 12px; border-radius: 12px;
   background: rgba(3,12,7,.5) !important; font-size: 13.5px; font-weight: 700;
 }
-.slr-cruce > span:first-child { text-align: right; }
-.slr-cruce > span { overflow-wrap: anywhere; }
-.slr-cruce b { font-family: 'Anton', sans-serif; font-weight: 400; font-size: 20px; color: #fff; min-width: 54px; text-align: center; }
+.slr-cruce > :first-child { text-align: right; }
+.slr-cruce > .slr-enlace-equipo { overflow-wrap: anywhere; font-weight: 700; }
+.slr-cruce__marcador { font-family: 'Anton', sans-serif; font-size: 20px; color: #fff !important; min-width: 64px; text-align: center; padding: 2px 6px; border-radius: 8px; }
+.slr-cruce__marcador[data-jugado] { background: rgba(255,255,255,.06) !important; }
+.slr-enlace-equipo { text-align: inherit; text-decoration: underline; text-decoration-color: rgba(255,255,255,.18); text-underline-offset: 3px; }
+.slr-tabla .slr-enlace-equipo { display: block; text-align: left; }
 .slr-cruce.es-mio { box-shadow: inset 0 0 0 1px rgba(57,255,136,.35); }
 .slr-jornada__descansa { font-size: 12px; color: var(--slr-suave); }
 .slr-amistoso {
@@ -937,17 +948,51 @@ html.slr-abierto, html.slr-abierto body { overflow: hidden; }
 .slr-carta__stats b { font-family: 'Anton', sans-serif; font-weight: 400; font-size: 11cqw; line-height: 1; color: #fff; letter-spacing: 0; }
 .slr-carta__stats span.es-destacada b { color: var(--c1); text-shadow: 0 0 3cqw color-mix(in srgb, var(--c1) 60%, transparent); }
 
-.slr-carta__capitan, .slr-carta__tocada-marca {
-  position: absolute; z-index: 4;
-  width: 22cqw; height: 22cqw; min-width: 18px; min-height: 18px;
+/* Marcas de estado (capitán, tocada, blindada, en venta): en una fila encima del
+   nombre, en el tercio inferior, para no tapar nunca la cara */
+.slr-carta__marcas { display: flex; justify-content: center; gap: 2cqw; margin-bottom: .5cqw; }
+.slr-carta__marca {
+  width: 15cqw; height: 15cqw; min-width: 14px; min-height: 14px;
   border-radius: 50%;
   display: grid; place-items: center;
-  font-family: 'Anton', sans-serif; font-size: max(11px, 12cqw);
-  box-shadow: 0 0 0 1cqw rgba(0,0,0,.4);
+  font-family: 'Anton', sans-serif; font-size: max(9px, 9cqw); line-height: 1;
+  box-shadow: 0 0 0 .8cqw rgba(0,0,0,.45);
 }
-.slr-carta__capitan { top: 30%; right: 4%; background: var(--slr-oro, #FFC94A); color: #2a1a00; }
-.slr-carta__tocada-marca { top: 30%; left: 4%; background: #FF5A5A; color: #fff; }
+.slr-carta__marca--capitan  { background: var(--slr-oro, #FFC94A); color: #2a1a00; }
+.slr-carta__marca--tocada   { background: #FF5A5A; color: #fff; }
+.slr-carta__marca--blindada { background: #1E3A5F; color: #A9CCFF; font-size: max(8px, 7cqw); }
+.slr-carta__marca--venta    { background: var(--slr-oro, #FFC94A); color: #2a1a00; }
 .slr-carta--tocada .slr-carta__arte { filter: saturate(.55); }
+
+/* ── Carta con foto ──
+   La foto ocupa toda la carta a sangre (object-fit: cover, recortada, nunca
+   deformada). Encima: el OVR arriba a la izquierda y, en el tercio inferior,
+   tipo, nombre y stats sobre un degradado oscuro que se lee con cualquier foto. */
+.slr-carta__tipo-pie { display: none; }
+.slr-carta--con-imagen .slr-carta__arte { inset: 0; border-radius: inherit; }
+.slr-carta--con-imagen .slr-carta__img { object-position: 50% 30%; background: #0a140e; }
+/* Con foto, el marco se pinta encima (en el velo): la foto taparía el de la cara.
+   Cada acabado puede cambiar su color con --marco-carta */
+.slr-carta--con-imagen .slr-carta__velo {
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1.4cqw var(--marco-carta, color-mix(in srgb, var(--c1) 70%, #000)), inset 0 0 0 2.2cqw rgba(0,0,0,.3);
+  background:
+    radial-gradient(60% 40% at 0% 0%, rgba(0,0,0,.55), transparent 70%),
+    linear-gradient(180deg, transparent 52%, rgba(2,8,4,.55) 66%, rgba(2,8,4,.92) 84%, #020804 100%);
+}
+.slr-carta--con-imagen .slr-carta__cabeza .slr-carta__tipo { display: none; }
+.slr-carta--con-imagen .slr-carta__tipo-pie {
+  display: block;
+  padding: .6cqw 2.6cqw; border-radius: 99px;
+  background: color-mix(in srgb, var(--c1) 85%, #000); color: #04130A;
+  font-size: 5cqw; font-weight: 800; letter-spacing: .1em; text-transform: uppercase;
+}
+.slr-carta--con-imagen .slr-carta__ovr { text-shadow: 0 0 4cqw rgba(0,0,0,.8), 0 .8cqw 0 rgba(0,0,0,.6); }
+.slr-carta--con-imagen .slr-carta__nombre { text-shadow: 0 .6cqw 2cqw rgba(0,0,0,.8); }
+.slr-carta--con-imagen .slr-carta__stats { border-top-color: color-mix(in srgb, var(--c1) 60%, transparent); }
+.slr-carta--con-imagen.slr-carta--xs .slr-carta__tipo-pie { display: none; }
+/* Si la foto no carga, vuelve el fondo del tipo */
+.slr-carta--sin-foto .slr-carta__img { visibility: hidden; }
 
 /* Tamaños */
 .slr-carta--xs .slr-carta__tipo, .slr-carta--xs .slr-carta__stats span:not(.es-destacada) { display: none; }
@@ -958,12 +1003,15 @@ html.slr-abierto, html.slr-abierto body { overflow: hidden; }
 .slr-carta--xs .slr-carta__ovr { font-size: 22cqw; }
 .slr-carta--xs .slr-carta__pie { gap: 0; }
 .slr-carta--xs .slr-carta__arte { inset: 7% 6% 34%; }
+.slr-carta--con-imagen.slr-carta--xs .slr-carta__arte { inset: 0; }   /* la foto, a sangre también en pequeño */
 .slr-carta--l { touch-action: none; }     /* el dedo mueve el foil en vez de hacer scroll */
 
 /* ── Acabados ────────────────────────────────────────────────────────────── */
-/* Cada efecto es una capa con un hijo (.slr-carta__capa) más grande que la carta que se
-   desplaza con transform (siguiendo --x/--y o en bucle) y cambia de opacity:
-   el gradiente se rasteriza una vez y el compositor solo lo mueve. */
+/* Base común. Cada acabado vive en su propio archivo (css/acabados/*.css, importados
+   al principio de este) y en su módulo JS (js/slr/acabados/*.js), con el mismo
+   contrato. Cada efecto es una capa con un hijo (.slr-carta__capa) más grande que
+   la carta que se desplaza con transform (siguiendo --x/--y o en bucle) y cambia
+   de opacity: el gradiente se rasteriza una vez y el compositor solo lo mueve. */
 .slr-carta__acabado, .slr-carta__destello {
   position: absolute; inset: 0; z-index: 3;
   overflow: hidden;
@@ -974,91 +1022,13 @@ html.slr-abierto, html.slr-abierto body { overflow: hidden; }
   position: absolute;
   left: 0; top: 0;
 }
-/* Solo las capas del foil se mueven con el dedo; las demás las anima el
-   compositor por su cuenta y no necesitan capa reservada */
-.slr-carta--foil.is-activa .slr-carta__capa,
-.slr-carta--foil.is-calentando .slr-carta__capa { will-change: transform; }
-
-/* Foil: espectro completo (hsl 0–360) en color-dodge que sigue el dedo, el
-   ratón o la inclinación; en reposo, un vaivén de 4 s */
-.slr-carta--foil .slr-carta__acabado { mix-blend-mode: color-dodge; opacity: .32; transition: opacity .3s; }
-.slr-carta--foil .slr-carta__acabado > .slr-carta__capa {
-  width: 300%; height: 300%;
-  background: linear-gradient(115deg,
-    hsl(0 100% 62%) 0%, hsl(45 100% 60%) 12%, hsl(90 100% 58%) 24%, hsl(160 100% 55%) 36%,
-    hsl(200 100% 60%) 48%, hsl(260 100% 66%) 60%, hsl(310 100% 64%) 72%, hsl(360 100% 62%) 84%, hsl(45 100% 60%) 100%);
-  transform: translate3d(calc(var(--x) * -66.667%), calc(var(--y) * -66.667%), 0);
-  animation: slr-foil 4s ease-in-out infinite;
-}
-.slr-carta--foil .slr-carta__destello { mix-blend-mode: overlay; opacity: 0; transition: opacity .3s; }
-.slr-carta--foil .slr-carta__destello > .slr-carta__capa {
-  width: 200%; height: 200%;
-  background: radial-gradient(circle at 50% 50%, rgba(255,255,255,.55), rgba(255,255,255,0) 24%);
-  transform: translate3d(calc((var(--x) - 1) * 50%), calc((var(--y) - 1) * 50%), 0);
-}
-.slr-carta--foil.is-activa .slr-carta__acabado { opacity: .5; }
-.slr-carta--foil.is-activa .slr-carta__acabado > .slr-carta__capa { animation: none; }
-.slr-carta--foil.is-activa .slr-carta__destello { opacity: 1; }
-@keyframes slr-foil {
-  0%, 100% { transform: translate3d(0, -20%, 0); }
-  50%      { transform: translate3d(-66.667%, -46.667%, 0); }
-}
-
-/* Brillante: destello dorado pulsante (solo opacity y transform) */
-.slr-carta--brillante .slr-carta__cara {
-  box-shadow:
-    inset 0 0 0 1.4cqw #C9932A,
-    inset 0 0 0 2.2cqw rgba(0,0,0,.35),
-    0 3cqw 8cqw rgba(0,0,0,.5);
-}
-/* Borde encendido encima, que late con opacity en lugar de animar la sombra */
-.slr-carta--brillante .slr-carta__cara::after {
-  content: '';
-  position: absolute; inset: 0; z-index: 4;
-  border-radius: inherit;
-  pointer-events: none;
-  box-shadow: inset 0 0 0 1.4cqw #FFE08A, inset 0 0 6cqw rgba(255,201,74,.45);
-  animation: slr-oro-pulso 2.4s ease-in-out infinite;
-}
-.slr-carta--brillante .slr-carta__acabado { mix-blend-mode: screen; }
-.slr-carta--brillante .slr-carta__acabado > .slr-carta__capa {
-  inset: 0; width: 100%; height: 100%;
-  background: radial-gradient(70% 55% at 50% 38%, rgba(255,214,102,.5), transparent 70%);
-  animation: slr-oro-pulso 2.4s ease-in-out infinite;
-}
-.slr-carta--brillante .slr-carta__destello { mix-blend-mode: screen; }
-.slr-carta--brillante .slr-carta__destello > .slr-carta__capa {
-  width: 100%; height: 100%;
-  background: linear-gradient(120deg, transparent 30%, rgba(255,236,170,.85) 48%, rgba(255,200,60,.4) 52%, transparent 70%);
-  animation: slr-barrido 2.4s ease-in-out infinite;
-}
-@keyframes slr-oro-pulso { 0%, 100% { opacity: .25; } 50% { opacity: .9; } }
+/* Solo las capas de los acabados que siguen el movimiento (data-sigue) se mueven
+   con el dedo; las demás las anima el compositor y no necesitan capa reservada */
+.slr-carta[data-sigue].is-activa .slr-carta__capa,
+.slr-carta[data-sigue].is-calentando .slr-carta__capa { will-change: transform; }
 @keyframes slr-barrido {
   0%       { transform: translate3d(-110%, 0, 0); }
   60%, 100% { transform: translate3d(110%, 0, 0); }
-}
-
-/* Plateada: tono metálico monocromo con brillo */
-.slr-carta--plateada .slr-carta__cara {
-  background: linear-gradient(160deg, #5B6670, #1B2128 55%, #0B0E12);
-  box-shadow:
-    inset 0 0 0 1.4cqw #C9D3DC,
-    inset 0 0 0 2.2cqw rgba(0,0,0,.35),
-    0 3cqw 8cqw rgba(0,0,0,.5);
-}
-.slr-carta--plateada .slr-carta__arte { filter: grayscale(1) contrast(1.1) brightness(1.08); }
-.slr-carta--plateada .slr-carta__tipo { background: #D5DEE6; }
-.slr-carta--plateada .slr-carta__iniciales { text-shadow: 0 0 6cqw rgba(220,230,240,.6), 0 1cqw 0 rgba(0,0,0,.4); }
-.slr-carta--plateada .slr-carta__silueta { fill: #39424B; }
-.slr-carta--plateada .slr-carta__acabado {
-  background: linear-gradient(135deg, rgba(255,255,255,.28), rgba(200,210,220,.05) 40%, rgba(255,255,255,.22) 70%, rgba(150,160,170,.1));
-  mix-blend-mode: soft-light;
-}
-.slr-carta--plateada .slr-carta__destello { mix-blend-mode: overlay; }
-.slr-carta--plateada .slr-carta__destello > .slr-carta__capa {
-  width: 100%; height: 100%;
-  background: linear-gradient(105deg, transparent 35%, rgba(255,255,255,.75) 50%, transparent 65%);
-  animation: slr-barrido 3.6s ease-in-out infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1068,9 +1038,6 @@ html.slr-abierto, html.slr-abierto body { overflow: hidden; }
   .slr-carta__cara::after,
   .slr-carta__acabado > .slr-carta__capa,
   .slr-carta__destello > .slr-carta__capa { animation: none !important; }
-  .slr-carta--brillante .slr-carta__cara::after { opacity: .6; }
-  .slr-carta--brillante .slr-carta__acabado > .slr-carta__capa { opacity: .55; }
-  .slr-carta--brillante .slr-carta__destello, .slr-carta--plateada .slr-carta__destello { display: none; }
   .slr-hoja__caja, .slr-hoja__fondo { transition: none; }
   .slr-balon { animation: none; }
 }
@@ -1080,3 +1047,167 @@ html.slr-abierto, html.slr-abierto body { overflow: hidden; }
   .slr-nav { grid-template-columns: repeat(5, 110px); justify-content: center; }
   .slr-rejilla { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
 }
+
+
+/* ═══════════════════════════════════════════════
+   Equipo, avisos, fichas, crónica, álbum, muestrario y plantillas
+═══════════════════════════════════════════════ */
+/* Campana de avisos en la barra superior */
+.slr-barra__avisos {
+  position: relative; flex-shrink: 0;
+  width: 40px; height: 40px; border-radius: 12px;
+  display: grid; place-items: center;
+  border: 1px solid var(--slr-borde) !important;
+  color: var(--slr-suave) !important;
+}
+.slr-barra__avisos svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; stroke-linecap: round; }
+.slr-barra__avisos b {
+  position: absolute; top: -6px; right: -6px; min-width: 19px; height: 19px; padding: 0 5px;
+  border-radius: 999px; background: var(--slr-rival); color: #1a0a00;
+  font-size: 11px; font-weight: 800; line-height: 19px; text-align: center;
+}
+.slr-barra__avisos b:empty { display: none; }
+.slr-barra__avisos.tiene { color: #fff !important; border-color: rgba(255,138,61,.5) !important; }
+.slr-barra__avisos[hidden] { display: none; }
+.slr-barra__saldo:not([hidden]) ~ .slr-barra__salir { margin-left: 0; }
+
+/* Franja superior de la pestaña Equipo */
+.slr-franja {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 12px 14px; border-radius: 16px;
+  border: 1px solid var(--slr-borde); background: var(--slr-tarjeta);
+}
+.slr-franja__fila { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0; }
+.slr-franja__rival { display: flex; flex-direction: column; text-align: left; min-width: 0; font-family: 'Anton', sans-serif; font-size: 19px; line-height: 1.1; text-transform: uppercase; overflow-wrap: anywhere; }
+.slr-franja__rival small { font-family: 'Sora', sans-serif; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: none; color: var(--slr-suave); }
+.slr-franja__cuenta { display: flex; flex-direction: column; align-items: flex-end; flex-shrink: 0; }
+.slr-franja__cuenta small { font-size: 10.5px; color: var(--slr-suave); }
+.slr-franja__cuenta b { font-family: 'Anton', sans-serif; font-weight: 400; font-size: 21px; color: #fff; white-space: nowrap; }
+.slr-franja__ultimo { display: flex; align-items: baseline; gap: 6px; font-family: 'Anton', sans-serif; font-size: 16px; min-width: 0; }
+.slr-franja__ultimo small { font-family: 'Sora', sans-serif; font-size: 11.5px; color: var(--slr-suave); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.slr-franja .slr-estado { align-self: auto; flex-shrink: 0; }
+
+/* Ficha de una carta sin colocar: aporte en cada puesto y "Colocar en…" */
+.slr-ficha-hueco__puestos { list-style: none; display: flex; flex-direction: column; gap: 6px; font-size: 13px; line-height: 1.5; }
+.slr-ficha-hueco__puestos li { padding: 8px 10px; border-radius: 10px; background: rgba(3,12,7,.5); }
+.slr-ficha-hueco__puestos b { color: var(--slr-propio); font-weight: 700; }
+.slr-ficha-hueco__puestos em { font-style: normal; color: var(--slr-rival); font-weight: 700; }
+.slr-ficha-hueco__puesto {
+  display: inline-block; min-width: 76px; margin-right: 6px; padding: 1px 8px; border-radius: 999px;
+  background: rgba(57,255,136,.15); color: var(--slr-propio); font-size: 11px; font-weight: 800; text-align: center;
+}
+.slr-colocar button { grid-template-columns: 1fr auto !important; }
+
+/* Alineación dibujada en un campo (crónica y ficha de equipo) */
+.slr-campito { display: flex; flex-direction: column; gap: 6px; }
+.slr-campito__cabeza { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.slr-campito__cabeza b { font-family: 'Anton', sans-serif; font-weight: 400; font-size: 16px; text-transform: uppercase; overflow-wrap: anywhere; }
+.slr-campito__cabeza span { font-size: 11.5px; color: var(--slr-suave); flex-shrink: 0; }
+.slr-campito__cesped {
+  position: relative; display: flex; flex-direction: column; gap: 6px; padding: 10px 6px;
+  border-radius: 14px; overflow: hidden;
+  background: repeating-linear-gradient(180deg, rgba(255,255,255,.035) 0 12.5%, transparent 12.5% 25%), linear-gradient(180deg, #0F4A26, #0B3A1E);
+  border: 1px solid rgba(57,255,136,.2);
+}
+.slr-campito__lineas { position: absolute; inset: 6px; border: 1.5px solid rgba(255,255,255,.12); border-radius: 9px; pointer-events: none; }
+.slr-campito__lineas::before { content: ''; position: absolute; left: 0; right: 0; top: 50%; border-top: 1.5px solid rgba(255,255,255,.12); }
+.slr-campito__fila { position: relative; display: flex; justify-content: center; gap: 6px; }
+.slr-mini {
+  position: relative; width: min(23%, 92px);
+  display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 4px; align-items: baseline;
+  padding: 5px 6px; border-radius: 9px; text-align: left;
+  background: rgba(2,10,5,.72) !important; border: 1px solid rgba(255,255,255,.12) !important;
+}
+.slr-mini b { font-family: 'Anton', sans-serif; font-weight: 400; font-size: 17px; line-height: 1; }
+.slr-mini small { font-size: 8.5px; font-weight: 800; letter-spacing: .06em; color: var(--slr-suave); }
+.slr-mini span { grid-column: 1 / -1; font-size: 10.5px; font-weight: 700; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #fff; }
+.slr-campito.slr-propio .slr-mini { border-color: rgba(57,255,136,.45) !important; }
+.slr-campito.slr-propio .slr-mini b { color: var(--slr-propio); }
+.slr-campito.slr-rival .slr-mini { border-color: rgba(255,138,61,.5) !important; }
+.slr-campito.slr-rival .slr-mini b { color: var(--slr-rival); }
+.slr-campito.slr-propio, .slr-campito.slr-rival { color: inherit; }
+.slr-mini.es-tocada span::after { content: ' +'; color: #FF5A5A; }
+.slr-mini__c {
+  position: absolute; top: -6px; right: -6px; width: 17px; height: 17px; border-radius: 50%;
+  display: grid; place-items: center; background: var(--slr-oro); color: #2a1a00;
+  font-family: 'Anton', sans-serif; font-style: normal; font-size: 10px;
+}
+.slr-mini:disabled { opacity: .7; }
+.slr-campito__banco { font-size: 11.5px; color: var(--slr-suave); display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
+.slr-campito__suplente { color: #C9E8D5 !important; text-decoration: underline; text-decoration-color: rgba(255,255,255,.15); }
+
+/* Crónica */
+.slr-cronica__leyenda { display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: 4px 10px; font-size: 13px; font-weight: 700; }
+.slr-cronica__leyenda small { font-size: 10.5px; font-weight: 600; color: var(--slr-suave); margin-left: -6px; }
+.slr-cronica__campos { display: flex; flex-direction: column; gap: 14px; }
+@media (min-width: 640px) { .slr-cronica__campos { display: grid; grid-template-columns: 1fr 1fr; } }
+.slr-jugadas { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.slr-jugada { padding: 10px 12px; border-radius: 12px; background: rgba(3,12,7,.5); border: 1px solid rgba(255,255,255,.05); }
+.slr-jugada.es-gol { border-color: rgba(57,255,136,.35); background: rgba(57,255,136,.07); }
+.slr-jugada__cabeza { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; font-size: 12px; color: var(--slr-suave); }
+.slr-jugada__cabeza time { font-family: 'Anton', sans-serif; font-size: 15px; color: #fff; }
+.slr-jugada__cabeza em { margin-left: auto; font-style: normal; font-family: 'Anton', sans-serif; font-size: 13px; color: var(--slr-suave); }
+.slr-jugada ul { list-style: none; display: flex; flex-direction: column; gap: 3px; }
+.slr-suceso { font-size: 13.5px; line-height: 1.45; color: #DCEFE3; }
+.slr-suceso .slr-pct { font-size: 11.5px; color: var(--slr-suave); }
+.slr-suceso--poder { font-size: 12.5px; }
+.slr-suceso--poder small { font-size: 11px; opacity: .8; }
+.slr-suceso__poder { font-weight: 800; text-decoration: underline dotted; text-underline-offset: 3px; color: inherit !important; }
+.slr-suceso.slr-propio { color: var(--slr-propio); }
+.slr-suceso.slr-rival { color: var(--slr-rival); }
+.slr-jugada.es-gol.slr-rival { border-color: rgba(255,138,61,.45); background: rgba(255,138,61,.08); }
+.slr-suceso--gol { font-family: 'Anton', sans-serif; font-size: 22px; letter-spacing: .03em; line-height: 1.2; padding: 4px 0; }
+.slr-suceso--gol b { font-weight: 400; color: #fff; }
+.slr-suceso--menor { font-size: 12px; color: var(--slr-suave); }
+.slr-suceso--lesion { color: #FF9C9C; }
+.slr-cronica__nota { font-size: 11.5px; color: var(--slr-suave); font-style: italic; }
+.slr-resumen { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.slr-resumen th, .slr-resumen td { padding: 7px 6px; border-top: 1px solid rgba(31,224,101,.08); }
+.slr-resumen thead th { border-top: none; font-family: 'Anton', sans-serif; font-weight: 400; font-size: 15px; text-transform: uppercase; }
+.slr-resumen tbody th { font-size: 11px; font-weight: 800; letter-spacing: .06em; color: var(--slr-suave); text-align: center; text-transform: uppercase; }
+.slr-resumen td:first-child, .slr-resumen thead th:first-child { text-align: left; }
+.slr-resumen td:last-child, .slr-resumen thead th:last-child { text-align: right; }
+.slr-resumen td { font-family: 'Anton', sans-serif; font-size: 17px; }
+.slr-resumen td small { font-family: 'Sora', sans-serif; font-size: 11px; color: var(--slr-suave); }
+.slr-cronica__pr li { grid-template-columns: 1fr 44px 56px !important; }
+
+/* Ficha de equipo */
+.slr-ficha-eq { display: flex; flex-direction: column; gap: 12px; }
+.slr-ficha-eq__cabeza .slr-titulo { overflow-wrap: anywhere; }
+.slr-ficha-eq__resultado {
+  display: flex; align-items: baseline; gap: 8px; width: 100%; padding: 8px 10px; border-radius: 10px;
+  background: rgba(3,12,7,.5) !important; text-align: left;
+}
+.slr-ficha-eq__resultado b { font-family: 'Anton', sans-serif; font-weight: 400; font-size: 17px; }
+.slr-ficha-eq__resultado small { font-size: 12px; color: var(--slr-suave); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.slr-rejilla--compacta { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; }
+
+/* Álbum */
+.slr-album { display: flex; flex-direction: column; gap: 12px; }
+.slr-album__contador { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; font-size: 14px; color: #C9E8D5; }
+.slr-album__contador b { font-family: 'Anton', sans-serif; font-weight: 400; font-size: 26px; color: #fff; }
+.slr-album__contador span { flex-basis: 100%; height: 8px; border-radius: 6px; background: rgba(255,255,255,.07); overflow: hidden; }
+.slr-album__contador i { display: block; height: 100%; background: linear-gradient(90deg, #17C454, var(--slr-propio)); }
+.slr-segmentos--chips button { flex: 0 0 auto; }
+.slr-ficha__album { display: flex; flex-direction: column; gap: 2px; font-size: 11px; line-height: 1.35; color: var(--slr-suave); }
+.slr-btn--album { width: 100%; }
+
+/* Muestrario */
+.slr-muestrario { display: flex; flex-direction: column; gap: 14px; }
+.slr-muestrario__par { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.slr-muestrario figure { margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.slr-muestrario figcaption { font-size: 11.5px; color: var(--slr-suave); text-align: center; }
+.slr-muestrario .slr-subtitulo small { font-family: 'Sora', sans-serif; font-size: 11px; letter-spacing: 0; text-transform: none; color: var(--slr-suave); }
+.slr-muestrario__fotos { display: flex; gap: 8px; justify-content: center; }
+.slr-muestrario__xs { width: 21vw; max-width: 88px; }
+.slr-muestrario__grande { width: min(78vw, 300px); margin: 0 auto; }
+
+/* Herramienta de plantillas */
+.slr-plantillas { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.slr-buscador { display: flex; gap: 8px; }
+.slr-buscador .slr-input { flex: 1; }
+.slr-plantillas__fila {
+  display: grid; grid-template-columns: 54px 1fr; gap: 10px; align-items: center;
+  padding: 8px; border-radius: 12px; background: rgba(3,12,7,.45); border: 1px solid rgba(31,224,101,.1);
+}
+.slr-plantillas__acciones { grid-column: 1 / -1; display: flex; gap: 8px; justify-content: flex-end; }

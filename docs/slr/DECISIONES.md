@@ -240,6 +240,72 @@ Puntos que ni la especificación ni el encargo fijaban del todo y que el motor r
   - `node tests/slr/api-paso5.mjs`: acceso, bots, temporada completa a golpe de botón, amistoso contra un bot y reinicio.
   - La pestaña según el acceso, el modo pruebas en la interfaz, la crónica y la ficha del hueco se probaron en Chrome headless. Para el caso "con sesión pero sin beta" se usó Bot Tres como humano durante la prueba (`es_bot = false`) y se restauró al terminar.
 
+## Ajustes tras la beta: Equipo, crónica, álbum y catálogo editable
+
+### Decisiones de Marcos
+
+- **Inicio = Alineación:**
+  - La primera pestaña pasa a ser "Equipo", con icono de campo: el editor de alineación.
+  - Encima del campo, una franja con el próximo rival (tocable: su ficha), la cuenta atrás al cierre, el último resultado y el estado de la alineación.
+  - Los avisos van a una campana en la barra superior, con contador; al abrirla se marcan como leídos.
+  - Se mantienen el saldo arriba y los avisos de pausa, cierre, preparación y entre temporadas.
+- **Ficha de las cartas sin colocar:** la misma información que las del campo, más lo que aportarían en cada puesto (POR, DEF, MED, DEL), y las opciones "Colocar en…" y "Ver carta".
+- **Pronóstico contra cualquier rival:** lista de rivales (por defecto el próximo), con la explicación y un aviso si hay cambios sin guardar. La acción `pronostico` de la Edge Function acepta `rival_equipo_id`.
+- **Alineaciones en los partidos y ficha de rival:**
+  - La crónica dibuja las dos alineaciones en un campo.
+  - La ficha de un equipo muestra su posición, sus últimos resultados, su plantilla completa y la alineación de su **último partido oficial publicado**. Nunca su alineación guardada actual.
+- **Amistosos:** en la beta siguen siendo instantáneos y sin aceptar. **Antes del lanzamiento tendrán que aceptarse por ambas partes**, porque un amistoso juega contra la alineación guardada del rival y su crónica la enseña: sin aceptación sirven para espiar alineaciones.
+- **Álbum** (adelantado de la entrega 2): desde Perfil. Todas las cartas que has tenido en la liga, con "X de Y desbloqueadas", filtros por tipo y acabado, orden por fecha o valor, y cómo, cuándo y quién la tiene ahora.
+- **Crónica más clara:**
+  - colores por equipo (verde el del usuario o el local, naranja el otro) con leyenda;
+  - cada jugada es un bloque con el minuto y quién saca, y una línea por suceso;
+  - el % es siempre la probabilidad que tenía lo que ocurrió, junto a quien lo consiguió;
+  - al final, un resumen por equipo.
+- **Catálogo editable a mano** (guía: `docs/slr/CARTAS.md`):
+  - un trigger recalcula `valor`, valida los poderes y crea un ejemplar libre en cada liga real al insertar o reactivar un diseño;
+  - desactivar una carta la saca de sobres, subastas y plantillas nuevas sin quitársela a nadie;
+  - valores por defecto para que una fila nueva solo necesite nombre, tipo y stats;
+  - herramienta de plantillas en el modo pruebas para dar o quitar cartas sin tocar tablas.
+- **Carta con foto:** vertical 5:7, la foto a sangre (cover, servida por Cloudinary al ancho real × DPR), con OVR, nombre, tipo y stats encima. Sin foto, el marcador de siempre.
+- **Acabados ampliables:** un registro con un bloque CSS/JS por acabado y el mismo contrato, y un muestrario en el modo pruebas.
+- **Shits League:** la rueda del pull-to-refresh gira al arrastrar y mientras recarga.
+
+### Decisiones mías
+
+- **Valor en SQL:**
+  - `valor_diseno()` repite `js/slr/valor.js` en coma flotante doble y en el mismo orden de operaciones.
+  - La migración pasó todo el catálogo por el trigger una vez, y `tests/slr/valor-sql.test.mjs` compara el valor guardado con el de `valor.js` en todas las cartas (283, todas iguales).
+  - El trigger recalcula el valor en **cualquier** cambio de la fila, no solo de stats o poderes: así nunca puede quedar un valor escrito a mano.
+- **Validación de poderes en el trigger:** los mensajes dicen qué poder y qué campo fallan (por ejemplo, «Poder 1 («Batuta»): "momento" tiene que ser posesion, ocasion_ataque…»). Las stats, el tipo y el acabado ya los validaban los `CHECK` y el enum.
+- **Diseño nuevo o reactivado:** crea su ejemplar solo en las ligas que no son de prueba. Las de prueba nacen con todo el catálogo activo.
+- **Cartas inactivas:** las funciones que eligen cartas libres (tanda de subastas, sorteo de sobres, comprar sobre y plantilla inicial) se copiaron de su última versión con `and d.activo` añadido. Las copias las genera un script a partir de las migraciones anteriores, que no se tocan.
+- **Herramienta de plantillas** (`slr_admin_buscar_cartas`, `slr_admin_mover_carta`; admin y modo pruebas):
+  - Para dar una carta usa `adquirir_carta`, que cancela ventas, ofertas e intercambios, aplica el blindaje de 7 días y apunta el álbum con la vía nueva `admin`.
+  - Además cancela la subasta abierta de la carta y la quita de la alineación del dueño anterior: su hueco queda vacío y lo resuelve el cierre; si era el capitán, se queda sin capitán.
+  - Avisa a los dos equipos y lo apunta en el historial.
+  - Dejar libre quita también el blindaje y devuelve la cláusula a ×1,5.
+- **Pronóstico contra un rival elegido:** se juega en casa del usuario, salvo que el elegido sea el del próximo partido: entonces se respeta quién es local. Las stats tocadas cuentan como en su próxima jornada.
+- **Avisos:** se cargan al abrir Rush. Las pantallas ya no los marcan como leídos por su cuenta; solo la campana.
+- **Fichas tocables:**
+  - En el calendario, el nombre de cada equipo abre su ficha y el marcador abre la crónica. En la clasificación, el nombre abre la ficha.
+  - En el campo de una crónica o ficha, cada carta abre su detalle; los Canteranos no, porque no son cartas.
+- **Crónica:**
+  - Los sucesos salen de los eventos del motor, en su orden.
+  - El porcentaje de cada línea es el de lo que pasó: mantener o robar el balón, llegar al área o cortar, ser el tirador, marcar o parar.
+  - Tocar el nombre de un poder abre su descripción.
+  - El bloque de una jugada con gol toma el color del equipo que marca.
+- **Fotos:**
+  - Se piden a Cloudinary con `c_fill,ar_5:7,g_auto` cuando la carta entra en pantalla (el mismo IntersectionObserver del movimiento), al ancho medido × DPR redondeado a 100 px. Así cargan diferidas y del tamaño justo.
+  - Con foto, el marco se pinta encima, en el degradado, y cada acabado puede cambiar su color (`--marco-carta`).
+  - Las marcas de estado (capitán, tocada, blindada, en venta) van en una fila sobre el nombre, nunca sobre la cara.
+- **Registro de acabados** (`js/slr/acabados/index.js`):
+  - Contrato: clase `.slr-carta--<id>`, dos capas con un hijo `.slr-carta__capa`, `sigue: true` si las capas siguen el movimiento, y un hook opcional `alMover(carta, x, y)` que se llama en el rAF compartido.
+  - Un acabado desconocido se pinta normal.
+  - Para añadir uno: valor del enum (migración), su `.js` y su `.css`, registrarlo e importarlo en `css/slr.css`.
+- **Pull-to-refresh:**
+  - La rueda no giraba porque la animación iba de `transform: scale(1)` a `rotate(360deg)`. Con funciones distintas el navegador interpola matrices, y 0° y 360° son la misma matriz. Ahora el giro va en la propiedad `rotate`, aparte.
+  - Al arrastrar, la rueda aparece, crece y gira 3° por píxel. Al soltar sin llegar al umbral desaparece, y al recargar gira en bucle hasta terminar. El gesto en sí no cambia.
+
 ## Balance de referencia (motor v1.1.0)
 
 `node tests/slr/balance.mjs`, 10.000 partidos por escenario:

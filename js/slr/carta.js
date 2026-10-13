@@ -5,11 +5,11 @@
      iniciarAcabados(raiz)      → movimiento 3D de todas las cartas y efectos de los acabados
      normalizarCarta(fila)      → acepta carta_json o una fila de /cartas con disenos_carta
      describirPoder(poder)      → texto claro de un poder
-   Acabados (especificación complementaria 2.1 y 2.2):
-     foil       gradiente iridiscente (color-dodge) que sigue el dedo o la
-                inclinación del móvil; en reposo, animación suave de 4 s
-     brillante  destello dorado pulsante
-     plateada   tono metálico plateado con brillo
+   Acabados (especificación complementaria 2.1 y 2.2): registro en
+   js/slr/acabados/ (un módulo JS y un CSS por acabado, mismo contrato).
+   Con imagen_url, la foto ocupa toda la carta (5:7, a sangre, recortada por
+   Cloudinary al ancho real × DPR cuando la carta aparece en pantalla) y la app
+   pinta encima el OVR, el nombre, el tipo y las stats.
    Todas las cartas se inclinan en 3D siguiendo el ratón (PC) o el giroscopio
    (móvil: todas las visibles a la vez); el brillo es solo de los acabados.
    Sin imagen (catálogo beta), un marcador con iniciales y silueta del color
@@ -17,9 +17,11 @@
    css/slr.css bajo .slr-carta.
 ═══════════════════════════════════════════════ */
 import { esc, iniciales } from './ui.js';
+import { acabado, listaAcabados } from './acabados/index.js';
 
 export const TIPOS = { individual: 'Individual', duo: 'Dúo', trio: 'Trío', unica: 'Única' };
-export const ACABADOS = { normal: 'Normal', foil: 'Foil', brillante: 'Brillante', plateada: 'Plateada' };
+// Nombres de los acabados registrados ({ foil: 'Foil', … })
+export const ACABADOS = Object.fromEntries(listaAcabados().map(a => [a.id, a.nombre]));
 
 // OVR: 60 % la mejor stat, 25 % la media, 15 % la peor (igual que ovr() en la base de datos)
 export function ovr(ata, def, con) {
@@ -66,19 +68,31 @@ export function describirPoder(p) {
 }
 
 /* ── Marcado ─────────────────────────────────────────────────────────────── */
-// Cloudinary a medida, como imagenOptimizada() de js/ui.js
-function imagen(url, ancho) {
+// Cloudinary a medida, como imagenOptimizada() de js/ui.js: recorte 5:7 centrado
+// en lo importante (g_auto) al ancho real × DPR, redondeado a 100 px para la caché
+export function imagenCarta(url, ancho) {
   if (!url || !url.includes('res.cloudinary.com')) return url;
   const w = Math.max(100, Math.ceil(ancho * (window.devicePixelRatio || 1) / 100) * 100);
-  return url.replace(/(\/image\/upload\/)/, `$1c_fill,ar_5:7,g_face,w_${w},f_auto,q_auto/`);
+  return url.replace(/(\/image\/upload\/)/, `$1c_fill,ar_5:7,g_auto,w_${w},f_auto,q_auto/`);
+}
+
+// Pone el src de las fotos pendientes (data-cld) midiendo el ancho real de la carta
+function cargarImagenes(carta) {
+  const img = carta.querySelector('img[data-cld]');
+  if (!img) return;
+  const ancho = carta.getBoundingClientRect().width || 160;
+  img.src = imagenCarta(img.dataset.cld, ancho);
+  img.removeAttribute('data-cld');
+  img.addEventListener('error', () => carta.classList.add('slr-carta--sin-foto'), { once: true });
 }
 
 const SILUETA = `<svg class="slr-carta__silueta" viewBox="0 0 100 100" aria-hidden="true">
   <circle cx="50" cy="36" r="17"/><path d="M14 100c0-22 16-36 36-36s36 14 36 36z"/></svg>`;
 
-function arte(c, ancho) {
+function arte(c) {
   if (c.imagen_url) {
-    return `<img class="slr-carta__img" src="${esc(imagen(c.imagen_url, ancho))}" alt="" loading="lazy" decoding="async">`;
+    // Sin src: se pone al aparecer en pantalla, con el ancho real (cargarImagenes)
+    return `<img class="slr-carta__img" data-cld="${esc(c.imagen_url)}" alt="" decoding="async">`;
   }
   const personas = c.personas.length ? c.personas : [c.nombre];
   const siluetas = personas.slice(0, 3).map(() => SILUETA).join('');
@@ -88,23 +102,31 @@ function arte(c, ancho) {
     </div>`;
 }
 
-// tam: 'xs' (huecos del campo) | 's' (cuadrícula) | 'l' (detalle). ancho: px aprox. para la imagen.
-// stats: false oculta ATA/DEF/CON (en 'xs' se muestra solo la stat indicada en destacar)
-export function cartaHTML(c, { tam = 's', ancho = 160, destacar = null, capitan = false, tocada = false } = {}) {
+// tam: 'xs' (huecos del campo) | 's' (cuadrícula) | 'l' (detalle). destacar: la stat
+// del hueco (en 'xs' solo se ve esa). Marcas de estado (en la franja de abajo, para
+// no tapar la cara): capitan, tocada, blindada, enVenta.
+export function cartaHTML(c, { tam = 's', destacar = null, capitan = false, tocada = false, blindada = false, enVenta = false } = {}) {
   const stats = [['ATA', c.ata], ['DEF', c.def], ['CON', c.con]];
+  const def = acabado(c.acabado);
+  const marcas = [
+    capitan && '<span class="slr-carta__marca slr-carta__marca--capitan" title="Capitán">C</span>',
+    tocada && '<span class="slr-carta__marca slr-carta__marca--tocada" title="Tocada: juega al 85 %">+</span>',
+    blindada && '<span class="slr-carta__marca slr-carta__marca--blindada" title="Blindada">🛡</span>',
+    enVenta && '<span class="slr-carta__marca slr-carta__marca--venta" title="En venta">€</span>',
+  ].filter(Boolean).join('');
   return `
-    <div class="slr-carta slr-carta--${tam} slr-carta--${esc(c.tipo)} slr-carta--${esc(c.acabado)}${tocada ? ' slr-carta--tocada' : ''}"
-         data-carta="${esc(c.id)}" data-acabado="${esc(c.acabado)}">
+    <div class="slr-carta slr-carta--${tam} slr-carta--${esc(c.tipo)} slr-carta--${esc(def.id)}${c.imagen_url ? ' slr-carta--con-imagen' : ''}${tocada ? ' slr-carta--tocada' : ''}"
+         data-carta="${esc(c.id)}" data-acabado="${esc(def.id)}"${def.sigue ? ' data-sigue' : ''}>
       <div class="slr-carta__marco"><div class="slr-carta__cara">
-        <div class="slr-carta__arte">${arte(c, ancho)}</div>
+        <div class="slr-carta__arte">${arte(c)}</div>
         <div class="slr-carta__velo"></div>
         <div class="slr-carta__cabeza">
           <span class="slr-carta__ovr">${c.ovr}</span>
           <span class="slr-carta__tipo">${esc(TIPOS[c.tipo] ?? c.tipo)}</span>
         </div>
-        ${capitan ? '<span class="slr-carta__capitan" title="Capitán">C</span>' : ''}
-        ${tocada ? '<span class="slr-carta__tocada-marca" title="Tocada: juega al 85 %">+</span>' : ''}
         <div class="slr-carta__pie">
+          ${marcas ? `<span class="slr-carta__marcas">${marcas}</span>` : ''}
+          <span class="slr-carta__tipo-pie">${esc(TIPOS[c.tipo] ?? c.tipo)}</span>
           <span class="slr-carta__nombre">${esc(c.nombre)}</span>
           <span class="slr-carta__stats">
             ${stats.map(([k, v]) => `<span class="${destacar === k ? 'es-destacada' : ''}"><b>${v}</b>${k}</span>`).join('')}
@@ -146,7 +168,8 @@ const movibles = new WeakMap();
 function moviblesDe(carta) {
   let m = movibles.get(carta);
   if (!m) {
-    m = [marcoDe(carta), ...(carta.classList.contains('slr-carta--foil') ? carta.querySelectorAll('.slr-carta__capa') : [])];
+    // El marco siempre; las capas solo si su acabado sigue el movimiento (registro)
+    m = [marcoDe(carta), ...(carta.hasAttribute('data-sigue') ? carta.querySelectorAll('.slr-carta__capa') : [])];
     movibles.set(carta, m);
   }
   return m;
@@ -157,6 +180,7 @@ function escribir(carta, x, y) {
     el.style.setProperty('--x', vx);
     el.style.setProperty('--y', vy);
   }
+  acabado(carta.dataset.acabado).alMover?.(carta, x, y);   // hook opcional del acabado
 }
 function borrar(carta) {
   for (const el of moviblesDe(carta)) {
@@ -241,7 +265,7 @@ function observar(nodo) {
   const cartas = nodo.matches?.('.slr-carta') ? [nodo] : nodo.querySelectorAll?.('.slr-carta') ?? [];
   for (const c of cartas) {
     if (io) io.observe(c);
-    else { c.classList.add('is-visible'); visibles.add(c); }
+    else { c.classList.add('is-visible'); visibles.add(c); cargarImagenes(c); }
   }
 }
 
@@ -251,6 +275,7 @@ function alVisibilidad(entradas) {
     c.classList.toggle('is-visible', e.isIntersecting);
     if (e.isIntersecting) {
       visibles.add(c);
+      cargarImagenes(c);
       precalentar(c);
       if (giro) activar(c);
     } else {

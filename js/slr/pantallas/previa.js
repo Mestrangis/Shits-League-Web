@@ -46,7 +46,7 @@ export async function pintar(cont, ctx) {
         else await rpc('slr_unirse_liga_principal', { nombre_equipo: nombre });
         toast(`¡Bienvenido, ${nombre}! Ya tienes 11 cartas y 5.000 monedas.`, 'ok');
         await recargar();
-        navegar('inicio');
+        navegar('equipo');
       }).catch(() => {});
     });
     return;

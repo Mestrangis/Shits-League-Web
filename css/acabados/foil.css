@@ -1,0 +1,36 @@
+/* ═══════════════════════════════════════════════
+   ACABADO «foil» — gradiente iridiscente que sigue el dedo, el ratón o la inclinación
+   Contrato de un acabado (ver js/slr/acabados/index.js):
+     · la carta lleva la clase .slr-carta--foil;
+     · dispone de dos capas: .slr-carta__acabado y .slr-carta__destello, cada
+       una con un hijo .slr-carta__capa que se puede mover con transform;
+     · si su módulo JS declara sigue: true, las capas reciben --x y --y (0–1,
+       posición del dedo, del ratón o del giroscopio) una vez por frame;
+     · solo transform y opacity en las animaciones (nada de background-position
+       ni sombras animadas), y sin animaciones con prefers-reduced-motion.
+═══════════════════════════════════════════════ */
+
+/* Foil: espectro completo (hsl 0–360) en color-dodge que sigue el dedo, el
+   ratón o la inclinación; en reposo, un vaivén de 4 s */
+.slr-carta--foil .slr-carta__acabado { mix-blend-mode: color-dodge; opacity: .32; transition: opacity .3s; }
+.slr-carta--foil .slr-carta__acabado > .slr-carta__capa {
+  width: 300%; height: 300%;
+  background: linear-gradient(115deg,
+    hsl(0 100% 62%) 0%, hsl(45 100% 60%) 12%, hsl(90 100% 58%) 24%, hsl(160 100% 55%) 36%,
+    hsl(200 100% 60%) 48%, hsl(260 100% 66%) 60%, hsl(310 100% 64%) 72%, hsl(360 100% 62%) 84%, hsl(45 100% 60%) 100%);
+  transform: translate3d(calc(var(--x) * -66.667%), calc(var(--y) * -66.667%), 0);
+  animation: slr-foil 4s ease-in-out infinite;
+}
+.slr-carta--foil .slr-carta__destello { mix-blend-mode: overlay; opacity: 0; transition: opacity .3s; }
+.slr-carta--foil .slr-carta__destello > .slr-carta__capa {
+  width: 200%; height: 200%;
+  background: radial-gradient(circle at 50% 50%, rgba(255,255,255,.55), rgba(255,255,255,0) 24%);
+  transform: translate3d(calc((var(--x) - 1) * 50%), calc((var(--y) - 1) * 50%), 0);
+}
+.slr-carta--foil.is-activa .slr-carta__acabado { opacity: .5; }
+.slr-carta--foil.is-activa .slr-carta__acabado > .slr-carta__capa { animation: none; }
+.slr-carta--foil.is-activa .slr-carta__destello { opacity: 1; }
+@keyframes slr-foil {
+  0%, 100% { transform: translate3d(0, -20%, 0); }
+  50%      { transform: translate3d(-66.667%, -46.667%, 0); }
+}

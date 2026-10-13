@@ -1,18 +1,18 @@
 /* ═══════════════════════════════════════════════
    SHITS LEAGUE RUSH — modo Rush (pantalla completa)
    Lo carga js/rush-panel.js al pulsar JUGAR: abrir({ jugador, reautenticar, sesionPerdida, sinAcceso, alSalir }).
-   · Capa por encima de la app, con barra superior (saldo, salir) e inferior
-     (Inicio, Plantilla, Mercado, Liga, Perfil).
+   · Capa por encima de la app, con barra superior (saldo, avisos, salir) e
+     inferior (Equipo, Plantilla, Mercado, Liga, Perfil). "Equipo" es el editor
+     de alineación con el próximo rival, la cuenta atrás y el último resultado.
    · history.pushState al entrar: el botón atrás cierra primero las hojas
      abiertas y después sale de Rush, sin cerrar la app.
    · El estado del jugador (liga, equipo, cartas, calendario…) vive en `datos`
      y cada pantalla lo pinta; tras una acción se recarga lo necesario.
 ═══════════════════════════════════════════════ */
 import { rpc, leer, configurarSesion, borrarToken, ErrorSesion } from './api.js';
-import { esc, miles, crear, fijarRaiz, ajustarCapas, capasAbiertas, toast } from './ui.js';
+import { esc, miles, crear, fijarRaiz, ajustarCapas, capasAbiertas, toast, hoja, fechaHora } from './ui.js';
 import { normalizarCarta, iniciarAcabados, pararAcabados } from './carta.js';
 import * as previa from './pantallas/previa.js';
-import * as inicio from './pantallas/inicio.js';
 import * as plantilla from './pantallas/plantilla.js';
 import * as mercado from './pantallas/mercado.js';
 import * as liga from './pantallas/liga.js';
@@ -22,8 +22,8 @@ import * as alineacion from './pantallas/alineacion.js';
 const ES_LOCAL = ['localhost', '127.0.0.1'].includes(location.hostname);
 
 const SECCIONES = [
-  { id: 'inicio',    texto: 'Inicio',    modulo: inicio,
-    icono: '<path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/><path d="M10 19.5v-5h4v5"/>' },
+  { id: 'equipo',    texto: 'Equipo',    modulo: alineacion,
+    icono: '<rect x="3.5" y="3" width="17" height="18" rx="2"/><path d="M3.5 12h17"/><circle cx="12" cy="12" r="2.6"/><path d="M8.5 3v3.2h7V3M8.5 21v-3.2h7V21"/>' },
   { id: 'plantilla', texto: 'Plantilla', modulo: plantilla,
     icono: '<rect x="3" y="5" width="7" height="10" rx="1.5"/><rect x="14" y="5" width="7" height="10" rx="1.5"/><path d="M6.5 18.5h11"/>' },
   { id: 'mercado',   texto: 'Mercado',   modulo: mercado,
@@ -47,7 +47,7 @@ export const datos = {
   alineacion: null,   // fila de alineaciones del equipo
 };
 
-let raiz = null, main = null, seccion = 'inicio', opciones = {}, pintando = 0;
+let raiz = null, main = null, seccion = 'equipo', opciones = {}, pintando = 0;
 
 /* ── Consultas derivadas (las usan varias pantallas) ─────────────────────── */
 export const pendientes = () => datos.jornadas.filter(j => ['programada', 'cerrada', 'simulada'].includes(j.estado));
@@ -158,7 +158,39 @@ export async function recargar(...partes) {
 }
 
 /* ── Pintado ─────────────────────────────────────────────────────────────── */
+/* ── Avisos (campana) ────────────────────────────────────────────────────── */
+let avisos = [];
+async function cargarAvisos() {
+  if (!datos.liga) return;
+  const r = await rpc('slr_notificaciones', {}, { silencioso: true }).catch(() => null);
+  if (!r) return;
+  avisos = r.notificaciones.filter(n => !n.liga_id || n.liga_id === datos.liga.id).slice(0, 40);
+  pintarCampana();
+}
+function pintarCampana() {
+  const b = raiz?.querySelector('.slr-barra__avisos');
+  if (!b) return;
+  const n = avisos.filter(a => !a.leida).length;
+  b.hidden = !datos.equipo;
+  b.querySelector('b').textContent = n > 9 ? '9+' : n || '';
+  b.classList.toggle('tiene', n > 0);
+  b.setAttribute('aria-label', n ? `Avisos: ${n} sin leer` : 'Avisos');
+}
+// Al abrir la lista se marcan como leídos (se siguen viendo resaltados hasta cerrarla)
+function abrirAvisos() {
+  const nuevas = avisos.filter(a => !a.leida).map(a => a.id);
+  hoja(avisos.length ? `<ul class="slr-avisos">${avisos.map(n => `
+      <li class="${n.leida ? '' : 'es-nuevo'}"><span>${esc(n.datos?.texto ?? n.tipo)}</span><time>${esc(fechaHora(n.creada_en))}</time></li>`).join('')}</ul>`
+    : '<div class="slr-vacio"><b>Sin avisos</b><p>Aquí llegan los resultados, cobros, cláusulas y ofertas.</p></div>',
+  { titulo: 'Avisos' });
+  if (!nuevas.length) return;
+  avisos.forEach(a => { a.leida = true; });
+  pintarCampana();
+  rpc('slr_notificaciones', { marcar_leidas: nuevas }, { silencioso: true }).catch(() => {});
+}
+
 function pintarBarra() {
+  pintarCampana();
   const saldo = raiz?.querySelector('.slr-barra__saldo');
   if (!saldo) return;
   saldo.hidden = !datos.equipo;
@@ -182,7 +214,6 @@ export async function pintar({ arriba = false } = {}) {
   const ctx = { navegar, recargar, pintar, datos };
   try {
     if (!datos.liga || !datos.equipo) await previa.pintar(cont, ctx);
-    else if (seccion === 'alineacion') await alineacion.pintar(cont, ctx);
     else await SECCIONES.find(s => s.id === seccion).modulo.pintar(cont, ctx);
   } catch (e) {
     if (e instanceof ErrorSesion) return;
@@ -213,6 +244,9 @@ function construir() {
       <header class="slr-barra">
         <div class="slr-barra__logo"><span>SL</span><b>RUSH</b></div>
         <div class="slr-barra__saldo" hidden></div>
+        <button class="slr-barra__avisos" type="button" aria-label="Avisos" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.6 2H4.4z"/><path d="M10 20.5a2 2 0 0 0 4 0"/></svg><b></b>
+        </button>
         <button class="slr-barra__salir" type="button">✕ Salir</button>
       </header>
       <main class="slr-main"></main>
@@ -225,6 +259,7 @@ function construir() {
     </div>`);
   main = raiz.querySelector('.slr-main');
   raiz.querySelector('.slr-barra__salir').addEventListener('click', salir);
+  raiz.querySelector('.slr-barra__avisos').addEventListener('click', abrirAvisos);
   raiz.querySelectorAll('.slr-nav__item').forEach(b => b.addEventListener('click', () => navegar(b.dataset.seccion)));
   document.body.appendChild(raiz);
   fijarRaiz(raiz);
@@ -266,4 +301,7 @@ export async function abrir(op) {
     return;
   }
   await navegar(seccion);
+  cargarAvisos();
 }
+
+export const recargarAvisos = cargarAvisos;

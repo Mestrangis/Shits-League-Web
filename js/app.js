@@ -297,6 +297,20 @@ function initSwipeTabs() {
 const PTR_UMBRAL = 70;  // px hacia abajo
 const PTR_MIN_MS = 600; // tiempo mínimo visible del spinner
 
+// Mientras se arrastra, la rueda aparece y gira con el recorrido; al soltar sin
+// llegar al umbral, se va
+function ptrArrastre(dy) {
+  const spinner = document.getElementById('ptrSpinner');
+  const k = Math.min(1, dy / PTR_UMBRAL);
+  spinner.style.opacity = String(k);
+  spinner.style.transform = `scale(${(0.6 + 0.4 * k).toFixed(3)})`;
+  spinner.style.rotate = `${Math.round(dy * 3)}deg`;
+}
+function ptrSoltar() {
+  const s = document.getElementById('ptrSpinner').style;
+  s.opacity = s.transform = s.rotate = '';
+}
+
 function initPullToRefresh() {
   if (!window.matchMedia('(pointer: coarse)').matches) return;
 
@@ -314,10 +328,14 @@ function initPullToRefresh() {
   }, { passive: true });
 
   document.addEventListener('touchmove', e => {
-    if (e.touches.length > 1) activo = false;
+    if (e.touches.length > 1) { activo = false; ptrSoltar(); return; }
+    if (!activo || document.getElementById('ptrSpinner').classList.contains('visible')) return;
+    const dy = e.touches[0].clientY - y0, dx = e.touches[0].clientX - x0;
+    if (dy > 0 && dy > Math.abs(dx) && window.scrollY <= 0) ptrArrastre(dy);
+    else ptrSoltar();
   }, { passive: true });
 
-  document.addEventListener('touchcancel', () => { activo = false; }, { passive: true });
+  document.addEventListener('touchcancel', () => { activo = false; ptrSoltar(); }, { passive: true });
 
   document.addEventListener('touchend', e => {
     if (!activo) return;
@@ -325,12 +343,14 @@ function initPullToRefresh() {
     const t  = e.changedTouches[0];
     const dx = t.clientX - x0, dy = t.clientY - y0;
     if (dy > PTR_UMBRAL && dy > Math.abs(dx) && window.scrollY <= 0) refrescarPorGesto();
+    else ptrSoltar();
   }, { passive: true });
 }
 
 async function refrescarPorGesto() {
   const spinner = document.getElementById('ptrSpinner');
   if (spinner.classList.contains('visible')) return;
+  ptrSoltar();                          // del arrastre al giro en bucle
   spinner.classList.add('visible');
   await Promise.all([recargarDatos(), new Promise(r => setTimeout(r, PTR_MIN_MS))]);
   spinner.classList.remove('visible');

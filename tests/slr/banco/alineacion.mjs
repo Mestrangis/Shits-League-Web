@@ -32,7 +32,7 @@ async function navegador(movil) {
   ws.addEventListener('message', m => { const x = JSON.parse(m.data); if (x.id && pend.has(x.id)) { pend.get(x.id)(x); pend.delete(x.id); } });
   const cdp = (method, params = {}) => new Promise(r => { const i = ++id; pend.set(i, r); ws.send(JSON.stringify({ id: i, method, params })); });
   const ev = async e => { const r = await cdp('Runtime.evaluate', { expression: e, awaitPromise: true, returnByValue: true }); if (r.result?.exceptionDetails) throw new Error(JSON.stringify(r.result.exceptionDetails).slice(0, 300)); return r.result?.result?.value; };
-  if (!movil) await cdp('Emulation.setDeviceMetricsOverride', { width: 1280, height: 1500, deviceScaleFactor: 1, mobile: false });
+  if (!movil) await cdp('Emulation.setDeviceMetricsOverride', { width: 1280, height: 1900, deviceScaleFactor: 1, mobile: false });
   if (movil) {
     await cdp('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
     await cdp('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
@@ -43,6 +43,7 @@ async function navegador(movil) {
   await ev(`localStorage.setItem('SESSION_PLAYER', 'Bot Uno'); localStorage.setItem('SESSION_CODE', ${JSON.stringify(env.SLR_BOT_UNO_CODIGO)});
     localStorage.setItem('RUSH_ACCESO', JSON.stringify({ jugador: 'Bot Uno', acceso: true })); 0`);   // ya había entrado antes
   await cdp('Page.navigate', { url: 'http://localhost:3000/#rush' });
+  await dormir(800);
   await cdp('Page.reload', {});   // cambiar solo el hash no recarga: hace falta para leer la sesión
   for (let i = 0; i < 150 && !(await ev(`!!document.getElementById('rushJugar')`)); i++) await dormir(200);
   if (!(await ev(`!!document.getElementById('rushJugar')`))) {
@@ -51,7 +52,7 @@ async function navegador(movil) {
   }
   await ev(`document.getElementById('rushJugar').click(); 0`);
   for (let i = 0; i < 50 && !(await ev(`!!document.querySelector('.slr-nav:not([hidden])')`)); i++) await dormir(200);
-  await ev(`import('/js/slr/rush.js').then(m => m.navegar('alineacion')).then(() => 0)`);
+  await ev(`import('/js/slr/rush.js').then(m => m.navegar('equipo')).then(() => 0)`);
   await dormir(800);
   const foto = async nombre => {
     if (!SALIDA) return;
@@ -64,7 +65,7 @@ async function navegador(movil) {
 const ESTADO = `(() => {
   const h = {}; document.querySelectorAll('.slr-hueco').forEach(b => { h[b.dataset.l + b.dataset.i] = b.dataset.id ?? null; });
   return { huecos: h, libres: [...document.querySelectorAll('.slr-libre')].map(x => x.dataset.id),
-           capitan: document.querySelector('.slr-hueco .slr-carta__capitan')?.closest('.slr-hueco')?.dataset.id ?? null,
+           capitan: document.querySelector('.slr-hueco .slr-carta__marca--capitan')?.closest('.slr-hueco')?.dataset.id ?? null,
            sucio: !!document.querySelector('.slr-estado--sucio'),
            fuerzas: [...document.querySelectorAll('.slr-fuerza b')].map(b => b.textContent).join('/'),
            toasts: [...document.querySelectorAll('.slr-toast')].map(t => t.textContent) };
@@ -130,7 +131,7 @@ console.log('\nEscritorio (ratón)');
   await dormir(600);
   await ev(`document.querySelector('.slr-hoja [data-capitan]').click(); 0`);
   await dormir(600);
-  const capSlot = await ev(`(() => { const b = document.querySelector('.slr-hueco .slr-carta__capitan')?.closest('.slr-hueco'); return b ? b.dataset.l + '|' + b.dataset.i : null; })()`);
+  const capSlot = await ev(`(() => { const b = document.querySelector('.slr-hueco .slr-carta__marca--capitan')?.closest('.slr-hueco'); return b ? b.dataset.l + '|' + b.dataset.i : null; })()`);
   if (capSlot) {
     const [l, i] = capSlot.split('|');
     await arrastrar(`.slr-hueco[data-l="${l}"][data-i="${i}"]`, '.slr-hueco[data-l="banco"][data-i="2"]');
@@ -177,6 +178,10 @@ console.log('\nMóvil 390×844 (táctil)');
 
   async function arrastrarDedo(desde, hasta, espera = 350, fotoMedio) {
     await ev(`document.querySelector(${JSON.stringify(desde)}).scrollIntoView({ block: 'center' }); 0`);
+    await dormir(200);
+    // Que el destino no quede debajo de la barra fija de Guardar/Confirmar
+    await ev(`(() => { const m = document.querySelector('.slr-main'), d = document.querySelector(${JSON.stringify(hasta)}).getBoundingClientRect();
+      const dif = d.bottom - (innerHeight - 190); if (dif > 0) m.scrollTop += dif; return 0; })()`);
     await dormir(200);
     const a = await pos(desde);
     await toque('touchStart', a);

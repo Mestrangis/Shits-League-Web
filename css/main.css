@@ -1484,4 +1484,6 @@ button, [role="button"], .modal__backdrop, .tab, .result-row, .card-wrap {
   transform: scale(1);
   animation: ptr-giro .8s linear infinite;
 }
-@keyframes ptr-giro { to { transform: rotate(360deg); } }
+/* El giro va en la propiedad rotate, aparte de transform (que lleva la escala):
+   animar transform de scale(1) a rotate(360deg) se interpola como matriz y no gira */
+@keyframes ptr-giro { from { rotate: 0deg; } to { rotate: 360deg; } }

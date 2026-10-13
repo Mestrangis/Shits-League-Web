@@ -8,7 +8,8 @@
 //       cerrada (partido real + 200 de pronóstico) y guarda los resultados.
 //       Idempotente: si la jornada ya no está cerrada, no hace nada.
 //   · { accion: 'amistoso', token, rival_equipo_id } → desde la web (slr_amistoso)
-//   · { accion: 'pronostico', token, equipo_id }    → desde la web (slr_pronostico)
+//   · { accion: 'pronostico', token, equipo_id, rival_equipo_id? } → desde la web:
+//       contra el rival indicado o, sin él, contra el del próximo partido
 //
 // Habla con la base de datos solo a través de funciones motor_* que únicamente
 // puede ejecutar la clave de servicio. El secreto de pg_cron está en Vault y
@@ -97,8 +98,10 @@ async function amistoso(cuerpo: { token?: string; rival_equipo_id?: string }) {
   return { partido_id: prep.partido_id, semilla: prep.semilla, version: VERSION, goles: r.goles };
 }
 
-async function pronostico(cuerpo: { token?: string; equipo_id?: string }) {
-  const prep = await rpc('motor_preparar_pronostico', { p_token: cuerpo.token ?? '', p_equipo: cuerpo.equipo_id });
+async function pronostico(cuerpo: { token?: string; equipo_id?: string; rival_equipo_id?: string }) {
+  const prep = await rpc('motor_preparar_pronostico', {
+    p_token: cuerpo.token ?? '', p_equipo: cuerpo.equipo_id, p_rival: cuerpo.rival_equipo_id ?? null,
+  });
   if (prep.sin_partido) return { sin_partido: true };
   const p = simularPronostico(prep.local, prep.visitante, semillaAleatoria(), SIMULACIONES_PRONOSTICO);
   const [ganar, perder] = prep.es_local ? [p.pA, p.pB] : [p.pB, p.pA];

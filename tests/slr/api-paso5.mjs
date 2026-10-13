@@ -12,6 +12,13 @@ const dormir = ms => new Promise(r => setTimeout(r, ms));
 const U = { codigo: env.SLR_BOT_UNO_CODIGO }, D = { codigo: env.SLR_BOT_DOS_CODIGO };
 let L = null;
 
+async function funcionSimular(cuerpo) {
+  const r = await fetch(`${SUPABASE_URL}/functions/v1/slr-simular`, {
+    method: 'POST', headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo),
+  });
+  return { status: r.status, datos: await r.json() };
+}
+
 async function amistoso(token, rival) {
   const r = await fetch(`${SUPABASE_URL}/functions/v1/slr-simular`, {
     method: 'POST', headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
@@ -44,7 +51,8 @@ try {
   const aj = (await leer('ajustes?select=clave,valor&clave=eq.rush_publico')).datos[0];
   check(aj?.valor === false, 'ajustes.rush_publico existe y es false (beta cerrada)');
   const beta = (await leer('usuarios?select=nombre&beta=eq.true&order=nombre')).datos.map(u => u.nombre);
-  check(beta.join() === 'Marcos,Nicolás', `beta = true solo para ${beta.join(' y ')}`);
+  // Marcos puede dar acceso a más gente desde el Table Editor: solo se exige el punto de partida
+  check(beta.includes('Marcos') && beta.includes('Nicolás'), `beta = true para Marcos y Nicolás (ahora: ${beta.join(', ')})`);
 
   seccion('Liga de prueba y bots del modo pruebas');
   const liga = await rpcOk('slr_crear_liga_prueba', { token: U.token, nombre: `Prueba paso 5 · ${new Date().toISOString().slice(0, 16)}` });
@@ -73,6 +81,40 @@ try {
   check(libresTras === 0, 'sus cartas quedan libres');
   const usuarioBorrado = (await leer(`usuarios?select=id&nombre=like.*${encodeURIComponent(bots[3].nombre)}*`)).datos.length;
   check(usuarioBorrado === 0, 'y su usuario interno desaparece');
+
+  seccion('Herramienta de plantillas (modo pruebas)');
+  {
+    rechaza(await rpc('slr_admin_buscar_cartas', { token: D.token, liga_id: L, texto: '' }), 'administrador', 'buscar cartas: solo el admin');
+    const libres = await rpcOk('slr_admin_buscar_cartas', { token: U.token, liga_id: L, texto: '' });
+    check(libres.length === 40 && libres.every(c => c.nombre && 'equipo_id' in c), 'buscar sin texto: las primeras 40 cartas con su dueño');
+    // Una carta de Bot Dos que esté en su alineación y en venta
+    D.equipo = (await equiposLiga()).find(e => e.nombre === 'Bot Dos FC').id;
+    const alD = (await leer(`alineaciones?equipo_id=eq.${D.equipo}`)).datos[0];
+    const cartaD = alD.huecos.def[0];
+    await rpcOk('slr_poner_en_venta', { token: D.token, carta_id: cartaD, precio: 999 });
+    const nombreD = (await leer(`cartas?select=disenos_carta(nombre)&id=eq.${cartaD}`)).datos[0].disenos_carta.nombre;
+    const busca = await rpcOk('slr_admin_buscar_cartas', { token: U.token, liga_id: L, texto: nombreD.slice(0, 6).toLowerCase() });
+    check(busca.some(c => c.id === cartaD && c.equipo === 'Bot Dos FC'), `buscar por nombre («${nombreD.slice(0, 6)}») la encuentra en Bot Dos FC`);
+    const m = await rpcOk('slr_admin_mover_carta', { token: U.token, liga_id: L, carta_id: cartaD, equipo_id: U.equipo });
+    const c1 = (await leer(`cartas?select=equipo_id,blindada_hasta&id=eq.${cartaD}`)).datos[0];
+    check(m.antes === 'Bot Dos FC' && m.ahora === 'Bot Uno FC' && c1.equipo_id === U.equipo, 'dar a otro equipo: pasa de Bot Dos FC a Bot Uno FC');
+    const alD2 = (await leer(`alineaciones?equipo_id=eq.${D.equipo}`)).datos[0];
+    check(alD2.huecos.def[0] === null && !alD2.banquillo.includes(cartaD), 'sale de la alineación guardada de su antiguo dueño (hueco vacío)');
+    const venta = (await leer(`ventas?select=estado&carta_id=eq.${cartaD}&order=creada_en.desc&limit=1`)).datos[0];
+    check(venta.estado === 'cancelada', 'su venta se cancela');
+    const alb = (await leer(`album?select=via_adquisicion&usuario_id=eq.${yo.usuario.id}&liga_id=eq.${L}`)).datos;
+    check(alb.some(a => a.via_adquisicion === 'admin'), 'entra en el álbum de Bot Uno con la vía «admin»');
+    const hist = (await leer(`historial?select=tipo,texto&liga_id=eq.${L}&tipo=eq.admin_carta`)).datos;
+    check(hist.length === 1 && /de Bot Dos FC a Bot Uno FC/.test(hist[0].texto), `y queda en el historial: «${hist[0]?.texto}»`);
+    // Límite de 15: Bot Uno tiene 12; tres más llegan a 15 y la cuarta se rechaza
+    const libresAhora = (await rpcOk('slr_admin_buscar_cartas', { token: U.token, liga_id: L, texto: '' })).filter(c => !c.equipo_id);
+    for (const c of libresAhora.slice(0, 3)) await rpcOk('slr_admin_mover_carta', { token: U.token, liga_id: L, carta_id: c.id, equipo_id: U.equipo });
+    rechaza(await rpc('slr_admin_mover_carta', { token: U.token, liga_id: L, carta_id: libresAhora[3].id, equipo_id: U.equipo }), '15', 'con 15 cartas no cabe otra');
+    for (const c of libresAhora.slice(0, 3)) await rpcOk('slr_admin_mover_carta', { token: U.token, liga_id: L, carta_id: c.id, equipo_id: null });
+    const libre = await rpcOk('slr_admin_mover_carta', { token: U.token, liga_id: L, carta_id: cartaD, equipo_id: null });
+    const c2 = (await leer(`cartas?select=equipo_id,blindada_hasta,multiplicador_clausula&id=eq.${cartaD}`)).datos[0];
+    check(libre.ahora === null && c2.equipo_id === null && c2.blindada_hasta === null && Number(c2.multiplicador_clausula) === 1.5, 'dejar libre: sin dueño, sin blindaje y cláusula ×1,5');
+  }
 
   seccion('Temporada completa a golpe de botón');
   const t = await rpcOk('slr_iniciar_temporada', { token: U.token, liga_id: L });
@@ -104,6 +146,16 @@ try {
   check(am.status === 200 && am.datos.goles?.length === 2, `amistoso Bot Uno FC – ${bot0.nombre}: ${am.datos.goles?.join('-')}`);
   const pa = (await leer(`partidos?select=tipo,goles_local&id=eq.${am.datos.partido_id}`)).datos[0];
   check(pa?.tipo === 'amistoso', 'el amistoso queda guardado y visible');
+
+  seccion('Pronóstico contra un rival elegido (sin temporada en marcha)');
+  const pr = await funcionSimular({ accion: 'pronostico', token: U.token, equipo_id: U.equipo, rival_equipo_id: bot0.id });
+  const suma = pr.datos.p_ganar + pr.datos.p_empate + pr.datos.p_perder;
+  check(pr.status === 200 && Math.abs(suma - 1) < 1e-9 && pr.datos.rival_id === bot0.id && pr.datos.simulaciones === 200,
+    `contra ${bot0.nombre}: ${Math.round(100 * pr.datos.p_ganar)} / ${Math.round(100 * pr.datos.p_empate)} / ${Math.round(100 * pr.datos.p_perder)} %`);
+  const sinRival = await funcionSimular({ accion: 'pronostico', token: U.token, equipo_id: U.equipo });
+  check(sinRival.datos.sin_partido === true, 'sin rival y sin próximo partido: «sin partido», como antes');
+  const propio = await funcionSimular({ accion: 'pronostico', token: U.token, equipo_id: U.equipo, rival_equipo_id: U.equipo });
+  check(propio.status === 400 && /rival de tu liga/.test(propio.datos.error), 'contra sí mismo: rechazado');
 
   seccion('Reiniciar beta');
   rechaza(await rpc('slr_admin_reiniciar_beta', { token: D.token, liga_id: L }), 'administrador', 'reiniciar: solo el admin');

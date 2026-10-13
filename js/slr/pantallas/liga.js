@@ -8,6 +8,7 @@ import { rpc, leer, funcion } from '../api.js';
 import { esc, diaHora, toast, conEspera } from '../ui.js';
 import { enJuego } from '../rush.js';
 import { abrirCronica } from './cronica.js';
+import { abrirEquipo } from './ficha-equipo.js';
 
 let vista = 'clasificacion';
 
@@ -20,7 +21,7 @@ function tabla(filas, yo) {
         <tbody>${filas.map(f => `
           <tr class="${f.equipo_id === yo ? 'es-mio' : ''}">
             <td>${f.posicion}</td>
-            <td class="izq"><b>${esc(f.equipo)}</b><small>${esc(f.usuario ?? '')}</small>
+            <td class="izq"><button class="slr-enlace-equipo" type="button" data-equipo="${esc(f.equipo_id)}"><b>${esc(f.equipo)}</b></button><small>${esc(f.usuario ?? '')}</small>
               ${f.equipo_id !== yo ? `<button class="slr-amistoso" type="button" data-amistoso="${esc(f.equipo_id)}">Amistoso</button>` : ''}</td>
             <td>${f.pj}</td><td>${f.g}</td><td>${f.e}</td><td>${f.p}</td>
             <td>${f.dg > 0 ? '+' : ''}${f.dg}</td><td class="pts">${f.puntos}</td>
@@ -42,11 +43,11 @@ function calendario(jornadas, yo) {
           const mio = [p.local.equipo_id, p.visitante.equipo_id].includes(yo);
           const lado = id => (id === yo ? 'slr-propio' : mio ? 'slr-rival' : '');
           return `
-          <button class="slr-cruce ${mio ? 'es-mio' : ''}" type="button" data-partido="${esc(p.id)}" ${p.goles ? 'data-jugado="1"' : ''}>
-            <span class="${lado(p.local.equipo_id)}">${esc(p.local.equipo)}</span>
-            <b>${p.goles ? `${p.goles[0]} – ${p.goles[1]}` : 'vs'}</b>
-            <span class="${lado(p.visitante.equipo_id)}">${esc(p.visitante.equipo)}</span>
-          </button>`;
+          <div class="slr-cruce ${mio ? 'es-mio' : ''}">
+            <button type="button" class="slr-enlace-equipo ${lado(p.local.equipo_id)}" data-equipo="${esc(p.local.equipo_id)}">${esc(p.local.equipo)}</button>
+            <button type="button" class="slr-cruce__marcador" data-partido="${esc(p.id)}" ${p.goles ? 'data-jugado="1"' : ''}>${p.goles ? `${p.goles[0]} – ${p.goles[1]}` : 'vs'}</button>
+            <button type="button" class="slr-enlace-equipo ${lado(p.visitante.equipo_id)}" data-equipo="${esc(p.visitante.equipo_id)}">${esc(p.visitante.equipo)}</button>
+          </div>`;
         }).join('')}
         ${j.descansa ? `<p class="slr-jornada__descansa">Descansa: <span class="${j.descansa.equipo_id === yo ? 'slr-propio' : ''}">${esc(j.descansa.equipo)}</span></p>` : ''}
       </section>`;
@@ -103,6 +104,7 @@ export async function pintar(cont, ctx) {
       : `${calendario(datos.jornadas, yo)}${await amistosos(datos.liga.id, yo)}`}`;
 
   cont.querySelectorAll('[data-vista]').forEach(b => b.addEventListener('click', () => { vista = b.dataset.vista; ctx.pintar(); }));
+  cont.querySelectorAll('[data-equipo]').forEach(b => b.addEventListener('click', () => abrirEquipo(b.dataset.equipo, ctx).catch(() => {})));
   cont.querySelectorAll('[data-partido]').forEach(b => b.addEventListener('click', () => {
     if (!b.dataset.jugado) { toast('Este partido todavía no se ha jugado', 'info'); return; }
     abrirCronica(b.dataset.partido, ctx).catch(() => {});

@@ -35,7 +35,7 @@ export async function pintar(cont, ctx) {
     ${cartas.length ? `<div class="slr-rejilla">
       ${cartas.map(c => `
         <button class="slr-ficha" type="button" data-id="${esc(c.id)}">
-          ${cartaHTML(c, { tam: 's', ancho: 170, tocada: estaTocada(c), destacar: ORDENES[orden] })}
+          ${cartaHTML(c, { tam: 's', tocada: estaTocada(c), blindada: !!c.blindada_hasta, enVenta: !!c.en_venta, destacar: ORDENES[orden] })}
           <span class="slr-ficha__datos">
             <span><small>Valor</small><b>${miles(c.valor)}</b></span>
             <span><small>Cláusula</small><b>${miles(c.clausula)}</b></span>

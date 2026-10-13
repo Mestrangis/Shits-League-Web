@@ -1,5 +1,8 @@
 /* ═══════════════════════════════════════════════
-   SHITS LEAGUE RUSH — Alineación
+   SHITS LEAGUE RUSH — Equipo (editor de alineación)
+   Arriba, una franja con el próximo rival (tocable: su ficha), la cuenta atrás
+   al cierre, el último resultado y el estado de la alineación, y los avisos de
+   pausa, cierre o entre temporadas.
    Campo en vertical con los huecos de la formación (5 formaciones). Se asigna
    tocando: un hueco abre una hoja con tus cartas (primero las sin colocar,
    luego las ya colocadas) ordenadas por la stat que usa ese hueco (POR y DEF
@@ -11,18 +14,21 @@
    Guardar = slr_guardar_alineacion; Confirmar = slr_confirmar_alineacion
    (ambos dan el bonus de participación de la próxima jornada).
 ═══════════════════════════════════════════════ */
-import { rpc, funcion } from '../api.js';
-import { esc, hoja, cerrarCapa, conEspera, toast, hora } from '../ui.js';
+import { rpc, funcion, leer as leerTabla } from '../api.js';
+import { esc, hoja, cerrarCapa, conEspera, toast, hora, faltan as quedan, diaHora } from '../ui.js';
 import { cartaHTML, describirPoder } from '../carta.js';
 import { fuerzaPosesion, fuerzaAtaque, fuerzaDefensa, probabilidadesTirador, CONFIG } from '../motor-v1.1.0.js';
-import { estaTocada, alineacionBloqueada, alineacionConfirmada, proximaJornada, pausada, configLiga, ventanaCierre } from '../rush.js';
+import { estaTocada, alineacionBloqueada, alineacionConfirmada, proximaJornada, pausada, configLiga, ventanaCierre, miPartido, enJuego } from '../rush.js';
+import { abrirDetalle } from './detalle.js';
+import { abrirEquipo } from './ficha-equipo.js';
+import { abrirCronica } from './cronica.js';
 
 const STAT  = { por: 'DEF', def: 'DEF', med: 'CON', del: 'ATA', banco: 'OVR' };
 const CAMPO = { por: 'def', def: 'def', med: 'con', del: 'ata' };
 const NOMBRE_LINEA = { por: 'POR', def: 'DEF', med: 'MED', del: 'DEL', banco: 'SUP' };
 const MAL_RINDE = 12; // puntos por debajo de su mejor stat
 
-let borrador = null, original = '', pronostico = null;
+let borrador = null, original = '';
 
 /* ── Borrador ────────────────────────────────────────────────────────────── */
 function desdeGuardada(al, mias) {
@@ -151,21 +157,21 @@ function pintarTodo(cont, ctx) {
   const faltan = titulares(borrador).filter(x => !x).length;
   const libres = [...porId.values()].filter(c => !posicion(c.id)).sort((a, b) => b.ovr - a.ovr);
 
+  const lg = datos.ligaInfo ?? {};
   let aviso = '';
   if (pausada()) aviso = '<div class="slr-banner slr-banner--pausa"><b>Liga en pausa</b><span>La alineación no se puede cambiar hasta que se reanude.</span></div>';
   else if (ventanaCierre()) aviso = `<div class="slr-banner slr-banner--cierre"><b>Jornada ${j.numero} en juego</b><span>Las alineaciones están cerradas hasta las ${hora(j.publicacion_en)}.</span></div>`;
+  else if (lg.estado === 'entre_temporadas') aviso = `<div class="slr-banner slr-banner--info"><b>Temporada ${lg.temporada} terminada</b><span>El mercado está cerrado. La siguiente empieza cuando el administrador la inicie.</span></div>`;
+  else if (lg.estado === 'preparacion') aviso = '<div class="slr-banner slr-banner--info"><b>La temporada aún no ha empezado</b><span>Ve preparando tu once: cuando el administrador la inicie, la jornada 1 será un domingo a las 20:00.</span></div>';
 
   let estadoTexto;
   if (esSucio) estadoTexto = '<span class="slr-estado slr-estado--sucio">● Cambios sin guardar</span>';
-  else if (!j) estadoTexto = '<span class="slr-estado">Guardada</span>';
-  else if (confirmada) estadoTexto = `<span class="slr-estado slr-estado--ok">✓ Confirmada para la jornada ${j.numero}</span>`;
-  else estadoTexto = `<span class="slr-estado slr-estado--pendiente">Sin confirmar para la jornada ${j.numero} (+${configLiga().bonus_participacion ?? 100})</span>`;
+  else if (!j) estadoTexto = '<span class="slr-estado">✓ Guardada</span>';
+  else if (confirmada) estadoTexto = `<span class="slr-estado slr-estado--ok">✓ Confirmada (J${j.numero})</span>`;
+  else estadoTexto = `<span class="slr-estado slr-estado--pendiente">Sin confirmar (+${configLiga().bonus_participacion ?? 100})</span>`;
 
   cont.innerHTML = `
-    <header class="slr-cabecera">
-      <h1 class="slr-titulo">Alineación</h1>
-      ${estadoTexto}
-    </header>
+    ${franja(datos, j, estadoTexto)}
     ${aviso}
     <div class="slr-segmentos slr-formaciones" role="group" aria-label="Formación">
       ${CONFIG.FORMACIONES.map(x => `<button type="button" data-formacion="${x}" class="${x === borrador.formacion ? 'activo' : ''}" ${bloqueada ? 'disabled' : ''}>${x}</button>`).join('')}
@@ -211,9 +217,7 @@ function pintarTodo(cont, ctx) {
       ${barraFuerza('Ataque', f.ataque, 220)}
       ${barraFuerza('Defensa', f.defensa, 220)}
       ${barraFuerza('Portero', f.portero, 100)}
-      <div class="slr-pronostico" data-pronostico>${pintarPronostico()}</div>
-      <button class="slr-btn slr-btn--fantasma" type="button" data-calcular ${esSucio || !j ? 'disabled' : ''}>Calcular pronóstico</button>
-      ${esSucio ? '<p class="slr-suave">El pronóstico usa la alineación guardada: guarda antes de calcularlo.</p>' : ''}
+      <button class="slr-btn slr-btn--fantasma" type="button" data-calcular>Calcular pronóstico</button>
     </section>
 
     <div class="slr-acciones-fijas">
@@ -227,16 +231,70 @@ function pintarTodo(cont, ctx) {
   enlazar(cont, ctx, porId, bloqueada);
 }
 
-function pintarPronostico() {
-  if (!pronostico) return '';
-  if (pronostico.sin_partido) return '<p class="slr-suave">No tienes partido en la próxima jornada.</p>';
-  const p = [pronostico.p_ganar, pronostico.p_empate, pronostico.p_perder].map(x => Math.round(x * 100));
+/* ── Franja superior: próximo rival, cuenta atrás, último resultado, estado ── */
+function franja(datos, j, estadoTexto) {
+  const yo = datos.equipo.id;
+  const p = miPartido(j);
+  let rival = '<span class="slr-franja__rival">Sin partido programado</span>';
+  if (j && !p) rival = `<span class="slr-franja__rival">Descansas en la J${j.numero}</span>`;
+  else if (p) {
+    const local = p.local.equipo_id === yo;
+    const r = local ? p.visitante : p.local;
+    rival = `<button class="slr-franja__rival slr-rival" type="button" data-equipo="${esc(r.equipo_id)}">
+      <small>J${j.numero} · ${local ? 'en casa' : 'fuera'} contra</small>${esc(r.equipo)} ›</button>`;
+  }
+  const abierta = j && !enJuego(j) && !pausada();
+  const jugadas = datos.jornadas.filter(x => x.estado === 'publicada' && miPartido(x));
+  const ult = jugadas[jugadas.length - 1];
+  let ultimo = '<span class="slr-suave">Aún no has jugado</span>';
+  if (ult) {
+    const q = miPartido(ult), local = q.local.equipo_id === yo;
+    const [m, s] = local ? q.goles : [q.goles[1], q.goles[0]];
+    const res = m > s ? 'V' : m < s ? 'D' : 'E';
+    ultimo = `<button class="slr-franja__ultimo" type="button" data-cronica="${esc(q.id)}">
+      <span class="slr-res slr-res--${res}">${res}</span> ${m}-${s} <small>vs ${esc(local ? q.visitante.equipo : q.local.equipo)}</small></button>`;
+  }
+  return `
+    <section class="slr-franja">
+      <div class="slr-franja__fila">${rival}
+        ${abierta ? `<span class="slr-franja__cuenta" title="Cierre: ${esc(diaHora(j.cierre_en))}"><small>cierre en</small><b data-cuenta="${esc(j.cierre_en)}">${quedan(j.cierre_en)}</b></span>` : ''}</div>
+      <div class="slr-franja__fila">${ultimo}${estadoTexto}</div>
+    </section>`;
+}
+
+/* ── Pronóstico contra el rival que se elija ─────────────────────────────── */
+function barraPronostico(r, nombreRival) {
+  const p = [r.p_ganar, r.p_empate, r.p_perder].map(x => Math.round(x * 100));
   return `
     <div class="slr-pronostico__barra">
       <i class="slr-propio-fondo" style="width:${p[0]}%"></i><i style="width:${p[1]}%"></i><i class="slr-rival-fondo" style="width:${p[2]}%"></i>
     </div>
     <div class="slr-pronostico__cifras"><span class="slr-propio">Ganar ${p[0]} %</span><span>Empate ${p[1]} %</span><span class="slr-rival">Perder ${p[2]} %</span></div>
-    <small class="slr-suave">${pronostico.simulaciones} simulaciones contra tu próximo rival</small>`;
+    <small class="slr-suave">${r.simulaciones} simulaciones contra ${esc(nombreRival)}${r.jornada ? ` (jornada ${r.jornada}, ${r.es_local ? 'en casa' : 'fuera'})` : ' (tú en casa)'}</small>`;
+}
+
+async function abrirPronostico(ctx) {
+  const { datos } = ctx;
+  const yo = datos.equipo.id;
+  const rivales = await leerTabla(`equipos?select=id,nombre&liga_id=eq.${datos.liga.id}&id=neq.${yo}&order=nombre`);
+  if (!rivales.length) { toast('Todavía no hay rivales en la liga', 'info'); return; }
+  const p = miPartido(proximaJornada());
+  const proximo = p ? (p.local.equipo_id === yo ? p.visitante.equipo_id : p.local.equipo_id) : null;
+  const el = hoja(`
+    <p class="slr-confirmar__texto">Probabilidad de ganar, empatar y perder contra este rival con tu alineación guardada.</p>
+    ${sucio() ? '<div class="slr-banner slr-banner--cierre"><b>Cambios sin guardar</b><span>El pronóstico usa tu alineación guardada, no la que estás editando.</span></div>' : ''}
+    <label class="slr-campo"><span>Rival</span>
+      <select class="slr-input" data-rival>
+        ${rivales.map(r => `<option value="${esc(r.id)}" ${r.id === proximo ? 'selected' : ''}>${esc(r.nombre)}${r.id === proximo ? ' (próximo rival)' : ''}</option>`).join('')}
+      </select></label>
+    <button class="slr-btn slr-btn--grande" type="button" data-calcular-ya>Calcular</button>
+    <div class="slr-pronostico" data-resultado></div>`, { titulo: 'Pronóstico' });
+  const sel = el.querySelector('[data-rival]'), res = el.querySelector('[data-resultado]');
+  sel.addEventListener('change', () => { res.innerHTML = ''; });
+  el.querySelector('[data-calcular-ya]').addEventListener('click', e => conEspera(e.currentTarget, async () => {
+    const r = await funcion({ accion: 'pronostico', equipo_id: yo, rival_equipo_id: sel.value });
+    res.innerHTML = barraPronostico(r, sel.selectedOptions[0].textContent.replace(' (próximo rival)', ''));
+  }).catch(() => {}));
 }
 
 /* ── Hoja de selección ───────────────────────────────────────────────────── */
@@ -303,6 +361,65 @@ function fichaEnHueco(c, l, i, porId) {
       : '<p class="slr-suave">Sin poderes.</p>'}`;
 }
 
+// Lo que aportaría una carta en cada puesto (para las cartas sin colocar)
+function aportesTodos(c, porId) {
+  return ['por', 'def', 'med', 'del'].map(l => {
+    // En DEL, la probabilidad de tirar se calcula como si entrara en la delantera actual
+    const copia = l === 'del' ? { ...borrador, del: [...borrador.del.filter(Boolean), c.id] } : borrador;
+    const guardado = borrador;
+    borrador = copia;
+    const txt = aporte(c, l, 0, new Map([...porId, [c.id, c]]));
+    borrador = guardado;
+    return `<li><span class="slr-ficha-hueco__puesto">${DONDE[l]}</span> ${txt}${rindeMal(c, l) ? ' <em>· rinde mal aquí</em>' : ''}</li>`;
+  }).join('');
+}
+
+function fichaLibre(id, cont, ctx, porId) {
+  const c = porId.get(id);
+  const bloqueada = alineacionBloqueada();
+  const poderes = (c.poderes ?? []).map(describirPoder);
+  const huecos = [['por', 0], ...['def', 'med', 'del'].flatMap(l => borrador[l].map((_, i) => [l, i])), ...borrador.banco.map((_, i) => ['banco', i])];
+  const el = hoja(`
+    <div class="slr-ficha-hueco">
+      <div class="slr-ficha-hueco__carta">${cartaHTML(c, { tam: 's', tocada: estaTocada(c) })}</div>
+      <div class="slr-ficha-hueco__datos">
+        <b class="slr-ficha-hueco__nombre">${esc(c.nombre)}</b>
+        <div class="slr-ficha-hueco__stats">
+          <span><small>OVR</small><b>${c.ovr}</b></span>
+          <span><small>ATA</small><b>${c.ata}</b></span><span><small>DEF</small><b>${c.def}</b></span><span><small>CON</small><b>${c.con}</b></span>
+        </div>
+        ${estaTocada(c) ? '<p class="slr-ficha-hueco__tocada">Tocada: juega al 85 % la próxima jornada</p>' : ''}
+      </div>
+    </div>
+    <h3 class="slr-subtitulo">Qué aportaría en cada puesto</h3>
+    <ul class="slr-ficha-hueco__puestos">${aportesTodos(c, porId)}</ul>
+    ${poderes.length ? `<ul class="slr-ficha-hueco__poderes">${poderes.map(p => `
+      <li><b>${esc(p.nombre)}</b> · ${esc(p.momento)}: ${esc(p.efecto)}. <small>${esc(p.probabilidad)}</small></li>`).join('')}</ul>`
+      : '<p class="slr-suave">Sin poderes.</p>'}
+    <div class="slr-botones">
+      ${bloqueada ? '' : '<button class="slr-btn" type="button" data-colocar>Colocar en…</button>'}
+      <button class="slr-btn slr-btn--fantasma" type="button" data-ver>Ver carta</button>
+    </div>
+    <ul class="slr-lista-cartas slr-colocar" data-huecos hidden>
+      ${huecos.map(([l, i]) => {
+        const actual = leer(l, i), occ = actual && porId.get(actual), mal = rindeMal(c, l);
+        return `<li><button type="button" data-l="${l}" data-i="${i}">
+          <span class="slr-lista-cartas__texto"><b>${DONDE[l]}${l === 'banco' ? ` ${i + 1}` : ''}</b>
+            <small>${occ ? `Ahora: ${esc(occ.nombre)} (se intercambian)` : 'Vacío'}</small>
+            ${mal ? `<em>Rinde mal aquí</em>` : ''}</span>
+          <span class="slr-lista-cartas__stat ${mal ? 'es-mal' : ''}"><b>${valorEnHueco(c, l)}</b><small>${STAT[l]}</small></span>
+        </button></li>`;
+      }).join('')}
+    </ul>`, { titulo: c.nombre, alCerrar: () => pintarTodo(cont, ctx) });
+  el.querySelector('[data-colocar]')?.addEventListener('click', () => { el.querySelector('[data-huecos]').hidden = false; });
+  el.querySelectorAll('[data-huecos] [data-l]').forEach(b => b.addEventListener('click', () => {
+    const perdido = asignar(b.dataset.l, Number(b.dataset.i), id);
+    cerrarCapa();
+    if (perdido) toast(AVISO_CAPITAN, 'info');
+  }));
+  el.querySelector('[data-ver]').addEventListener('click', () => { cerrarCapa(); setTimeout(() => abrirDetalle(id, ctx), 300); });
+}
+
 function elegir(l, i, cont, ctx, porId) {
   const actual = leer(l, i);
   const stat = STAT[l];
@@ -323,6 +440,7 @@ function elegir(l, i, cont, ctx, porId) {
       ${titular ? `<button class="slr-btn ${borrador.capitan === actual ? '' : 'slr-btn--fantasma'}" type="button" data-capitan>
         ${borrador.capitan === actual ? '★ Es el capitán' : '★ Hacer capitán'}</button>` : ''}
       <button class="slr-btn slr-btn--fantasma" type="button" data-quitar>Quitar del hueco</button>
+      <button class="slr-btn slr-btn--fantasma" type="button" data-ver>Ver carta</button>
     </div>` : ''}
     <p class="slr-suave">${titular ? `En este hueco cuenta su <b>${stat}</b>${l === 'por' ? ' (el portero para con la DEF)' : ''}.` : 'Ordenadas por OVR.'}</p>
     ${bloque('Sin colocar', sinColocar, 'Todas tus cartas están colocadas.')}
@@ -339,6 +457,7 @@ function elegir(l, i, cont, ctx, porId) {
     cerrarCapa();
   });
   el.querySelector('[data-capitan]')?.addEventListener('click', () => { borrador.capitan = actual; cerrarCapa(); });
+  el.querySelector('[data-ver]')?.addEventListener('click', () => { cerrarCapa(); setTimeout(() => abrirDetalle(actual, ctx), 300); });
 }
 
 /* ── Arrastrar y soltar ──────────────────────────────────────────────────── */
@@ -493,8 +612,10 @@ function enlazar(cont, ctx, porId, bloqueada) {
     elegir(b.dataset.l, Number(b.dataset.i), cont, ctx, porId);
   }));
   cont.querySelectorAll('.slr-libre').forEach(b => b.addEventListener('click', () => {
-    if (!acabaDeArrastrar() && !bloqueada) toast('Mantén pulsada la carta y suéltala en un hueco, o toca el hueco para elegirla', 'info');
+    if (!acabaDeArrastrar()) fichaLibre(b.dataset.id, cont, ctx, porId);
   }));
+  cont.querySelectorAll('[data-equipo]').forEach(b => b.addEventListener('click', () => abrirEquipo(b.dataset.equipo, ctx)));
+  cont.querySelectorAll('[data-cronica]').forEach(b => b.addEventListener('click', () => abrirCronica(b.dataset.cronica, ctx).catch(() => {})));
   cont.querySelector('[data-manual]')?.addEventListener('change', e => { borrador.orden_manual = e.target.checked; repintar(); });
   cont.querySelectorAll('[data-subir],[data-bajar]').forEach(b => b.addEventListener('click', () => {
     const i = Number(b.dataset.subir ?? b.dataset.bajar), k = b.dataset.subir != null ? i - 1 : i + 1;
@@ -516,7 +637,6 @@ function enlazar(cont, ctx, porId, bloqueada) {
         capitan_id: borrador.capitan,
       });
       await ctx.recargar('alineacion');
-      pronostico = null;
       reiniciar(datos);
       toast(proximaJornada() ? `Alineación guardada y confirmada para la jornada ${proximaJornada().numero}` : 'Alineación guardada', 'ok');
       repintar();
@@ -531,10 +651,7 @@ function enlazar(cont, ctx, porId, bloqueada) {
     repintar();
   }).catch(() => {}));
 
-  cont.querySelector('[data-calcular]')?.addEventListener('click', e => conEspera(e.currentTarget, async () => {
-    pronostico = await funcion({ accion: 'pronostico', equipo_id: datos.equipo.id });
-    cont.querySelector('[data-pronostico]').innerHTML = pintarPronostico();
-  }).catch(() => {}));
+  cont.querySelector('[data-calcular]')?.addEventListener('click', () => abrirPronostico(ctx));
 }
 
 function reiniciar(datos) {
@@ -542,10 +659,17 @@ function reiniciar(datos) {
   original = firma(borrador);
 }
 
+let reloj = null;
 export async function pintar(cont, ctx) {
+  // Cuenta atrás viva mientras la pantalla esté montada
+  clearInterval(reloj);
+  reloj = setInterval(() => {
+    const el = cont.querySelector('[data-cuenta]');
+    if (!cont.isConnected) { clearInterval(reloj); return; }
+    if (el) el.textContent = quedan(el.dataset.cuenta);
+  }, 30000);
   // Siempre desde lo guardado al entrar (lo que había sin guardar se descarta)
   reiniciar(ctx.datos);
-  pronostico = null;
   pintarTodo(cont, ctx);
   // Los listeners del arrastre van en el contenedor, que no se sustituye al repintar
   if (!alineacionBloqueada()) activarArrastre(cont, ctx, new Map(ctx.datos.cartas.map(c => [c.id, c])));
