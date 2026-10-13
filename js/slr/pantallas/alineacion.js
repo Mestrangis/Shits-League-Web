@@ -13,8 +13,8 @@
 ═══════════════════════════════════════════════ */
 import { rpc, funcion } from '../api.js';
 import { esc, hoja, cerrarCapa, conEspera, toast, hora } from '../ui.js';
-import { cartaHTML } from '../carta.js';
-import { fuerzaPosesion, fuerzaAtaque, fuerzaDefensa, CONFIG } from '../motor-v1.1.0.js';
+import { cartaHTML, describirPoder } from '../carta.js';
+import { fuerzaPosesion, fuerzaAtaque, fuerzaDefensa, probabilidadesTirador, CONFIG } from '../motor-v1.1.0.js';
 import { estaTocada, alineacionBloqueada, alineacionConfirmada, proximaJornada, pausada, configLiga, ventanaCierre } from '../rush.js';
 
 const STAT  = { por: 'DEF', def: 'DEF', med: 'CON', del: 'ATA', banco: 'OVR' };
@@ -254,11 +254,53 @@ function filaCarta(c, l, actual) {
       ${cartaHTML(c, { tam: 'xs', ancho: 60, destacar: stat, tocada: estaTocada(c) })}
       <span class="slr-lista-cartas__texto">
         <b>${esc(c.nombre)}</b>
+        <span class="slr-lista-cartas__stats">ATA ${c.ata} · DEF ${c.def} · CON ${c.con}</span>
         <small>${c.id === actual ? 'En este hueco' : p ? `Ahora en <strong>${DONDE[p[0]]}</strong>` : 'Sin colocar'}${estaTocada(c) ? ' · tocada (85 %)' : ''}</small>
         ${mal ? `<em>Rinde mal aquí: su fuerte es ${mejor}</em>` : ''}
       </span>
       <span class="slr-lista-cartas__stat ${mal ? 'es-mal' : ''}"><b>${valorEnHueco(c, l)}</b><small>${stat}</small></span>
     </button></li>`;
+}
+
+// Cabecera de la hoja cuando el hueco tiene carta: qué es y qué aporta ahí
+function aporte(c, l, i, porId) {
+  const ef = efectiva(c);
+  const peso = CONFIG.PESO_MED_OCASION, pct = Math.round(peso * 100);
+  if (l === 'por') return `<b>Paradas:</b> DEF ${ef.DEF}`;
+  if (l === 'def') return `<b>Defensa:</b> DEF ${ef.DEF}`;
+  if (l === 'med') {
+    return `<b>Posesión:</b> CON ${ef.CON} · <b>Ataque:</b> ${pct} % ATA = ${Math.round(peso * ef.ATA)} · ` +
+      `<b>Defensa:</b> ${pct} % DEF = ${Math.round(peso * ef.DEF)}`;
+  }
+  if (l === 'del') {
+    // Probabilidad de ser el tirador con los MED y DEL que hay ahora en el campo
+    const vista = { med: borrador.med.filter(Boolean).map(id => efectiva(porId.get(id))),
+                    del: borrador.del.filter(Boolean).map(id => efectiva(porId.get(id))) };
+    const p = probabilidadesTirador(vista).find(x => x.id === c.id)?.p ?? 0;
+    return `<b>Ataque:</b> ATA ${ef.ATA} · <b>Tirador:</b> ~${Math.round(p * 100)} % de ser el elegido en cada ocasión`;
+  }
+  return `<b>Suplente</b> (OVR ${c.ovr}): entra si se lesiona un titular · ` +
+    (borrador.orden_manual ? `es el ${i + 1}º en el orden` : 'entra el que mejor rinde en ese hueco');
+}
+
+function fichaEnHueco(c, l, i, porId) {
+  const poderes = (c.poderes ?? []).map(describirPoder);
+  return `
+    <div class="slr-ficha-hueco">
+      <div class="slr-ficha-hueco__carta">${cartaHTML(c, { tam: 's', ancho: 110, destacar: STAT[l], capitan: borrador.capitan === c.id, tocada: estaTocada(c) })}</div>
+      <div class="slr-ficha-hueco__datos">
+        <b class="slr-ficha-hueco__nombre">${esc(c.nombre)}</b>
+        <div class="slr-ficha-hueco__stats">
+          <span><small>OVR</small><b>${c.ovr}</b></span>
+          <span><small>ATA</small><b>${c.ata}</b></span><span><small>DEF</small><b>${c.def}</b></span><span><small>CON</small><b>${c.con}</b></span>
+        </div>
+        ${estaTocada(c) ? '<p class="slr-ficha-hueco__tocada">Tocada: juega al 85 % la próxima jornada</p>' : ''}
+      </div>
+    </div>
+    <p class="slr-ficha-hueco__aporte"><span>En ${DONDE[l]}</span> ${aporte(c, l, i, porId)}${borrador.capitan === c.id ? ' · ★ capitán: sus poderes saltan ×1,5' : ''}</p>
+    ${poderes.length ? `<ul class="slr-ficha-hueco__poderes">${poderes.map(p => `
+      <li><b>${esc(p.nombre)}</b> · ${esc(p.momento)}: ${esc(p.efecto)}. <small>${esc(p.probabilidad)}</small></li>`).join('')}</ul>`
+      : '<p class="slr-suave">Sin poderes.</p>'}`;
 }
 
 function elegir(l, i, cont, ctx, porId) {
@@ -276,6 +318,7 @@ function elegir(l, i, cont, ctx, porId) {
   let avisoCapitan = false;
 
   const el = hoja(`
+    ${actual ? fichaEnHueco(porId.get(actual), l, i, porId) : ''}
     ${actual ? `<div class="slr-botones">
       ${titular ? `<button class="slr-btn ${borrador.capitan === actual ? '' : 'slr-btn--fantasma'}" type="button" data-capitan>
         ${borrador.capitan === actual ? '★ Es el capitán' : '★ Hacer capitán'}</button>` : ''}

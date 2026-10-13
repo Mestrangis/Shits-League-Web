@@ -201,7 +201,12 @@ const TABS = ['inicio', 'votacion', 'resumen', 'clasificacion', 'goleadores', 'a
 // Permite que las notificaciones enlacen a una pestaña concreta.
 function tabDesdeHash() {
   const name = decodeURIComponent(location.hash.slice(1)).toLowerCase();
-  return TABS.includes(name) ? name : null;
+  return tabsVisibles().includes(name) ? name : null;
+}
+
+// Pestañas que se ven ahora (la de Rush depende de la sesión y del acceso a la beta)
+function tabsVisibles() {
+  return TABS.filter(t => !document.querySelector(`.tab[data-tab="${t}"]`)?.hidden);
 }
 
 function initTabs() {
@@ -279,9 +284,10 @@ function initSwipeTabs() {
     if (Math.abs(dx) <= SWIPE_TAB_UMBRAL || Math.abs(dx) <= Math.abs(dy)) return;
 
     // Dedo hacia la izquierda → siguiente pestaña, que entra por la derecha
-    const i = TABS.indexOf(STATE.activeTab) + (dx < 0 ? 1 : -1);
-    if (i < 0 || i >= TABS.length) return;
-    switchTab(TABS[i], { desde: dx < 0 ? 'derecha' : 'izquierda' });
+    const tabs = tabsVisibles();
+    const i = tabs.indexOf(STATE.activeTab) + (dx < 0 ? 1 : -1);
+    if (i < 0 || i >= tabs.length) return;
+    switchTab(tabs[i], { desde: dx < 0 ? 'derecha' : 'izquierda' });
   }, { passive: true });
 }
 
@@ -626,6 +632,7 @@ async function init() {
   initTabs();
   initSeasonSelector();
   initSession();
+  if (typeof rushVerificarAcceso === 'function') rushVerificarAcceso();
   initSwipeTabs();
   initPullToRefresh();
 
@@ -663,6 +670,7 @@ async function init() {
 function onSessionChange() {
   rerenderPanel('votacion');
   rerenderPanel('rush');
+  if (typeof rushVerificarAcceso === 'function') rushVerificarAcceso();
 }
 
 document.addEventListener('DOMContentLoaded', init);

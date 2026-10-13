@@ -162,10 +162,9 @@ async function tryLogin() {
   };
   if (!nombre) return fallo('Código incorrecto');
 
-  // Rush abre su sesión con el mismo código, sin esperar: si el servidor
-  // falla, Shits League entra igual y Rush lo reintentará al pulsar JUGAR
+  // Rush abre su sesión con el mismo código al cambiar la sesión (app.js →
+  // rushVerificarAcceso), sin esperar: si el servidor falla, Shits League entra igual
   if (esBot) rushConfirmarBot();
-  else if (typeof rushActivar === 'function') rushActivar(input.value, nombre);
 
   setSessionCode(input.value.trim());
   setSessionPlayer(nombre);

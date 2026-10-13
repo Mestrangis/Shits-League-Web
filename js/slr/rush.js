@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════
    SHITS LEAGUE RUSH — modo Rush (pantalla completa)
-   Lo carga js/rush-panel.js al pulsar JUGAR: abrir({ jugador, reautenticar, sesionPerdida, alSalir }).
+   Lo carga js/rush-panel.js al pulsar JUGAR: abrir({ jugador, reautenticar, sesionPerdida, sinAcceso, alSalir }).
    · Capa por encima de la app, con barra superior (saldo, salir) e inferior
      (Inicio, Plantilla, Mercado, Liga, Perfil).
    · history.pushState al entrar: el botón atrás cierra primero las hojas
@@ -88,12 +88,16 @@ async function cargarYo() {
     // La sesión de Rush es de otra persona: otra sesión en silencio con el
     // código guardado; si tampoco encaja, se cierra la sesión de Shits League
     borrarToken();
-    if (await opciones.reautenticar()) yo = await rpc('slr_yo', {}, { silencioso: true });
+    if (await opciones.reautenticar() === 'ok') yo = await rpc('slr_yo', {}, { silencioso: true });
     if (!mismoNombre(yo.usuario.nombre, datos.jugador)) {
       borrarToken();
       opciones.sesionPerdida();
       throw new ErrorSesion('La sesión de Rush no coincide con la de Shits League');
     }
+  }
+  if (!yo.tiene_acceso) {
+    opciones.sinAcceso();
+    throw new ErrorSesion('Sin acceso a la beta de Rush');
   }
   datos.yo = yo;
   const prueba = ES_LOCAL ? yo.ligas.find(l => l.es_prueba) : null;
@@ -250,7 +254,7 @@ function cerrar() {
 export async function abrir(op) {
   opciones = op;
   datos.jugador = op.jugador;
-  configurarSesion({ reautenticar: op.reautenticar, sesionPerdida: op.sesionPerdida });
+  configurarSesion({ reautenticar: op.reautenticar, sesionPerdida: op.sesionPerdida, sinAcceso: op.sinAcceso });
   if (!raiz) construir();
   pintarCargando();
   try {

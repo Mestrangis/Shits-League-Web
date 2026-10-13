@@ -56,6 +56,8 @@ export function toast(texto, tipo = 'info') {
   if (!zona) zona = contenedor().appendChild(crear('<div class="slr-toasts" role="status" aria-live="polite"></div>'));
   const t = crear(`<div class="slr-toast slr-toast--${tipo}">${esc(texto)}</div>`);
   zona.appendChild(t);
+  // Como mucho 3 a la vez: los más antiguos se van
+  while (zona.children.length > 3) zona.firstElementChild.remove();
   setTimeout(() => t.classList.add('slr-toast--fuera'), tipo === 'error' ? 5200 : 3200);
   setTimeout(() => t.remove(), tipo === 'error' ? 5600 : 3600);
 }

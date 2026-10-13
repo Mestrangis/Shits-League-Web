@@ -179,6 +179,67 @@ Puntos que ni la especificación ni el encargo fijaban del todo y que el motor r
   - **Otros comportamientos:** el clic que llega tras soltar se ignora, así que un toque corto sigue abriendo la hoja de siempre. El botón atrás cancela el arrastre. Si el capitán sale del once (al banquillo o fuera), pierde la capitanía con un aviso.
   - **Prueba:** `node tests/slr/banco/alineacion.mjs` lo prueba en Chrome headless con ratón y táctil.
 
+## Beta cerrada y modo pruebas
+
+### Decisiones de Marcos
+
+- **Rush solo para la beta.** Pueden usarlo quienes tengan `usuarios.beta = true` (al principio, Marcos y Nicolás), o cualquiera si el ajuste `rush_publico` es `true`. Sin sesión de Shits League, o con sesión pero sin acceso, la pestaña Rush no aparece y el swipe entre pestañas no cuenta con ella. Los bots de los tests y las ligas de prueba no se ven afectados.
+- **Modo pruebas para el admin** (`ligas.config.modo_beta`, activado en la liga principal por ahora):
+  - jugar la siguiente jornada al momento;
+  - añadir y quitar equipos bot;
+  - reiniciar la liga entera.
+- **Amistosos** desde la clasificación, contra cualquier rival.
+- **Crónica en texto** de cada partido jugado o amistoso, hasta que llegue el reproductor.
+- **La hoja del hueco** muestra arriba la carta, sus stats, sus poderes y qué aporta en ese puesto; la lista para elegir muestra también las tres stats.
+
+### Cómo dar acceso o abrir Rush a todos
+
+- **Dar acceso a alguien:** en el panel de Supabase, *Table Editor → usuarios*, buscar su fila y poner la columna `beta` a `true`. La próxima vez que abra la app (o al iniciar sesión) le aparece la pestaña Rush.
+- **Quitar el acceso:** poner `beta` a `false`. La pestaña desaparece la próxima vez que abra la app, y si la tenía abierta, Rush se cierra en cuanto haga cualquier acción.
+- **Abrir Rush a todos:** *Table Editor → ajustes*, fila `rush_publico`, poner `valor` a `true`. Para volver a la beta cerrada, `false`.
+- **El modo pruebas de la liga** se quita en *Table Editor → ligas → config*, cambiando `"modo_beta": true` por `false` o borrando la clave.
+- Son cambios de datos, no de esquema, así que se hacen a mano en el panel sin migración.
+
+### Decisiones mías
+
+- **Acceso en el servidor:**
+  - `tiene_acceso(usuario)` es `rush_publico` o `beta` o `es_bot`; así los bots de los tests y los del modo pruebas siempre entran.
+  - Todas las `slr_*` lo exigen a través de `sesion_usuario`, con un código de error propio (`RUSH0`) para que la web lo distinga de una sesión caducada.
+  - `slr_login` no da sesión sin acceso: devuelve `tiene_acceso: false`.
+  - `slr_yo` responde siempre con una sesión válida (usa `sesion_sin_acceso`) para que la web sepa si mostrar la pestaña.
+  - `ajustes` es legible por todos y solo se cambia desde el panel.
+- **Acceso en la web:**
+  - La pestaña arranca oculta en el HTML. `rush-panel.js` la muestra al instante si el último valor guardado (`RUSH_ACCESO`, ligado al nombre del jugador) era `true`, y luego lo confirma con `slr_yo` o con el login silencioso.
+  - El login de Shits League ya no abre la sesión de Rush por su cuenta: lo hace esa verificación, que se lanza en cada cambio de sesión.
+  - Si una llamada devuelve `RUSH0`, Rush se cierra y la pestaña desaparece, sin cerrar la sesión de Shits League.
+  - Un enlace `#rush` solo abre la pestaña si es visible.
+- **Bots del modo pruebas:**
+  - Son usuarios internos (`usuarios.interno`, `es_bot`), sin código ni login. Se unen con `slr_unirse_liga` mediante una sesión temporal que se borra en el acto, así que reciben la misma plantilla inicial y la misma alineación que cualquiera.
+  - Antes de cada cierre (en `cerrar_jornada`, el mismo código que el cron) su alineación se rehace con `crear_alineacion_por_defecto`. Como queda marcada `automatica`, no cobran el bonus de participación.
+  - Quitar un bot borra su equipo y su usuario, y sus cartas quedan libres.
+  - Nombres de equipo de una lista fija (Robots United, Atlético Silicio, Real Algoritmo…).
+- **Jugar la jornada ahora:** la simulación la hace la Edge Function de forma asíncrona, así que `slr_admin_jugar_jornada` va por pasos y es idempotente:
+  - programada → la cierra (igual que el cron) y pide la simulación, y devuelve `simulando`;
+  - cerrada → vuelve a pedir la simulación si lleva más de 20 s esperando;
+  - simulada → la publica con cobros, lesiones y bonus reales, y devuelve `publicada`.
+  - La web la llama cada 1,5 s hasta `publicada`. Las fechas de las jornadas siguientes no cambian.
+- **Reiniciar beta:**
+  - Borra todas las filas con `liga_id` de esa liga (y en cascada lo que cuelga de ellas) y los usuarios de sus bots.
+  - Vuelve a crear un ejemplar libre de cada diseño y deja la liga en preparación, temporada 1.
+  - El historial empieza con el aviso del reinicio.
+  - Las ligas de prueba nacen siempre en modo pruebas.
+- **Amistosos:** sin temporada, la clasificación lista igualmente los equipos para poder jugarlos. Los últimos 8 aparecen en el calendario.
+- **Crónica:** la crónica no guarda las jugadas. Se reproduce el partido en el navegador con `simularPartido(alineaciones congeladas, semilla)` y las jugadas salen de esos eventos. Si el marcador reproducido no es el guardado, o la versión del motor es otra, se avisa en la propia crónica.
+- **Aporte en el puesto** (hoja del hueco):
+  - MED: posesión con su CON, y ataque y defensa con el 30 % de su ATA y su DEF;
+  - DEL: su ATA y la probabilidad de ser el tirador con los MED y DEL que hay en el campo en ese momento (`probabilidadesTirador`);
+  - DEF y POR: su DEF;
+  - banquillo: cuándo entraría.
+  - Las cifras son las efectivas (tocada al 85 %).
+- **Pruebas:**
+  - `node tests/slr/api-paso5.mjs`: acceso, bots, temporada completa a golpe de botón, amistoso contra un bot y reinicio.
+  - La pestaña según el acceso, el modo pruebas en la interfaz, la crónica y la ficha del hueco se probaron en Chrome headless. Para el caso "con sesión pero sin beta" se usó Bot Tres como humano durante la prueba (`es_bot = false`) y se restauró al terminar.
+
 ## Balance de referencia (motor v1.1.0)
 
 `node tests/slr/balance.mjs`, 10.000 partidos por escenario:

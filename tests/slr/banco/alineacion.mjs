@@ -40,9 +40,15 @@ async function navegador(movil) {
   await cdp('Page.enable');
   await cdp('Page.navigate', { url: 'http://localhost:3000/' });
   await dormir(1500);
-  await ev(`localStorage.setItem('SESSION_PLAYER', 'Bot Uno'); localStorage.setItem('SESSION_CODE', ${JSON.stringify(env.SLR_BOT_UNO_CODIGO)}); 0`);
+  await ev(`localStorage.setItem('SESSION_PLAYER', 'Bot Uno'); localStorage.setItem('SESSION_CODE', ${JSON.stringify(env.SLR_BOT_UNO_CODIGO)});
+    localStorage.setItem('RUSH_ACCESO', JSON.stringify({ jugador: 'Bot Uno', acceso: true })); 0`);   // ya había entrado antes
   await cdp('Page.navigate', { url: 'http://localhost:3000/#rush' });
-  for (let i = 0; i < 50 && !(await ev(`!!document.getElementById('rushJugar')`)); i++) await dormir(200);
+  await cdp('Page.reload', {});   // cambiar solo el hash no recarga: hace falta para leer la sesión
+  for (let i = 0; i < 150 && !(await ev(`!!document.getElementById('rushJugar')`)); i++) await dormir(200);
+  if (!(await ev(`!!document.getElementById('rushJugar')`))) {
+    throw new Error('Sin botón JUGAR: ' + JSON.stringify(await ev(`({ hash: location.hash, activa: document.querySelector('.tab.active')?.dataset.tab,
+      oculta: document.querySelector('.tab[data-tab="rush"]').hidden, acceso: localStorage.getItem('RUSH_ACCESO'), jugador: localStorage.getItem('SESSION_PLAYER') })`)));
+  }
   await ev(`document.getElementById('rushJugar').click(); 0`);
   for (let i = 0; i < 50 && !(await ev(`!!document.querySelector('.slr-nav:not([hidden])')`)); i++) await dormir(200);
   await ev(`import('/js/slr/rush.js').then(m => m.navegar('alineacion')).then(() => 0)`);
@@ -65,6 +71,7 @@ const ESTADO = `(() => {
 })()`;
 const centro = sel => `(() => { const el = document.querySelector(${JSON.stringify(sel)}); el.scrollIntoView({ block: 'center' }); const r = el.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`;
 
+try {
 /* ── Escritorio: ratón ─────────────────────────────────────────────────── */
 console.log('\nEscritorio (ratón)');
 {
@@ -243,7 +250,12 @@ console.log('\nMóvil 390×844 (táctil)');
   ch.kill();
 }
 
-await rpc('slr_borrar_liga', { token: t, liga_id: liga.id });
-await rpc('slr_logout', { token: t });
+} catch (e) {
+  mal++;
+  console.log(`  ✖ Error inesperado: ${e.message.slice(0, 300)}`);
+} finally {
+  await rpc('slr_borrar_liga', { token: t, liga_id: liga.id });
+  await rpc('slr_logout', { token: t });
+}
 console.log(`\n${ok}/${ok + mal} comprobaciones correctas`);
 process.exit(mal ? 1 : 0);

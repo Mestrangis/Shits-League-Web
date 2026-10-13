@@ -7,6 +7,7 @@
    Rush nunca pide el código: ante un 403 (sesión caducada) se abre otra
    sesión en silencio con el código guardado y se repite la llamada una vez.
    Si el código ya no vale, sesionPerdida() cierra la sesión de Shits League.
+   Sin acceso a la beta (error RUSH0 del servidor), sinAcceso() cierra Rush.
 ═══════════════════════════════════════════════ */
 import { SUPABASE_URL, SUPABASE_KEY } from './config.js';
 import { toast } from './ui.js';
@@ -15,10 +16,11 @@ export const TOKEN_KEY = 'SLR_TOKEN';
 
 export class ErrorSesion extends Error {}
 
-let ganchos = { reautenticar: async () => false, perdida: () => {} };
-export function configurarSesion({ reautenticar, sesionPerdida }) {
-  ganchos = { reautenticar, perdida: sesionPerdida };
+let ganchos = { reautenticar: async () => 'perdida', perdida: () => {}, sinAcceso: () => {} };
+export function configurarSesion({ reautenticar, sesionPerdida, sinAcceso }) {
+  ganchos = { reautenticar, perdida: sesionPerdida, sinAcceso };
 }
+const SIN_ACCESO = 'Shits League Rush está en beta cerrada y todavía no tienes acceso.';
 
 export function token() {
   try { return localStorage.getItem(TOKEN_KEY); } catch { return null; }
@@ -35,12 +37,13 @@ async function leerRespuesta(r) {
 // 403: nueva sesión silenciosa. true → repetir la llamada; si no, lanza.
 async function renovar(mensaje) {
   borrarToken();
-  let ok;
-  try { ok = await ganchos.reautenticar(); } catch {
+  let r;
+  try { r = await ganchos.reautenticar(); } catch {
     toast('Sin conexión con el servidor', 'error');
     throw new Error('Sin conexión');
   }
-  if (ok) return true;
+  if (r === 'ok') return true;
+  if (r === 'sin_acceso') { ganchos.sinAcceso(); throw new ErrorSesion(SIN_ACCESO); }
   ganchos.perdida();
   throw new ErrorSesion(mensaje || 'Tu sesión ha caducado');
 }
@@ -72,6 +75,7 @@ export async function rpc(fn, args = {}, { silencioso = false } = {}) {
     throw err;
   }
   const datos = await leerRespuesta(r);
+  if (datos?.code === 'RUSH0') { ganchos.sinAcceso(); throw new ErrorSesion(datos.message); }
   if (!r.ok) {
     const e = new Error(datos?.message || `Error en ${fn}`);
     if (!silencioso) toast(e.message, 'error');
@@ -105,6 +109,7 @@ export async function funcion(cuerpo) {
     throw new Error('Sin conexión');
   }
   const datos = await leerRespuesta(r);
+  if (datos?.error === SIN_ACCESO) { ganchos.sinAcceso(); throw new ErrorSesion(datos.error); }
   if (!r.ok) {
     const e = new Error(datos?.error || 'Error en el servidor');
     toast(e.message, 'error');

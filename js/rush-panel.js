@@ -3,9 +3,13 @@
    Pestaña "Rush": portada ligera de Shits League Rush y el puente con la
    sesión de Shits League (session.js). Aquí no hay nada del juego: el modo
    Rush (js/slr/rush.js + css/slr.css) se carga al pulsar JUGAR.
+   Rush está en beta: la pestaña solo aparece con sesión y acceso. El acceso lo
+   dice el servidor (slr_yo / slr_login → tiene_acceso) y se guarda en
+   localStorage para que al arrancar no parpadee.
 ═══════════════════════════════════════════════ */
 
 const RUSH_TOKEN_KEY = 'SLR_TOKEN';
+const RUSH_ACCESO_KEY = 'RUSH_ACCESO';   // { jugador, acceso }: último valor conocido
 // Solo en local se aceptan los códigos de los bots de prueba (validados en el servidor)
 const RUSH_ES_LOCAL  = ['localhost', '127.0.0.1'].includes(location.hostname);
 
@@ -49,21 +53,52 @@ function rushMismoNombre(a, b) {
   return !!a && n(a) === n(b);
 }
 
-/* ── Puente con session.js ───────────────────────────────────────────────── */
-// Tras un código válido de Shits League: abre también la sesión de Rush con el
-// mismo código. Nunca lanza: si el servidor falla, Shits League entra igual.
-async function rushActivar(codigo, nombre) {
+/* ── Acceso (beta) ───────────────────────────────────────────────────────── */
+function rushAccesoGuardado() {
   try {
-    const r = await rushRpc('slr_login', { codigo: (codigo || '').trim() });
-    if (!rushMismoNombre(r.usuario?.nombre, nombre)) {
-      rushRpc('slr_logout', { token: r.token }).catch(() => {});
-      return false;
+    const a = JSON.parse(localStorage.getItem(RUSH_ACCESO_KEY) || 'null');
+    return a && a.jugador === getSessionPlayer() ? a.acceso : null;
+  } catch { return null; }
+}
+
+// Muestra u oculta la pestaña; si se oculta estando en ella, se vuelve a Inicio
+function rushMostrarPestana(visible) {
+  const tab = document.querySelector('.tab[data-tab="rush"]');
+  if (!tab || tab.hidden === !visible) return;
+  tab.hidden = !visible;
+  if (!visible && typeof STATE !== 'undefined' && STATE.activeTab === 'rush') switchTab('inicio');
+}
+
+function rushGuardarAcceso(acceso) {
+  try {
+    if (getSessionPlayer()) localStorage.setItem(RUSH_ACCESO_KEY, JSON.stringify({ jugador: getSessionPlayer(), acceso: !!acceso }));
+    else localStorage.removeItem(RUSH_ACCESO_KEY);
+  } catch { /* sin persistencia */ }
+  rushMostrarPestana(!!acceso && !!getSessionPlayer());
+}
+
+// Al arrancar y en cada cambio de sesión (app.js): primero lo guardado, sin
+// esperar a la red, y luego lo que diga el servidor
+async function rushVerificarAcceso() {
+  const jugador = getSessionPlayer();
+  // Sin código guardado es una sesión antigua: session.js la cierra
+  if (!jugador || !getSessionCode()) { rushMostrarPestana(false); return; }
+  rushMostrarPestana(rushAccesoGuardado() === true);
+  try {
+    const token = rushToken();
+    if (token) {
+      try {
+        const yo = await rushRpc('slr_yo', { token });
+        if (rushMismoNombre(yo.usuario?.nombre, jugador)) { rushGuardarAcceso(yo.tiene_acceso); return; }
+      } catch (e) {
+        if (e.status !== 403) throw e;
+      }
+      rushGuardarToken(null);
     }
-    rushGuardarToken(r.token);
-    return true;
+    const r = await rushReautenticar();
+    if (r === 'perdida') rushSesionPerdida();
   } catch (e) {
-    console.warn('[rush] No se pudo activar Rush:', e.message);
-    return false;
+    console.warn('[rush] No se pudo comprobar el acceso:', e.message);   // se queda lo guardado
   }
 }
 
@@ -88,28 +123,37 @@ function rushConfirmarBot() {
 }
 
 // Sesión de Rush en silencio con el código guardado (SESSION_CODE). Rush nunca
-// pide el código: lo usa al pulsar JUGAR sin token y ante un 403.
-//   true  → token nuevo guardado
-//   false → el código ya no vale (o es de otra persona): hay que volver a entrar
-//   lanza → sin conexión (no se cierra la sesión por eso)
+// pide el código: lo usa sin token y ante un 403.
+//   'ok'         → token nuevo guardado
+//   'sin_acceso' → el código vale pero el jugador no está en la beta
+//   'perdida'    → el código ya no vale (o es de otra persona): hay que volver a entrar
+//   lanza        → sin conexión (no se cierra la sesión por eso)
 let rushReautenticando = null;
 function rushReautenticar() {
   return (rushReautenticando ??= (async () => {
     const codigo = getSessionCode(), nombre = getSessionPlayer();
-    if (!codigo || !nombre) return false;
+    if (!codigo || !nombre) return 'perdida';
     try {
       const r = await rushRpc('slr_login', { codigo });
       if (!rushMismoNombre(r.usuario?.nombre, nombre)) {
-        rushRpc('slr_logout', { token: r.token }).catch(() => {});
-        return false;
+        if (r.token) rushRpc('slr_logout', { token: r.token }).catch(() => {});
+        return 'perdida';
       }
+      if (!r.tiene_acceso) { rushGuardarAcceso(false); return 'sin_acceso'; }
       rushGuardarToken(r.token);
-      return true;
+      rushGuardarAcceso(true);
+      return 'ok';
     } catch (e) {
-      if (e.status === 403) return false;   // «Código incorrecto»
+      if (e.status === 403) return 'perdida';   // «Código incorrecto»
       throw e;
     }
   })().finally(() => { rushReautenticando = null; }));
+}
+
+// El servidor dice que ya no hay acceso (beta): se cierra Rush y se quita la pestaña
+async function rushSinAcceso() {
+  if (rushModulo) (await rushModulo).salir();
+  rushGuardarAcceso(false);
 }
 
 // El código guardado ya no sirve: se cierra la sesión y se entra de nuevo con
@@ -123,6 +167,7 @@ async function rushSesionPerdida() {
 function rushCerrarSesion() {
   const token = rushToken();
   rushGuardarToken(null);
+  try { localStorage.removeItem(RUSH_ACCESO_KEY); } catch { /* sin persistencia */ }
   if (token) rushRpc('slr_logout', { token }).catch(() => {});
 }
 
@@ -219,7 +264,11 @@ async function rushJugar() {
   const btn = document.getElementById('rushJugar');
   if (btn) { btn.disabled = true; btn.textContent = 'CARGANDO…'; }
   try {
-    if (!rushToken() && !(await rushReautenticar())) { rushSesionPerdida(); return; }
+    if (!rushToken()) {
+      const r = await rushReautenticar();
+      if (r === 'perdida') { rushSesionPerdida(); return; }
+      if (r === 'sin_acceso') return;          // la pestaña ya se ha ocultado
+    }
     const [mod] = await Promise.all([
       rushModulo ??= import(rushRuta('js/slr/rush.js')),
       rushCargarCss(),
@@ -228,6 +277,7 @@ async function rushJugar() {
       jugador: getSessionPlayer(),
       reautenticar: rushReautenticar,
       sesionPerdida: rushSesionPerdida,
+      sinAcceso: rushSinAcceso,
       alSalir: () => rerenderPanel('rush'),
     });
   } catch (e) {
@@ -237,3 +287,6 @@ async function rushJugar() {
   }
   if (btn?.isConnected) { btn.disabled = false; btn.textContent = 'JUGAR'; }
 }
+
+// Primer pintado de la pestaña con lo guardado (el script va al final del body)
+rushMostrarPestana(!!getSessionPlayer() && !!getSessionCode() && rushAccesoGuardado() === true);

@@ -645,6 +645,29 @@ html.slr-abierto, html.slr-abierto body { overflow: hidden; }
 }
 .slr-hueco__previsto.es-mal { background: var(--slr-rival); font-size: 12px; }
 
+/* Cabecera de la hoja del hueco: la carta que hay y qué aporta ahí */
+.slr-ficha-hueco { display: grid; grid-template-columns: 96px 1fr; gap: 14px; align-items: center; }
+.slr-ficha-hueco__nombre { font-family: 'Anton', sans-serif; font-weight: 400; font-size: 21px; text-transform: uppercase; letter-spacing: .02em; display: block; margin-bottom: 8px; }
+.slr-ficha-hueco__stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.slr-ficha-hueco__stats span { display: flex; flex-direction: column; align-items: center; padding: 6px 2px; border-radius: 9px; background: rgba(3,12,7,.55); }
+.slr-ficha-hueco__stats small { font-size: 9.5px; font-weight: 800; letter-spacing: .1em; color: var(--slr-suave); }
+.slr-ficha-hueco__stats b { font-family: 'Anton', sans-serif; font-weight: 400; font-size: 19px; }
+.slr-ficha-hueco__stats span:first-child b { color: var(--slr-propio); }
+.slr-ficha-hueco__tocada { margin-top: 6px; font-size: 12px; color: #FF9C9C; }
+.slr-ficha-hueco__aporte {
+  padding: 10px 12px; border-radius: 12px; background: rgba(57,255,136,.07); border: 1px solid rgba(57,255,136,.2);
+  font-size: 13px; line-height: 1.55;
+}
+.slr-ficha-hueco__aporte > span:first-child {
+  display: inline-block; margin-right: 6px; padding: 1px 8px; border-radius: 999px;
+  background: var(--slr-propio); color: #04130A; font-size: 11px; font-weight: 800;
+}
+.slr-ficha-hueco__aporte b { color: var(--slr-propio); font-weight: 700; }
+.slr-ficha-hueco__poderes { list-style: none; display: flex; flex-direction: column; gap: 5px; font-size: 13px; line-height: 1.45; }
+.slr-ficha-hueco__poderes b { color: var(--slr-oro); }
+.slr-ficha-hueco__poderes small { color: var(--slr-suave); font-size: 11.5px; }
+.slr-lista-cartas__stats { font-size: 11px; font-weight: 600; color: #C9E8D5; letter-spacing: .02em; }
+
 .slr-lista-cartas__titulo { margin: 8px 0 2px; display: flex; align-items: baseline; gap: 8px; }
 .slr-lista-cartas__titulo small { font-family: 'Sora', sans-serif; font-size: 12px; letter-spacing: 0; color: var(--slr-suave); }
 .slr-lista-cartas__texto small strong { color: var(--slr-oro); font-weight: 800; }
@@ -695,6 +718,47 @@ html.slr-abierto, html.slr-abierto body { overflow: hidden; }
 .slr-cruce b { font-family: 'Anton', sans-serif; font-weight: 400; font-size: 20px; color: #fff; min-width: 54px; text-align: center; }
 .slr-cruce.es-mio { box-shadow: inset 0 0 0 1px rgba(57,255,136,.35); }
 .slr-jornada__descansa { font-size: 12px; color: var(--slr-suave); }
+.slr-amistoso {
+  margin-top: 5px; padding: 3px 9px; border-radius: 999px;
+  border: 1px solid rgba(255,138,61,.5) !important; color: var(--slr-rival) !important;
+  font-size: 10.5px; font-weight: 800; letter-spacing: .04em;
+}
+.slr-amistoso.slr-esperando { opacity: .5; }
+
+/* Crónica */
+.slr-cronica { display: flex; flex-direction: column; gap: 10px; }
+.slr-cronica__tipo { font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--slr-suave); text-align: center; }
+.slr-cronica__marcador { padding: 8px 0; }
+.slr-cronica__prev { text-align: center; }
+.slr-cronica__jugadas { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.slr-cronica__jugadas li {
+  display: grid; grid-template-columns: 54px 1fr; gap: 8px;
+  padding: 9px 10px; border-radius: 10px; background: rgba(3,12,7,.5);
+  border-left: 3px solid rgba(255,255,255,.12); font-size: 13px; line-height: 1.5;
+}
+.slr-cronica__jugadas li.es-gol { background: rgba(57,255,136,.1); }
+.slr-cronica__jugadas time { font-family: 'Anton', sans-serif; font-size: 14px; color: var(--slr-suave); }
+.slr-cronica__gol { color: var(--slr-propio); font-family: 'Anton', sans-serif; font-weight: 400; letter-spacing: .04em; }
+.slr-cronica__poder { color: var(--slr-oro); }
+.slr-cronica__lesion { color: #FF9C9C; }
+.slr-cronica__final { font-family: 'Anton', sans-serif; font-size: 16px; letter-spacing: .04em; text-align: center; padding-top: 4px; }
+.slr-cronica__lesiones { list-style: none; font-size: 13px; display: flex; flex-direction: column; gap: 4px; }
+.slr-cronica__alineaciones { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.slr-cronica__equipo h4 { font-family: 'Anton', sans-serif; font-weight: 400; font-size: 16px; text-transform: uppercase; letter-spacing: .03em; overflow-wrap: anywhere; }
+.slr-cronica__equipo h4 small { font-family: 'Sora', sans-serif; font-size: 11px; color: var(--slr-suave); }
+.slr-cronica__linea { margin-top: 8px; font-size: 10px; font-weight: 800; letter-spacing: .1em; color: var(--slr-suave); }
+.slr-cronica__equipo ul { list-style: none; }
+.slr-cronica__equipo li { display: flex; justify-content: space-between; gap: 6px; font-size: 12.5px; padding: 2px 0; }
+.slr-cronica__equipo li small { color: #FF9C9C; font-size: 10px; }
+.slr-cronica__equipo li b { font-family: 'Anton', sans-serif; font-weight: 400; }
+.slr-cronica__c { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: var(--slr-oro); color: #2a1a00; font-size: 10px; }
+.slr-cronica__pr { list-style: none; display: flex; flex-direction: column; }
+.slr-cronica__pr li { display: grid; grid-template-columns: 1fr auto 44px 56px; gap: 8px; align-items: baseline; padding: 6px 0; border-top: 1px solid rgba(31,224,101,.07); font-size: 13px; }
+.slr-cronica__pr small { font-size: 11px; color: var(--slr-suave); }
+.slr-cronica__pr b { font-family: 'Anton', sans-serif; font-weight: 400; font-size: 16px; text-align: right; }
+.slr-cronica__pr b.es-bien { color: var(--slr-propio); }
+.slr-cronica__pr b.es-mal { color: var(--slr-rival); }
+.slr-cronica__pr em { font-style: normal; font-size: 11px; color: var(--slr-suave); text-align: right; }
 
 /* ── Perfil ──────────────────────────────────────────────────────────────── */
 .slr-perfil { display: flex; align-items: center; gap: 16px; }
@@ -733,6 +797,24 @@ html.slr-abierto, html.slr-abierto body { overflow: hidden; }
 .slr-miembros li span { color: var(--slr-suave); font-size: 12px; }
 .slr-admin__acciones { display: flex; flex-direction: column; gap: 8px; }
 .slr-admin .slr-subtitulo { margin-top: 4px; }
+
+/* Modo pruebas: bien separado del panel normal */
+.slr-pruebas {
+  border: 1.5px dashed rgba(255,138,61,.6);
+  background: repeating-linear-gradient(-45deg, rgba(255,138,61,.05) 0 12px, transparent 12px 24px), var(--slr-tarjeta);
+}
+.slr-pruebas .slr-tarjeta__cabeza > span:first-child { color: var(--slr-rival); }
+.slr-btn--pruebas {
+  background: transparent !important;
+  color: var(--slr-rival) !important;
+  border: 1px solid rgba(255,138,61,.55) !important;
+  box-shadow: none;
+}
+.slr-pruebas__progreso:empty { display: none; }
+.slr-btn.slr-esperando .slr-pruebas__progreso {
+  position: absolute; inset: auto 0 -22px; color: var(--slr-rival);
+  font-family: 'Sora', sans-serif; font-size: 12px; letter-spacing: 0; text-transform: none;
+}
 
 /* ═══════════════════════════════════════════════
    LA CARTA (componente: js/slr/carta.js)

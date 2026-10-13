@@ -2,7 +2,9 @@
    SHITS LEAGUE RUSH — Perfil
    Nombre y avatar de la sesión de Shits League, equipo, saldo y movimientos.
    Cambiar el nombre del equipo. El administrador de la liga ve además su
-   panel: miembros, iniciar temporada, pausar/reanudar, aplazar y terminar.
+   panel: miembros, iniciar temporada, pausar/reanudar, aplazar y terminar, y
+   con ligas.config.modo_beta, el "Modo pruebas": jugar la jornada ya, añadir y
+   quitar bots y reiniciar la liga.
 ═══════════════════════════════════════════════ */
 import { rpc, leer } from '../api.js';
 import { esc, miles, monedas, conSigno, fechaHora, diaHora, confirmar, conEspera, toast, hoja, cerrarCapa } from '../ui.js';
@@ -28,7 +30,10 @@ export async function panelAdmin(cont, ctx) {
   const { datos, recargar } = ctx;
   const liga = datos.liga, info = datos.ligaInfo ?? liga;
   const estado = info.estado;
-  const miembros = await leer(`equipos?select=id,nombre,saldo,creado_en,usuarios(nombre)&liga_id=eq.${liga.id}&order=creado_en`);
+  const miembros = await leer(`equipos?select=id,nombre,saldo,creado_en,usuarios(nombre,interno)&liga_id=eq.${liga.id}&order=creado_en`);
+  const bots = miembros.filter(m => m.usuarios?.interno);
+  const modoBeta = info.config?.modo_beta === true;
+  const sinTemporada = ['preparacion', 'entre_temporadas'].includes(estado);
   const j = proximaJornada();
 
   const ACCIONES = [
@@ -53,12 +58,26 @@ export async function panelAdmin(cont, ctx) {
       <div class="slr-tarjeta__cabeza"><span>Administración</span><span class="slr-estado-liga">${esc(ESTADOS_LIGA[estado] ?? estado)}</span></div>
       <h3 class="slr-subtitulo">Miembros (${miembros.length})</h3>
       <ul class="slr-miembros">${miembros.map(m => `
-        <li><b>${esc(m.nombre)}</b><span>${esc(m.usuarios?.nombre ?? '')}</span>${monedas(m.saldo)}</li>`).join('') || '<li class="slr-suave">Nadie se ha unido todavía.</li>'}</ul>
+        <li><b>${m.usuarios?.interno ? '🤖 ' : ''}${esc(m.nombre)}</b><span>${m.usuarios?.interno ? 'bot de pruebas' : esc(m.usuarios?.nombre ?? '')}</span>${monedas(m.saldo)}</li>`).join('') || '<li class="slr-suave">Nadie se ha unido todavía.</li>'}</ul>
       ${j ? `<p class="slr-suave">Próxima jornada: ${j.numero}, cierre el ${esc(diaHora(j.cierre_en))}.</p>` : ''}
       <div class="slr-admin__acciones">
         ${ACCIONES.filter(a => a.si).map(a => `<button class="slr-btn ${a.peligro ? 'slr-btn--peligro' : 'slr-btn--fantasma'}" type="button" data-accion="${a.id}">${esc(a.texto)}</button>`).join('')}
       </div>
-    </section>`;
+    </section>
+    ${modoBeta ? `
+    <section class="slr-tarjeta slr-pruebas">
+      <div class="slr-tarjeta__cabeza"><span>🧪 Modo pruebas</span><span>${bots.length} ${bots.length === 1 ? 'bot' : 'bots'}</span></div>
+      <p class="slr-suave">Herramientas para probar la beta. Los bots no tocan el mercado y su alineación (la mejor 2-2-2) se rehace sola antes de cada cierre.</p>
+      <div class="slr-admin__acciones">
+        ${estado === 'en_curso' && j ? `<button class="slr-btn slr-btn--pruebas" type="button" data-pruebas="jugar">▶ Jugar la jornada ${j.numero} ahora</button>` : ''}
+        ${sinTemporada ? '<button class="slr-btn slr-btn--pruebas" type="button" data-pruebas="anadir">+ Añadir bot</button>' : ''}
+        ${sinTemporada && bots.length ? `<button class="slr-btn slr-btn--pruebas" type="button" data-pruebas="quitar">− Quitar bot (${esc(bots[bots.length - 1].nombre)})</button>` : ''}
+        <button class="slr-btn slr-btn--peligro" type="button" data-pruebas="reiniciar">Reiniciar beta</button>
+      </div>
+      ${!sinTemporada ? '<p class="slr-suave">Los bots se añaden o quitan antes de empezar la temporada o entre temporadas.</p>' : ''}
+    </section>` : ''}`;
+
+  cont.querySelectorAll('[data-pruebas]').forEach(b => b.addEventListener('click', () => accionPruebas(b, ctx)));
 
   cont.querySelectorAll('[data-accion]').forEach(b => b.addEventListener('click', async () => {
     const a = ACCIONES.find(x => x.id === b.dataset.accion);
@@ -93,6 +112,56 @@ function renombrar(ctx) {
       ctx.pintar();
     }).catch(() => {});
   });
+}
+
+/* ── Modo pruebas ────────────────────────────────────────────────────────── */
+const dormir = ms => new Promise(r => setTimeout(r, ms));
+
+// Juega la siguiente jornada ya: el servidor la cierra, la Edge Function la
+// simula (asíncrono) y se publica en cuanto está; se repite hasta 'publicada'
+async function jugarJornada(boton, liga) {
+  for (let i = 0; i < 60; i++) {
+    const r = await rpc('slr_admin_jugar_jornada', { liga_id: liga });
+    if (r.estado === 'sin_jornadas') return r;
+    boton.lastChild.textContent = r.estado === 'simulando' ? `Simulando la jornada ${r.jornada}…` : '';
+    if (r.estado === 'publicada') return r;
+    await dormir(1500);
+  }
+  throw new Error('La simulación está tardando demasiado: vuelve a pulsar en un momento');
+}
+
+async function accionPruebas(boton, ctx) {
+  const liga = ctx.datos.liga.id;
+  const accion = boton.dataset.pruebas;
+  if (accion === 'reiniciar') {
+    const ok = await confirmar({
+      titulo: 'Reiniciar beta',
+      texto: 'Se borran <b>todos</b> los equipos, cartas, álbumes, temporadas, partidos, mercado y movimientos de esta liga. ' +
+        'Queda en preparación con un ejemplar libre de cada carta. La liga y su configuración se conservan.',
+      ok: 'Reiniciar', peligro: true, escribir: 'REINICIAR',
+    });
+    if (!ok) return;
+  }
+  await conEspera(boton, async () => {
+    if (accion === 'jugar') {
+      boton.insertAdjacentHTML('beforeend', '<span class="slr-pruebas__progreso"></span>');
+      const r = await jugarJornada(boton, liga);
+      toast(r.estado === 'publicada'
+        ? `Jornada ${r.jornada} publicada${r.fin_temporada ? ' · ¡temporada terminada!' : ''}`
+        : 'No queda ninguna jornada por jugar', 'ok');
+    } else if (accion === 'anadir') {
+      const r = await rpc('slr_admin_anadir_bot', { liga_id: liga });
+      toast(`🤖 ${r.nombre} se une a la liga`, 'ok');
+    } else if (accion === 'quitar') {
+      const r = await rpc('slr_admin_quitar_bot', { liga_id: liga });
+      toast(`${r.quitado} deja la liga`, 'ok');
+    } else if (accion === 'reiniciar') {
+      await rpc('slr_admin_reiniciar_beta', { liga_id: liga });
+      toast('Liga reiniciada', 'ok');
+    }
+    await ctx.recargar();
+    await ctx.pintar();
+  }).catch(e => { if (e.message?.includes('tardando')) toast(e.message, 'error'); });
 }
 
 export async function pintar(cont, ctx) {
