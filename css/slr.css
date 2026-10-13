@@ -251,6 +251,7 @@ html.slr-abierto, html.slr-abierto body { overflow: hidden; }
   outline: none;
 }
 .slr-input:focus { border-color: var(--slr-propio); }
+.slr-input--grande { padding: 16px; font-size: 20px; text-align: center; }
 
 .slr-segmentos {
   display: flex;
@@ -662,6 +663,13 @@ html.slr-abierto, html.slr-abierto body { overflow: hidden; }
   background: rgba(3,12,7,.6);
 }
 .slr-perfil__equipo { font-family: 'Anton', sans-serif; font-size: 18px; letter-spacing: .04em; text-transform: uppercase; }
+.slr-perfil__nombres { min-width: 0; }
+.slr-perfil__equipo { display: flex; align-items: center; gap: 8px; overflow-wrap: anywhere; }
+.slr-perfil__editar {
+  flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%;
+  border: 1px solid rgba(57,255,136,.35) !important; color: var(--slr-propio) !important;
+  font-family: 'Sora', sans-serif; font-size: 14px; text-transform: none;
+}
 .slr-movimientos { list-style: none; display: flex; flex-direction: column; }
 .slr-movimientos li { display: flex; justify-content: space-between; gap: 10px; padding: 10px 0; border-top: 1px solid rgba(31,224,101,.07); }
 .slr-movimientos li:first-child { border-top: none; padding-top: 0; }
@@ -674,9 +682,6 @@ html.slr-abierto, html.slr-abierto body { overflow: hidden; }
 
 .slr-admin { border-color: rgba(255,201,74,.35); }
 .slr-estado-liga { padding: 3px 9px; border-radius: 999px; background: rgba(255,201,74,.13); color: var(--slr-oro); }
-.slr-codigo { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 12px; background: rgba(3,12,7,.6); }
-.slr-codigo small { font-size: 11px; color: var(--slr-suave); flex-basis: 70px; }
-.slr-codigo b { flex: 1; font-family: 'Anton', sans-serif; font-weight: 400; font-size: 28px; letter-spacing: .22em; color: #fff; }
 .slr-miembros { list-style: none; display: flex; flex-direction: column; gap: 6px; }
 .slr-miembros li { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 10px; font-size: 13px; }
 .slr-miembros li span { color: var(--slr-suave); font-size: 12px; }

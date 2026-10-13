@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════
    SHITS LEAGUE RUSH — modo Rush (pantalla completa)
-   Lo carga js/rush-panel.js al pulsar JUGAR: abrir({ jugador, pedirCodigo, alSalir }).
+   Lo carga js/rush-panel.js al pulsar JUGAR: abrir({ jugador, reautenticar, sesionPerdida, alSalir }).
    · Capa por encima de la app, con barra superior (saldo, salir) e inferior
      (Inicio, Plantilla, Mercado, Liga, Perfil).
    · history.pushState al entrar: el botón atrás cierra primero las hojas
@@ -8,7 +8,7 @@
    · El estado del jugador (liga, equipo, cartas, calendario…) vive en `datos`
      y cada pantalla lo pinta; tras una acción se recarga lo necesario.
 ═══════════════════════════════════════════════ */
-import { rpc, leer, alCaducarSesion, borrarToken, ErrorSesion } from './api.js';
+import { rpc, leer, configurarSesion, borrarToken, ErrorSesion } from './api.js';
 import { esc, miles, crear, fijarRaiz, ajustarCapas, capasAbiertas, toast } from './ui.js';
 import { normalizarCarta, iniciarAcabados, pararAcabados } from './carta.js';
 import * as previa from './pantallas/previa.js';
@@ -83,11 +83,17 @@ function mismoNombre(a, b) {
 }
 
 async function cargarYo() {
-  const yo = await rpc('slr_yo', {}, { silencioso: true });
+  let yo = await rpc('slr_yo', {}, { silencioso: true });
   if (!mismoNombre(yo.usuario.nombre, datos.jugador)) {
-    // La sesión de Rush es de otra persona: se vuelve a pedir el código
+    // La sesión de Rush es de otra persona: otra sesión en silencio con el
+    // código guardado; si tampoco encaja, se cierra la sesión de Shits League
     borrarToken();
-    throw new ErrorSesion('La sesión de Rush no coincide con la de Shits League');
+    if (await opciones.reautenticar()) yo = await rpc('slr_yo', {}, { silencioso: true });
+    if (!mismoNombre(yo.usuario.nombre, datos.jugador)) {
+      borrarToken();
+      opciones.sesionPerdida();
+      throw new ErrorSesion('La sesión de Rush no coincide con la de Shits League');
+    }
   }
   datos.yo = yo;
   const prueba = ES_LOCAL ? yo.ligas.find(l => l.es_prueba) : null;
@@ -225,6 +231,7 @@ function construir() {
 }
 
 export function salir() {
+  if (!raiz) return;
   history.go(-(capasAbiertas() + 1));   // el popstate cierra Rush
 }
 
@@ -243,16 +250,13 @@ function cerrar() {
 export async function abrir(op) {
   opciones = op;
   datos.jugador = op.jugador;
-  alCaducarSesion(() => {
-    if (main) main.innerHTML = '<div class="slr-vacio"><b>Confirma tu código</b><p>Tu sesión de Rush ha caducado.</p></div>';
-    op.pedirCodigo();
-  });
+  configurarSesion({ reautenticar: op.reautenticar, sesionPerdida: op.sesionPerdida });
   if (!raiz) construir();
   pintarCargando();
   try {
     await recargar();
   } catch (e) {
-    if (e instanceof ErrorSesion) { op.pedirCodigo(); return; }
+    if (e instanceof ErrorSesion) return;      // sesionPerdida ya ha cerrado la sesión
     main.innerHTML = `<div class="slr-vacio"><b>No se pudo cargar Rush</b><p>${esc(e.message)}</p></div>`;
     toast(e.message, 'error');
     return;

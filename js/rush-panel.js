@@ -87,6 +87,39 @@ function rushConfirmarBot() {
   return true;
 }
 
+// Sesión de Rush en silencio con el código guardado (SESSION_CODE). Rush nunca
+// pide el código: lo usa al pulsar JUGAR sin token y ante un 403.
+//   true  → token nuevo guardado
+//   false → el código ya no vale (o es de otra persona): hay que volver a entrar
+//   lanza → sin conexión (no se cierra la sesión por eso)
+let rushReautenticando = null;
+function rushReautenticar() {
+  return (rushReautenticando ??= (async () => {
+    const codigo = getSessionCode(), nombre = getSessionPlayer();
+    if (!codigo || !nombre) return false;
+    try {
+      const r = await rushRpc('slr_login', { codigo });
+      if (!rushMismoNombre(r.usuario?.nombre, nombre)) {
+        rushRpc('slr_logout', { token: r.token }).catch(() => {});
+        return false;
+      }
+      rushGuardarToken(r.token);
+      return true;
+    } catch (e) {
+      if (e.status === 403) return false;   // «Código incorrecto»
+      throw e;
+    }
+  })().finally(() => { rushReautenticando = null; }));
+}
+
+// El código guardado ya no sirve: se cierra la sesión y se entra de nuevo con
+// el modal normal de Shits League
+async function rushSesionPerdida() {
+  if (rushModulo) (await rushModulo).salir();
+  logout();
+  openSessionModal();
+}
+
 function rushCerrarSesion() {
   const token = rushToken();
   rushGuardarToken(null);
@@ -180,31 +213,27 @@ function rushCargarCss() {
   });
 }
 
-// Pide el código (modal de sesión de siempre) y, al acertar, entra al juego
-function rushPedirCodigo() {
-  rushGuardarToken(null);
-  openSessionModal({ alActivarRush: rushJugar });
-}
-
 async function rushJugar() {
   if (!getSessionPlayer()) { openSessionModal(); return; }
-  if (!rushToken()) { rushPedirCodigo(); return; }
 
   const btn = document.getElementById('rushJugar');
   if (btn) { btn.disabled = true; btn.textContent = 'CARGANDO…'; }
   try {
+    if (!rushToken() && !(await rushReautenticar())) { rushSesionPerdida(); return; }
     const [mod] = await Promise.all([
       rushModulo ??= import(rushRuta('js/slr/rush.js')),
       rushCargarCss(),
     ]);
     await mod.abrir({
       jugador: getSessionPlayer(),
-      pedirCodigo: rushPedirCodigo,
+      reautenticar: rushReautenticar,
+      sesionPerdida: rushSesionPerdida,
       alSalir: () => rerenderPanel('rush'),
     });
   } catch (e) {
     console.error('[rush] No se pudo abrir Rush:', e);
-  } finally {
-    if (btn?.isConnected) { btn.disabled = false; btn.textContent = 'JUGAR'; }
+    if (btn?.isConnected) { btn.textContent = 'SIN CONEXIÓN · REINTENTAR'; btn.disabled = false; }
+    return;
   }
+  if (btn?.isConnected) { btn.disabled = false; btn.textContent = 'JUGAR'; }
 }

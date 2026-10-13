@@ -1,11 +1,11 @@
 /* ═══════════════════════════════════════════════
    SHITS LEAGUE RUSH — Perfil
    Nombre y avatar de la sesión de Shits League, equipo, saldo y movimientos.
-   El administrador de la liga ve además su panel: código de invitación,
-   miembros, iniciar temporada, pausar/reanudar, aplazar y terminar.
+   Cambiar el nombre del equipo. El administrador de la liga ve además su
+   panel: miembros, iniciar temporada, pausar/reanudar, aplazar y terminar.
 ═══════════════════════════════════════════════ */
 import { rpc, leer } from '../api.js';
-import { esc, miles, monedas, conSigno, fechaHora, diaHora, confirmar, conEspera, toast } from '../ui.js';
+import { esc, miles, monedas, conSigno, fechaHora, diaHora, confirmar, conEspera, toast, hoja, cerrarCapa } from '../ui.js';
 import { proximaJornada } from '../rush.js';
 
 const TIPOS_MOV = {
@@ -51,9 +51,6 @@ export async function panelAdmin(cont, ctx) {
   cont.innerHTML = `
     <section class="slr-tarjeta slr-admin">
       <div class="slr-tarjeta__cabeza"><span>Administración</span><span class="slr-estado-liga">${esc(ESTADOS_LIGA[estado] ?? estado)}</span></div>
-      ${liga.codigo_invitacion ? `
-        <div class="slr-codigo"><small>Código de invitación</small><b>${esc(liga.codigo_invitacion)}</b>
-          <button class="slr-btn slr-btn--fantasma slr-btn--mini" type="button" data-copiar>Copiar</button></div>` : ''}
       <h3 class="slr-subtitulo">Miembros (${miembros.length})</h3>
       <ul class="slr-miembros">${miembros.map(m => `
         <li><b>${esc(m.nombre)}</b><span>${esc(m.usuarios?.nombre ?? '')}</span>${monedas(m.saldo)}</li>`).join('') || '<li class="slr-suave">Nadie se ha unido todavía.</li>'}</ul>
@@ -63,9 +60,6 @@ export async function panelAdmin(cont, ctx) {
       </div>
     </section>`;
 
-  cont.querySelector('[data-copiar]')?.addEventListener('click', () => {
-    navigator.clipboard?.writeText(liga.codigo_invitacion).then(() => toast('Código copiado', 'ok'), () => {});
-  });
   cont.querySelectorAll('[data-accion]').forEach(b => b.addEventListener('click', async () => {
     const a = ACCIONES.find(x => x.id === b.dataset.accion);
     if (!(await confirmar(a.confirmar))) return;
@@ -78,6 +72,29 @@ export async function panelAdmin(cont, ctx) {
   }));
 }
 
+// Hoja para cambiar el nombre del equipo (slr_renombrar_equipo)
+function renombrar(ctx) {
+  const { datos } = ctx;
+  const el = hoja(`
+    <form class="slr-form" data-form>
+      <label class="slr-campo"><span>Nombre del equipo</span>
+        <input class="slr-input" name="nombre" minlength="3" maxlength="30" value="${esc(datos.equipo.nombre)}" autocomplete="off" required></label>
+      <button class="slr-btn slr-btn--grande" type="submit">Guardar nombre</button>
+    </form>`, { titulo: 'Tu equipo' });
+  const form = el.querySelector('[data-form]');
+  setTimeout(() => form.nombre.select(), 300);
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    conEspera(form.querySelector('button'), async () => {
+      const r = await rpc('slr_renombrar_equipo', { equipo_id: datos.equipo.id, nombre: form.nombre.value });
+      toast(`Tu equipo ahora se llama ${r.nombre}`, 'ok');
+      await ctx.recargar('yo', 'liga');
+      cerrarCapa();
+      ctx.pintar();
+    }).catch(() => {});
+  });
+}
+
 export async function pintar(cont, ctx) {
   const { datos } = ctx;
   const movs = (await rpc('slr_movimientos', { equipo_id: datos.equipo.id })).slice().reverse();
@@ -85,9 +102,10 @@ export async function pintar(cont, ctx) {
   cont.innerHTML = `
     <section class="slr-perfil">
       <div class="avatar slr-perfil__avatar" data-avatar></div>
-      <div>
+      <div class="slr-perfil__nombres">
         <h1 class="slr-titulo">${esc(datos.jugador)}</h1>
-        <p class="slr-perfil__equipo slr-propio">${esc(datos.equipo.nombre)}</p>
+        <p class="slr-perfil__equipo slr-propio">${esc(datos.equipo.nombre)}
+          <button class="slr-perfil__editar" type="button" data-renombrar aria-label="Cambiar el nombre del equipo">✎</button></p>
       </div>
     </section>
     <section class="slr-saldo"><div><small>${esc(datos.liga.nombre)}</small><span>Saldo</span></div><b>${monedas(datos.equipo.saldo)}</b></section>
@@ -100,6 +118,8 @@ export async function pintar(cont, ctx) {
           <div class="${m.importe >= 0 ? 'es-ingreso' : 'es-gasto'}"><b>${conSigno(m.importe)}</b><small>${miles(m.saldo_despues)}</small></div>
         </li>`).join('')}</ul>
     </section>`;
+
+  cont.querySelector('[data-renombrar]').addEventListener('click', () => renombrar(ctx));
 
   // Avatar de la sesión de Shits League (session.js, script clásico global)
   const av = cont.querySelector('[data-avatar]');

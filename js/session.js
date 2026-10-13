@@ -51,9 +51,9 @@ const JUGADORES_FOTOS = {
 };
 
 const SESSION_KEY = 'SESSION_PLAYER';
-
-// Si el modal se abrió desde Rush (rush-panel.js), qué hacer al activar Rush
-let sessionParaRush = null;
+// El código se guarda tras un login correcto para que Rush (rush-panel.js)
+// pueda abrir su sesión del servidor sin volver a pedirlo nunca
+const SESSION_CODE_KEY = 'SESSION_CODE';
 
 /* ── Estado de sesión ────────────────────────────────────────────────────── */
 // Jugador logueado o null. localStorage puede no estar disponible (modo privado)
@@ -69,6 +69,17 @@ function setSessionPlayer(nombre) {
   renderSessionButton(nombre);
   if (typeof pushVincularJugador === 'function') pushVincularJugador(nombre);
   if (typeof onSessionChange === 'function') onSessionChange(nombre);
+}
+
+function getSessionCode() {
+  try { return localStorage.getItem(SESSION_CODE_KEY) || null; } catch { return null; }
+}
+
+function setSessionCode(codigo) {
+  try {
+    if (codigo) localStorage.setItem(SESSION_CODE_KEY, codigo);
+    else        localStorage.removeItem(SESSION_CODE_KEY);
+  } catch { /* sin persistencia */ }
 }
 
 async function sha256(texto) {
@@ -109,14 +120,8 @@ function renderSessionButton(nombre) {
   if (nombre) renderAvatar(btn.querySelector('.avatar'), nombre);
 }
 
-// opciones.alActivarRush: el modal pide el código para activar Rush aunque ya
-// haya sesión, y llama a esa función cuando Rush queda activado
-function openSessionModal(opciones = {}) {
-  sessionParaRush = typeof opciones.alActivarRush === 'function' ? opciones.alActivarRush : null;
-  const nombre = sessionParaRush ? null : getSessionPlayer();
-  document.getElementById('sessionText').textContent = sessionParaRush
-    ? 'Confirma tu código para activar Rush'
-    : 'Introduce tu código de jugador.';
+function openSessionModal() {
+  const nombre = getSessionPlayer();
   document.getElementById('sessionLogin').hidden  = !!nombre;
   document.getElementById('sessionLogged').hidden = !nombre;
   if (nombre) {
@@ -157,32 +162,31 @@ async function tryLogin() {
   };
   if (!nombre) return fallo('Código incorrecto');
 
-  const paraRush = sessionParaRush;
-  const actual = getSessionPlayer();
-  if (paraRush && actual && actual !== nombre) return fallo(`Ese no es el código de ${actual}`);
+  // Rush abre su sesión con el mismo código, sin esperar: si el servidor
+  // falla, Shits League entra igual y Rush lo reintentará al pulsar JUGAR
+  if (esBot) rushConfirmarBot();
+  else if (typeof rushActivar === 'function') rushActivar(input.value, nombre);
 
-  // Rush usa el mismo código. Sin servidor, Shits League entra igual; solo
-  // se espera cuando el modal se abrió para activar Rush
-  const rushListo = esBot ? Promise.resolve(rushConfirmarBot())
-    : typeof rushActivar === 'function' ? rushActivar(input.value, nombre) : Promise.resolve(false);
-  if (paraRush && !(await rushListo)) return fallo('No se pudo activar Rush. Inténtalo de nuevo.');
-
-  if (!paraRush || nombre !== actual) setSessionPlayer(nombre);
+  setSessionCode(input.value.trim());
+  setSessionPlayer(nombre);
   resetLoginForm();
   closeModal('sessionModal');
-  if (paraRush) {
-    sessionParaRush = null;
-    paraRush();
-  }
 }
 
 function logout() {
   if (typeof rushCerrarSesion === 'function') rushCerrarSesion();
+  setSessionCode(null);
   setSessionPlayer(null);
   closeModal('sessionModal');
 }
 
 function initSession() {
+  // Sesiones de antes de guardar el código: se cierran sin aviso y el jugador
+  // se identifica otra vez con el modal de siempre (ya será la última)
+  if (getSessionPlayer() && !getSessionCode()) {
+    if (typeof rushCerrarSesion === 'function') rushCerrarSesion();
+    setSessionPlayer(null);
+  }
   renderSessionButton(getSessionPlayer());
 
   document.getElementById('sessionBtn').addEventListener('click', openSessionModal);

@@ -4,7 +4,9 @@
    · leer(): lecturas públicas de tablas (/rest/v1/tabla?…)
    · funcion(): Edge Function slr-simular (pronóstico, amistosos)
    Los mensajes de error del servidor se muestran tal cual en un toast.
-   Un 403 (sesión caducada) borra el token y avisa con alCaducarSesion().
+   Rush nunca pide el código: ante un 403 (sesión caducada) se abre otra
+   sesión en silencio con el código guardado y se repite la llamada una vez.
+   Si el código ya no vale, sesionPerdida() cierra la sesión de Shits League.
 ═══════════════════════════════════════════════ */
 import { SUPABASE_URL, SUPABASE_KEY } from './config.js';
 import { toast } from './ui.js';
@@ -13,8 +15,10 @@ export const TOKEN_KEY = 'SLR_TOKEN';
 
 export class ErrorSesion extends Error {}
 
-let caducada = () => {};
-export function alCaducarSesion(fn) { caducada = fn; }
+let ganchos = { reautenticar: async () => false, perdida: () => {} };
+export function configurarSesion({ reautenticar, sesionPerdida }) {
+  ganchos = { reautenticar, perdida: sesionPerdida };
+}
 
 export function token() {
   try { return localStorage.getItem(TOKEN_KEY); } catch { return null; }
@@ -28,28 +32,46 @@ async function leerRespuesta(r) {
   try { return texto ? JSON.parse(texto) : null; } catch { return { message: texto }; }
 }
 
-function sesionCaducada(mensaje) {
+// 403: nueva sesión silenciosa. true → repetir la llamada; si no, lanza.
+async function renovar(mensaje) {
   borrarToken();
-  caducada();
-  return new ErrorSesion(mensaje || 'Tu sesión de Rush ha caducado');
+  let ok;
+  try { ok = await ganchos.reautenticar(); } catch {
+    toast('Sin conexión con el servidor', 'error');
+    throw new Error('Sin conexión');
+  }
+  if (ok) return true;
+  ganchos.perdida();
+  throw new ErrorSesion(mensaje || 'Tu sesión ha caducado');
+}
+
+// Hace la petición; con un 403 renueva la sesión y la repite una sola vez
+async function conSesion(hacer) {
+  let r = await hacer();
+  if (r.status === 403 && await renovar()) r = await hacer();
+  if (r.status === 403) {
+    ganchos.perdida();
+    throw new ErrorSesion('Tu sesión ha caducado');
+  }
+  return r;
 }
 
 // silencioso: no muestra el toast (quien llama decide qué hacer con el error)
 export async function rpc(fn, args = {}, { silencioso = false } = {}) {
   let r;
   try {
-    r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
+    r = await conSesion(() => fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
       method: 'POST',
       headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
       body: JSON.stringify({ token: token(), ...args }),
-    });
-  } catch {
-    const e = new Error('Sin conexión con el servidor');
-    if (!silencioso) toast(e.message, 'error');
-    throw e;
+    }));
+  } catch (e) {
+    if (e instanceof ErrorSesion || e.message === 'Sin conexión') throw e;
+    const err = new Error('Sin conexión con el servidor');
+    if (!silencioso) toast(err.message, 'error');
+    throw err;
   }
   const datos = await leerRespuesta(r);
-  if (r.status === 403) throw sesionCaducada(datos?.message);
   if (!r.ok) {
     const e = new Error(datos?.message || `Error en ${fn}`);
     if (!silencioso) toast(e.message, 'error');
@@ -72,17 +94,17 @@ export async function leer(ruta) {
 export async function funcion(cuerpo) {
   let r;
   try {
-    r = await fetch(`${SUPABASE_URL}/functions/v1/slr-simular`, {
+    r = await conSesion(() => fetch(`${SUPABASE_URL}/functions/v1/slr-simular`, {
       method: 'POST',
       headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
       body: JSON.stringify({ token: token(), ...cuerpo }),
-    });
-  } catch {
+    }));
+  } catch (e) {
+    if (e instanceof ErrorSesion || e.message === 'Sin conexión') throw e;
     toast('Sin conexión con el servidor', 'error');
     throw new Error('Sin conexión');
   }
   const datos = await leerRespuesta(r);
-  if (r.status === 403) throw sesionCaducada(datos?.error);
   if (!r.ok) {
     const e = new Error(datos?.error || 'Error en el servidor');
     toast(e.message, 'error');
