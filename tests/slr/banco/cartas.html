@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Banco de cartas</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Sora:wght@400;600;700;800&display=swap">
+<link rel="stylesheet" href="../../../css/slr.css">
+<style>body { margin: 0; background: #041009; }</style>
+</head><body>
+<!-- Banco de rendimiento de las cartas: 15 cartas como en Plantilla. Lo usa tests/slr/banco/medir.mjs -->
+<div class="slr" id="slr"><main class="slr-main"><div class="slr-pantalla"><div class="slr-rejilla" id="rejilla"></div></div></main></div>
+<script type="module">
+import * as carta from '../../../js/slr/carta.js';
+const acabados = ['foil', 'normal', 'brillante', 'normal', 'plateada', 'foil', 'normal', 'normal', 'foil', 'normal', 'normal', 'brillante', 'normal', 'normal', 'normal'];
+const tipos = ['individual', 'individual', 'individual', 'duo', 'individual', 'trio', 'individual', 'individual', 'individual', 'individual', 'unica', 'individual', 'individual', 'duo', 'individual'];
+const cs = acabados.map((a, i) => carta.normalizarCarta({ id: 'c' + i, disenos_carta: {
+  nombre: `Jugador ${i + 1}`, tipo: tipos[i], acabado: a, ata: 50 + i, def: 60 - i, con: 55, valor: 200, personas: [] } }));
+const rejilla = document.getElementById('rejilla');
+rejilla.innerHTML = cs.map(c => `<button class="slr-ficha" type="button">${carta.cartaHTML(c, { tam: 's', ancho: 170 })}</button>`).join('');
+carta.iniciarAcabados(document.getElementById('slr'));
+document.fonts.ready.then(() => { document.body.dataset.listo = '1'; });
+</script>
+</body></html>

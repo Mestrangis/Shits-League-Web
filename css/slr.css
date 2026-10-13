@@ -602,6 +602,52 @@ html.slr-abierto, html.slr-abierto body { overflow: hidden; }
 .slr-acciones-fijas .slr-btn--grande { flex: 2; }
 .slr-acciones-fijas .slr-btn--fantasma { flex: 1; min-height: 54px; }
 
+/* Sin colocar: franja con scroll horizontal */
+.slr-sincolocar__fila {
+  display: flex; gap: 10px;
+  margin: 0 -16px; padding: 4px 16px 8px;
+  overflow-x: auto; scrollbar-width: none;
+}
+.slr-sincolocar__fila::-webkit-scrollbar { display: none; }
+.slr-libre { flex: 0 0 auto; width: 76px; }
+.slr-sincolocar.es-destino { box-shadow: inset 0 0 0 2px var(--slr-rival); background: rgba(255,138,61,.08); }
+
+/* Arrastrar y soltar */
+.slr-hueco, .slr-libre { -webkit-touch-callout: none; touch-action: manipulation; }
+@media (hover: hover) {
+  .slr-hueco.lleno:not(:disabled), .slr-libre:not(.es-bloqueada) { cursor: grab; }
+}
+.slr-arrastrando, .slr-arrastrando * { cursor: grabbing !important; user-select: none !important; -webkit-user-select: none !important; }
+.slr-fantasma {
+  position: fixed !important;
+  left: 0; top: 0;
+  transform-origin: 0 0;
+  z-index: 60;
+  pointer-events: none;
+  will-change: transform;
+  filter: drop-shadow(0 14px 22px rgba(0,0,0,.6));
+}
+.slr-fantasma .slr-carta__marco { transition: none; }
+.es-origen { opacity: .3; }
+.slr-hueco.es-destino .slr-carta, .slr-hueco.es-destino .slr-hueco__vacio {
+  box-shadow: 0 0 0 3px var(--slr-propio), 0 0 22px rgba(57,255,136,.55);
+  border-radius: 10px;
+}
+.slr-hueco.es-destino .slr-hueco__vacio { border-color: var(--slr-propio); background: rgba(57,255,136,.12); }
+.slr-hueco__previsto {
+  position: absolute; left: 50%; bottom: 14px; z-index: 5;
+  transform: translateX(-50%);
+  padding: 4px 9px; border-radius: 999px;
+  background: var(--slr-propio); color: #04130A;
+  font-family: 'Anton', sans-serif; font-size: 15px; letter-spacing: .04em; white-space: nowrap;
+  box-shadow: 0 4px 14px rgba(0,0,0,.5);
+  pointer-events: none;
+}
+.slr-hueco__previsto.es-mal { background: var(--slr-rival); font-size: 12px; }
+
+.slr-lista-cartas__titulo { margin: 8px 0 2px; display: flex; align-items: baseline; gap: 8px; }
+.slr-lista-cartas__titulo small { font-family: 'Sora', sans-serif; font-size: 12px; letter-spacing: 0; color: var(--slr-suave); }
+.slr-lista-cartas__texto small strong { color: var(--slr-oro); font-weight: 800; }
 .slr-lista-cartas { list-style: none; display: flex; flex-direction: column; gap: 6px; }
 .slr-lista-cartas button {
   width: 100%;
@@ -695,8 +741,6 @@ html.slr-abierto, html.slr-abierto body { overflow: hidden; }
 .slr-carta {
   --c1: #1FE065;              /* color del tipo */
   --c2: #0A3B1E;
-  --rx: 0deg; --ry: 0deg;
-  --px: 50%; --py: 50%;
   container-type: inline-size;
   position: relative;
   width: 100%;
@@ -709,7 +753,20 @@ html.slr-abierto, html.slr-abierto body { overflow: hidden; }
 .slr-carta--trio   { --c1: #B67CFF; --c2: #261048; }
 .slr-carta--unica  { --c1: #FFC94A; --c2: #4A1E06; }
 
+/* --x, --y ∈ [0, 1]: posición del ratón, del dedo o del giroscopio sobre la carta
+   (js/slr/carta.js las escribe una vez por frame en el marco y en las capas del
+   foil). 0,5 = en reposo. No se heredan: cambiarlas solo recalcula esos
+   elementos. Todo lo que depende de ellas es transform: no se repinta nada. */
+@property --x { syntax: '<number>'; inherits: false; initial-value: .5; }
+@property --y { syntax: '<number>'; inherits: false; initial-value: .5; }
 .slr-carta__marco {
+  position: absolute; inset: 0;
+  transform: rotateX(calc((.5 - var(--y)) * 12deg)) rotateY(calc((var(--x) - .5) * 14deg));
+  transition: transform .45s cubic-bezier(.2, .8, .2, 1);
+}
+/* El aspecto va en .slr-carta__cara, hijo único del marco: al inclinar, Blink
+   recalcula el marco y sus hijos directos, y así son 2 elementos en lugar de 8 */
+.slr-carta__cara {
   position: absolute; inset: 0;
   border-radius: 7cqw;
   overflow: hidden;
@@ -721,10 +778,18 @@ html.slr-abierto, html.slr-abierto body { overflow: hidden; }
     inset 0 0 0 1.4cqw color-mix(in srgb, var(--c1) 70%, #000),
     inset 0 0 0 2.2cqw rgba(0,0,0,.35),
     0 3cqw 8cqw rgba(0,0,0,.5);
-  transform: rotateX(var(--rx)) rotateY(var(--ry));
-  transition: transform .4s ease-out;
 }
-.slr-carta.is-activa .slr-carta__marco { transition: transform .08s linear; }
+/* Durante la interacción: capas propias (will-change) y respuesta casi inmediata.
+   is-calentando: lo mismo durante dos frames al aparecer, para crear las capas antes */
+.slr-carta.is-activa .slr-carta__marco,
+.slr-carta.is-calentando .slr-carta__marco { will-change: transform; }
+/* Sin transición mientras se mueve: crear una en cada frame costaba más que el
+   propio movimiento (el giroscopio se suaviza en JS) */
+.slr-carta.is-activa .slr-carta__marco { transition: none; }
+/* Fuera de la pantalla, las animaciones de reposo de los acabados se paran
+   (selectores concretos: uno universal encarecía cada recálculo de estilo) */
+.slr-carta:not(.is-visible) .slr-carta__capa,
+.slr-carta:not(.is-visible) .slr-carta__cara::after { animation-play-state: paused; }
 
 .slr-carta__arte { position: absolute; inset: 9% 6% 30%; border-radius: 4cqw; overflow: hidden; }
 .slr-carta__img { width: 100%; height: 100%; object-fit: cover; }
@@ -814,61 +879,85 @@ html.slr-abierto, html.slr-abierto body { overflow: hidden; }
 .slr-carta--l { touch-action: none; }     /* el dedo mueve el foil en vez de hacer scroll */
 
 /* ── Acabados ────────────────────────────────────────────────────────────── */
-.slr-carta__acabado, .slr-carta__destello { position: absolute; inset: 0; z-index: 3; pointer-events: none; border-radius: inherit; }
+/* Cada efecto es una capa con un hijo (.slr-carta__capa) más grande que la carta que se
+   desplaza con transform (siguiendo --x/--y o en bucle) y cambia de opacity:
+   el gradiente se rasteriza una vez y el compositor solo lo mueve. */
+.slr-carta__acabado, .slr-carta__destello {
+  position: absolute; inset: 0; z-index: 3;
+  overflow: hidden;
+  pointer-events: none;
+  border-radius: inherit;
+}
+.slr-carta__capa {
+  position: absolute;
+  left: 0; top: 0;
+}
+/* Solo las capas del foil se mueven con el dedo; las demás las anima el
+   compositor por su cuenta y no necesitan capa reservada */
+.slr-carta--foil.is-activa .slr-carta__capa,
+.slr-carta--foil.is-calentando .slr-carta__capa { will-change: transform; }
 
-/* Foil: espectro completo (hsl 0–360) en color-dodge que sigue el dedo o la inclinación */
-.slr-carta--foil .slr-carta__acabado {
-  background:
-    linear-gradient(115deg,
-      hsl(0 100% 62%) 0%, hsl(45 100% 60%) 12%, hsl(90 100% 58%) 24%, hsl(160 100% 55%) 36%,
-      hsl(200 100% 60%) 48%, hsl(260 100% 66%) 60%, hsl(310 100% 64%) 72%, hsl(360 100% 62%) 84%, hsl(45 100% 60%) 100%);
-  background-size: 300% 300%;
-  background-position: var(--px) var(--py);
-  mix-blend-mode: color-dodge;
-  opacity: .32;
+/* Foil: espectro completo (hsl 0–360) en color-dodge que sigue el dedo, el
+   ratón o la inclinación; en reposo, un vaivén de 4 s */
+.slr-carta--foil .slr-carta__acabado { mix-blend-mode: color-dodge; opacity: .32; transition: opacity .3s; }
+.slr-carta--foil .slr-carta__acabado > .slr-carta__capa {
+  width: 300%; height: 300%;
+  background: linear-gradient(115deg,
+    hsl(0 100% 62%) 0%, hsl(45 100% 60%) 12%, hsl(90 100% 58%) 24%, hsl(160 100% 55%) 36%,
+    hsl(200 100% 60%) 48%, hsl(260 100% 66%) 60%, hsl(310 100% 64%) 72%, hsl(360 100% 62%) 84%, hsl(45 100% 60%) 100%);
+  transform: translate3d(calc(var(--x) * -66.667%), calc(var(--y) * -66.667%), 0);
   animation: slr-foil 4s ease-in-out infinite;
 }
-.slr-carta--foil .slr-carta__destello {
-  background: radial-gradient(circle at var(--px) var(--py), rgba(255,255,255,.4), transparent 45%);
-  mix-blend-mode: overlay;
-  opacity: 0;
-  transition: opacity .3s;
+.slr-carta--foil .slr-carta__destello { mix-blend-mode: overlay; opacity: 0; transition: opacity .3s; }
+.slr-carta--foil .slr-carta__destello > .slr-carta__capa {
+  width: 200%; height: 200%;
+  background: radial-gradient(circle at 50% 50%, rgba(255,255,255,.55), rgba(255,255,255,0) 24%);
+  transform: translate3d(calc((var(--x) - 1) * 50%), calc((var(--y) - 1) * 50%), 0);
 }
-.slr-carta--foil.is-activa .slr-carta__acabado { animation: none; opacity: .5; }
+.slr-carta--foil.is-activa .slr-carta__acabado { opacity: .5; }
+.slr-carta--foil.is-activa .slr-carta__acabado > .slr-carta__capa { animation: none; }
 .slr-carta--foil.is-activa .slr-carta__destello { opacity: 1; }
 @keyframes slr-foil {
-  0%, 100% { background-position: 0% 30%; }
-  50%      { background-position: 100% 70%; }
+  0%, 100% { transform: translate3d(0, -20%, 0); }
+  50%      { transform: translate3d(-66.667%, -46.667%, 0); }
 }
 
-/* Brillante: destello dorado pulsante */
-.slr-carta--brillante .slr-carta__marco {
+/* Brillante: destello dorado pulsante (solo opacity y transform) */
+.slr-carta--brillante .slr-carta__cara {
   box-shadow:
-    inset 0 0 0 1.4cqw #E8B33A,
+    inset 0 0 0 1.4cqw #C9932A,
     inset 0 0 0 2.2cqw rgba(0,0,0,.35),
     0 3cqw 8cqw rgba(0,0,0,.5);
-  animation: slr-oro-borde 2.4s ease-in-out infinite;
 }
-.slr-carta--brillante .slr-carta__acabado {
-  background: radial-gradient(70% 55% at 50% 38%, rgba(255,214,102,.5), transparent 70%);
-  mix-blend-mode: screen;
+/* Borde encendido encima, que late con opacity en lugar de animar la sombra */
+.slr-carta--brillante .slr-carta__cara::after {
+  content: '';
+  position: absolute; inset: 0; z-index: 4;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 1.4cqw #FFE08A, inset 0 0 6cqw rgba(255,201,74,.45);
   animation: slr-oro-pulso 2.4s ease-in-out infinite;
 }
-.slr-carta--brillante .slr-carta__destello {
-  background: linear-gradient(120deg, transparent 35%, rgba(255,236,170,.85) 48%, rgba(255,200,60,.4) 52%, transparent 65%);
-  background-size: 260% 100%;
-  mix-blend-mode: screen;
+.slr-carta--brillante .slr-carta__acabado { mix-blend-mode: screen; }
+.slr-carta--brillante .slr-carta__acabado > .slr-carta__capa {
+  inset: 0; width: 100%; height: 100%;
+  background: radial-gradient(70% 55% at 50% 38%, rgba(255,214,102,.5), transparent 70%);
+  animation: slr-oro-pulso 2.4s ease-in-out infinite;
+}
+.slr-carta--brillante .slr-carta__destello { mix-blend-mode: screen; }
+.slr-carta--brillante .slr-carta__destello > .slr-carta__capa {
+  width: 100%; height: 100%;
+  background: linear-gradient(120deg, transparent 30%, rgba(255,236,170,.85) 48%, rgba(255,200,60,.4) 52%, transparent 70%);
   animation: slr-barrido 2.4s ease-in-out infinite;
 }
-@keyframes slr-oro-pulso { 0%, 100% { opacity: .25; } 50% { opacity: .85; } }
-@keyframes slr-oro-borde {
-  0%, 100% { box-shadow: inset 0 0 0 1.4cqw #C9932A, inset 0 0 0 2.2cqw rgba(0,0,0,.35), 0 3cqw 8cqw rgba(0,0,0,.5); }
-  50%      { box-shadow: inset 0 0 0 1.4cqw #FFE08A, inset 0 0 0 2.2cqw rgba(0,0,0,.2), 0 0 8cqw rgba(255,201,74,.55); }
+@keyframes slr-oro-pulso { 0%, 100% { opacity: .25; } 50% { opacity: .9; } }
+@keyframes slr-barrido {
+  0%       { transform: translate3d(-110%, 0, 0); }
+  60%, 100% { transform: translate3d(110%, 0, 0); }
 }
-@keyframes slr-barrido { 0% { background-position: 130% 0; } 60%, 100% { background-position: -30% 0; } }
 
 /* Plateada: tono metálico monocromo con brillo */
-.slr-carta--plateada .slr-carta__marco {
+.slr-carta--plateada .slr-carta__cara {
   background: linear-gradient(160deg, #5B6670, #1B2128 55%, #0B0E12);
   box-shadow:
     inset 0 0 0 1.4cqw #C9D3DC,
@@ -883,22 +972,23 @@ html.slr-abierto, html.slr-abierto body { overflow: hidden; }
   background: linear-gradient(135deg, rgba(255,255,255,.28), rgba(200,210,220,.05) 40%, rgba(255,255,255,.22) 70%, rgba(150,160,170,.1));
   mix-blend-mode: soft-light;
 }
-.slr-carta--plateada .slr-carta__destello {
-  background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,.75) 50%, transparent 60%);
-  background-size: 300% 100%;
-  mix-blend-mode: overlay;
+.slr-carta--plateada .slr-carta__destello { mix-blend-mode: overlay; }
+.slr-carta--plateada .slr-carta__destello > .slr-carta__capa {
+  width: 100%; height: 100%;
+  background: linear-gradient(105deg, transparent 35%, rgba(255,255,255,.75) 50%, transparent 65%);
   animation: slr-barrido 3.6s ease-in-out infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .slr, .slr-pantalla, .slr-toast { animation: none; }
+  /* Sin inclinación ni animaciones; el dedo sigue moviendo el brillo del foil */
   .slr-carta__marco { transform: none !important; transition: none; }
-  .slr-carta--foil .slr-carta__acabado,
-  .slr-carta--brillante .slr-carta__marco,
-  .slr-carta--brillante .slr-carta__acabado,
-  .slr-carta--brillante .slr-carta__destello,
-  .slr-carta--plateada .slr-carta__destello { animation: none; }
-  .slr-carta--brillante .slr-carta__acabado { opacity: .55; }
+  .slr-carta__cara::after,
+  .slr-carta__acabado > .slr-carta__capa,
+  .slr-carta__destello > .slr-carta__capa { animation: none !important; }
+  .slr-carta--brillante .slr-carta__cara::after { opacity: .6; }
+  .slr-carta--brillante .slr-carta__acabado > .slr-carta__capa { opacity: .55; }
+  .slr-carta--brillante .slr-carta__destello, .slr-carta--plateada .slr-carta__destello { display: none; }
   .slr-hoja__caja, .slr-hoja__fondo { transition: none; }
   .slr-balon { animation: none; }
 }

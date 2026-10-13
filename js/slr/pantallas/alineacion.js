@@ -1,9 +1,11 @@
 /* ═══════════════════════════════════════════════
    SHITS LEAGUE RUSH — Alineación
    Campo en vertical con los huecos de la formación (5 formaciones). Se asigna
-   tocando: un hueco abre una hoja con tus cartas ordenadas por la stat que
-   usa ese hueco (POR y DEF → DEF, MED → CON, DEL → ATA), avisando si rinden
-   mal ahí. Banquillo de 3 con orden manual opcional y capitán.
+   tocando: un hueco abre una hoja con tus cartas (primero las sin colocar,
+   luego las ya colocadas) ordenadas por la stat que usa ese hueco (POR y DEF
+   → DEF, MED → CON, DEL → ATA), avisando si rinden mal ahí. También se puede
+   arrastrar y soltar entre huecos, banquillo y "Sin colocar".
+   Banquillo de 3 con orden manual opcional y capitán.
    Fuerza de cada línea en vivo con las funciones del motor; pronóstico bajo
    demanda (Edge Function) con la alineación guardada.
    Guardar = slr_guardar_alineacion; Confirmar = slr_confirmar_alineacion
@@ -66,12 +68,33 @@ function posicion(id) {
 const leer = (l, i) => (l === 'por' ? borrador.por : borrador[l][i]);
 function escribir(l, i, id) { if (l === 'por') borrador.por = id; else borrador[l][i] = id; }
 
+// Las dos devuelven true si el capitán sale del once (al banquillo o fuera)
 function asignar(l, i, id) {
+  const capitan = borrador.capitan;
   const previa = leer(l, i), desde = posicion(id);
   if (desde) escribir(desde[0], desde[1], previa);   // intercambio
   escribir(l, i, id);
-  if (!titulares(borrador).includes(borrador.capitan)) borrador.capitan = null;
+  return comprobarCapitan(capitan);
 }
+// Arrastre: origen { l, i } (hueco) o { id } (sin colocar); destino { l, i } o { libre: true }
+function mover(origen, destino) {
+  const capitan = borrador.capitan;
+  if (destino.libre) {
+    if (origen.l) escribir(origen.l, origen.i, null);
+  } else if (origen.l) {
+    const a = leer(origen.l, origen.i), b = leer(destino.l, destino.i);
+    escribir(destino.l, destino.i, a);
+    escribir(origen.l, origen.i, b);
+  } else {
+    escribir(destino.l, destino.i, origen.id);   // la que había queda sin colocar
+  }
+  return comprobarCapitan(capitan);
+}
+function comprobarCapitan(antes) {
+  if (!titulares(borrador).includes(borrador.capitan)) borrador.capitan = null;
+  return !!antes && !borrador.capitan;
+}
+const AVISO_CAPITAN = 'El capitán ha salido del once y pierde la capitanía: elige otro';
 
 /* ── Stats efectivas y fuerzas ───────────────────────────────────────────── */
 const factorTocada = () => configLiga().lesion_tocada_factor ?? 0.85;
@@ -104,7 +127,8 @@ function hueco(l, i, porId, bloqueada) {
   const id = leer(l, i), c = id && porId.get(id);
   const capitan = c && borrador.capitan === id;
   return `
-    <button class="slr-hueco slr-hueco--${l} ${c ? 'lleno' : ''}" type="button" data-l="${l}" data-i="${i}" ${bloqueada ? 'disabled' : ''}>
+    <button class="slr-hueco slr-hueco--${l} ${c ? 'lleno' : ''}" type="button" data-l="${l}" data-i="${i}"
+            ${c ? `data-id="${esc(id)}"` : ''} ${bloqueada ? 'disabled' : ''}>
       ${c ? `${cartaHTML(c, { tam: 'xs', ancho: 80, destacar: STAT[l], capitan, tocada: estaTocada(c) })}
              ${rindeMal(c, l) ? '<span class="slr-hueco__aviso" title="Rinde mal aquí">!</span>' : ''}`
           : `<span class="slr-hueco__vacio">+</span>`}
@@ -125,6 +149,7 @@ function pintarTodo(cont, ctx) {
   const esSucio = sucio();
   const confirmada = alineacionConfirmada();
   const faltan = titulares(borrador).filter(x => !x).length;
+  const libres = [...porId.values()].filter(c => !posicion(c.id)).sort((a, b) => b.ovr - a.ovr);
 
   let aviso = '';
   if (pausada()) aviso = '<div class="slr-banner slr-banner--pausa"><b>Liga en pausa</b><span>La alineación no se puede cambiar hasta que se reanude.</span></div>';
@@ -170,6 +195,16 @@ function pintarTodo(cont, ctx) {
         : 'Si hay una lesión entra el suplente que mejor rinde en ese hueco.'}</p>
     </section>
 
+    <section class="slr-tarjeta slr-sincolocar" data-libres>
+      <div class="slr-tarjeta__cabeza"><span>Sin colocar</span><span>${libres.length}</span></div>
+      ${libres.length ? `<div class="slr-sincolocar__fila">
+        ${libres.map(c => `<div class="slr-libre ${bloqueada ? 'es-bloqueada' : ''}" data-id="${esc(c.id)}">
+          ${cartaHTML(c, { tam: 'xs', ancho: 70, tocada: estaTocada(c) })}</div>`).join('')}
+      </div>` : '<p class="slr-suave">Todas tus cartas están en el once o en el banquillo.</p>'}
+      ${bloqueada ? '' : `<p class="slr-suave">Mantén pulsada una carta (o arrástrala con el ratón) y suéltala en un hueco.
+        Si está ocupado, se intercambian.</p>`}
+    </section>
+
     <section class="slr-tarjeta">
       <div class="slr-tarjeta__cabeza"><span>Fuerza de las líneas</span><span>${borrador.capitan ? `Capitán: ${esc(porId.get(borrador.capitan).nombre)}` : 'Sin capitán'}</span></div>
       ${barraFuerza('Posesión', f.posesion, 220)}
@@ -205,12 +240,40 @@ function pintarPronostico() {
 }
 
 /* ── Hoja de selección ───────────────────────────────────────────────────── */
+// Dos bloques: "Sin colocar" y "Ya colocadas" (indicando dónde están; elegir
+// una de estas intercambia las posiciones), los dos por la stat del hueco
+const DONDE = { por: 'POR', def: 'DEF', med: 'MED', del: 'DEL', banco: 'Banquillo' };
+
+function filaCarta(c, l, actual) {
+  const stat = STAT[l];
+  const mal = rindeMal(c, l);
+  const mejor = [['ATA', c.ata], ['DEF', c.def], ['CON', c.con]].sort((a, b) => b[1] - a[1])[0][0];
+  const p = posicion(c.id);
+  return `
+    <li><button type="button" data-id="${esc(c.id)}" class="${c.id === actual ? 'es-actual' : ''}">
+      ${cartaHTML(c, { tam: 'xs', ancho: 60, destacar: stat, tocada: estaTocada(c) })}
+      <span class="slr-lista-cartas__texto">
+        <b>${esc(c.nombre)}</b>
+        <small>${c.id === actual ? 'En este hueco' : p ? `Ahora en <strong>${DONDE[p[0]]}</strong>` : 'Sin colocar'}${estaTocada(c) ? ' · tocada (85 %)' : ''}</small>
+        ${mal ? `<em>Rinde mal aquí: su fuerte es ${mejor}</em>` : ''}
+      </span>
+      <span class="slr-lista-cartas__stat ${mal ? 'es-mal' : ''}"><b>${valorEnHueco(c, l)}</b><small>${stat}</small></span>
+    </button></li>`;
+}
+
 function elegir(l, i, cont, ctx, porId) {
   const actual = leer(l, i);
   const stat = STAT[l];
-  const cartas = [...porId.values()].sort((a, b) => valorEnHueco(b, l) - valorEnHueco(a, l) || b.ovr - a.ovr);
-  const donde = id => { const p = posicion(id); return p ? `${NOMBRE_LINEA[p[0]]}` : ''; };
+  const orden = (a, b) => valorEnHueco(b, l) - valorEnHueco(a, l) || b.ovr - a.ovr;
+  const todas = [...porId.values()];
+  const sinColocar = todas.filter(c => !posicion(c.id)).sort(orden);
+  const colocadas = todas.filter(c => posicion(c.id)).sort(orden);
   const titular = l !== 'banco';
+  const bloque = (titulo, lista, vacio) => `
+    <h3 class="slr-subtitulo slr-lista-cartas__titulo">${titulo} <small>${lista.length}</small></h3>
+    ${lista.length ? `<ul class="slr-lista-cartas">${lista.map(c => filaCarta(c, l, actual)).join('')}</ul>`
+      : `<p class="slr-suave">${vacio}</p>`}`;
+  let avisoCapitan = false;
 
   const el = hoja(`
     ${actual ? `<div class="slr-botones">
@@ -219,24 +282,14 @@ function elegir(l, i, cont, ctx, porId) {
       <button class="slr-btn slr-btn--fantasma" type="button" data-quitar>Quitar del hueco</button>
     </div>` : ''}
     <p class="slr-suave">${titular ? `En este hueco cuenta su <b>${stat}</b>${l === 'por' ? ' (el portero para con la DEF)' : ''}.` : 'Ordenadas por OVR.'}</p>
-    <ul class="slr-lista-cartas">
-      ${cartas.map(c => {
-        const mal = rindeMal(c, l);
-        const mejor = [['ATA', c.ata], ['DEF', c.def], ['CON', c.con]].sort((a, b) => b[1] - a[1])[0][0];
-        return `
-        <li><button type="button" data-id="${esc(c.id)}" class="${c.id === actual ? 'es-actual' : ''}">
-          ${cartaHTML(c, { tam: 'xs', ancho: 60, destacar: stat, tocada: estaTocada(c) })}
-          <span class="slr-lista-cartas__texto">
-            <b>${esc(c.nombre)}</b>
-            <small>${donde(c.id) ? `Ahora en ${donde(c.id)}` : 'Sin colocar'}${estaTocada(c) ? ' · tocada (85 %)' : ''}</small>
-            ${mal ? `<em>Rinde mal aquí: su fuerte es ${mejor}</em>` : ''}
-          </span>
-          <span class="slr-lista-cartas__stat ${mal ? 'es-mal' : ''}"><b>${valorEnHueco(c, l)}</b><small>${stat}</small></span>
-        </button></li>`;
-      }).join('')}
-    </ul>`, { titulo: `Hueco ${NOMBRE_LINEA[l]}`, alCerrar: () => pintarTodo(cont, ctx) });
+    ${bloque('Sin colocar', sinColocar, 'Todas tus cartas están colocadas.')}
+    ${bloque('Ya colocadas', colocadas, 'Ninguna carta colocada todavía.')}`,
+  { titulo: `Hueco ${NOMBRE_LINEA[l]}`, alCerrar: () => { pintarTodo(cont, ctx); if (avisoCapitan) toast(AVISO_CAPITAN, 'info'); } });
 
-  el.querySelectorAll('[data-id]').forEach(b => b.addEventListener('click', () => { asignar(l, i, b.dataset.id); cerrarCapa(); }));
+  el.querySelectorAll('[data-id]').forEach(b => b.addEventListener('click', () => {
+    avisoCapitan = asignar(l, i, b.dataset.id);
+    cerrarCapa();
+  }));
   el.querySelector('[data-quitar]')?.addEventListener('click', () => {
     escribir(l, i, null);
     if (borrador.capitan === actual) borrador.capitan = null;
@@ -245,13 +298,160 @@ function elegir(l, i, cont, ctx, porId) {
   el.querySelector('[data-capitan]')?.addEventListener('click', () => { borrador.capitan = actual; cerrarCapa(); });
 }
 
+/* ── Arrastrar y soltar ──────────────────────────────────────────────────── */
+// Pointer events con setPointerCapture, sin librerías.
+//  · Ratón: se levanta la carta al moverla más de 5 px con el botón pulsado.
+//  · Táctil: mantener pulsado ~250 ms; si el dedo se mueve antes, es scroll.
+//    Durante el arrastre un touchmove no pasivo bloquea el scroll de la página.
+//  · Un toque o clic corto sigue abriendo la hoja de siempre.
+// Se puede soltar en cualquier hueco (ocupado = intercambio; vacío = se mueve)
+// o en "Sin colocar" (sale de la alineación).
+const PULSACION_MS = 250, UMBRAL_RATON = 5, UMBRAL_DEDO = 8;
+const BORDE_SCROLL = 70, VELOCIDAD_SCROLL = 14;
+let ultimoArrastre = 0;
+const acabaDeArrastrar = () => Date.now() - ultimoArrastre < 350;
+
+function activarArrastre(cont, ctx, porId) {
+  // La raíz de Rush y el contenedor con scroll se buscan al levantar la carta:
+  // al activar el arrastre la pantalla todavía no está en el documento
+  let raiz = null, main = null;
+  let a = null;   // arrastre en curso
+
+  const origenDe = el => el.classList.contains('slr-hueco')
+    ? { l: el.dataset.l, i: Number(el.dataset.i), id: el.dataset.id }
+    : { id: el.dataset.id };
+
+  function levantar() {
+    raiz = cont.closest('.slr') ?? document.body;
+    main = cont.closest('.slr-main');
+    a.activo = true;
+    clearTimeout(a.temporizador);
+    const carta = a.el.querySelector('.slr-carta');
+    const r = carta.getBoundingClientRect();
+    // La carta no tapa el destino: con el dedo flota por encima de él; con el
+    // ratón va abajo a la derecha del cursor, como el arrastre del sistema
+    if (a.tipo === 'mouse') { a.dx = -14; a.dy = -14; }
+    else { a.dx = r.width / 2; a.dy = r.height + 28; }
+    a.fantasma = carta.cloneNode(true);
+    a.fantasma.classList.add('slr-fantasma');
+    a.fantasma.classList.remove('is-activa');
+    a.fantasma.style.width = `${r.width}px`;
+    raiz.appendChild(a.fantasma);
+    a.el.classList.add('es-origen');
+    raiz.classList.add('slr-arrastrando');
+    try { a.el.setPointerCapture(a.pointerId); } catch { /* el puntero ya no existe */ }
+    navigator.vibrate?.(12);
+    colocar();
+  }
+
+  function colocar() {
+    if (!a?.fantasma) return;
+    a.fantasma.style.transform = `translate3d(${a.x - a.dx}px, ${a.y - a.dy}px, 0) rotate(-4deg) scale(${a.tipo === 'mouse' ? 0.9 : 1.05})`;
+    // Destino bajo el dedo (el fantasma no recibe eventos: pointer-events none)
+    const bajo = document.elementFromPoint(a.x, a.y);
+    const destino = bajo?.closest('.slr-hueco, [data-libres]');
+    const valido = destino && cont.contains(destino) && destino !== a.el;
+    marcarDestino(valido ? destino : null);
+  }
+
+  function marcarDestino(d) {
+    if (d === a.destino) return;
+    a.destino?.classList.remove('es-destino');
+    a.destino?.querySelector('.slr-hueco__previsto')?.remove();
+    a.destino = d;
+    if (!d) return;
+    d.classList.add('es-destino');
+    if (d.classList.contains('slr-hueco')) {
+      // La stat que tendría la carta en ese hueco
+      const c = porId.get(a.origen.id), l = d.dataset.l;
+      const mal = rindeMal(c, l);
+      d.insertAdjacentHTML('beforeend',
+        `<span class="slr-hueco__previsto ${mal ? 'es-mal' : ''}">${STAT[l]} ${valorEnHueco(c, l)}${mal ? ' · rinde mal' : ''}</span>`);
+    }
+  }
+
+  // Desplazamiento automático al llevar la carta al borde de la pantalla
+  function desplazar() {
+    if (!a?.activo || !main) return;
+    const r = main.getBoundingClientRect();
+    let v = 0;
+    if (a.y < r.top + BORDE_SCROLL) v = -VELOCIDAD_SCROLL * (1 - (a.y - r.top) / BORDE_SCROLL);
+    else if (a.y > r.bottom - BORDE_SCROLL) v = VELOCIDAD_SCROLL * (1 - (r.bottom - a.y) / BORDE_SCROLL);
+    if (v) { main.scrollTop += v; colocar(); }
+    a.scroll = requestAnimationFrame(desplazar);
+  }
+
+  function terminar(soltar) {
+    if (!a) return;
+    const { activo, destino, origen } = a;
+    clearTimeout(a.temporizador);
+    cancelAnimationFrame(a.scroll);
+    a.fantasma?.remove();
+    a.el.classList.remove('es-origen');
+    destino?.classList.remove('es-destino');
+    destino?.querySelector('.slr-hueco__previsto')?.remove();
+    raiz?.classList.remove('slr-arrastrando');
+    document.removeEventListener('touchmove', bloquearScroll);
+    window.removeEventListener('popstate', cancelar);
+    a = null;
+    if (!activo) return;
+    ultimoArrastre = Date.now();
+    if (!soltar || !destino) return;
+    const capitanPerdido = destino.hasAttribute('data-libres')
+      ? mover(origen, { libre: true })
+      : mover(origen, { l: destino.dataset.l, i: Number(destino.dataset.i) });
+    if (capitanPerdido) toast(AVISO_CAPITAN, 'info');
+    pintarTodo(cont, ctx);   // las fuerzas de línea se recalculan al soltar
+  }
+  const cancelar = () => terminar(false);
+  function bloquearScroll(e) { if (a?.activo) e.preventDefault(); }
+
+  cont.addEventListener('pointerdown', e => {
+    const el = e.target.closest('.slr-hueco.lleno, .slr-libre');
+    if (!el || el.disabled || e.button > 0 || a) return;
+    a = { el, origen: origenDe(el), pointerId: e.pointerId, tipo: e.pointerType,
+          x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, activo: false };
+    // Antes de que empiece el scroll: así se puede cancelar desde el primer touchmove
+    document.addEventListener('touchmove', bloquearScroll, { passive: false });
+    window.addEventListener('popstate', cancelar);   // el botón atrás cancela el arrastre
+    if (e.pointerType !== 'mouse') a.temporizador = setTimeout(() => { if (a && !a.activo) { levantar(); desplazar(); } }, PULSACION_MS);
+  });
+
+  cont.addEventListener('pointermove', e => {
+    if (!a || e.pointerId !== a.pointerId) return;
+    a.x = e.clientX;
+    a.y = e.clientY;
+    if (!a.activo) {
+      const d = Math.hypot(a.x - a.x0, a.y - a.y0);
+      if (a.tipo === 'mouse' && d > UMBRAL_RATON) { levantar(); desplazar(); }
+      else if (a.tipo !== 'mouse' && d > UMBRAL_DEDO) terminar(false);   // era un scroll
+      return;
+    }
+    if (!a.pendiente) {
+      a.pendiente = true;
+      requestAnimationFrame(() => { if (a) { a.pendiente = false; colocar(); } });
+    }
+  });
+  cont.addEventListener('pointerup', e => { if (a && e.pointerId === a.pointerId) terminar(true); });
+  cont.addEventListener('pointercancel', e => { if (a && e.pointerId === a.pointerId) terminar(false); });
+  cont.addEventListener('keydown', e => { if (e.key === 'Escape') cancelar(); });
+  // Sin menú contextual ni selección al mantener pulsado
+  cont.addEventListener('contextmenu', e => { if (e.target.closest('.slr-hueco, .slr-libre')) e.preventDefault(); });
+}
+
 /* ── Eventos ─────────────────────────────────────────────────────────────── */
 function enlazar(cont, ctx, porId, bloqueada) {
   const { datos } = ctx;
   const repintar = () => pintarTodo(cont, ctx);
 
   cont.querySelectorAll('[data-formacion]').forEach(b => b.addEventListener('click', () => { cambiarFormacion(b.dataset.formacion); repintar(); }));
-  cont.querySelectorAll('.slr-hueco').forEach(b => b.addEventListener('click', () => elegir(b.dataset.l, Number(b.dataset.i), cont, ctx, porId)));
+  cont.querySelectorAll('.slr-hueco').forEach(b => b.addEventListener('click', () => {
+    if (acabaDeArrastrar()) return;   // el clic que llega al soltar un arrastre
+    elegir(b.dataset.l, Number(b.dataset.i), cont, ctx, porId);
+  }));
+  cont.querySelectorAll('.slr-libre').forEach(b => b.addEventListener('click', () => {
+    if (!acabaDeArrastrar() && !bloqueada) toast('Mantén pulsada la carta y suéltala en un hueco, o toca el hueco para elegirla', 'info');
+  }));
   cont.querySelector('[data-manual]')?.addEventListener('change', e => { borrador.orden_manual = e.target.checked; repintar(); });
   cont.querySelectorAll('[data-subir],[data-bajar]').forEach(b => b.addEventListener('click', () => {
     const i = Number(b.dataset.subir ?? b.dataset.bajar), k = b.dataset.subir != null ? i - 1 : i + 1;
@@ -304,4 +504,6 @@ export async function pintar(cont, ctx) {
   reiniciar(ctx.datos);
   pronostico = null;
   pintarTodo(cont, ctx);
+  // Los listeners del arrastre van en el contenedor, que no se sustituye al repintar
+  if (!alineacionBloqueada()) activarArrastre(cont, ctx, new Map(ctx.datos.cartas.map(c => [c.id, c])));
 }

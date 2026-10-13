@@ -156,6 +156,29 @@ Puntos que ni la especificación ni el encargo fijaban del todo y que el motor r
 - **La carta** (`js/slr/carta.js` + `.slr-carta` en `css/slr.css`) es independiente de las pantallas: escala con `cqw` (container queries) a cualquier tamaño, marcador con iniciales y siluetas (una por persona en dúos y tríos) en el color del tipo (verde, azul, morado, oro), imagen de Cloudinary recortada 5:7 si existe. Foil: `linear-gradient` con el espectro (hsl 0–360) en `color-dodge` que sigue el dedo (pointermove) o la inclinación (deviceorientation; en iOS se pide permiso al tocar una carta foil), con una leve inclinación 3D y animación de 4 s en reposo. Con `prefers-reduced-motion` no hay animaciones ni inclinación (el dedo sigue moviendo el brillo).
 - **Las notificaciones** de Inicio se marcan como leídas al mostrarse (siguen marcadas como nuevas hasta salir de la pantalla).
 
+### Pulido (rendimiento de las cartas, hoja y arrastrar en la alineación)
+
+- **Todas las cartas se inclinan en 3D** siguiendo el ratón (PC) o el giroscopio (móvil: todas las visibles a la vez). El brillo y el degradado siguen siendo solo de los acabados. Con `prefers-reduced-motion` no hay inclinación ni animaciones.
+- **Rendimiento** (medido con `node tests/slr/banco/medir.mjs`, que graba la traza de DevTools, la del panel Performance, en Chrome con la CPU ×4 y 15 cartas):
+  - los eventos solo guardan la posición y se aplica una vez por frame (rAF);
+  - se escriben dos variables (`--x`, `--y`), registradas con `@property` como no heredables, solo en los elementos que se mueven: el marco y, en el foil, sus dos capas;
+  - el CSS las convierte en `transform`; las capas de los acabados son hijos más grandes que la carta desplazados con `transform`, y las animaciones de reposo usan solo `transform` y `opacity`, nunca `background-position` ni sombras animadas;
+  - `will-change` solo durante la interacción, más dos frames de "precalentamiento" cuando la carta aparece;
+  - un único `deviceorientation` para toda la pantalla, suavizado en JS; solo se mueven las cartas visibles (IntersectionObserver) y las que no se ven pausan sus animaciones.
+- **Lo que más pesaba y no era evidente:**
+  - las animaciones de los acabados repintaban en cada frame (incluso sin tocar nada);
+  - la transición del marco creaba una transición nueva en cada frame;
+  - Blink recalcula el estilo del elemento inclinado y de sus hijos directos, por eso el aspecto de la carta va en `.slr-carta__cara`, hijo único del marco;
+  - un selector universal (`… .slr-carta__marco *`) para pausar animaciones encarecía cada recálculo.
+- **`DeviceOrientationEvent.requestPermission`** ya existe también en Chrome: se pide al montar (Chrome y Android lo conceden sin preguntar) y, si el navegador exige un gesto (iOS), al tocar una carta.
+- **Hoja del hueco** en dos bloques: "Sin colocar" y "Ya colocadas" (indicando dónde está cada una: POR, DEF, MED, DEL o Banquillo; elegirla intercambia posiciones), los dos ordenados por la stat del hueco y con el aviso de "rinde mal aquí".
+- **Arrastrar y soltar** (Pointer Events + `setPointerCapture`, sin librerías):
+  - **Cómo se levanta:** con ratón, al moverla más de 5 px con el botón pulsado; con el dedo, manteniendo pulsado 250 ms. Si el dedo se mueve más de 8 px antes, es scroll y no arrastre.
+  - **Durante el arrastre:** un `touchmove` no pasivo bloquea el scroll. La carta flota encima del dedo (o junto al cursor) para no tapar el destino, el destino se ilumina con la stat que tendría allí y la página se desplaza sola cerca de los bordes.
+  - **Dónde se suelta:** en cualquier hueco (ocupado = intercambio; vacío = se mueve) o en la nueva franja "Sin colocar" de la pantalla (sale de la alineación). Las fuerzas se recalculan al soltar.
+  - **Otros comportamientos:** el clic que llega tras soltar se ignora, así que un toque corto sigue abriendo la hoja de siempre. El botón atrás cancela el arrastre. Si el capitán sale del once (al banquillo o fuera), pierde la capitanía con un aviso.
+  - **Prueba:** `node tests/slr/banco/alineacion.mjs` lo prueba en Chrome headless con ratón y táctil.
+
 ## Balance de referencia (motor v1.1.0)
 
 `node tests/slr/balance.mjs`, 10.000 partidos por escenario:
