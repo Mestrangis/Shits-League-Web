@@ -896,12 +896,17 @@ button.slr-aviso:active { background: rgba(57,255,136,.08) !important; }
 .slr-carta--color-plata   { --c1: #DCE4EC; --c2: #2B333C; }
 .slr-carta--color-negro   { --c1: #9AA39E; --c2: #050605; }
 
-/* Levantada con el ratón (fuera de la alineación): sigue al puntero y vuelve con rebote */
-.slr-carta.is-levantada { z-index: 60; cursor: grabbing; transition: none; }
+/* Carta levantada (ratón o pulsación larga, fuera de la alineación): una copia en
+   una capa fija en <body> sigue al puntero y vuelve con rebote; la original
+   guarda el hueco invisible (is-origen) */
+.slr-capa-arrastre { position: fixed; inset: 0; z-index: 450; pointer-events: none; font-family: 'Sora', sans-serif; }
+.slr-capa-arrastre *, .slr-capa-arrastre *::before, .slr-capa-arrastre *::after { box-sizing: border-box; }
+.slr-capa-arrastre .slr-carta { position: absolute; cursor: grabbing; will-change: transform; }
+.slr-carta.is-origen { visibility: hidden; }
 .slr-carta.is-levantada .slr-carta__cara { box-shadow:
     inset 0 0 0 1.4cqw color-mix(in srgb, var(--c1) 70%, #000), inset 0 0 0 2.2cqw rgba(0,0,0,.35),
     0 8cqw 18cqw rgba(0,0,0,.65); }
-.slr-carta.is-volviendo { z-index: 60; transition: transform .6s cubic-bezier(.34, 1.56, .64, 1); }
+.slr-carta.is-volviendo { transition: transform .6s cubic-bezier(.34, 1.56, .64, 1); }
 
 /* --x, --y ∈ [0, 1]: posición del ratón, del dedo o del giroscopio sobre la carta
    (js/slr/carta.js las escribe una vez por frame en el marco y en las capas del
@@ -1335,3 +1340,80 @@ button.slr-aviso:active { background: rgba(57,255,136,.08) !important; }
 .slr-editor__poder { display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 12px; background: rgba(255,255,255,.03); border: 1px solid rgba(31,224,101,.1); }
 .slr-editor__quitar { flex: 0 0 40px; height: 40px; border-radius: 10px; background: rgba(255,90,90,.12) !important; color: #FF9C9C !important; font-size: 16px; }
 .slr-detalle__editar { width: 100%; margin-top: 14px; }
+
+/* ═══════════════════════════════════════════════
+   PC (≥ 900 px): paneles integrados y amplios, no ventanas de móvil
+   · Las hojas a pantalla completa (álbum, plantillas, muestrario, formulario,
+     crónica, ficha de equipo, detalle) son un panel centrado de hasta 1180 px
+     con márgenes; hace scroll toda la capa (un único scroll, discreto) y no el
+     cuerpo de la hoja. La cabecera del panel se queda arriba.
+   · Las hojas pequeñas (confirmar, "Dar a…", avisos) son un diálogo centrado.
+   · Rejillas de cartas a 4-5 columnas.
+═══════════════════════════════════════════════ */
+@media (min-width: 900px) {
+  .slr-main, .slr-hoja--completa { scrollbar-width: thin; scrollbar-color: rgba(57,255,136,.3) transparent; }
+  .slr-main::-webkit-scrollbar, .slr-hoja--completa::-webkit-scrollbar { width: 10px; }
+  .slr-main::-webkit-scrollbar-thumb, .slr-hoja--completa::-webkit-scrollbar-thumb {
+    background: rgba(57,255,136,.25); border-radius: 10px; border: 3px solid transparent; background-clip: padding-box; }
+  .slr-main::-webkit-scrollbar-track, .slr-hoja--completa::-webkit-scrollbar-track { background: transparent; }
+
+  /* Pantallas de la barra con rejillas o listas: más anchas (Equipo sigue igual) */
+  .slr-pantalla[data-seccion="plantilla"], .slr-pantalla[data-seccion="liga"], .slr-pantalla[data-seccion="mercado"] { max-width: 1180px; padding-left: 32px; padding-right: 32px; }
+
+  /* Hojas completas → panel integrado */
+  .slr-hoja--completa { overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; align-items: flex-start; padding: 28px 32px 48px; }
+  .slr-hoja--completa .slr-hoja__fondo { position: fixed; }
+  .slr-hoja--completa .slr-hoja__caja {
+    width: 100%; max-width: 1180px; height: auto; max-height: none; margin: 0 auto;
+    border: 1px solid var(--slr-borde); border-radius: 22px;
+    box-shadow: 0 24px 70px rgba(0,0,0,.5);
+    opacity: 0; transform: translateY(18px);
+    transition: transform .24s cubic-bezier(.2,.8,.2,1), opacity .2s;
+  }
+  .slr-hoja--completa.abierta .slr-hoja__caja { opacity: 1; transform: none; }
+  .slr-hoja--completa.cerrando .slr-hoja__caja { opacity: 0; transform: translateY(18px); }
+  .slr-hoja--completa .slr-hoja__cabecera {
+    position: sticky; top: 0; z-index: 6; padding: 20px 28px 14px;
+    border-radius: 22px 22px 0 0; background: linear-gradient(180deg, #0D2818 82%, rgba(13,40,24,0));
+  }
+  .slr-hoja--completa .slr-hoja__titulo { font-size: 26px; }
+  .slr-hoja--completa .slr-hoja__cuerpo { overflow: visible; padding: 6px 28px 32px; }
+
+  /* Hojas pequeñas → diálogo centrado */
+  .slr-hoja:not(.slr-hoja--completa) { align-items: center; padding: 24px; }
+  .slr-hoja:not(.slr-hoja--completa) .slr-hoja__caja {
+    max-width: 560px; max-height: min(84vh, 760px); border-radius: 22px; border-bottom: 1px solid var(--slr-borde);
+    box-shadow: 0 24px 60px rgba(0,0,0,.55);
+    opacity: 0; transform: translateY(14px) scale(.98);
+    transition: transform .22s cubic-bezier(.2,.8,.2,1), opacity .18s;
+  }
+  .slr-hoja:not(.slr-hoja--completa).abierta .slr-hoja__caja { opacity: 1; transform: none; }
+  .slr-hoja:not(.slr-hoja--completa).cerrando .slr-hoja__caja { opacity: 0; transform: translateY(14px) scale(.98); }
+  .slr-hoja:not(.slr-hoja--completa) .slr-hoja__cabecera::before { display: none; }
+
+  /* Rejillas de cartas: 4-5 columnas cómodas */
+  .slr-rejilla { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 24px 20px; }
+
+  /* Detalle: carta a la izquierda y la información a la derecha */
+  .slr-detalle { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 32px; align-items: start; }
+  .slr-detalle__carta { width: 100%; margin: 0; position: sticky; top: 72px; }
+
+  /* Herramienta de plantillas: filtros en una fila y resultados a dos columnas */
+  .slr-filtros { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .slr-filtros label:last-child { grid-column: auto; }
+  .slr-plantillas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; }
+
+  /* Formulario de carta: vista previa fija a la izquierda, campos a la derecha */
+  .slr-editor { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 16px 32px; align-items: start; }
+  .slr-editor > :not(.slr-editor__lado):not(datalist) { grid-column: 2; }
+  .slr-editor__lado { grid-column: 1; grid-row: 1 / span 20; position: sticky; top: 72px; display: flex; flex-direction: column; gap: 10px; }
+  .slr-editor__vista { width: 100%; margin: 0; }
+
+  /* Muestrario: colores en una fila y pares más contenidos */
+  .slr-muestrario__colores { grid-template-columns: repeat(8, minmax(0, 1fr)); }
+  .slr-muestrario__par { grid-template-columns: repeat(2, minmax(0, 260px)); justify-content: start; gap: 20px; }
+  .slr-muestrario__xs { max-width: 110px; }
+
+  /* Crónica y ficha de equipo: texto a un ancho cómodo dentro del panel */
+  .slr-cronica, .slr-ficha-eq { max-width: 1100px; }
+}

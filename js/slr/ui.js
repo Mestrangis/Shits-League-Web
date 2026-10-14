@@ -110,6 +110,12 @@ export function hoja(html, { titulo = '', completa = false, clase = '', alCerrar
   return el;
 }
 
+// Elemento que hace scroll en una hoja: en PC las hojas completas son un panel
+// amplio y el scroll es el de toda la capa; en móvil, el del cuerpo de la hoja
+export function scrollDeHoja(el) {
+  return getComputedStyle(el).overflowY === 'auto' ? el : el.querySelector('.slr-hoja__cuerpo');
+}
+
 // Devuelve una promesa: true si se confirma. escribir: palabra que hay que teclear.
 export function confirmar({ titulo, texto, ok = 'Confirmar', peligro = false, escribir = null }) {
   return new Promise(resolve => {

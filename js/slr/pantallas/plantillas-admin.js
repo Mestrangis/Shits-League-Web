@@ -10,7 +10,7 @@
    que tocar las tablas cartas o equipos a mano.
 ═══════════════════════════════════════════════ */
 import { rpc } from '../api.js';
-import { esc, hoja, cerrarCapa, conEspera, toast, monedas } from '../ui.js';
+import { esc, hoja, cerrarCapa, conEspera, toast, monedas, scrollDeHoja } from '../ui.js';
 import { cartaHTML, normalizarCarta, TIPOS, ACABADOS } from '../carta.js';
 
 const POR_PAGINA = 30;
@@ -102,7 +102,7 @@ export async function abrirPlantillas(ctx) {
   }
 
   // Scroll infinito: a menos de 400 px del final se pinta otra página
-  const cuerpo = el.querySelector('.slr-hoja__cuerpo');
+  const cuerpo = scrollDeHoja(el);
   cuerpo.addEventListener('scroll', () => {
     if (pintadas < visibles.length && cuerpo.scrollTop + cuerpo.clientHeight > cuerpo.scrollHeight - 400) pintarPagina();
   }, { passive: true });

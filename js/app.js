@@ -195,7 +195,21 @@ function initHero() {
 }
 
 /* ── Tabs ────────────────────────────────────────────────────────────────── */
-const TABS = ['inicio', 'votacion', 'resumen', 'clasificacion', 'goleadores', 'asistentes', 'plantilla', 'rush'];
+// Rush va la primera (a la izquierda de Inicio); la app sigue abriéndose en Inicio
+const TABS = ['rush', 'inicio', 'votacion', 'resumen', 'clasificacion', 'goleadores', 'asistentes', 'plantilla'];
+
+// Móvil: en la pestaña Rush se oculta la cabecera grande (hero). Se guarda el
+// scroll de las demás pestañas para devolverlo igual al salir de Rush.
+const MQ_MOVIL = window.matchMedia('(max-width: 899px)');
+let scrollAntesDeRush = null;
+function ajustarCabeceraRush(nueva, anterior, scrollAntes) {
+  const enRush = nueva === 'rush';
+  if (enRush && anterior !== 'rush') scrollAntesDeRush = scrollAntes;
+  document.body.classList.toggle('en-rush', enRush);
+  if (!MQ_MOVIL.matches) return;
+  if (enRush) window.scrollTo({ top: 0, behavior: 'instant' });
+  else if (anterior === 'rush' && scrollAntesDeRush != null) window.scrollTo({ top: scrollAntesDeRush, behavior: 'instant' });
+}
 
 // '#votacion' → 'votacion'; null si el hash no es una pestaña.
 // Permite que las notificaciones enlacen a una pestaña concreta.
@@ -222,7 +236,9 @@ function initTabs() {
 // (solo cuando el cambio viene de un swipe; con click no hay animación)
 function switchTab(name, { desde } = {}) {
   if (name === STATE.activeTab) return;
-  const saliente = document.getElementById(`panel-${STATE.activeTab}`);
+  const anterior = STATE.activeTab;
+  const scrollAntes = window.scrollY;   // antes de cambiar de panel (luego puede quedar recortado)
+  const saliente = document.getElementById(`panel-${anterior}`);
   STATE.activeTab = name;
 
   document.querySelectorAll('.tab').forEach(t => {
@@ -235,6 +251,7 @@ function switchTab(name, { desde } = {}) {
   );
 
   renderTabIfNeeded(name);
+  ajustarCabeceraRush(name, anterior, scrollAntes);   // con el panel nuevo ya visible (su altura cuenta para el scroll)
   if (desde) deslizarPaneles(saliente, document.getElementById(`panel-${name}`), desde);
   history.replaceState(null, '', `#${name}`);
   actualizarRefrescoVotaciones();
@@ -668,7 +685,8 @@ async function init() {
   if (tabInicial) {
     switchTab(tabInicial);
     // Si se entra con hash (p. ej. desde una notificación), saltamos el hero
-    document.querySelector('.main').scrollIntoView({ block: 'start', behavior: 'instant' });
+    // (en Rush, en móvil, el hero ya está oculto)
+    if (!(tabInicial === 'rush' && MQ_MOVIL.matches)) document.querySelector('.main').scrollIntoView({ block: 'start', behavior: 'instant' });
   }
   window.addEventListener('hashchange', () => {
     const tab = tabDesdeHash();

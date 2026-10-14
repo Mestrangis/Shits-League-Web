@@ -527,3 +527,56 @@ Los goles dependen mucho de la formación (con un solo defensa la ocasión llega
 
 - Con dúo y trío, la mitad de los partidos tiene entre 3 y 6 activaciones.
 - Las plantillas iniciales beta casi no tienen poderes: solo 20 de las 250 individuales tienen uno, y van en tiers bajos. Con el catálogo real por tiers pasará lo mismo, porque las plantillas iniciales son D, E y F. Los poderes llegan con las cartas del mercado.
+
+## Ajustes de interfaz: Rush primero, PC integrado y arrastre en móvil
+
+### Decisiones de Marcos
+
+- **Pestaña Rush:**
+  - Es la **primera** de la barra, a la izquierda de Inicio. Solo aparece con sesión y acceso beta.
+  - La app sigue abriéndose en Inicio y el funcionamiento de Rush no cambia (panel con JUGAR).
+  - El swipe respeta el orden: desde Inicio, deslizar hacia la derecha lleva a Rush.
+  - En **móvil**, con Rush activa se oculta la cabecera grande (hero); se quedan la barra superior y las pestañas. En PC no cambia.
+- **PC (≥ 900 px):** álbum, plantilla, muestrario, herramienta de plantillas, formulario de carta, crónica y ficha de equipo se ven como un **panel integrado y amplio**.
+  - Centrado, de hasta 1180 px, con márgenes.
+  - Un único scroll discreto, sin scroll horizontal.
+  - Rejillas de 4 a 5 columnas.
+  - Las hojas pequeñas, como diálogos centrados.
+  - La carta arrastrada va en una capa encima de todo.
+- **Arrastre en móvil:**
+  - Mantener pulsada una carta (~300 ms) la levanta y se arrastra con inclinación; al soltar vuelve con un rebote, con vibración corta al levantarla.
+  - Un toque corto abre la ficha.
+  - En la alineación, la pulsación larga sigue colocando jugadores.
+  - Nunca sale el menú de guardar o copiar imagen.
+
+### Decisiones mías
+
+- **Orden de pestañas:**
+  - `TABS` en `app.js` empieza por `rush`, y en `index.html` su botón va el primero.
+  - El swipe usa `tabsVisibles()`, así que respeta el orden solo. Sin acceso a Rush, Inicio vuelve a ser la primera.
+- **Cabecera en móvil** (`max-width: 899px`, el mismo corte que el resto de Rush):
+  - `switchTab` pone `body.en-rush` y el CSS oculta `.hero-section`.
+  - Al entrar en Rush se sube arriba del todo. Se guarda el scroll que había **antes** de cambiar de panel: después ya está recortado por la altura de Rush, y ese fallo apareció en las pruebas.
+  - Al salir se devuelve el scroll guardado, una vez que el panel nuevo ya ocupa su altura.
+  - Si se entra con `#rush` en móvil, no se hace el salto al contenido (no hay hero que saltar).
+- **Panel de PC:**
+  - Las hojas completas pasan de "ventana de 760 px con scroll en el cuerpo" a una capa con `overflow-y: auto` y la caja con altura natural. Hace scroll toda la capa, como una página.
+  - El fondo oscuro queda fijo y la cabecera del panel, pegada arriba (`sticky`).
+  - Al abrir, aparece con un fundido en lugar de subir desde abajo.
+  - Scrollbar fina en el verde de la app (`scrollbar-width: thin` y `::-webkit-scrollbar`).
+  - `scrollDeHoja(el)` en `ui.js` devuelve el elemento que hace scroll (capa en PC, cuerpo en móvil). Lo usa el scroll infinito de la herramienta de plantillas.
+- **Pantallas de la barra en PC:**
+  - Plantilla, Liga y Mercado se ensanchan a 1180 px (`.slr-pantalla[data-seccion]`). Equipo y Perfil se quedan como estaban: el campo y los formularios no ganan nada estirándose.
+  - Rejillas con `minmax(200px, 1fr)`, que da 5 columnas a 1180 px.
+- **Distribución dentro del panel:**
+  - El detalle y el formulario de carta, en dos columnas: carta fija a la izquierda, información o campos a la derecha. En el formulario, la vista previa y el resumen van dentro de `.slr-editor__lado`.
+  - La herramienta de plantillas, con los filtros en una fila y los resultados a dos columnas.
+- **Carta levantada:**
+  - Una **copia** de la carta va a una capa `.slr-capa-arrastre` en `<body>` (`position: fixed`, z-index 450, por encima de Rush y sus hojas). La original deja su hueco invisible (`is-origen`), así la rejilla no se mueve.
+  - Al soltar, la copia vuelve con rebote y desaparece.
+  - En táctil se añade un `touchmove` no pasivo que bloquea el scroll solo mientras la carta está levantada. Si el dedo se mueve más de 10 px antes de los 300 ms, era un scroll y no se levanta.
+  - El clic que llega al soltar se anula, así que una pulsación larga ya no abre la ficha (antes sí). Solo un toque corto la abre.
+- **Probado** en el navegador a 375×812, 1280×800 y 1920×1080:
+  - Ninguna pantalla tiene scroll interno ni horizontal.
+  - La carta arrastrada sale del panel sin cortarse.
+  - Swipe, `#rush` y la vuelta a otras pestañas con su scroll funcionan.

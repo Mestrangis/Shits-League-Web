@@ -18,10 +18,11 @@
    El nombre se ajusta a su largo (--n): letra más pequeña hasta un mínimo y,
    si aun así no cabe, dos líneas.
    Interacción (iniciarAcabados): sin menú de "guardar imagen" ni arrastre del
-   navegador; mantener pulsada una carta (móvil) hace lo mismo que tocarla;
-   con el ratón, arrastrarla la levanta, se inclina con la velocidad y vuelve
-   a su sitio con un rebote. En la alineación (huecos y cartas libres) manda
-   su propio arrastre.
+   navegador. Con el ratón (arrastrar) o el dedo (mantener pulsado 300 ms) la
+   carta se levanta: una copia sube a una capa en <body> (nunca la corta su
+   contenedor), sigue al puntero inclinándose con la velocidad y al soltar
+   vuelve a su sitio con un rebote. Un toque o clic corto abre la carta. En la
+   alineación (huecos y cartas libres) manda su propio arrastre.
    Solo depende de ui.js (esc, iniciales); los estilos están en
    css/slr.css bajo .slr-carta.
 ═══════════════════════════════════════════════ */
@@ -362,44 +363,63 @@ export function iniciarAcabados(raiz) {
     { capture: true, passive: true });
 }
 
-/* ── Interacción: mantener pulsado y levantar con el ratón ──────────────── */
+/* ── Interacción: levantar la carta (ratón o pulsación larga) ────────────── */
 // En la alineación las cartas se arrastran para colocarlas (alineacion.js)
 const CON_ARRASTRE_PROPIO = '.slr-hueco, .slr-libre, .slr-campo-juego, .slr-quietas';
-const PULSACION_MS = 480;
+const PULSACION_MS = 300;                 // dedo: mantener pulsado para levantar
 const UMBRAL_DEDO = 10, UMBRAL_RATON = 5;
-let pulsacion = null;          // { carta, x0, y0, temporizador }
-let levantada = null;          // { carta, id, x0, y0, dx, dy, ultX, ultT, giro, activa, frame }
+let levantada = null;   // { carta, id, tipo, x0, y0, dx, dy, ultX, ultT, giro, activa, frame, temporizador, copia }
 let anularClicHasta = 0;
+let capa = null;        // portal en <body>: la carta levantada nunca la corta su contenedor
 
-// Lo que se toca de la carta: el botón o elemento pulsable que la contiene
-const pulsableDe = carta => carta.closest('button, a[href], [role="button"], [data-id], [data-carta-abrir]');
+function capaArrastre() {
+  if (!capa?.isConnected) {
+    capa = document.createElement('div');
+    capa.className = 'slr-capa-arrastre';
+    capa.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(capa);
+  }
+  return capa;
+}
 
-function mantener() {
-  const { carta } = pulsacion;
-  pulsacion = null;
-  const objetivo = pulsableDe(carta);
-  if (!objetivo || objetivo.disabled) return;
-  navigator.vibrate?.(12);
-  objetivo.click();
-  anularClicHasta = Date.now() + 700;   // el clic que llega al soltar no repite la acción
+// Bloquea el scroll del dedo mientras la carta está levantada
+function bloquearScroll(e) { if (levantada?.activa) e.preventDefault(); }
+
+// La carta original deja su hueco (invisible) y una copia sube a la capa del body
+function levantar() {
+  const l = levantada;
+  l.activa = true;
+  const r = l.carta.getBoundingClientRect();
+  const copia = l.carta.cloneNode(true);
+  copia.classList.add('is-levantada');
+  copia.classList.remove('is-activa');
+  Object.assign(copia.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });
+  capaArrastre().appendChild(copia);
+  l.copia = copia;
+  l.carta.classList.add('is-origen');
+  if (l.tipo !== 'mouse') navigator.vibrate?.(15);
+  pintarLevantada();
 }
 
 function pintarLevantada() {
   const l = levantada;
+  if (!l?.copia) return;
   l.frame = 0;
-  l.carta.style.transform = `translate3d(${l.dx}px, ${l.dy}px, 0) rotate(${l.giro.toFixed(2)}deg) scale(1.06)`;
+  l.copia.style.transform = `translate3d(${l.dx}px, ${l.dy}px, 0) rotate(${l.giro.toFixed(2)}deg) scale(1.06)`;
 }
 
 function soltarLevantada() {
-  const { carta, activa, frame } = levantada;
+  const l = levantada;
   levantada = null;
-  if (frame) cancelAnimationFrame(frame);
-  if (!activa) return;
-  anularClicHasta = Date.now() + 350;   // ha sido un arrastre, no un clic
-  carta.classList.remove('is-levantada');
-  carta.classList.add('is-volviendo');
-  carta.style.transform = '';
-  setTimeout(() => carta.classList.remove('is-volviendo'), 650);
+  clearTimeout(l.temporizador);
+  document.removeEventListener('touchmove', bloquearScroll);
+  if (l.frame) cancelAnimationFrame(l.frame);
+  if (!l.activa) return;
+  anularClicHasta = Date.now() + 400;      // ha sido un arrastre, no un toque ni un clic
+  const { copia, carta } = l;
+  copia.classList.add('is-volviendo');
+  copia.style.transform = '';               // vuelve a su sitio con rebote
+  setTimeout(() => { copia.remove(); carta.classList.remove('is-origen'); }, 620);
 }
 
 function enlazarInteraccion(raiz) {
@@ -412,27 +432,24 @@ function enlazarInteraccion(raiz) {
 
   raiz.addEventListener('pointerdown', e => {
     const carta = e.target.closest('.slr-carta');
-    if (!carta || e.button > 0 || carta.closest(CON_ARRASTRE_PROPIO)) return;
-    if (e.pointerType === 'mouse') {
-      levantada = { carta, id: e.pointerId, x0: e.clientX, y0: e.clientY, dx: 0, dy: 0,
-                    ultX: e.clientX, ultT: performance.now(), giro: 0, activa: false, frame: 0 };
-    } else {
-      clearTimeout(pulsacion?.temporizador);
-      pulsacion = { carta, x0: e.clientX, y0: e.clientY, temporizador: setTimeout(mantener, PULSACION_MS) };
+    if (!carta || e.button > 0 || levantada || carta.closest(CON_ARRASTRE_PROPIO)) return;
+    const raton = e.pointerType === 'mouse';
+    levantada = { carta, id: e.pointerId, tipo: e.pointerType, x0: e.clientX, y0: e.clientY, dx: 0, dy: 0,
+                  ultX: e.clientX, ultT: performance.now(), giro: 0, activa: false, frame: 0, copia: null };
+    if (!raton) {
+      // Antes de que empiece el scroll, para poder cancelarlo si la carta se levanta
+      document.addEventListener('touchmove', bloquearScroll, { passive: false });
+      levantada.temporizador = setTimeout(() => { if (levantada && !levantada.activa) levantar(); }, PULSACION_MS);
     }
   });
   raiz.addEventListener('pointermove', e => {
-    if (pulsacion && Math.hypot(e.clientX - pulsacion.x0, e.clientY - pulsacion.y0) > UMBRAL_DEDO) {
-      clearTimeout(pulsacion.temporizador);
-      pulsacion = null;
-    }
     const l = levantada;
     if (!l || e.pointerId !== l.id) return;
     if (!l.activa) {
-      if (Math.hypot(e.clientX - l.x0, e.clientY - l.y0) < UMBRAL_RATON) return;
-      l.activa = true;
-      l.carta.classList.add('is-levantada');
-      try { l.carta.setPointerCapture(e.pointerId); } catch { /* sin captura: sigue dentro de la raíz */ }
+      const d = Math.hypot(e.clientX - l.x0, e.clientY - l.y0);
+      if (l.tipo === 'mouse' && d >= UMBRAL_RATON) levantar();
+      else if (l.tipo !== 'mouse' && d > UMBRAL_DEDO) { soltarLevantada(); return; }   // era un scroll
+      if (!l.activa) return;
     }
     // Inclinación según la velocidad horizontal (px/ms), suavizada
     const ahora = performance.now();
@@ -442,12 +459,10 @@ function enlazarInteraccion(raiz) {
     l.dx = e.clientX - l.x0; l.dy = e.clientY - l.y0;
     if (!l.frame) l.frame = requestAnimationFrame(pintarLevantada);
   }, { passive: true });
-  const fin = e => {
-    if (pulsacion) { clearTimeout(pulsacion.temporizador); pulsacion = null; }
-    if (levantada && e.pointerId === levantada.id) soltarLevantada();
-  };
-  raiz.addEventListener('pointerup', fin);
-  raiz.addEventListener('pointercancel', fin);
+  const fin = e => { if (levantada && e.pointerId === levantada.id) soltarLevantada(); };
+  // En la ventana: con el ratón fuera de la raíz o el dedo fuera de la carta también se suelta
+  window.addEventListener('pointerup', fin);
+  window.addEventListener('pointercancel', fin);
 }
 
 export function pararAcabados() {

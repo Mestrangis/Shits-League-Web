@@ -1487,3 +1487,9 @@ button, [role="button"], .modal__backdrop, .tab, .result-row, .card-wrap {
 /* El giro va en la propiedad rotate, aparte de transform (que lleva la escala):
    animar transform de scale(1) a rotate(360deg) se interpola como matriz y no gira */
 @keyframes ptr-giro { from { rotate: 0deg; } to { rotate: 360deg; } }
+
+/* Móvil: en la pestaña Rush no se ve la cabecera grande (hero); quedan la barra
+   superior y las pestañas para volver (app.js añade body.en-rush) */
+@media (max-width: 899px) {
+  body.en-rush .hero-section { display: none !important; }
+}

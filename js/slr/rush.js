@@ -265,7 +265,7 @@ export function navegar(id, { arriba = true } = {}) {
 
 export async function pintar({ arriba = false } = {}) {
   const n = ++pintando;
-  const cont = crear('<div class="slr-pantalla"></div>');
+  const cont = crear(`<div class="slr-pantalla" data-seccion="${seccion}"></div>`);
   const ctx = { navegar, recargar, pintar, datos };
   try {
     if (!datos.liga || !datos.equipo) await previa.pintar(cont, ctx);

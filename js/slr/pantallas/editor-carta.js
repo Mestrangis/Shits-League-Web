@@ -78,8 +78,10 @@ export async function abrirEditorCarta(ctx, { disenoId = null } = {}) {
 
   const el = hoja(`
     <form class="slr-editor" data-editor novalidate>
-      <div class="slr-editor__vista" data-vista></div>
-      <p class="slr-editor__resumen" data-resumen></p>
+      <div class="slr-editor__lado">
+        <div class="slr-editor__vista" data-vista></div>
+        <p class="slr-editor__resumen" data-resumen></p>
+      </div>
 
       <fieldset class="slr-editor__bloque">
         <legend>Foto</legend>
