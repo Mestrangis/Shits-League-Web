@@ -102,7 +102,7 @@ Puntos que ni la especificación ni el encargo fijaban del todo y que el motor r
   - *Simulación:* semilla criptográfica (`gen_random_bytes`), 200 simulaciones de pronóstico (semilla+1…+200) y el partido real con el motor v1.1.0. Se guardan goles, p_local, p_visitante, PR, PR esperado, versión del motor y semilla; las lesiones dejan la carta tocada para la siguiente jornada de su equipo. Cobros: salario 1.000, participación 100 (si se guardó o confirmó la alineación desde la jornada anterior; `slr_confirmar_alineacion` solo marca `guardada_en`), bonus sorpresa (7.3) y ojo clínico (7.4: últimos 3 partidos oficiales con el mismo equipo, máximo 3 cartas por equipo).
   - *Publicación:* el resultado se hace visible, el mercado se reabre, historial y notificaciones. Si era la última jornada, la temporada termina y la liga pasa a `entre_temporadas`.
   - *Desempate:* puntos, diferencia de goles, goles a favor, enfrentamiento directo y sorteo con `temporadas.semilla_desempate`.
-- **Edge Function `slr-simular`** (Deno) con exactamente `js/slr/motor-v1.1.0.js`. pg_cron la invoca con pg_net; el secreto está en Supabase Vault (`slr_cron_secreto`) y en los secretos de la función (`SLR_CRON_SECRETO`), nunca en el repo. También simula los **amistosos** al instante con las alineaciones guardadas (sin puntos, dinero, lesiones ni cansancio posterior; no cuentan para el ojo clínico; se guardan para poder verlos). Idempotente.
+- **Edge Function `slr-simular`** (Deno) con copias exactas de los motores (`js/slr/motor-vX.Y.Z.js`; desde la v1.2.0, ver más abajo, elige versión por partido). pg_cron la invoca con pg_net; el secreto está en Supabase Vault (`slr_cron_secreto`) y en los secretos de la función (`SLR_CRON_SECRETO`), nunca en el repo. También simula los **amistosos** al instante con las alineaciones guardadas (sin puntos, dinero, lesiones ni cansancio posterior; no cuentan para el ojo clínico; se guardan para poder verlos). Idempotente.
 - **Lecturas:** `slr_jornada`, `slr_partido` (solo publicado o amistoso), `slr_calendario`, `slr_clasificacion(token, liga, temporada)` y el pronóstico (~200 simulaciones contra el próximo rival).
 
 ### Plantillas iniciales baratas y equilibradas (añadido de Marcos)
@@ -117,7 +117,7 @@ Puntos que ni la especificación ni el encargo fijaban del todo y que el motor r
 
 - **Los cobros se calculan al simular pero se pagan al publicar** (`jornadas.cobros`). El saldo es público y, si se pagara al simular, el bonus sorpresa delataría el resultado antes de las 21:00. Lo mismo con las cartas tocadas por lesión: se marcan al publicar.
 - **Amistoso y pronóstico son acciones de la Edge Function** (`{accion: 'amistoso', token, rival_equipo_id}` y `{accion: 'pronostico', token, equipo_id}`), no funciones de Postgres: el motor solo corre en Deno. La función habla con la base de datos a través de funciones `motor_*` que solo puede ejecutar la clave de servicio, y el token de sesión se valida ahí. Se despliega con `--no-verify-jwt` porque la web no usa JWT de Supabase Auth; autorizan el secreto (cron) o el token de sesión (web).
-- **Copia del motor:** la CLI solo empaqueta `supabase/functions`, así que la función importa `supabase/functions/_shared/motor-v1.1.0.js`, copiada con `node supabase/seed/copiar-motor.mjs`. `tests/slr/motor-copia.test.mjs` comprueba que es idéntica byte a byte y que la función importa esa versión.
+- **Copia del motor:** la CLI solo empaqueta `supabase/functions`, así que la función importa `supabase/functions/_shared/motor-vX.Y.Z.js` (todas las versiones), copiadas con `node supabase/seed/copiar-motor.mjs`. `tests/slr/motor-copia.test.mjs` comprueba que son idénticas byte a byte y que la función las importa.
 - **Participación:** cuenta si la alineación se guardó o confirmó después de publicarse la jornada anterior (o del inicio de la temporada) y no es la automática.
 - **`alineaciones_cerradas()` y `liga_bloqueada()` son distintas:** la primera es solo la ventana cierre→publicación (bloquea guardar alineaciones); la segunda añade pausa, entre temporadas y terminada (bloquea el mercado). Entre temporadas se puede tocar la alineación.
 - **No se puede pausar ni terminar con una jornada en juego** (cerrada o simulada): hay que esperar a que se publique, para no dejar un partido a medias.
@@ -324,3 +324,91 @@ Puntos que ni la especificación ni el encargo fijaban del todo y que el motor r
 | v1.1.0 (posesión lineal) | 1-3-2 1,453 … 1-2-3 1,288 → diferencia 0,17 | 2-2-2 1,494 … 3-2-1 1,280 → diferencia 0,21 |
 
 Los goles dependen mucho de la formación (con un solo defensa la ocasión llega el 70 % de las veces). Cuando exista el catálogo real conviene volver a medir con alineaciones típicas.
+
+## Motor v1.2.0: equilibrio y poderes
+
+### Decisiones de Marcos
+
+- Con la v1.1.0 el partido era casi una moneda: un equipo claramente mejor perdía demasiado y recibía muchos contraataques. Marcos simuló alternativas y eligió estas reglas (`js/slr/motor-v1.2.0.js`, constantes en `CONFIG`):
+  - **Exponente 3** en los duelos de posesión, ocasión y chut: P = a³ / (a³ + b³) (`EXPONENTE_DUELO`). Se calcula como `a*a*a`, sin `Math.pow`. Los penaltis siguen con el cuadrático.
+  - **Posesión** con los pesos 1,0 / 0,7 / 0,2 para el CON de los MED (`PESOS_LINEA_POSESION`). Ataque y defensa siguen con 1,0 / 0,7 / 0,5 y el 30 % de los MED.
+  - **Ventaja de saque:** el equipo que saca multiplica su fuerza de posesión × 1,15 en el duelo, después de sus poderes (`BONUS_SAQUE`).
+  - **Cada poder se activa como mucho una vez por partido** (`PODER_UNA_VEZ`). Una vez activado ya no se sortea y no consume número del PRNG. Los "siempre" (tirador) no tienen límite. El capitán sigue con ×1,5 sobre la probabilidad.
+  - El resto de reglas y el orden del PRNG son los de la v1.1.0.
+- **La v1.1.0 no se borra.** Cada partido guarda `version_motor` y se reproduce con esa versión. Los nuevos (liga y amistosos) usan la v1.2.0.
+- **Catálogo beta:** probabilidad ~0,15 y efectos más altos (simple +0,20, fuerte +0,30, muy fuerte +0,40). Los de tirador "siempre" no cambian.
+- **Amistosos sin notificación**, y se borran las que había.
+- **Avisos que llevan a su sitio:**
+  - carta recibida o perdida → detalle de la carta;
+  - partido de liga → crónica;
+  - dinero cobrado → movimientos en Perfil;
+  - pausa, reanudación o temporada → estado de la liga.
+- **Herramienta de plantillas:** todas las cartas con búsqueda, filtros y orden. En "Dar a…", nombres de equipo enteros, el dueño debajo y X/15.
+
+### Decisiones mías
+
+- **Registro de motores** `js/slr/motores.js` (`MOTORES`, `MOTOR_ACTUAL`, `motorDe(version)`):
+  - La crónica reproduce con `motorDe(partido.version_motor)`. El aviso de "versión distinta" desaparece: ya no puede pasar.
+  - La alineación usa la v1.2.0 para las fuerzas.
+  - La Edge Function lleva las dos copias (`node supabase/seed/copiar-motor.mjs` copia todas). Simula cada jornada con la versión que tuvieran guardada sus partidos o, si no tienen, con la actual (`MOTOR_ACTUAL = '1.2.0'`). Amistosos y pronósticos usan siempre la actual.
+  - `motor-copia.test.mjs` comprueba byte a byte cada copia y que la función importa todas.
+- **Poder usado:** se marca en la copia interna de la carta (`usado`), nunca en la alineación de entrada. Un suplente entra con sus poderes sin usar.
+- **Evento `posesion`:** `fuerzas` ya incluye el ×1,15 del que saca, así que `p` = duelo(fuerzas del que saca, fuerzas del rival).
+- **`opciones.rng`** en `simularPartido`: un generador propio en lugar de mulberry32, solo para tests. Con un generador constante se cuentan los números consumidos y se demuestra que un poder ya usado no gasta ninguno. La web y el servidor no lo usan.
+- **Transformación del catálogo** (migración `20261014000000_slr_motor_v120.sql`, solo `beta = true`):
+  - Probabilidad nueva = 60 % de la anterior, entre 0,10 y 0,20, a dos decimales: 0,25 → 0,15 y 0,30 → 0,18.
+  - El efecto va según el nivel. Los de tirador conservan su multiplicador.
+  - El valor no cambia, porque el nivel tampoco.
+  - Las alineaciones ya congeladas guardan sus poderes, así que los partidos jugados no cambian.
+  - `tests/slr/catalogo-beta.mjs` hace el mismo cálculo en JS y `api-paso6.mjs` comprueba que la base de datos coincide.
+- **Destino de los avisos** (`notificaciones.destino_tipo` / `destino_id`):
+  - Lo pone un trigger `before insert` con `destino_notificacion()`, así que no hubo que tocar ninguna de las ~30 llamadas a `notificar`. Las antiguas se rellenaron en la migración.
+  - Tipos: `carta`, `partido`, `movimientos` (id = equipo) y `liga` (id = liga).
+  - Venta completada y cláusula cobrada van a movimientos (es dinero cobrado, aunque también se pierda la carta).
+  - Ofertas, subastas, elección automática y las cartas de la herramienta van a la carta.
+  - Jornada publicada va a la crónica del partido del equipo. Si descansó, a movimientos si cobró, y si no a la liga.
+  - Los intercambios no tienen destino (aún no hay pantalla de intercambios) y salen sin flecha.
+- **Panel de avisos:**
+  - Tarjetas anchas con icono por tipo.
+  - La carta y la crónica se abren encima de la lista (al cerrarlas se vuelve a los avisos).
+  - Movimientos y liga cierran la lista, van a Perfil o Liga y resaltan el bloque un momento.
+  - La pantalla Liga tiene ahora un bloque "Estado de la liga": estado, pausa o próxima jornada.
+- **`slr_admin_cartas`:** devuelve todas las cartas de la liga y los equipos con dueño y cartas ocupadas (`plantilla_ocupada`, que cuenta también los sobres pendientes). Se filtra y ordena en el navegador (~300 cartas). Se pinta en páginas de 30 al acercarse al final, con "Ver más" de respaldo. `slr_admin_buscar_cartas` se queda por compatibilidad.
+- **Nombres cortados:**
+  - "Dar a…" usa una lista propia (`.slr-lista-equipos`) que parte las líneas.
+  - La clasificación también cortaba los nombres con "…" y ahora los parte.
+  - El resto de listas de equipos (miembros, ficha, franja del rival) ya partían línea.
+  - El selector de rival del pronóstico es nativo y muestra el nombre entero al abrirlo.
+
+## Balance de referencia (motor v1.2.0)
+
+`node tests/slr/balance.mjs` (10.000 partidos por escenario). Entre paréntesis, lo que esperaba Marcos de sus simulaciones:
+
+- **Cartas iguales, 2-2-2, 75 contra 65** (mitad en casa, mitad fuera): gana el mejor el 76,2 % (~75), empata el 14,9 % (~16) y pierde el 8,9 %.
+  - Posesiones del mejor: 6,01 de 10 (~6).
+  - Contraataques que recibe: 1,49 por partido (~1,5).
+- **72 contra 68:** gana el mejor el 54,2 % (~55) y empata el 22,7 %.
+- **Espejo 70 contra 70:** 2,70 goles por partido (~2,7) y 24,7 % de empates.
+- **Equipos de prueba:**
+  - Los del Fondo contra sí mismo: 2,25 goles.
+  - Marcos FC contra sí mismo (un solo defensa): 4,35 goles.
+  - Marcos FC contra Los del Fondo: 37,9 % / 22,2 % / 39,8 %.
+  - Partidos con lesión: 6,7 %.
+- **Poderes activados por partido** (los dos equipos, catálogo beta, alineación por defecto):
+
+  | Escenario | Total | Sorteados |
+  |---|---|---|
+  | Plantillas iniciales (11 individuales) | 0,56 | 0,56 |
+  | Con 1 dúo y 1 trío por equipo | 5,55 | 4,95 |
+  | Con 2 dúos y 1 trío por equipo | 7,36 | 5,99 |
+
+  - Marcos esperaba ~2–4: con dúos y tríos sale más.
+  - Un poder de posesión al 15 % se activa en el 81 % de los partidos (10 sorteos hasta que sale). Uno de chut, en el 13 %.
+  - Los dúos (1,6 poderes de media) y los tríos (2,5) llevan muchos, y casi la mitad de los poderes del catálogo son de posesión.
+  - Para bajarlo basta con tocar el catálogo, sin motor nuevo: menos poderes por carta o menos de posesión.
+
+`node tests/slr/formaciones.mjs`: diferencia de puntos por partido entre la mejor y la peor formación.
+
+| | Plantilla neutra | Plantilla realista |
+|---|---|---|
+| v1.2.0 | 2-2-2 1,482 … 1-2-3 1,259 → 0,22 | 2-2-2 1,541 … 2-3-1 1,238 → 0,30 (~0,3) |

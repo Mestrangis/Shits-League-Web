@@ -18,7 +18,7 @@ import { rpc, leer } from '../api.js';
 import { esc, hoja } from '../ui.js';
 import { describirPoder } from '../carta.js';
 import { campoHTML, enlazarCampo } from '../campo.js';
-import { simularPartido, VERSION } from '../motor-v1.1.0.js';
+import { motorDe } from '../motores.js';
 
 const pct = p => `${Math.round(p * 100)} %`;
 const LETRAS = ['A', 'B'];
@@ -156,11 +156,10 @@ export async function abrirCronica(partidoId, ctx) {
     return c?.poderes?.find(x => x.nombre === nombrePoder) ?? null;
   };
 
-  // Reproducción en el navegador con la misma semilla
+  // Reproducción en el navegador con la misma semilla y la misma versión del motor
   let sim = null, aviso = '';
-  if (p.version_motor !== VERSION) aviso = `Este partido se jugó con el motor ${p.version_motor} y aquí está el ${VERSION}: la crónica puede no coincidir.`;
   try {
-    sim = simularPartido(al.local, al.visitante, p.semilla);
+    sim = motorDe(p.version_motor).simularPartido(al.local, al.visitante, p.semilla);
     if (sim.goles[0] !== p.goles[0] || sim.goles[1] !== p.goles[1]) {
       aviso = `Atención: al reproducir el partido sale ${sim.goles.join('-')} y el resultado guardado es ${p.goles.join('-')}.`;
     }

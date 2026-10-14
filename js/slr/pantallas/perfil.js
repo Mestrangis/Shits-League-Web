@@ -23,7 +23,7 @@ const TIPOS_MOV = {
 };
 const tipoMov = t => TIPOS_MOV[t] ?? (t.startsWith('sobre_') ? `Sobre ${t.slice(6)}` : t.replace(/_/g, ' '));
 
-const ESTADOS_LIGA = {
+export const ESTADOS_LIGA = {
   preparacion: 'En preparación', en_curso: 'En curso', pausada: 'En pausa',
   entre_temporadas: 'Entre temporadas', terminada: 'Terminada',
 };
@@ -189,7 +189,7 @@ export async function pintar(cont, ctx) {
     <section class="slr-saldo"><div><small>${esc(datos.liga.nombre)}</small><span>Saldo</span></div><b>${monedas(datos.equipo.saldo)}</b></section>
     <button class="slr-btn slr-btn--fantasma slr-btn--album" type="button" data-album>📖 Mi álbum</button>
     <div data-admin></div>
-    <section class="slr-tarjeta">
+    <section class="slr-tarjeta" data-movimientos>
       <div class="slr-tarjeta__cabeza"><span>Movimientos</span><span>${movs.length}</span></div>
       <ul class="slr-movimientos">${movs.map(m => `
         <li>

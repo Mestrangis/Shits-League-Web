@@ -63,7 +63,7 @@ export function describirPoder(p) {
   const [corto, momento, efecto] = MOMENTOS[p.momento] ?? [p.momento, p.momento, e => `efecto ${num(e)}`];
   const prob = p.probabilidad === 'siempre'
     ? 'Siempre'
-    : `${Math.round(p.probabilidad * 100)} % de las veces (×1,5 si es el capitán)`;
+    : `${Math.round(p.probabilidad * 100)} % de las veces (×1,5 si es el capitán), como mucho una vez por partido`;
   return { nombre: p.nombre, corto, momento, probabilidad: prob, efecto: efecto(p.efecto), nivel: p.nivel };
 }
 

@@ -10,7 +10,7 @@
      y cada pantalla lo pinta; tras una acción se recarga lo necesario.
 ═══════════════════════════════════════════════ */
 import { rpc, leer, configurarSesion, borrarToken, ErrorSesion } from './api.js';
-import { esc, miles, crear, fijarRaiz, ajustarCapas, capasAbiertas, toast, hoja, fechaHora } from './ui.js';
+import { esc, miles, crear, fijarRaiz, ajustarCapas, capasAbiertas, toast, hoja, cerrarCapa, fechaHora } from './ui.js';
 import { normalizarCarta, iniciarAcabados, pararAcabados } from './carta.js';
 import * as previa from './pantallas/previa.js';
 import * as plantilla from './pantallas/plantilla.js';
@@ -159,7 +159,20 @@ export async function recargar(...partes) {
 
 /* ── Pintado ─────────────────────────────────────────────────────────────── */
 /* ── Avisos (campana) ────────────────────────────────────────────────────── */
+// Cada aviso es una tarjeta con icono según el tipo. Si el servidor le ha
+// guardado destino (destino_tipo + destino_id), al tocarla lleva a su sitio:
+// carta → detalle · partido → crónica · movimientos → Perfil · liga → Liga.
 let avisos = [];
+const ICONOS_AVISO = {
+  jornada_publicada: '⚽', venta_completada: '💰', clausula_recibida: '💰',
+  subasta_ganada: '🔨', subasta_perdida: '🔨', puja_anulada: '🔨', subasta_cancelada: '🔨',
+  oferta_recibida: '🤝', oferta_aceptada: '🤝', oferta_rechazada: '🤝', contraoferta: '🤝',
+  oferta_caducada: '🤝', oferta_cancelada: '🤝', venta_cancelada: '🏷️',
+  intercambio_recibido: '🔁', intercambio_aceptado: '🔁', intercambio_rechazado: '🔁',
+  intercambio_caducado: '🔁', intercambio_cancelado: '🔁',
+  eleccion_automatica: '🃏', admin_carta: '🃏',
+  liga_pausada: '⏸️', liga_reanudada: '▶️', temporada_iniciada: '🏁', temporada_terminada: '🏆', jornada_aplazada: '📅',
+};
 async function cargarAvisos() {
   if (!datos.liga) return;
   const r = await rpc('slr_notificaciones', {}, { silencioso: true }).catch(() => null);
@@ -176,17 +189,59 @@ function pintarCampana() {
   b.classList.toggle('tiene', n > 0);
   b.setAttribute('aria-label', n ? `Avisos: ${n} sin leer` : 'Avisos');
 }
+function tarjetaAviso(n) {
+  const dentro = `
+    <span class="slr-aviso__icono" aria-hidden="true">${ICONOS_AVISO[n.tipo] ?? '🔔'}</span>
+    <span class="slr-aviso__texto"><span>${esc(n.datos?.texto ?? n.tipo)}</span><time>${esc(fechaHora(n.creada_en))}</time></span>`;
+  const clase = `slr-aviso ${n.leida ? '' : 'es-nuevo'}`;
+  return n.destino_tipo
+    ? `<li><button type="button" class="${clase}" data-aviso="${n.id}">${dentro}<span class="slr-aviso__flecha" aria-hidden="true">›</span></button></li>`
+    : `<li><div class="${clase}">${dentro}</div></li>`;
+}
 // Al abrir la lista se marcan como leídos (se siguen viendo resaltados hasta cerrarla)
 function abrirAvisos() {
   const nuevas = avisos.filter(a => !a.leida).map(a => a.id);
-  hoja(avisos.length ? `<ul class="slr-avisos">${avisos.map(n => `
-      <li class="${n.leida ? '' : 'es-nuevo'}"><span>${esc(n.datos?.texto ?? n.tipo)}</span><time>${esc(fechaHora(n.creada_en))}</time></li>`).join('')}</ul>`
+  const el = hoja(avisos.length ? `<ul class="slr-avisos">${avisos.map(tarjetaAviso).join('')}</ul>`
     : '<div class="slr-vacio"><b>Sin avisos</b><p>Aquí llegan los resultados, cobros, cláusulas y ofertas.</p></div>',
   { titulo: 'Avisos' });
+  el.querySelectorAll('[data-aviso]').forEach(b => b.addEventListener('click', () => {
+    const n = avisos.find(a => String(a.id) === b.dataset.aviso);
+    if (n) irAlAviso(n).catch(() => {});
+  }));
   if (!nuevas.length) return;
   avisos.forEach(a => { a.leida = true; });
   pintarCampana();
   rpc('slr_notificaciones', { marcar_leidas: nuevas }, { silencioso: true }).catch(() => {});
+}
+
+// Cierra la hoja de avisos y, cuando el historial ha vuelto, sigue
+function trasCerrarAvisos(siguiente) {
+  window.addEventListener('popstate', () => setTimeout(siguiente, 0), { once: true });
+  cerrarCapa();
+}
+
+async function irAlAviso(n) {
+  const ctx = { navegar, recargar, pintar, datos };
+  if (n.destino_tipo === 'carta') {
+    // Encima de los avisos: al cerrar el detalle se vuelve a la lista
+    const { abrirDetalle } = await import('./pantallas/detalle.js');
+    return abrirDetalle(n.destino_id, ctx);
+  }
+  if (n.destino_tipo === 'partido') {
+    const { abrirCronica } = await import('./pantallas/cronica.js');
+    return abrirCronica(n.destino_id, ctx);
+  }
+  if (n.destino_tipo === 'movimientos' || n.destino_tipo === 'liga') {
+    trasCerrarAvisos(async () => {
+      if (n.destino_tipo === 'liga') await recargar('liga');
+      await navegar(n.destino_tipo === 'liga' ? 'liga' : 'perfil');
+      const destino = main?.querySelector(n.destino_tipo === 'liga' ? '[data-estado-liga]' : '[data-movimientos]');
+      if (!destino) return;
+      destino.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      destino.classList.add('es-destacado');
+      setTimeout(() => destino.classList.remove('es-destacado'), 1800);
+    });
+  }
 }
 
 function pintarBarra() {

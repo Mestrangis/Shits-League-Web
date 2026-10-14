@@ -6,7 +6,8 @@
 ═══════════════════════════════════════════════ */
 import { rpc, leer, funcion } from '../api.js';
 import { esc, diaHora, toast, conEspera } from '../ui.js';
-import { enJuego } from '../rush.js';
+import { enJuego, proximaJornada } from '../rush.js';
+import { ESTADOS_LIGA } from './perfil.js';
 import { abrirCronica } from './cronica.js';
 import { abrirEquipo } from './ficha-equipo.js';
 
@@ -82,6 +83,21 @@ async function amistosos(liga, yo) {
     </section>`;
 }
 
+// Estado de la liga (destino de los avisos de pausa, reanudación y temporada)
+function estadoLiga(datos) {
+  const info = datos.ligaInfo ?? {}, j = proximaJornada();
+  const detalle = info.estado === 'pausada'
+    ? `En pausa desde el ${esc(diaHora(info.pausada_en))}: mercado cerrado y calendario congelado.`
+    : info.estado === 'en_curso' && j ? `Próxima jornada: ${j.numero}, cierre el ${esc(diaHora(j.cierre_en))}.`
+    : info.estado === 'entre_temporadas' ? 'La temporada ha terminado: la siguiente empieza cuando la inicie el administrador.'
+    : info.estado === 'preparacion' ? 'La primera temporada empieza cuando la inicie el administrador.' : '';
+  return `
+    <section class="slr-estado-liga-tarjeta ${info.estado === 'pausada' ? 'es-pausa' : ''}" data-estado-liga>
+      <div><small>Estado de la liga</small><b>${esc(ESTADOS_LIGA[info.estado] ?? info.estado ?? '—')}</b></div>
+      ${detalle ? `<p>${detalle}</p>` : ''}
+    </section>`;
+}
+
 export async function pintar(cont, ctx) {
   const { datos } = ctx;
   const yo = datos.equipo.id;
@@ -99,6 +115,7 @@ export async function pintar(cont, ctx) {
         <button type="button" data-vista="calendario" class="${vista === 'calendario' ? 'activo' : ''}">Calendario</button>
       </div>
     </header>
+    ${estadoLiga(datos)}
     ${vista === 'clasificacion'
       ? `${tabla(clas.clasificacion, yo)}<p class="slr-suave">Un amistoso se juega al momento con las alineaciones guardadas: no da puntos, dinero ni lesiones.</p>`
       : `${calendario(datos.jornadas, yo)}${await amistosos(datos.liga.id, yo)}`}`;

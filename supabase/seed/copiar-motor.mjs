@@ -1,14 +1,15 @@
-// Copia el motor a supabase/functions/_shared para que la Edge Function lo
+// Copia los motores a supabase/functions/_shared para que la Edge Function los
 // empaquete (la CLI solo sube lo que hay dentro de supabase/functions).
 //   node supabase/seed/copiar-motor.mjs
-// La copia tiene que ser idéntica byte a byte al original:
-// tests/slr/motor-copia.test.mjs falla si no lo es.
+// Se copian todas las versiones publicadas (la función elige la de cada partido
+// según partidos.version_motor; los nuevos usan la actual). Las copias tienen que
+// ser idénticas byte a byte: tests/slr/motor-copia.test.mjs falla si no lo son.
 import { copyFileSync, mkdirSync } from 'node:fs';
 
-export const MOTOR = 'motor-v1.1.0.js';
-const origen = new URL(`../../js/slr/${MOTOR}`, import.meta.url);
-const destino = new URL(`../functions/_shared/${MOTOR}`, import.meta.url);
+export const MOTORES = ['motor-v1.1.0.js', 'motor-v1.2.0.js'];
 
 mkdirSync(new URL('../functions/_shared/', import.meta.url), { recursive: true });
-copyFileSync(origen, destino);
-console.log(`Copiado js/slr/${MOTOR} → supabase/functions/_shared/${MOTOR}`);
+for (const motor of MOTORES) {
+  copyFileSync(new URL(`../../js/slr/${motor}`, import.meta.url), new URL(`../functions/_shared/${motor}`, import.meta.url));
+  console.log(`Copiado js/slr/${motor} → supabase/functions/_shared/${motor}`);
+}

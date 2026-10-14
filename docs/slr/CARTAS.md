@@ -33,47 +33,49 @@ El **valor** sale del OVR y de los poderes. Cada poder lo sube un 15 % (`simple`
 
 - `nombre`: el nombre que se verá.
 - `momento`: cuándo actúa (uno de los seis de abajo).
-- `probabilidad`: de 0 a 1 (`0.25` = 25 % de las veces), o `"siempre"`. Si la carta es el capitán, la probabilidad se multiplica por 1,5.
-- `efecto`: un número mayor que 0. Normalmente es el aumento (`0.15` = +15 %). En `tirador` es un multiplicador (`2` = el doble de opciones).
+- `probabilidad`: de 0 a 1 (`0.15` = 15 % de las veces), o `"siempre"`. Si la carta es el capitán, la probabilidad se multiplica por 1,5. Lo normal es entre `0.10` y `0.20`.
+- `efecto`: un número mayor que 0. Normalmente es el aumento (`0.2` = +20 %). En `tirador` es un multiplicador (`2` = el doble de opciones). Lo normal: `0.2` si es simple, `0.3` si es fuerte y `0.4` si es muy fuerte.
 - `nivel`: `simple`, `fuerte` o `muy fuerte`. Solo cuenta para el valor.
+
+**Cada poder se activa como mucho una vez por partido.** Se sortea cada vez que llega su momento hasta que sale. A partir de ahí ya no vuelve a sortearse en ese partido. Por eso un poder de posesión (que se sortea en cada jugada) sale en casi todos los partidos, y uno de chut o de parada solo cuando le toca chutar o parar. Los poderes `"siempre"` (los de tirador) no tienen límite: actúan en todas las ocasiones.
 
 Un ejemplo de cada momento:
 
 ```json
-[{"nombre": "Batuta",       "momento": "posesion",        "probabilidad": 0.25,      "efecto": 0.15, "nivel": "simple"}]
+[{"nombre": "Batuta",       "momento": "posesion",        "probabilidad": 0.15,      "efecto": 0.2,  "nivel": "simple"}]
 ```
-Al disputar cada balón: +15 % a la fuerza de posesión de su equipo, el 25 % de las veces.
+Al disputar un balón: +20 % a la fuerza de posesión de su equipo, el 15 % de las veces (una vez por partido).
 
 ```json
-[{"nombre": "Desmarque",    "momento": "ocasion_ataque",  "probabilidad": 0.3,       "efecto": 0.2,  "nivel": "fuerte"}]
+[{"nombre": "Desmarque",    "momento": "ocasion_ataque",  "probabilidad": 0.18,      "efecto": 0.3,  "nivel": "fuerte"}]
 ```
-Cuando su equipo ataca: +20 % a la fuerza de ataque.
+Cuando su equipo ataca: +30 % a la fuerza de ataque, el 18 % de las veces.
 
 ```json
-[{"nombre": "Muro",         "momento": "ocasion_defensa", "probabilidad": 0.25,      "efecto": 0.2,  "nivel": "fuerte"}]
+[{"nombre": "Muro",         "momento": "ocasion_defensa", "probabilidad": 0.15,      "efecto": 0.3,  "nivel": "fuerte"}]
 ```
-Cuando su equipo defiende: +20 % a la fuerza defensiva.
+Cuando su equipo defiende: +30 % a la fuerza defensiva.
 
 ```json
 [{"nombre": "Chupón",       "momento": "tirador",         "probabilidad": "siempre", "efecto": 2,    "nivel": "simple"}]
 ```
-Al elegir quién chuta: el doble de opciones de ser él.
+Al elegir quién chuta: el doble de opciones de ser él, en todas las ocasiones.
 
 ```json
-[{"nombre": "Cañonero",     "momento": "chut",            "probabilidad": 0.3,       "efecto": 0.25, "nivel": "fuerte"}]
+[{"nombre": "Cañonero",     "momento": "chut",            "probabilidad": 0.2,       "efecto": 0.3,  "nivel": "fuerte"}]
 ```
-Cuando chuta él: +25 % a su ATA en ese chut.
+Cuando chuta él: +30 % a su ATA en ese chut.
 
 ```json
-[{"nombre": "Manos de oro", "momento": "parada",          "probabilidad": 0.2,       "efecto": 0.3,  "nivel": "muy fuerte"}]
+[{"nombre": "Manos de oro", "momento": "parada",          "probabilidad": 0.15,      "efecto": 0.4,  "nivel": "muy fuerte"}]
 ```
-Cuando para de portero: +30 % a su DEF en esa parada.
+Cuando para de portero: +40 % a su DEF en esa parada.
 
 Una carta puede tener varios poderes. Se ponen todos en la misma lista, separados por comas:
 
 ```json
-[{"nombre": "Batuta", "momento": "posesion", "probabilidad": 0.25, "efecto": 0.15, "nivel": "simple"},
- {"nombre": "Cañonero", "momento": "chut", "probabilidad": 0.3, "efecto": 0.25, "nivel": "fuerte"}]
+[{"nombre": "Batuta", "momento": "posesion", "probabilidad": 0.15, "efecto": 0.2, "nivel": "simple"},
+ {"nombre": "Cañonero", "momento": "chut", "probabilidad": 0.2, "efecto": 0.3, "nivel": "fuerte"}]
 ```
 
 ## Imagen

@@ -1,8 +1,11 @@
 // Balance por formación: cada una contra todas (incluida ella misma). Solo informa.
-//   node tests/slr/formaciones.mjs
+//   node tests/slr/formaciones.mjs            (motor actual)
+//   node tests/slr/formaciones.mjs 1.1.0      (una versión concreta)
 // Cada cruce se juega con las semillas 1..10000 en los dos órdenes de local
 // (20.000 partidos por cruce); el resultado de la fila suma ambos órdenes.
-import { simularPartido, VERSION, CONFIG } from '../../js/slr/motor-v1.1.0.js';
+import { motorDe } from '../../js/slr/motores.js';
+
+const { simularPartido, VERSION, CONFIG } = motorDe(process.argv[2]);
 
 const N = 10000;
 const FORMACIONES = CONFIG.FORMACIONES; // 2-2-2, 3-2-1, 1-3-2, 2-3-1, 1-2-3

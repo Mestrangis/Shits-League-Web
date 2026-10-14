@@ -17,7 +17,7 @@
 import { rpc, funcion, leer as leerTabla } from '../api.js';
 import { esc, hoja, cerrarCapa, conEspera, toast, hora, faltan as quedan, diaHora } from '../ui.js';
 import { cartaHTML, describirPoder } from '../carta.js';
-import { fuerzaPosesion, fuerzaAtaque, fuerzaDefensa, probabilidadesTirador, CONFIG } from '../motor-v1.1.0.js';
+import { fuerzaPosesion, fuerzaAtaque, fuerzaDefensa, probabilidadesTirador, CONFIG } from '../motor-v1.2.0.js';
 import { estaTocada, alineacionBloqueada, alineacionConfirmada, proximaJornada, pausada, configLiga, ventanaCierre, miPartido, enJuego } from '../rush.js';
 import { abrirDetalle } from './detalle.js';
 import { abrirEquipo } from './ficha-equipo.js';

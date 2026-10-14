@@ -86,6 +86,15 @@ try {
   await esperar(`!!document.querySelector('.slr-hoja .slr-avisos')`);
   const nAvisos = await ev(`document.querySelectorAll('.slr-hoja .slr-avisos li').length`);
   check(nAvisos > 0 && await ev(`document.querySelector('.slr-barra__avisos b').textContent === ''`), `al abrir la campana: ${nAvisos} avisos y el contador a cero`);
+  const tarjetas = await ev(`({ conDestino: document.querySelectorAll('.slr-hoja button.slr-aviso[data-aviso] .slr-aviso__flecha').length,
+    iconos: document.querySelectorAll('.slr-hoja .slr-aviso__icono').length,
+    jornada: !![...document.querySelectorAll('.slr-hoja button.slr-aviso')].find(b => /Jornada \\d+:/.test(b.textContent)) })`);
+  check(tarjetas.iconos === nAvisos && tarjetas.conDestino > 0 && tarjetas.jornada, `avisos en tarjetas con icono; ${tarjetas.conDestino} con flecha (destino)`);
+  await ev(`[...document.querySelectorAll('.slr-hoja button.slr-aviso')].find(b => /Jornada \\d+:/.test(b.textContent)).click(); 0`);
+  await esperar(`!!document.querySelector('.slr-cronica')`, 10000);
+  check(await ev(`document.querySelectorAll('.slr-hoja').length === 2 && !document.querySelector('.slr-cronica .slr-banner--pausa')`),
+    'tocar el aviso de la jornada abre su crónica encima de los avisos (y se reproduce sin avisos de versión)');
+  await atras();
   await atras();
 
   console.log('\nFicha de una carta sin colocar');
@@ -176,9 +185,21 @@ try {
   await clic('[data-pruebas=plantillas]');
   await esperar(`document.querySelectorAll('.slr-plantillas__fila').length > 0`);
   await dormir(600);
+  const total = await ev(`document.querySelector('[data-total]').textContent`);
+  const nCartas = (await leer(`cartas?select=id&liga_id=eq.${L}`)).datos.length;
+  check(new RegExp(`de ${nCartas}\\b`).test(total) && await ev(`document.querySelectorAll('.slr-plantillas__fila').length === 30`),
+    `herramienta con todas las cartas (${total}), pintadas de 30 en 30`);
+  await ev(`(() => { const e = document.querySelector('[data-f="tipo"]'); e.value = 'duo'; e.dispatchEvent(new Event('change')); return 0; })()`);
+  await dormir(200);
+  check(await ev(`[...document.querySelectorAll('.slr-plantillas__fila')].every(f => /Dúo/.test(f.textContent))`), 'filtro por tipo: solo dúos');
+  await ev(`(() => { const e = document.querySelector('[data-f="tipo"]'); e.value = ''; e.dispatchEvent(new Event('change')); return 0; })()`);
+  await dormir(200);
   await foto('plantillas');
   const libre = await ev(`(() => { const f = [...document.querySelectorAll('.slr-plantillas__fila')].find(x => /Libre/.test(x.textContent)); f.querySelector('[data-dar]').click(); return f.dataset.carta; })()`);
   await esperar(`!!document.querySelector('[data-equipo]')`);
+  const darA = await ev(`[...document.querySelectorAll('.slr-lista-equipos button')].map(b => b.innerText.replace(/\\s+/g, ' '))`);
+  check(darA.length > 1 && darA.every(t => /\d+\/15/.test(t)) && darA.some(t => /Bot Uno FC Bot Uno/.test(t)), `«Dar a…»: nombre, dueño y cartas (${darA[0]})`);
+  await foto('dar-a');
   await ev(`[...document.querySelectorAll('.slr-hoja [data-equipo]')].find(b => /Bot Uno FC/.test(b.textContent)).click(); 0`);
   await esperar(`[...document.querySelectorAll('.slr-toast')].some(t => /→ Bot Uno FC/.test(t.textContent))`, 10000);
   const dueno = (await leer(`cartas?select=equipo_id,equipos(nombre)&id=eq.${libre}`)).datos[0];

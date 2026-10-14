@@ -8,7 +8,7 @@ import {
   cartasLiga, invariantes, bomboInicial,
 } from './api-util.mjs';
 import { SUPABASE_URL, SUPABASE_KEY } from '../../js/slr/config.js';
-import { simularPartido, simularPronostico } from '../../js/slr/motor-v1.1.0.js';
+import { motorDe } from '../../js/slr/motores.js';
 
 exigirEnv('SLR_BOT_UNO_CODIGO', 'SLR_BOT_DOS_CODIGO', 'SLR_BOT_TRES_CODIGO', 'SLR_CRON_SECRETO');
 
@@ -153,8 +153,9 @@ try {
     const s2 = await saldoDe(Bv);
     const am = await funcion({ accion: 'amistoso', token: Bv.token, rival_equipo_id: R.equipo });
     const pa = am.status === 200 ? await rpcOk('slr_partido', { token: R.token, partido_id: am.datos.partido_id }) : null;
-    const repro = pa && simularPartido(pa.alineaciones_congeladas.local, pa.alineaciones_congeladas.visitante, pa.semilla);
-    check(pa && pa.tipo === 'amistoso' && repro.goles.join() === pa.goles.join(), `amistoso ${Bv.nombre}–${R.nombre} ${pa?.goles.join('-')}: se reproduce igual con el motor`);
+    const repro = pa && motorDe(pa.version_motor).simularPartido(pa.alineaciones_congeladas.local, pa.alineaciones_congeladas.visitante, pa.semilla);
+    check(pa && pa.tipo === 'amistoso' && pa.version_motor === '1.2.0' && repro.goles.join() === pa.goles.join(),
+      `amistoso ${Bv.nombre}–${R.nombre} ${pa?.goles.join('-')} (motor ${pa?.version_motor}): se reproduce igual con el motor`);
     check(await saldoDe(Bv) === s2, 'el amistoso no mueve dinero');
     check((await leer(`partidos?select=id&id=eq.${pa?.id}`)).datos.length === 1, 'el amistoso es visible');
 
@@ -208,10 +209,10 @@ try {
     const t2 = await tareas(j1.publicacion_en);
     check(t2.publicadas === 1, 'publicación');
     const p = await rpcOk('slr_partido', { token: R.token, partido_id: P1.id });
-    check(p.version_motor === '1.1.0' && p.semilla >= 0 && p.semilla < 2 ** 32, `publicado con motor ${p.version_motor} y semilla ${p.semilla}`);
-    const real = simularPartido(p.alineaciones_congeladas.local, p.alineaciones_congeladas.visitante, p.semilla);
+    check(p.version_motor === '1.2.0' && p.semilla >= 0 && p.semilla < 2 ** 32, `publicado con motor ${p.version_motor} y semilla ${p.semilla}`);
+    const real = motorDe(p.version_motor).simularPartido(p.alineaciones_congeladas.local, p.alineaciones_congeladas.visitante, p.semilla);
     check(real.goles.join() === p.goles.join(), `el partido reproducido con el motor da lo mismo: ${p.goles.join('-')}`);
-    const pron = simularPronostico(p.alineaciones_congeladas.local, p.alineaciones_congeladas.visitante, p.semilla, 200);
+    const pron = motorDe(p.version_motor).simularPronostico(p.alineaciones_congeladas.local, p.alineaciones_congeladas.visitante, p.semilla, 200);
     check(pron.pA === p.p_local && pron.pB === p.p_visitante, `el pronóstico de 200 simulaciones coincide (${p.p_local} / ${p.p_visitante})`);
     check((await leer(`partidos?select=id&id=eq.${P1.id}`)).datos.length === 1, 'ya es visible');
 
@@ -274,7 +275,7 @@ try {
     const { local, visitante } = cong.alineaciones_congeladas;
     let semilla = null;
     for (let s = 1; s < 500000 && semilla === null; s++) {
-      const ev = simularPartido(local, visitante, s).eventos.find(e => e.tipo === 'lesion' && e.equipo === ladoZ && !e.carta.startsWith('canterano-'));
+      const ev = motorDe().simularPartido(local, visitante, s).eventos.find(e => e.tipo === 'lesion' && e.equipo === ladoZ && !e.carta.startsWith('canterano-'));
       if (ev) { semilla = s; lesion = { carta: ev.carta, equipo: Z }; }
     }
     check(semilla !== null, `semilla ${semilla} con lesión de ${lesion?.carta.slice(0, 8)}… (${botDe(Z)?.nombre})`);

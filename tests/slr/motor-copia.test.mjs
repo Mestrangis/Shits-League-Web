@@ -1,19 +1,26 @@
-// La Edge Function slr-simular usa una copia del motor (la CLI de Supabase solo
-// empaqueta lo que hay en supabase/functions). Tiene que ser idéntica byte a
-// byte al original; si no, regenerarla con node supabase/seed/copiar-motor.mjs.
+// La Edge Function slr-simular usa copias de los motores (la CLI de Supabase solo
+// empaqueta lo que hay en supabase/functions). Tienen que ser idénticas byte a
+// byte a los originales; si no, regenerarlas con node supabase/seed/copiar-motor.mjs.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { MOTORES } from '../../js/slr/motores.js';
 
-const MOTOR = 'motor-v1.1.0.js';
+const ARCHIVOS = Object.keys(MOTORES).map(v => `motor-v${v}.js`);
+const funcion = () => readFileSync(new URL('../../supabase/functions/slr-simular/index.ts', import.meta.url), 'utf8');
 
-test(`supabase/functions/_shared/${MOTOR} es idéntico byte a byte a js/slr/${MOTOR}`, () => {
-  const original = readFileSync(new URL(`../../js/slr/${MOTOR}`, import.meta.url));
-  const copia = readFileSync(new URL(`../../supabase/functions/_shared/${MOTOR}`, import.meta.url));
-  assert.ok(original.equals(copia), 'la copia del motor de la Edge Function no coincide con el original');
-});
+for (const motor of ARCHIVOS) {
+  test(`supabase/functions/_shared/${motor} es idéntico byte a byte a js/slr/${motor}`, () => {
+    const original = readFileSync(new URL(`../../js/slr/${motor}`, import.meta.url));
+    const copia = readFileSync(new URL(`../../supabase/functions/_shared/${motor}`, import.meta.url));
+    assert.ok(original.equals(copia), `la copia de ${motor} de la Edge Function no coincide con el original`);
+  });
 
-test('la Edge Function importa exactamente esa versión del motor', () => {
-  const funcion = readFileSync(new URL('../../supabase/functions/slr-simular/index.ts', import.meta.url), 'utf8');
-  assert.ok(funcion.includes(`'../_shared/${MOTOR}'`), 'la función no importa ../_shared/' + MOTOR);
+  test(`la Edge Function importa ${motor}`, () => {
+    assert.ok(funcion().includes(`'../_shared/${motor}'`), 'la función no importa ../_shared/' + motor);
+  });
+}
+
+test('la Edge Function simula los partidos nuevos con el motor actual (1.2.0)', () => {
+  assert.match(funcion(), /const MOTOR_ACTUAL = '1\.2\.0'/);
 });
