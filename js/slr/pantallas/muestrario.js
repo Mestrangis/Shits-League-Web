@@ -2,12 +2,18 @@
    SHITS LEAGUE RUSH — muestrario de acabados (modo pruebas)
    La misma carta en todos los acabados registrados, sin y con foto, lado a lado
    y con el movimiento activo (ratón, dedo o giroscopio), para comparar. Debajo,
-   la composición de la carta con varias fotos en tamaño pequeño y grande.
-   Las fotos de muestra son las de perfil de Shits League (JUGADORES_FOTOS).
+   la composición de la carta con varias fotos en tamaño pequeño y grande, los
+   colores de la paleta, una foto PNG sin fondo (assets/slr-muestra-sin-fondo.png:
+   el fondo de la carta tiene que verse detrás) y nombres largos en los tres
+   tamaños. Las fotos de muestra son las de perfil de Shits League (JUGADORES_FOTOS).
 ═══════════════════════════════════════════════ */
 import { esc, hoja } from '../ui.js';
 import { cartaHTML } from '../carta.js';
 import { listaAcabados } from '../acabados/index.js';
+import { COLORES } from '../generador.js';
+
+const PNG_SIN_FONDO = new URL('../../../assets/slr-muestra-sin-fondo.png', import.meta.url).href;
+const NOMBRES_LARGOS = ['Los Tres Caballeros', 'El Trío Calavera de Getafe', 'Los Hermanos Ibáñez Montero'];
 
 function fotosDeMuestra() {
   // const global de js/session.js (script clásico): visible por su nombre, no en window
@@ -23,6 +29,29 @@ export function abrirMuestrario(ctx) {
 
   hoja(`
     <div class="slr-muestrario">
+      <section class="slr-muestrario__acabado" data-muestra="colores">
+        <h3 class="slr-subtitulo">Colores <small>disenos_carta.color; sin color, el del tipo</small></h3>
+        <div class="slr-muestrario__colores">
+          ${Object.entries(COLORES).map(([k, v]) => `<figure>${carta({ color: k, imagen_url: null, nombre: v }, { tam: 's' })}<figcaption>${esc(v)}</figcaption></figure>`).join('')}
+        </div>
+      </section>
+      <section class="slr-muestrario__acabado" data-muestra="sin-fondo">
+        <h3 class="slr-subtitulo">Foto PNG sin fondo <small>el fondo de la carta se ve detrás</small></h3>
+        <div class="slr-muestrario__par">
+          <figure>${carta({ imagen_url: PNG_SIN_FONDO, color: 'rojo', nombre: 'Sin fondo' }, { tam: 's' })}<figcaption>Color rojo</figcaption></figure>
+          <figure>${carta({ imagen_url: PNG_SIN_FONDO, tipo: 'trio', acabado: 'brillante', color: null, nombre: 'Sin fondo' }, { tam: 's' })}<figcaption>Trío brillante</figcaption></figure>
+        </div>
+      </section>
+      <section class="slr-muestrario__acabado" data-muestra="nombres">
+        <h3 class="slr-subtitulo">Nombres largos <small>letra más pequeña y, si no cabe, dos líneas</small></h3>
+        <div class="slr-muestrario__fotos">
+          ${NOMBRES_LARGOS.map(n => `<figure class="slr-muestrario__xs">${carta({ nombre: n, tipo: 'trio', imagen_url: null }, { tam: 'xs', destacar: 'ATA' })}</figure>`).join('')}
+        </div>
+        <div class="slr-muestrario__par">
+          ${NOMBRES_LARGOS.slice(0, 2).map(n => `<figure>${carta({ nombre: n, tipo: 'trio', imagen_url: null }, { tam: 's' })}</figure>`).join('')}
+        </div>
+        <div class="slr-muestrario__grande">${carta({ nombre: NOMBRES_LARGOS[2], tipo: 'duo', imagen_url: PNG_SIN_FONDO, color: 'azul' }, { tam: 'l' })}</div>
+      </section>
       <p class="slr-suave">Mueve el ratón por encima, arrastra el dedo o inclina el móvil. Cada acabado vive en su propio
         archivo (js/slr/acabados/ y css/acabados/): añadir uno nuevo es crearlo y registrarlo.</p>
       ${listaAcabados().map(a => `
@@ -45,5 +74,5 @@ export function abrirMuestrario(ctx) {
           ${fotos.map((f, i) => `<figure>${carta({ imagen_url: f, acabado: ['normal', 'foil', 'brillante', 'plateada'][i] ?? 'normal' }, { tam: 's', blindada: i === 1, enVenta: i === 2, tocada: i === 3 })}</figure>`).join('')}
         </div>
         <div class="slr-muestrario__grande">${carta({ imagen_url: fotos[1] ?? fotos[0], acabado: 'foil' }, { tam: 'l' })}</div>` : ''}
-    </div>`, { titulo: 'Muestrario de acabados', completa: true });
+    </div>`, { titulo: 'Muestrario de cartas', completa: true });
 }

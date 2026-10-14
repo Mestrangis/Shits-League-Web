@@ -6,7 +6,7 @@
 // ser idénticas byte a byte: tests/slr/motor-copia.test.mjs falla si no lo son.
 import { copyFileSync, mkdirSync } from 'node:fs';
 
-export const MOTORES = ['motor-v1.1.0.js', 'motor-v1.2.0.js'];
+export const MOTORES = ['motor-v1.1.0.js', 'motor-v1.2.0.js', 'motor-v1.3.0.js'];
 
 mkdirSync(new URL('../functions/_shared/', import.meta.url), { recursive: true });
 for (const motor of MOTORES) {

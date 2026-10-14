@@ -32,12 +32,12 @@ function constante(x) {
 }
 
 /* ── Versión y registro de motores ───────────────────────────────────────── */
-test('versión 1.2.0, motor actual y la 1.1.0 sigue disponible', () => {
+test('versión 1.2.0 registrada junto a la 1.1.0 (el motor actual se comprueba en su versión)', () => {
   assert.equal(VERSION, '1.2.0');
-  assert.equal(MOTOR_ACTUAL.VERSION, '1.2.0');
+  assert.equal(motorDe('1.2.0').VERSION, '1.2.0');
   assert.equal(motorDe('1.1.0').VERSION, '1.1.0');
-  assert.equal(motorDe(null).VERSION, '1.2.0');
-  assert.deepEqual(Object.keys(MOTORES).sort(), ['1.1.0', '1.2.0']);
+  assert.equal(motorDe(null), MOTOR_ACTUAL);
+  assert.ok(['1.1.0', '1.2.0'].every(v => v in MOTORES));
   assert.throws(() => motorDe('9.9.9'), /No existe el motor/);
 });
 

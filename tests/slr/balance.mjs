@@ -6,6 +6,7 @@ import { motorDe } from '../../js/slr/motores.js';
 import { calcularValor, calcularOVR } from '../../js/slr/valor.js';
 import { marcosFC, losDelFondo, conPrefijo } from './cartas-prueba.mjs';
 import { catalogoBeta } from './catalogo-beta.mjs';
+import { generarStats, generarPoderes } from '../../js/slr/generador.js';
 
 const { simularPartido, mulberry32, VERSION } = motorDe(process.argv[2]);
 const N = 10000;
@@ -102,7 +103,7 @@ console.log(`    Espejo 70 contra 70: ${e70.goles.toFixed(2)} goles por partido 
 // más caro) con valor cerca de 11 × la media del bombo; alineación por defecto
 // (la mejor 2-2-2, capitán el de más OVR). Con dúos y tríos: además los dúos
 // y tríos indicados, al azar, que entran en la alineación si son mejores.
-const catalogo = catalogoBeta({ version: VERSION === '1.1.0' ? '1.1.0' : '1.2.0' })
+const catalogo = catalogoBeta({ version: VERSION })
   .map(c => ({ ...c, valor: calcularValor(c), ovr: calcularOVR(c) }));
 const individuales = catalogo.filter(c => c.tipo === 'individual').sort((a, b) => b.valor - a.valor || (a.id < b.id ? -1 : 1));
 const bombo = individuales.slice(Math.round(individuales.length * 0.20));
@@ -140,15 +141,16 @@ function alineacionPorDefecto(cartas, p) {
     banquillo: banquillo.map(m), orden_manual: false, capitan_id: p + capitan.id };
 }
 
-function poderesPorPartido(nDuos, nTrios) {
-  const rng = mulberry32(20261014 + 10 * nDuos + nTrios);
+// Activaciones de poderes sorteados (sin los "siempre") en un partido y por jugada
+function medirPoderes(crearEquipo, semillaBase) {
+  const rng = mulberry32(semillaBase);
   const PAREJAS = 200, SEMILLAS = 50;
-  let partidos = 0, activados = 0, sorteados = 0, conPoder = 0, titularesConPoder = 0;
+  let partidos = 0, activados = 0, sorteados = 0, conPoder = 0, titularesConPoder = 0, suma2 = 0;
+  const hist = new Map(), porJugada = [0, 0, 0];
   for (let k = 0; k < PAREJAS; k++) {
     const usadas = new Set();
     const equipo = p => {
-      const cartas = plantillaInicial(rng, usadas);
-      cartas.push(...muestra(duos, nDuos, rng, usadas), ...muestra(trios, nTrios, rng, usadas));
+      const cartas = crearEquipo(rng, usadas);
       cartas.forEach(c => usadas.add(c.id));
       return alineacionPorDefecto(cartas, p);
     };
@@ -160,18 +162,48 @@ function poderesPorPartido(nDuos, nTrios) {
       partidos++;
       activados += ev.length;
       if (ev.length) conPoder++;
-      sorteados += ev.filter(e => e.momento !== 'tirador').length;
+      // Sorteados: en la v1.3.0 los programados (llevan "programada"); antes, los no "siempre"
+      const sort = ev.filter(e => (e.programada != null) || (VERSION < '1.3.0' && e.momento !== 'tirador'));
+      sorteados += sort.length;
+      suma2 += sort.length * sort.length;
+      hist.set(sort.length, (hist.get(sort.length) ?? 0) + 1);
+      for (let j = 1; j <= 10; j++) porJugada[Math.min(2, sort.filter(e => e.jugada === j).length)]++;
     }
   }
-  return { activados: activados / partidos, sorteados: sorteados / partidos, conPoder: conPoder / partidos,
-    titularesConPoder: titularesConPoder / (2 * PAREJAS), partidos };
+  const media = sorteados / partidos;
+  return { activados: activados / partidos, sorteados: media, desviacion: Math.sqrt(suma2 / partidos - media * media),
+    conPoder: conPoder / partidos, titularesConPoder: titularesConPoder / (2 * PAREJAS), partidos, hist, porJugada };
 }
 
-console.log('\n(d) Poderes activados por partido (los dos equipos), catálogo beta');
-for (const [titulo, nDuos, nTrios] of [['Plantillas iniciales (11 individuales)', 0, 0],
-  ['Con 1 dúo y 1 trío cada equipo', 1, 1], ['Con 2 dúos y 1 trío cada equipo', 2, 1]]) {
-  const r = poderesPorPartido(nDuos, nTrios);
-  console.log(`    ${titulo}: ${r.activados.toFixed(2)} por partido (${r.sorteados.toFixed(2)} sorteados, el resto "siempre")`);
+// Plantilla inicial más los dúos y tríos indicados del catálogo beta
+const conEspeciales = (nDuos, nTrios) => (rng, usadas) => {
+  const cartas = plantillaInicial(rng, usadas);
+  cartas.push(...muestra(duos, nDuos, rng, usadas), ...muestra(trios, nTrios, rng, usadas));
+  return cartas;
+};
+
+// Equipo de cartas generadas por tiers (js/slr/generador.js), como las del catálogo nuevo
+const REPARTO_TIPICO = ['A', 'B', 'B', 'C', 'C', 'C', 'D', 'D', 'D', 'E', 'E'];
+const PERFILES_EQUIPO = ['portero', 'defensa', 'defensa', 'control', 'control', 'atacante', 'atacante',
+  'equilibrado', 'defensa', 'control', 'atacante'];
+const porTiers = rng => REPARTO_TIPICO.map((tier, i) => {
+  const perfil = PERFILES_EQUIPO[i], id = `g${Math.floor(rng() * 1e9)}`;
+  const st = generarStats(tier, perfil, 'individual', Math.floor(rng() * 2e9));
+  const c = { id, nombre: id, tipo: 'individual', ...st, poderes: generarPoderes(tier, perfil, Math.floor(rng() * 2e9)) };
+  return { ...c, valor: calcularValor(c), ovr: calcularOVR(c) };
+});
+
+console.log('\n(d) Poderes activados por partido (los dos equipos, alineación por defecto 2-2-2)');
+for (const [titulo, crear, semilla] of [
+  ['Plantillas iniciales del catálogo beta (11 individuales)', conEspeciales(0, 0), 20261014],
+  ['Beta con 1 dúo y 1 trío cada equipo', conEspeciales(1, 1), 20261025],
+  ['Beta con 2 dúos y 1 trío cada equipo', conEspeciales(2, 1), 20261035],
+  [`Cartas generadas por tiers (${REPARTO_TIPICO.join('')})`, porTiers, 20261045]]) {
+  const r = medirPoderes(crear, semilla);
+  const total = r.porJugada.reduce((a, b) => a + b, 0);
+  console.log(`    ${titulo}: ${r.sorteados.toFixed(2)} sorteados por partido (desviación ${r.desviacion.toFixed(2)}) · ${r.activados.toFixed(2)} con los "siempre"`);
+  console.log(`      reparto: ${[...r.hist].sort((a, b) => a[0] - b[0]).map(([n, v]) => `${n}: ${pct(v / r.partidos).trim()}`).join(' · ')}`);
+  console.log(`      jugadas con 0 / 1 / 2 activaciones: ${r.porJugada.map(v => pct(v / total).trim()).join(' / ')}`);
   console.log(`      partidos con algún poder ${pct(r.conPoder)} · titulares con poder por equipo ${r.titularesConPoder.toFixed(2)} · ${r.partidos.toLocaleString('es-ES')} partidos`);
 }
 

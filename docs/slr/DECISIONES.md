@@ -412,3 +412,118 @@ Los goles dependen mucho de la formación (con un solo defensa la ocasión llega
 | | Plantilla neutra | Plantilla realista |
 |---|---|---|
 | v1.2.0 | 2-2-2 1,482 … 1-2-3 1,259 → 0,22 | 2-2-2 1,541 … 2-3-1 1,238 → 0,30 (~0,3) |
+
+## Motor v1.3.0, cartas por tiers, formulario y pulido de las cartas
+
+### Decisiones de Marcos
+
+- **Motor v1.3.0: poderes repartidos** (`js/slr/motor-v1.3.0.js`). Sustituye al "una vez por partido" de la v1.2.0; el resto de reglas no cambia:
+  - Cada poder puede activarse **1, 2 o 3 veces**, con `probabilidades: [p1, p2, p3]` decrecientes. Compatibilidad: con solo `probabilidad` p, se usa [p, p/2,5, p/6].
+  - El capitán multiplica las tres × 1,5 (tope 0,95).
+  - Todo se sortea **antes de la jugada 1**: cuántas activaciones y en qué jugadas (distintas, de 1 a 10).
+  - Si el momento no ocurre en su jugada, la activación queda **pendiente** para la siguiente ocasión; lo que quede al final se pierde.
+  - Como mucho **2 activaciones por jugada** entre los dos equipos.
+  - Durante las jugadas, los poderes no gastan números del PRNG.
+  - Los "siempre" de tirador no cambian.
+  - Calibrado para ~5 activaciones por partido entre equipos típicos.
+- **Cartas por tiers** (S…F, con su rango de OVR) y **perfil**:
+  - Generador de stats y poderes en SQL y en JS (gemelos).
+  - Lo que venga relleno se respeta (excepciones de Marcos).
+  - La semilla se guarda para que "Regenerar" dé otra.
+- **Formulario "Nueva carta" / "Editar carta"** (modo pruebas, admin):
+  - Foto a Cloudinary (preset unsigned `slr_cartas`).
+  - Vista previa grande, regenerar, edición a mano y "Crear y dar a…".
+- **Colores** de una paleta fija (`color`; vacío = el del tipo) y **PNG sin fondo**: el fondo de la carta se ve detrás de la foto.
+- **Nombres largos enteros:** letra más pequeña hasta un mínimo y, si no cabe, dos líneas.
+- **Interacción con las cartas:**
+  - Sin menú de "guardar imagen" ni arrastre del navegador.
+  - Mantener pulsado (móvil) abre la carta.
+  - En PC, arrastrar la carta la levanta, la inclina según la velocidad y la devuelve a su sitio con un rebote.
+  - La alineación conserva su arrastre.
+- **Partidos:**
+  - Los tuyos en verde, rojo o naranja según el resultado; los demás en gris.
+  - Marcador grande.
+  - Foto de perfil del dueño junto a cada equipo.
+
+### Decisiones mías
+
+- **Programa de poderes** (orden exacto del PRNG, documentado en la cabecera del motor):
+  - Orden de programación: equipo A y luego B; titulares por hueco (POR, DEF, MED, DEL) y después el banquillo; cada poder en su orden.
+  - Por poder, un número decide cuántas activaciones y uno más por activación elige su jugada entre las libres (`splice` de la lista 1..10).
+  - Después, cada jugada consume los mismos números que en la v1.2.0. Sin poderes, un partido de la v1.3.0 es idéntico al de la v1.2.0 (hay un test).
+- **Cuándo "ocurre" cada momento:**
+  - Posesión: siempre, para los dos equipos.
+  - ocasion_ataque y ocasion_defensa: según quién tenga el balón.
+  - Tirador: si su equipo llega y la carta es MED o DEL.
+  - Chut: si esa carta chuta.
+  - Parada: si ese portero recibe el chut.
+  - Un poder de parada en una carta que no juega de portero nunca llega a activarse.
+- **Detalles del programa:**
+  - Un poder con varias pendientes se aplica una vez por momento; el resto espera.
+  - El tope de 2 se reparte por orden cronológico dentro de la jugada y, en un mismo momento, por el orden fijo (A antes que B).
+  - Un suplente que entra pierde lo programado para jugadas ya jugadas.
+  - El evento `poder` lleva `programada` (la jugada prevista). La crónica avisa cuando se aplica más tarde ("le tocaba en la jugada 3").
+- **Calibración:**
+  - Probabilidades por defecto **[0,40, 0,18, 0,07]** para los tres niveles: unas 0,65 activaciones programadas por poder. La fuerza la da el efecto (+0,20 / +0,30 / +0,40), no la frecuencia.
+  - Las cartas beta pasaron a ese formato (migración `20261015000000`).
+  - Medido con `node tests/slr/balance.mjs`: ver el balance de referencia de abajo.
+- **Generador (aritmética entera para que SQL y JS coincidan):**
+  - Park-Miller (`s ← s·48271 mod 2³¹−1`) y `r(n) = s mod n`.
+  - El tier da un OVR objetivo T en [mín, máx). Según el perfil, salen dos diferencias d1 (1.ª−2.ª stat) y d2 (2.ª−3.ª).
+  - La stat principal es T + ⌈0,40·d1 + 0,15·d2⌉, así que el OVR cae en [T, T+1).
+  - Si pasa del tope del tipo (97 / 99 / 100 / 101), se estrechan d2 y luego d1 (en el portero, al revés, para que la ATA siga siendo la más baja).
+  - En un portero S de OVR alto, la ATA no puede quedar 30 por debajo de la DEF (está documentado y el test lo tiene en cuenta).
+  - Poderes: el momento sale del perfil (equilibrado: posesión, ataque, defensa o chut; no parada, que solo sirve al portero). Los nombres salen de 6 por momento, sin repetir en la misma carta.
+  - `tests/slr/generador-sql.test.mjs` compara 560 casos contra `slr_generar_cartas`.
+- **Tier y perfil de las cartas existentes:**
+  - Se calculan de sus stats con OVR en enteros (60·s1 + 25·s2 + 15·s3 ≥ 100·mín), sin errores de coma flotante en los límites.
+  - Perfil: equilibrado si las tres stats están a 6 o menos; portero si DEF es la más alta, ATA la más baja y DEF−ATA ≥ 30; si no, el de la stat más alta.
+  - Tier y perfil quedan `not null`: el trigger los deduce si faltan.
+- **Vacío frente a `[]` en poderes:** vacío (null) = generarlos; `[]` = sin poderes. Para eso se quitó el valor por defecto de la columna.
+- **Cartas creadas desde una liga de prueba:**
+  - Nacen inactivas (no llegan a las ligas reales ni a sobres o plantillas), con `liga_prueba_id` y un ejemplar solo en esa liga.
+  - Se borran con la liga (`on delete cascade`).
+  - Desde una liga de prueba solo se editan esas cartas: los bots de los tests no pueden tocar el catálogo real.
+  - `slr_admin_guardar_diseno` apunta en el historial cada alta o cambio.
+- **Formulario:**
+  - Mientras sube la foto, la vista previa la muestra al instante (URL `blob:`).
+  - Si Cloudinary rechaza la subida, el mensaje dice qué revisar (preset, modo Unsigned, formatos) y se puede pegar la URL.
+  - Al cambiar tier, perfil o tipo, se regenera con la misma semilla. "Regenerar" cambia la semilla.
+  - El preset `slr_cartas` ya existía y la subida real funcionó en la prueba.
+- **Cartas en pantalla:**
+  - Colores: clases `slr-carta--color-*` que cambian `--c1/--c2` y mandan sobre el color del tipo.
+  - Con foto, `.slr-carta__arte` lleva el mismo fondo (rayas y halo del color) y la `img` ya no tiene fondo opaco. Cloudinary ya usaba `f_auto`, que conserva la transparencia.
+  - Nombres: `carta.js` calcula un largo visual `--n` (las letras estrechas cuentan menos y M, W y Ñ más). El CSS hace `font-size = max(mín, min(máx, 150cqw / n))` y permite 2 líneas con `line-clamp`. Va en `cqw`, así que vale para los tres tamaños.
+- **Interacción** (`enlazarInteraccion` en `carta.js`):
+  - `contextmenu` y `dragstart` bloqueados en las cartas, `-webkit-touch-callout: none` e `img draggable=false`.
+  - Mantener pulsado (480 ms sin mover más de 10 px) hace `click()` en el elemento pulsable que contiene la carta, y anula el clic que llega al soltar.
+  - Ratón: a partir de 5 px la carta se levanta (`is-levantada`, `setPointerCapture`), sigue al puntero y gira según la velocidad horizontal suavizada (tope ±18°). Al soltar vuelve con `cubic-bezier(.34, 1.56, .64, 1)` y el clic de después se anula.
+  - Se excluyen `.slr-hueco`, `.slr-libre`, `.slr-campo-juego` y `.slr-quietas`, que tienen su propio arrastre o están quietas.
+- **Partidos:**
+  - Clases `es-ganado`, `es-perdido`, `es-empatado` y `es-ajeno` en el calendario y en los amistosos.
+  - Avatares con `renderAvatar` de `session.js` (foto de `JUGADORES_FOTOS`; 👤 si no hay). Los bots no tienen foto.
+  - El avatar va encima del nombre, para que los nombres largos no se partan a mitad de palabra; se usa `hyphens: auto`.
+- **Supabase CLI:** `npx --no-install supabase` empezó a querer la 2.121 (sin red de npm no la instala). Mientras tanto se usa el binario 2.120 de la caché de npx directamente: `~/AppData/Local/npm-cache/_npx/aa8e5c70f9d8d161/node_modules/.bin/supabase`.
+
+## Balance de referencia (motor v1.3.0)
+
+`node tests/slr/balance.mjs` (10.000 partidos por escenario).
+
+**Sin poderes, igual que la v1.2.0** (mismas reglas y mismo PRNG):
+
+- 75 contra 65: gana el mejor el 76,2 %, empata el 14,9 %; 6,01 posesiones de 10; recibe 1,49 contraataques.
+- 72 contra 68: gana el mejor el 54,2 %.
+- Espejo 70 contra 70: 2,70 goles.
+- Formaciones: 0,22 (plantilla neutra) y 0,30 (realista).
+
+**Activaciones programadas por partido** (los dos equipos, alineación por defecto):
+
+| Escenario | Media | Desviación | Jugadas con 0 / 1 / 2 |
+|---|---|---|---|
+| Plantillas iniciales beta (11 individuales) | 0,50 | 0,95 | 95,1 % / 4,8 % / 0,1 % |
+| Beta con 1 dúo y 1 trío por equipo | 5,11 | 2,61 | 58,3 % / 32,2 % / 9,5 % |
+| Beta con 2 dúos y 1 trío por equipo | 6,01 | 2,77 | 52,9 % / 34,1 % / 13,0 % |
+| Cartas generadas por tiers (A B B C C C D D D E E) | 4,76 | 2,40 | 60,4 % / 31,7 % / 8,0 % |
+
+- Con dúo y trío, la mitad de los partidos tiene entre 3 y 6 activaciones.
+- Las plantillas iniciales beta casi no tienen poderes: solo 20 de las 250 individuales tienen uno, y van en tiers bajos. Con el catálogo real por tiers pasará lo mismo, porque las plantillas iniciales son D, E y F. Los poderes llegan con las cartas del mercado.

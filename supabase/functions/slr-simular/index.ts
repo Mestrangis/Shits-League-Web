@@ -20,9 +20,10 @@
 // ═══════════════════════════════════════════════════════════════════════════
 import * as motor_1_1_0 from '../_shared/motor-v1.1.0.js';
 import * as motor_1_2_0 from '../_shared/motor-v1.2.0.js';
+import * as motor_1_3_0 from '../_shared/motor-v1.3.0.js';
 
-const MOTORES: Record<string, typeof motor_1_2_0> = { '1.1.0': motor_1_1_0, '1.2.0': motor_1_2_0 };
-const MOTOR_ACTUAL = '1.2.0';
+const MOTORES: Record<string, typeof motor_1_2_0> = { '1.1.0': motor_1_1_0, '1.2.0': motor_1_2_0, '1.3.0': motor_1_3_0 };
+const MOTOR_ACTUAL = '1.3.0';
 
 function motorDe(version?: string | null) {
   const m = MOTORES[version ?? MOTOR_ACTUAL];

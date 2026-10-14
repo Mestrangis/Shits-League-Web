@@ -744,8 +744,26 @@ button.slr-aviso:active { background: rgba(57,255,136,.08) !important; }
 }
 .slr-cruce > :first-child { text-align: right; }
 .slr-cruce > .slr-enlace-equipo { overflow-wrap: anywhere; font-weight: 700; }
-.slr-cruce__marcador { font-family: 'Anton', sans-serif; font-size: 20px; color: #fff !important; min-width: 64px; text-align: center; padding: 2px 6px; border-radius: 8px; }
-.slr-cruce__marcador[data-jugado] { background: rgba(255,255,255,.06) !important; }
+/* Avatar del dueño encima del nombre: así el nombre tiene todo el ancho */
+.slr-cruce__equipo { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; overflow-wrap: break-word; hyphens: auto; line-height: 1.25; }
+.slr-cruce__equipo--local { align-items: flex-end; text-align: right; }
+.slr-cruce__avatar { order: -1; width: 28px; height: 28px; font-size: 15px; }
+.slr-cruce__marcador {
+  font-family: 'Anton', sans-serif; font-weight: 400; font-size: 27px; line-height: 1; letter-spacing: .02em;
+  color: #fff !important; min-width: 74px; text-align: center; padding: 6px 8px; border-radius: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.slr-cruce__marcador i { font-style: normal; margin: 0 .22em; opacity: .55; font-size: .8em; vertical-align: .08em; }
+.slr-cruce__marcador[data-jugado], b.slr-cruce__marcador { background: rgba(255,255,255,.07) !important; }
+/* Resultado: los tuyos en color, los ajenos en gris */
+.slr-cruce.es-ajeno { background: rgba(255,255,255,.03) !important; color: #B4BDB8; }
+.slr-cruce.es-ajeno .slr-cruce__marcador { color: #D6DCD8 !important; }
+.slr-cruce.es-ganado   { background: rgba(31,224,101,.13) !important; box-shadow: inset 0 0 0 1.5px rgba(57,255,136,.6) !important; }
+.slr-cruce.es-perdido  { background: rgba(255,77,94,.12) !important;  box-shadow: inset 0 0 0 1.5px rgba(255,90,100,.6) !important; }
+.slr-cruce.es-empatado { background: rgba(255,152,48,.12) !important; box-shadow: inset 0 0 0 1.5px rgba(255,160,60,.6) !important; }
+.slr-cruce.es-ganado .slr-cruce__marcador   { background: rgba(31,224,101,.22) !important; }
+.slr-cruce.es-perdido .slr-cruce__marcador  { background: rgba(255,77,94,.22) !important; }
+.slr-cruce.es-empatado .slr-cruce__marcador { background: rgba(255,152,48,.22) !important; }
 .slr-enlace-equipo { text-align: inherit; text-decoration: underline; text-decoration-color: rgba(255,255,255,.18); text-underline-offset: 3px; }
 .slr-tabla .slr-enlace-equipo { display: block; text-align: left; }
 .slr-cruce.es-mio { box-shadow: inset 0 0 0 1px rgba(57,255,136,.35); }
@@ -862,10 +880,28 @@ button.slr-aviso:active { background: rgba(57,255,136,.08) !important; }
   perspective: 700px;
   user-select: none;
   -webkit-user-select: none;
+  -webkit-touch-callout: none;   /* sin menú de "guardar imagen" al mantener pulsado */
 }
+.slr-carta img { -webkit-user-drag: none; -webkit-touch-callout: none; }
 .slr-carta--duo    { --c1: #35D3FF; --c2: #082F45; }
 .slr-carta--trio   { --c1: #B67CFF; --c2: #261048; }
 .slr-carta--unica  { --c1: #FFC94A; --c2: #4A1E06; }
+/* Color propio de la carta (disenos_carta.color): manda sobre el del tipo */
+.slr-carta--color-verde   { --c1: #1FE065; --c2: #0A3B1E; }
+.slr-carta--color-morado  { --c1: #B67CFF; --c2: #261048; }
+.slr-carta--color-azul    { --c1: #4D8DFF; --c2: #0A1E4A; }
+.slr-carta--color-rojo    { --c1: #FF4D5E; --c2: #4A0A14; }
+.slr-carta--color-naranja { --c1: #FF8A2A; --c2: #4A2106; }
+.slr-carta--color-dorado  { --c1: #FFC94A; --c2: #4A3206; }
+.slr-carta--color-plata   { --c1: #DCE4EC; --c2: #2B333C; }
+.slr-carta--color-negro   { --c1: #9AA39E; --c2: #050605; }
+
+/* Levantada con el ratón (fuera de la alineación): sigue al puntero y vuelve con rebote */
+.slr-carta.is-levantada { z-index: 60; cursor: grabbing; transition: none; }
+.slr-carta.is-levantada .slr-carta__cara { box-shadow:
+    inset 0 0 0 1.4cqw color-mix(in srgb, var(--c1) 70%, #000), inset 0 0 0 2.2cqw rgba(0,0,0,.35),
+    0 8cqw 18cqw rgba(0,0,0,.65); }
+.slr-carta.is-volviendo { z-index: 60; transition: transform .6s cubic-bezier(.34, 1.56, .64, 1); }
 
 /* --x, --y ∈ [0, 1]: posición del ratón, del dedo o del giroscopio sobre la carta
    (js/slr/carta.js las escribe una vez por frame en el marco y en las capas del
@@ -952,17 +988,24 @@ button.slr-aviso:active { background: rgba(57,255,136,.08) !important; }
 }
 .slr-carta__pie { position: absolute; left: 6%; right: 6%; bottom: 5%; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 2.5cqw; }
 .slr-carta__nombre {
+  /* --n (carta.js): largo del nombre. La letra baja con el largo hasta un
+     mínimo; si aun así no cabe, parte en dos líneas (y como mucho dos) */
+  --nombre-max: 11cqw; --nombre-min: 7.2cqw;
   max-width: 100%;
   font-family: 'Anton', sans-serif;
-  font-size: 11cqw;
-  line-height: 1.2;             /* sin recortar las tildes de las mayúsculas (Á, Ú…) */
+  font-size: max(var(--nombre-min), min(var(--nombre-max), calc(150cqw / var(--n, 10))));
+  line-height: 1.12;            /* sin recortar las tildes de las mayúsculas (Á, Ú…) */
   margin-bottom: -1.5cqw;
   letter-spacing: .02em;
   text-transform: uppercase;
+  text-align: center;
   color: #fff;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
 .slr-carta__stats { display: flex; justify-content: space-between; width: 100%; padding-top: 2.4cqw; border-top: .6cqw solid color-mix(in srgb, var(--c1) 45%, transparent); }
 .slr-carta__stats span { display: flex; flex-direction: column; align-items: center; flex: 1; font-size: 5.4cqw; font-weight: 800; letter-spacing: .06em; color: color-mix(in srgb, var(--c1) 55%, #9DC4AD); }
@@ -990,8 +1033,14 @@ button.slr-aviso:active { background: rgba(57,255,136,.08) !important; }
    deformada). Encima: el OVR arriba a la izquierda y, en el tercio inferior,
    tipo, nombre y stats sobre un degradado oscuro que se lee con cualquier foto. */
 .slr-carta__tipo-pie { display: none; }
-.slr-carta--con-imagen .slr-carta__arte { inset: 0; border-radius: inherit; }
-.slr-carta--con-imagen .slr-carta__img { object-position: 50% 30%; background: #0a140e; }
+.slr-carta--con-imagen .slr-carta__arte {
+  inset: 0; border-radius: inherit;
+  /* Detrás de la foto, el fondo de la carta: se ve en los PNG sin fondo */
+  background:
+    repeating-linear-gradient(-35deg, color-mix(in srgb, var(--c1) 10%, transparent) 0 3cqw, transparent 3cqw 6cqw),
+    radial-gradient(80% 70% at 50% 30%, color-mix(in srgb, var(--c1) 34%, transparent), transparent);
+}
+.slr-carta--con-imagen .slr-carta__img { object-position: 50% 30%; }
 /* Con foto, el marco se pinta encima (en el velo): la foto taparía el de la cara.
    Cada acabado puede cambiar su color con --marco-carta */
 .slr-carta--con-imagen .slr-carta__velo {
@@ -1020,7 +1069,7 @@ button.slr-aviso:active { background: rgba(57,255,136,.08) !important; }
 .slr-carta--xs .slr-carta__stats { justify-content: center; border: none; padding: 0; }
 .slr-carta--xs .slr-carta__stats span { font-size: 9cqw; }
 .slr-carta--xs .slr-carta__stats b { font-size: 18cqw; }
-.slr-carta--xs .slr-carta__nombre { font-size: 13cqw; }
+.slr-carta--xs .slr-carta__nombre { --nombre-max: 13cqw; --nombre-min: 9.5cqw; font-size: max(var(--nombre-min), min(var(--nombre-max), calc(165cqw / var(--n, 10)))); }
 .slr-carta--xs .slr-carta__ovr { font-size: 22cqw; }
 .slr-carta--xs .slr-carta__pie { gap: 0; }
 .slr-carta--xs .slr-carta__arte { inset: 7% 6% 34%; }
@@ -1221,7 +1270,9 @@ button.slr-aviso:active { background: rgba(57,255,136,.08) !important; }
 .slr-muestrario .slr-subtitulo small { font-family: 'Sora', sans-serif; font-size: 11px; letter-spacing: 0; text-transform: none; color: var(--slr-suave); }
 .slr-muestrario__fotos { display: flex; gap: 8px; justify-content: center; }
 .slr-muestrario__xs { width: 21vw; max-width: 88px; }
-.slr-muestrario__grande { width: min(78vw, 300px); margin: 0 auto; }
+.slr-muestrario__grande { width: min(78vw, 300px); margin: 14px auto 0; }
+.slr-muestrario__colores { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.slr-muestrario__colores figcaption { text-align: center; font-size: 11px; color: var(--slr-suave); margin-top: 4px; }
 
 /* Herramienta de plantillas */
 .slr-plantillas { list-style: none; display: flex; flex-direction: column; gap: 8px; }
@@ -1263,3 +1314,24 @@ button.slr-aviso:active { background: rgba(57,255,136,.08) !important; }
 .slr-lista-equipos__cartas b { font-family: 'Anton', sans-serif; font-weight: 400; font-size: 20px; line-height: 1; color: var(--slr-propio); }
 .slr-lista-equipos__cartas small { font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--slr-suave); }
 .slr-lista-equipos__cartas.es-llena b { color: var(--slr-rival); }
+
+/* Formulario "Nueva carta" / "Editar carta" (modo pruebas) */
+.slr-editor { display: flex; flex-direction: column; gap: 14px; }
+.slr-editor__vista { width: min(70vw, 280px); margin: 4px auto 0; }
+.slr-editor__resumen { text-align: center; font-size: 13px; color: #C9E8D5; }
+.slr-editor__resumen b { color: #fff; }
+.slr-editor__resumen em { font-style: normal; color: var(--slr-oro); }
+.slr-editor__bloque { display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 14px; border: 1px solid rgba(31,224,101,.14); background: rgba(3,12,7,.4); min-width: 0; }
+.slr-editor__bloque legend { padding: 0 6px; font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--slr-suave); }
+.slr-editor__fila { display: flex; gap: 8px; align-items: flex-end; }
+.slr-editor__fila > .slr-campo { flex: 1; min-width: 0; }
+.slr-editor .slr-campo .slr-input { padding: 10px; font-size: 15px; }
+.slr-editor__subir { display: flex; }
+.slr-editor__subir .slr-btn { flex: 1; text-align: center; cursor: pointer; }
+.slr-editor__estado { font-size: 12.5px; color: #C9E8D5; }
+.slr-editor__estado:empty { display: none; }
+.slr-editor__estado.es-error, .slr-editor__error { color: #FF9C9C; font-size: 13px; line-height: 1.45; }
+.slr-editor__poderes { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+.slr-editor__poder { display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 12px; background: rgba(255,255,255,.03); border: 1px solid rgba(31,224,101,.1); }
+.slr-editor__quitar { flex: 0 0 40px; height: 40px; border-radius: 10px; background: rgba(255,90,90,.12) !important; color: #FF9C9C !important; font-size: 16px; }
+.slr-detalle__editar { width: 100%; margin-top: 14px; }

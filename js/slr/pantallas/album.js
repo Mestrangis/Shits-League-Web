@@ -25,7 +25,7 @@ export async function abrirAlbum(ctx) {
   ]);
   const ids = entradas.map(e => e.diseno_id);
   const cartas = ids.length
-    ? await leer(`cartas?select=id,diseno_id,equipo_id,disenos_carta(nombre,tipo,acabado,personas,ata,def,con,valor,poderes,imagen_url,texto)` +
+    ? await leer(`cartas?select=id,diseno_id,equipo_id,disenos_carta(nombre,tipo,acabado,color,tier,perfil,personas,ata,def,con,valor,poderes,imagen_url,texto)` +
         `&liga_id=eq.${liga}&diseno_id=in.(${ids.join(',')})`)
     : [];
   const items = cartas.map(f => {

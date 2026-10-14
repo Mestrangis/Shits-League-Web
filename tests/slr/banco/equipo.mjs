@@ -210,9 +210,10 @@ try {
   await clic('[data-pruebas=muestrario]');
   await esperar(`!!document.querySelector('.slr-muestrario')`);
   await dormir(1500);
-  const mu = await ev(`({ acabados: document.querySelectorAll('.slr-muestrario__acabado').length, conFoto: document.querySelectorAll('.slr-muestrario .slr-carta--con-imagen').length,
+  const mu = await ev(`({ acabados: document.querySelectorAll('.slr-muestrario__acabado:not([data-muestra])').length, colores: document.querySelectorAll('[data-muestra=colores] .slr-carta').length, nombres2: [...document.querySelectorAll('[data-muestra=nombres] .slr-carta__nombre')].filter(n => n.getBoundingClientRect().height > parseFloat(getComputedStyle(n).fontSize) * 1.6).length, conFoto: document.querySelectorAll('.slr-muestrario .slr-carta--con-imagen').length,
     cargadas: [...document.querySelectorAll('.slr-muestrario .slr-carta__img')].filter(i => i.src && /c_fill,ar_5:7,g_auto,w_\\d+/.test(i.src)).length })`);
   check(mu.acabados === 4 && mu.conFoto >= 4, `${mu.acabados} acabados, ${mu.conFoto} cartas con foto (${mu.cargadas} ya pedidas a Cloudinary al ancho real)`);
+  check(mu.colores === 8 && mu.nombres2 >= 1, `muestrario: 8 colores y nombres largos en dos líneas (${mu.nombres2})`);
   await foto('muestrario');
   await foto('muestrario-fotos', '.slr-muestrario__fotos');
   await foto('muestrario-grande', '.slr-muestrario__grande');

@@ -57,7 +57,7 @@ function jugadas(eventos, eq, nombre, poderDe) {
       if (e.tipo === 'poder') {
         const p = poderDe(e.carta, e.poder);
         lineas.push(`<li class="slr-suceso slr-suceso--poder ${eq[e.equipo].clase}">⚡ ${carta(e.carta, e.equipo)} <small>(${esc(eq[e.equipo].nombre)})</small> activa
-          <button type="button" class="slr-suceso__poder" data-poder="${esc(e.carta)}|${esc(e.poder)}">${esc(e.poder)}</button>${p ? `: ${esc(CORTO[p.momento]?.(p.efecto) ?? '')}` : ''}</li>`);
+          <button type="button" class="slr-suceso__poder" data-poder="${esc(e.carta)}|${esc(e.poder)}">${esc(e.poder)}</button>${p ? `: ${esc(CORTO[p.momento]?.(p.efecto) ?? '')}` : ''}${e.programada != null && e.programada < e.jugada ? ` <small>(le tocaba en la jugada ${e.programada})</small>` : ''}</li>`);
       } else if (e.tipo === 'posesion') {
         const gana = e.ganador, saca = e.saca;
         lineas.push(gana === saca

@@ -109,7 +109,7 @@ async function cargarCartas() {
   const eq = datos.equipo.id;
   const [filas, ventas] = await Promise.all([
     leer(`cartas?select=id,diseno_id,equipo_id,multiplicador_clausula,blindada_hasta,tocada_en_jornada,adquirida_en,` +
-      `disenos_carta(nombre,tipo,acabado,personas,ata,def,con,valor,poderes,imagen_url,texto)&equipo_id=eq.${eq}`),
+      `disenos_carta(nombre,tipo,acabado,color,tier,perfil,personas,ata,def,con,valor,poderes,imagen_url,texto)&equipo_id=eq.${eq}`),
     leer(`ventas?select=id,carta_id,precio&vendedor_id=eq.${eq}&estado=eq.activa`),
   ]);
   datos.cartas = filas.map(f => ({

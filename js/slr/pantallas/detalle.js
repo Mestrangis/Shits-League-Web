@@ -9,6 +9,7 @@ import { esc, miles, monedas, hoja, cerrarCapa, confirmar, conEspera, toast, fec
 import { cartaHTML, normalizarCarta, describirPoder, TIPOS, ACABADOS } from '../carta.js';
 import { estaTocada, configLiga } from '../rush.js';
 import { chipsEstado } from './plantilla.js';
+import { abrirEditorCarta } from './editor-carta.js';
 
 const barras = c => [['ATA', c.ata], ['DEF', c.def], ['CON', c.con]].map(([k, v]) => `
   <div class="slr-barra-stat">
@@ -35,6 +36,7 @@ export async function abrirDetalle(cartaId, ctx) {
   const cl = cfg.clausula ?? {};
   const [mMin, mMax, paso, costeSubida] = [cl.multiplicador_min ?? 1.5, cl.multiplicador_max ?? 3, cl.paso ?? 0.1, cl.coste_subida ?? 0.2];
   const precioBanco = Math.round(c.valor * (cfg.venta_banco ?? 0.6));
+  const puedeEditar = !!datos.liga?.es_admin && cfg.modo_beta === true && !!info.diseno_id;
 
   const el = hoja(`
     <div class="slr-detalle">
@@ -70,12 +72,17 @@ export async function abrirDetalle(cartaId, ctx) {
           <p class="slr-suave">El banco paga el ${Math.round((cfg.venta_banco ?? 0.6) * 100)} % del valor, al momento.</p>
           <button class="slr-btn slr-btn--peligro" type="button" data-vender>Vender por ${miles(precioBanco)}</button>` : ''}
 
+        ${puedeEditar ? '<button class="slr-btn slr-btn--pruebas slr-detalle__editar" type="button" data-editar-carta>✎ Editar carta (modo pruebas)</button>' : ''}
+
         <h3 class="slr-subtitulo">Historial</h3>
         ${info.historial.length ? `<ul class="slr-historial">${info.historial.slice().reverse().map(h => `
           <li><span>${esc(h.texto)}</span><time>${esc(fechaCorta(h.fecha))}</time></li>`).join('')}</ul>`
           : '<p class="slr-suave">Sin movimientos todavía.</p>'}
       </div>
     </div>`, { titulo: c.nombre, completa: true });
+
+  el.querySelector('[data-editar-carta]')?.addEventListener('click', () =>
+    abrirEditorCarta(ctx, { disenoId: info.diseno_id }).catch(e => toast(e.message, 'error')));
 
   if (!esMia) return;
 

@@ -1,17 +1,20 @@
-// Prueba de la API real de SLR: motor v1.2.0, notificaciones con destino y la
+// Prueba de la API real de SLR (paso 6, motor v1.2.0 y siguientes): notificaciones con destino y la
 // herramienta de plantillas.
 //   node tests/slr/api-paso6.mjs               (crea una liga de prueba y la borra al final)
 //   node tests/slr/api-paso6.mjs --conservar   (no la borra: para mirarla en la web)
 //   node tests/slr/api-paso6.mjs --borrar ID   (borra una liga de prueba conservada)
-// · El catálogo beta tiene los poderes de la v1.2.0 (tests/slr/catalogo-beta.mjs).
+// · El catálogo beta tiene los poderes de la versión actual (tests/slr/catalogo-beta.mjs).
 // · Bot Uno administra una liga de prueba con Bot Dos y 2 bots del modo pruebas;
-//   juega 2 jornadas: se simulan con la v1.2.0 y se reproducen igual aquí.
+//   juega 2 jornadas: se simulan con el motor actual y se reproducen igual aquí.
 // · Avisos: destino guardado (carta, partido, movimientos, liga) y los
 //   amistosos ya no avisan.
 // · Los partidos antiguos (v1.1.0) se siguen reproduciendo con su motor.
 import { env, exigirEnv, rpc, rpcOk, leer, check, rechaza, seccion, resultado, cartasLiga } from './api-util.mjs';
 import { SUPABASE_URL, SUPABASE_KEY } from '../../js/slr/config.js';
-import { motorDe } from '../../js/slr/motores.js';
+import { motorDe, MOTOR_ACTUAL } from '../../js/slr/motores.js';
+import { PROBABILIDADES } from '../../js/slr/generador.js';
+
+const ACTUAL = MOTOR_ACTUAL.VERSION;
 import { calcularValor } from '../../js/slr/valor.js';
 import { catalogoBeta } from './catalogo-beta.mjs';
 
@@ -49,12 +52,12 @@ if (BORRAR) {
 }
 
 try {
-  seccion('Catálogo beta con los poderes de la v1.2.0');
+  seccion(`Catálogo beta con los poderes de la v${ACTUAL}`);
   {
     const bd = (await leer('disenos_carta?select=id,ata,def,con,poderes,valor&beta=eq.true&limit=5000')).datos;
     const porId = new Map(bd.map(d => [d.id, d]));
     const esperado = catalogoBeta().filter(c => porId.has(c.id));
-    const clave = ps => JSON.stringify(ps.map(p => [p.nombre, p.momento, p.probabilidad, p.efecto, p.nivel]));
+    const clave = ps => JSON.stringify(ps.map(p => [p.nombre, p.momento, p.probabilidad, p.probabilidades, p.efecto, p.nivel]));
     const conPoder = esperado.filter(c => c.poderes.length);
     const iguales = conPoder.filter(c => clave(porId.get(c.id).poderes) === clave(c.poderes));
     check(conPoder.length > 40 && iguales.length === conPoder.length,
@@ -62,7 +65,8 @@ try {
       conPoder.filter(c => !iguales.includes(c)).map(c => c.nombre).slice(0, 5).join(', '));
     const todos = bd.flatMap(d => d.poderes);
     const sorteados = todos.filter(p => p.probabilidad !== 'siempre');
-    check(sorteados.every(p => p.probabilidad >= 0.10 && p.probabilidad <= 0.20), 'probabilidades entre 0,10 y 0,20');
+    check(sorteados.every(p => p.probabilidad === undefined && p.probabilidades?.join() === PROBABILIDADES[p.nivel].join()),
+      `probabilidades [p1, p2, p3] del generador (${PROBABILIDADES.simple.join(' / ')})`);
     check(sorteados.filter(p => p.momento !== 'tirador').every(p => p.efecto === { simple: 0.2, fuerte: 0.3, 'muy fuerte': 0.4 }[p.nivel]),
       'efectos: simple +0,20, fuerte +0,30, muy fuerte +0,40');
     check(todos.filter(p => p.probabilidad === 'siempre').every(p => p.momento === 'tirador' && p.efecto === 2), 'los "siempre" de tirador no cambian (×2)');
@@ -122,7 +126,7 @@ try {
     check(n?.destino_tipo === 'movimientos' && n.destino_id === D.equipo, 'venta completada → destino «movimientos» del equipo que cobra');
   }
 
-  seccion('Temporada: 2 jornadas con el motor v1.2.0');
+  seccion(`Temporada: 2 jornadas con el motor v${ACTUAL}`);
   await rpcOk('slr_iniciar_temporada', { token: U.token, liga_id: L });
   const ini = (await avisos(U)).find(x => x.tipo === 'temporada_iniciada');
   check(ini?.destino_tipo === 'liga' && ini.destino_id === L, 'temporada iniciada → destino «liga»');
@@ -138,7 +142,7 @@ try {
       const m = motorDe(d.version_motor);
       const real = m.simularPartido(d.alineaciones_congeladas.local, d.alineaciones_congeladas.visitante, d.semilla);
       const pron = m.simularPronostico(d.alineaciones_congeladas.local, d.alineaciones_congeladas.visitante, d.semilla, 200);
-      check(d.version_motor === '1.2.0' && real.goles.join() === d.goles.join() && pron.pA === d.p_local,
+      check(d.version_motor === ACTUAL && real.goles.join() === d.goles.join() && pron.pA === d.p_local,
         `J${j.jornada}: ${d.goles.join('-')} con el motor ${d.version_motor}, reproducido igual (y su pronóstico)`);
     }
     const n = (await avisos(U)).find(x => x.tipo === 'jornada_publicada' && x.datos.numero === j.jornada);
@@ -159,7 +163,7 @@ try {
     const am = await funcion({ accion: 'amistoso', token: U.token, rival_equipo_id: D.equipo });
     const d = am.status === 200 ? await rpcOk('slr_partido', { token: U.token, partido_id: am.datos.partido_id }) : null;
     const r = d && motorDe(d.version_motor).simularPartido(d.alineaciones_congeladas.local, d.alineaciones_congeladas.visitante, d.semilla);
-    check(d?.version_motor === '1.2.0' && r.goles.join() === d.goles.join(), `amistoso ${d?.goles.join('-')} con el motor ${d?.version_motor}, reproducido igual`);
+    check(d?.version_motor === ACTUAL && r.goles.join() === d.goles.join(), `amistoso ${d?.goles.join('-')} con el motor ${d?.version_motor}, reproducido igual`);
     const despues = await avisos(D);
     check(despues.length === antes && !despues.some(x => x.tipo === 'amistoso'), 'el rival del amistoso no recibe ningún aviso');
   }

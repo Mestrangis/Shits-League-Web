@@ -13,7 +13,16 @@
    Todas las cartas se inclinan en 3D siguiendo el ratón (PC) o el giroscopio
    (móvil: todas las visibles a la vez); el brillo es solo de los acabados.
    Sin imagen (catálogo beta), un marcador con iniciales y silueta del color
-   del tipo. Solo depende de ui.js (esc, iniciales); los estilos están en
+   de la carta (`color` de la paleta o, si no tiene, el del tipo). Con una foto
+   PNG sin fondo, el fondo de la carta se ve detrás.
+   El nombre se ajusta a su largo (--n): letra más pequeña hasta un mínimo y,
+   si aun así no cabe, dos líneas.
+   Interacción (iniciarAcabados): sin menú de "guardar imagen" ni arrastre del
+   navegador; mantener pulsada una carta (móvil) hace lo mismo que tocarla;
+   con el ratón, arrastrarla la levanta, se inclina con la velocidad y vuelve
+   a su sitio con un rebote. En la alineación (huecos y cartas libres) manda
+   su propio arrastre.
+   Solo depende de ui.js (esc, iniciales); los estilos están en
    css/slr.css bajo .slr-carta.
 ═══════════════════════════════════════════════ */
 import { esc, iniciales } from './ui.js';
@@ -37,6 +46,9 @@ export function normalizarCarta(f) {
     nombre: d.nombre,
     tipo: d.tipo,
     acabado: d.acabado ?? 'normal',
+    color: d.color ?? null,
+    tier: d.tier ?? null,
+    perfil: d.perfil ?? null,
     personas: d.personas ?? [],
     ata: d.ata, def: d.def, con: d.con,
     ovr: ovr(d.ata, d.def, d.con),
@@ -59,11 +71,18 @@ const MOMENTOS = {
 const pct = e => `${Math.round(e * 100)} %`;
 const num = e => String(Math.round(e * 100) / 100).replace('.', ',');
 
+// Probabilidades [p1, p2, p3] (igual que probabilidadesPoder del motor v1.3.0)
+export function probabilidadesDe(p) {
+  if (Array.isArray(p.probabilidades)) return [0, 1, 2].map(k => p.probabilidades[k] ?? 0);
+  return [p.probabilidad, p.probabilidad / 2.5, p.probabilidad / 6];
+}
+
 export function describirPoder(p) {
   const [corto, momento, efecto] = MOMENTOS[p.momento] ?? [p.momento, p.momento, e => `efecto ${num(e)}`];
+  const [p1, p2, p3] = p.probabilidad === 'siempre' ? [] : probabilidadesDe(p);
   const prob = p.probabilidad === 'siempre'
     ? 'Siempre'
-    : `${Math.round(p.probabilidad * 100)} % de las veces (×1,5 si es el capitán), como mucho una vez por partido`;
+    : `Se activa en el ${pct(p1)} de los partidos (2 veces en el ${pct(p2)}, 3 en el ${pct(p3)}), repartido por el partido · ×1,5 si es el capitán`;
   return { nombre: p.nombre, corto, momento, probabilidad: prob, efecto: efecto(p.efecto), nivel: p.nivel };
 }
 
@@ -92,7 +111,7 @@ const SILUETA = `<svg class="slr-carta__silueta" viewBox="0 0 100 100" aria-hidd
 function arte(c) {
   if (c.imagen_url) {
     // Sin src: se pone al aparecer en pantalla, con el ancho real (cargarImagenes)
-    return `<img class="slr-carta__img" data-cld="${esc(c.imagen_url)}" alt="" decoding="async">`;
+    return `<img class="slr-carta__img" data-cld="${esc(c.imagen_url)}" alt="" decoding="async" draggable="false">`;
   }
   const personas = c.personas.length ? c.personas : [c.nombre];
   const siluetas = personas.slice(0, 3).map(() => SILUETA).join('');
@@ -100,6 +119,16 @@ function arte(c) {
       <div class="slr-carta__siluetas">${siluetas}</div>
       <span class="slr-carta__iniciales">${esc(iniciales(c.nombre))}</span>
     </div>`;
+}
+
+// Largo "visual" del nombre para ajustar la letra (Anton en mayúsculas: las
+// estrechas cuentan menos y las anchas más). Mínimo 8: los cortos no crecen.
+function largoNombre(nombre) {
+  let n = 0;
+  for (const ch of String(nombre ?? '').toUpperCase()) {
+    n += 'IJ1. \'-'.includes(ch) ? 0.55 : 'MWÑ'.includes(ch) ? 1.3 : 1;
+  }
+  return Math.max(8, Math.round(n * 10) / 10);
 }
 
 // tam: 'xs' (huecos del campo) | 's' (cuadrícula) | 'l' (detalle). destacar: la stat
@@ -115,7 +144,7 @@ export function cartaHTML(c, { tam = 's', destacar = null, capitan = false, toca
     enVenta && '<span class="slr-carta__marca slr-carta__marca--venta" title="En venta">€</span>',
   ].filter(Boolean).join('');
   return `
-    <div class="slr-carta slr-carta--${tam} slr-carta--${esc(c.tipo)} slr-carta--${esc(def.id)}${c.imagen_url ? ' slr-carta--con-imagen' : ''}${tocada ? ' slr-carta--tocada' : ''}"
+    <div class="slr-carta slr-carta--${tam} slr-carta--${esc(c.tipo)} slr-carta--${esc(def.id)}${c.color ? ` slr-carta--color-${esc(c.color)}` : ''}${c.imagen_url ? ' slr-carta--con-imagen' : ''}${tocada ? ' slr-carta--tocada' : ''}"
          data-carta="${esc(c.id)}" data-acabado="${esc(def.id)}"${def.sigue ? ' data-sigue' : ''}>
       <div class="slr-carta__marco"><div class="slr-carta__cara">
         <div class="slr-carta__arte">${arte(c)}</div>
@@ -127,7 +156,7 @@ export function cartaHTML(c, { tam = 's', destacar = null, capitan = false, toca
         <div class="slr-carta__pie">
           ${marcas ? `<span class="slr-carta__marcas">${marcas}</span>` : ''}
           <span class="slr-carta__tipo-pie">${esc(TIPOS[c.tipo] ?? c.tipo)}</span>
-          <span class="slr-carta__nombre">${esc(c.nombre)}</span>
+          <span class="slr-carta__nombre" style="--n:${largoNombre(c.nombre)}">${esc(c.nombre)}</span>
           <span class="slr-carta__stats">
             ${stats.map(([k, v]) => `<span class="${destacar === k ? 'es-destacada' : ''}"><b>${v}</b>${k}</span>`).join('')}
           </span>
@@ -303,6 +332,7 @@ export function iniciarAcabados(raiz) {
   raiz.addEventListener('pointerdown', e => {
     if (e.target.closest('.slr-carta')) activarInclinacion(true);   // iOS: dentro de un gesto del usuario
   });
+  enlazarInteraccion(raiz);
   raiz.addEventListener('pointerover', e => {
     const carta = e.target.closest('.slr-carta');
     if (!carta || carta === puntero?.carta || carta.closest('.slr-quietas')) return;
@@ -330,6 +360,94 @@ export function iniciarAcabados(raiz) {
   // Con scroll, el rectángulo guardado deja de valer
   raiz.addEventListener('scroll', () => { if (puntero) puntero.r = puntero.carta.getBoundingClientRect(); },
     { capture: true, passive: true });
+}
+
+/* ── Interacción: mantener pulsado y levantar con el ratón ──────────────── */
+// En la alineación las cartas se arrastran para colocarlas (alineacion.js)
+const CON_ARRASTRE_PROPIO = '.slr-hueco, .slr-libre, .slr-campo-juego, .slr-quietas';
+const PULSACION_MS = 480;
+const UMBRAL_DEDO = 10, UMBRAL_RATON = 5;
+let pulsacion = null;          // { carta, x0, y0, temporizador }
+let levantada = null;          // { carta, id, x0, y0, dx, dy, ultX, ultT, giro, activa, frame }
+let anularClicHasta = 0;
+
+// Lo que se toca de la carta: el botón o elemento pulsable que la contiene
+const pulsableDe = carta => carta.closest('button, a[href], [role="button"], [data-id], [data-carta-abrir]');
+
+function mantener() {
+  const { carta } = pulsacion;
+  pulsacion = null;
+  const objetivo = pulsableDe(carta);
+  if (!objetivo || objetivo.disabled) return;
+  navigator.vibrate?.(12);
+  objetivo.click();
+  anularClicHasta = Date.now() + 700;   // el clic que llega al soltar no repite la acción
+}
+
+function pintarLevantada() {
+  const l = levantada;
+  l.frame = 0;
+  l.carta.style.transform = `translate3d(${l.dx}px, ${l.dy}px, 0) rotate(${l.giro.toFixed(2)}deg) scale(1.06)`;
+}
+
+function soltarLevantada() {
+  const { carta, activa, frame } = levantada;
+  levantada = null;
+  if (frame) cancelAnimationFrame(frame);
+  if (!activa) return;
+  anularClicHasta = Date.now() + 350;   // ha sido un arrastre, no un clic
+  carta.classList.remove('is-levantada');
+  carta.classList.add('is-volviendo');
+  carta.style.transform = '';
+  setTimeout(() => carta.classList.remove('is-volviendo'), 650);
+}
+
+function enlazarInteraccion(raiz) {
+  // Sin menú de "guardar/copiar imagen" ni arrastre de imágenes del navegador
+  raiz.addEventListener('contextmenu', e => { if (e.target.closest('.slr-carta')) e.preventDefault(); });
+  raiz.addEventListener('dragstart', e => { if (e.target.closest?.('.slr-carta') || e.target.tagName === 'IMG') e.preventDefault(); });
+  raiz.addEventListener('click', e => {
+    if (Date.now() < anularClicHasta && e.isTrusted) { e.preventDefault(); e.stopPropagation(); }
+  }, true);
+
+  raiz.addEventListener('pointerdown', e => {
+    const carta = e.target.closest('.slr-carta');
+    if (!carta || e.button > 0 || carta.closest(CON_ARRASTRE_PROPIO)) return;
+    if (e.pointerType === 'mouse') {
+      levantada = { carta, id: e.pointerId, x0: e.clientX, y0: e.clientY, dx: 0, dy: 0,
+                    ultX: e.clientX, ultT: performance.now(), giro: 0, activa: false, frame: 0 };
+    } else {
+      clearTimeout(pulsacion?.temporizador);
+      pulsacion = { carta, x0: e.clientX, y0: e.clientY, temporizador: setTimeout(mantener, PULSACION_MS) };
+    }
+  });
+  raiz.addEventListener('pointermove', e => {
+    if (pulsacion && Math.hypot(e.clientX - pulsacion.x0, e.clientY - pulsacion.y0) > UMBRAL_DEDO) {
+      clearTimeout(pulsacion.temporizador);
+      pulsacion = null;
+    }
+    const l = levantada;
+    if (!l || e.pointerId !== l.id) return;
+    if (!l.activa) {
+      if (Math.hypot(e.clientX - l.x0, e.clientY - l.y0) < UMBRAL_RATON) return;
+      l.activa = true;
+      l.carta.classList.add('is-levantada');
+      try { l.carta.setPointerCapture(e.pointerId); } catch { /* sin captura: sigue dentro de la raíz */ }
+    }
+    // Inclinación según la velocidad horizontal (px/ms), suavizada
+    const ahora = performance.now();
+    const v = (e.clientX - l.ultX) / Math.max(8, ahora - l.ultT);
+    l.giro = l.giro * 0.7 + Math.max(-18, Math.min(18, v * 22)) * 0.3;
+    l.ultX = e.clientX; l.ultT = ahora;
+    l.dx = e.clientX - l.x0; l.dy = e.clientY - l.y0;
+    if (!l.frame) l.frame = requestAnimationFrame(pintarLevantada);
+  }, { passive: true });
+  const fin = e => {
+    if (pulsacion) { clearTimeout(pulsacion.temporizador); pulsacion = null; }
+    if (levantada && e.pointerId === levantada.id) soltarLevantada();
+  };
+  raiz.addEventListener('pointerup', fin);
+  raiz.addEventListener('pointercancel', fin);
 }
 
 export function pararAcabados() {

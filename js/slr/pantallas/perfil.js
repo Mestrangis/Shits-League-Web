@@ -12,6 +12,7 @@ import { proximaJornada } from '../rush.js';
 import { abrirAlbum } from './album.js';
 import { abrirPlantillas } from './plantillas-admin.js';
 import { abrirMuestrario } from './muestrario.js';
+import { abrirEditorCarta } from './editor-carta.js';
 
 const TIPOS_MOV = {
   saldo_inicial: 'Saldo inicial', reinicio_temporada: 'Nueva temporada', salario: 'Salario de la jornada',
@@ -75,8 +76,9 @@ export async function panelAdmin(cont, ctx) {
         ${estado === 'en_curso' && j ? `<button class="slr-btn slr-btn--pruebas" type="button" data-pruebas="jugar">▶ Jugar la jornada ${j.numero} ahora</button>` : ''}
         ${sinTemporada ? '<button class="slr-btn slr-btn--pruebas" type="button" data-pruebas="anadir">+ Añadir bot</button>' : ''}
         ${sinTemporada && bots.length ? `<button class="slr-btn slr-btn--pruebas" type="button" data-pruebas="quitar">− Quitar bot (${esc(bots[bots.length - 1].nombre)})</button>` : ''}
+        <button class="slr-btn slr-btn--pruebas" type="button" data-pruebas="nueva-carta">➕ Nueva carta</button>
         <button class="slr-btn slr-btn--pruebas" type="button" data-pruebas="plantillas">🃏 Plantillas: dar o quitar cartas</button>
-        <button class="slr-btn slr-btn--pruebas" type="button" data-pruebas="muestrario">✨ Muestrario de acabados</button>
+        <button class="slr-btn slr-btn--pruebas" type="button" data-pruebas="muestrario">✨ Muestrario de cartas</button>
         <button class="slr-btn slr-btn--peligro" type="button" data-pruebas="reiniciar">Reiniciar beta</button>
       </div>
       ${!sinTemporada ? '<p class="slr-suave">Los bots se añaden o quitan antes de empezar la temporada o entre temporadas.</p>' : ''}
@@ -84,6 +86,7 @@ export async function panelAdmin(cont, ctx) {
 
   cont.querySelectorAll('[data-pruebas]').forEach(b => b.addEventListener('click', () => {
     if (b.dataset.pruebas === 'plantillas') abrirPlantillas(ctx).catch(() => {});
+    else if (b.dataset.pruebas === 'nueva-carta') abrirEditorCarta(ctx).catch(e => toast(e.message, 'error'));
     else if (b.dataset.pruebas === 'muestrario') abrirMuestrario(ctx);
     else accionPruebas(b, ctx);
   }));
