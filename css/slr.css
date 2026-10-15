@@ -1303,6 +1303,25 @@ button.slr-aviso:active { background: rgba(57,255,136,.08) !important; }
 .slr-segmentos--chips button { flex: 0 0 auto; }
 .slr-ficha__album { display: flex; flex-direction: column; gap: 2px; font-size: 11px; line-height: 1.35; color: var(--slr-suave); }
 .slr-btn--album { width: 100%; }
+.slr-perfil__libros { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+
+/* Catálogo de cartas (solo admin): cartas grandes, recuento arriba */
+.slr-catalogo { display: grid; gap: 12px; }
+.slr-catalogo__resumen { display: grid; gap: 6px; padding: 12px 14px; border-radius: 14px; background: var(--slr-tarjeta); border: 1px solid var(--slr-borde); }
+.slr-catalogo__total { margin: 0; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.slr-catalogo__total b { font-family: 'Anton', sans-serif; font-weight: 400; font-size: 30px; line-height: 1; color: var(--slr-propio); }
+.slr-catalogo__total small { color: var(--slr-suave); font-size: 12px; }
+.slr-catalogo__cuentas { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; }
+.slr-catalogo__cuentas > small { width: 34px; color: var(--slr-suave); font-weight: 800; letter-spacing: .06em; text-transform: uppercase; font-size: 10px; }
+.slr-catalogo__cuentas span { padding: 3px 9px; border-radius: 99px; background: rgba(255,255,255,.05); border: 1px solid var(--slr-borde); }
+.slr-catalogo__cuentas span b { color: var(--slr-texto); margin-right: 2px; }
+.slr-filtros--catalogo { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.slr-rejilla--catalogo { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 16px 12px; }
+.slr-ficha--catalogo.es-inactiva .slr-carta { opacity: .55; filter: grayscale(.6); }
+@media (min-width: 900px) {
+  .slr-filtros--catalogo { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .slr-rejilla--catalogo { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 28px 22px; }
+}
 
 /* Muestrario */
 .slr-muestrario { display: flex; flex-direction: column; gap: 14px; }

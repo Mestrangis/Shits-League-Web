@@ -10,6 +10,7 @@ import { rpc, leer } from '../api.js';
 import { esc, miles, monedas, conSigno, fechaHora, diaHora, confirmar, conEspera, toast, hoja, cerrarCapa } from '../ui.js';
 import { proximaJornada } from '../rush.js';
 import { abrirAlbum } from './album.js';
+import { abrirCatalogo } from './catalogo.js';
 import { abrirPlantillas } from './plantillas-admin.js';
 import { abrirMuestrario } from './muestrario.js';
 import { abrirEditorCarta } from './editor-carta.js';
@@ -244,7 +245,10 @@ export async function pintar(cont, ctx) {
       </div>
     </section>
     <section class="slr-saldo"><div><small>${esc(datos.liga.nombre)}</small><span>Saldo</span></div><b>${monedas(datos.equipo.saldo)}</b></section>
-    <button class="slr-btn slr-btn--fantasma slr-btn--album" type="button" data-album>📖 Mi álbum</button>
+    <div class="slr-perfil__libros">
+      <button class="slr-btn slr-btn--fantasma slr-btn--album" type="button" data-album>📖 Mi álbum</button>
+      ${datos.liga.es_admin ? '<button class="slr-btn slr-btn--fantasma slr-btn--album" type="button" data-catalogo>🗂 Catálogo de cartas</button>' : ''}
+    </div>
     <div data-admin></div>
     <section class="slr-tarjeta" data-movimientos>
       <div class="slr-tarjeta__cabeza"><span>Movimientos</span><span>${movs.length}</span></div>
@@ -257,6 +261,7 @@ export async function pintar(cont, ctx) {
 
   cont.querySelector('[data-renombrar]').addEventListener('click', () => renombrar(ctx));
   cont.querySelector('[data-album]').addEventListener('click', () => abrirAlbum(ctx).catch(() => {}));
+  cont.querySelector('[data-catalogo]')?.addEventListener('click', () => abrirCatalogo(ctx).catch(() => {}));
 
   // Avatar de la sesión de Shits League (session.js, script clásico global)
   const av = cont.querySelector('[data-avatar]');

@@ -699,3 +699,36 @@ Los goles dependen mucho de la formación (con un solo defensa la ocasión llega
   - `banco/listas.mjs`, nuevo (carga de fotos y listas largas). Con `SALIDA=carpeta` graba los GIF.
   - `banco/equipo.mjs`: la herramienta ahora espera 24 por página.
   - `api-paso3`: con el catálogo corto, la garantía premium tardaba más sobres y el bucle acababa vendiendo la carta clausulada que la sección 10 vuelve a leer. `bajarA` ya no la vende y el bucle admite hasta 120 sobres.
+
+## Catálogo de cartas para el admin
+
+### Decisiones de Marcos
+
+- **Acceso:** página «Catálogo de cartas» solo para el admin, desde Perfil y separada del Modo pruebas.
+- **Contenido:** todas las cartas del juego como en el álbum, pero todas y sin herramientas de gestión: los diseños activos, con un interruptor para incluir los inactivos.
+- **Carga:** la misma que el álbum.
+- **Arriba:** total y recuento por tipo y por tier.
+- **Filtros y orden:** filtros por tipo, tier, perfil, acabado, color y libre / con dueño; buscador; orden por valor, OVR, nombre, tier o fecha de creación.
+- **Al tocar una carta:** se abre el detalle normal, con «Editar carta».
+
+### Decisiones mías
+
+- **Datos:** salen de `disenos_carta`, de lectura pública, como ya hace el álbum. No hace falta una función nueva.
+  - Se incluyen los diseños del catálogo común y, en una liga de prueba, los creados en ella.
+  - Se cruzan con el ejemplar de cada uno en la liga para saber el dueño.
+- **Diseño sin ejemplar en la liga:** pasa con uno desactivado antes de un reinicio de la beta, porque el reinicio solo crea ejemplares de los activos. Abre una ficha del diseño con la carta grande, stats, valor, tier, poderes y «Editar carta», en vez del detalle de un ejemplar que no existe.
+- **«Editar carta»:** sigue las reglas del detalle: admin y liga en modo pruebas.
+- **Carga:** el pintado por bloques del álbum pasa a `js/slr/bloques.js` (`rejillaPorBloques`), que usan el álbum y el catálogo: todas hasta 60, y con más, bloques de 30 con el siguiente precargado. Con la vista previa y el esqueleto de `imagenes.js`.
+- **Las inactivas:** se ven atenuadas y con la marca «Inactiva».
+- **Filtro de color:** tiene la opción «El del tipo», para las cartas sin color propio.
+- **Filtros y orden:** se recuerdan mientras dura la sesión.
+- **Rejilla:** 2 columnas en móvil y unas 5 en PC (mínimo de 230 px por carta); filtros en 3 y 4 columnas.
+- **Probado** en `banco/equipo.mjs` a 390×844:
+  - total y recuentos;
+  - pintado por bloques;
+  - filtro por tier, orden por nombre y buscador;
+  - interruptor de inactivas;
+  - detalle con «Editar carta».
+
+  Además, una captura a 1440×900.
+

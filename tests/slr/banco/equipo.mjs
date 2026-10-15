@@ -1,6 +1,6 @@
 // Prueba en Chrome headless (móvil 390×844) de la
 // pestaña Equipo, avisos, fichas, pronóstico, crónica, álbum, plantillas,
-// muestrario, el botón «Borrar cartas beta» y la rueda del pull-to-refresh de Shits League.
+// catálogo del admin, muestrario, el botón «Borrar cartas beta» y la rueda del pull-to-refresh de Shits League.
 //   node tests/slr/banco/equipo.mjs   (servidor local en :3000 y .env.local; SALIDA=carpeta guarda capturas)
 // Crea una liga de prueba con Bot Uno y 3 bots y la borra al terminar.
 import { spawn } from 'node:child_process';
@@ -184,6 +184,47 @@ try {
   await clic('[data-orden] [data-v="valor"]'); await dormir(300);
   check(await ev(`document.querySelector('[data-orden] .activo').dataset.v === 'valor'`), 'ordenar por valor');
   await atras();
+
+  console.log('\nCatálogo de cartas (admin)');
+  await clic('[data-catalogo]');
+  await esperar(`document.querySelectorAll('.slr-catalogo .slr-carta').length > 0`, 15000);
+  await dormir(800);
+  const activos = (await leer(`disenos_carta?select=id,tipo,tier&activo=eq.true&or=(liga_prueba_id.is.null,liga_prueba_id.eq.${L})&limit=5000`)).datos;
+  const inactivos = (await leer(`disenos_carta?select=id&activo=eq.false&or=(liga_prueba_id.is.null,liga_prueba_id.eq.${L})&limit=5000`)).datos.length;
+  const cat = await ev(`({ total: document.querySelector('.slr-catalogo__total b').textContent, cuentas: [...document.querySelectorAll('.slr-catalogo__cuentas')].map(x => x.innerText.replace(/\\s+/g, ' ')),
+    pintadas: document.querySelectorAll('.slr-catalogo .slr-ficha').length, filtros: document.querySelectorAll('.slr-filtros--catalogo select').length,
+    columnas: getComputedStyle(document.querySelector('.slr-rejilla--catalogo')).gridTemplateColumns.split(' ').length })`);
+  check(Number(cat.total.replace(/\./g, '')) === activos.length && cat.cuentas.length === 2 && cat.filtros === 7,
+    `catálogo: ${cat.total} activas · ${cat.cuentas.join(' · ')} · ${cat.filtros} filtros, ${cat.columnas} columnas en móvil`);
+  check(cat.pintadas === Math.min(activos.length, activos.length <= 60 ? activos.length : 30), `pinta ${cat.pintadas} (como el álbum: todas hasta 60, luego por bloques)`);
+  await foto('catalogo');
+  // Filtros, buscador y orden
+  await ev(`(() => { const e = document.querySelector('.slr-catalogo [data-f="tier"]'); e.value = 'D'; e.dispatchEvent(new Event('change')); return 0; })()`);
+  await dormir(200);
+  const nD = activos.filter(d => d.tier === 'D').length;
+  check(await ev(`document.querySelectorAll('.slr-catalogo .slr-ficha').length`) === Math.min(nD, nD <= 60 ? nD : 30) &&
+        await ev(`[...document.querySelectorAll('.slr-catalogo .slr-ficha__album')].every(x => /Tier D/.test(x.textContent))`), `filtro tier D: ${nD} cartas`);
+  await ev(`(() => { const e = document.querySelector('.slr-catalogo [data-f="tier"]'); e.value = ''; e.dispatchEvent(new Event('change'));
+    const o = document.querySelector('.slr-catalogo [data-f="orden"]'); o.value = 'nombre'; o.dispatchEvent(new Event('change')); return 0; })()`);
+  await dormir(200);
+  const nombres = await ev(`[...document.querySelectorAll('.slr-catalogo .slr-carta__nombre')].slice(0, 8).map(n => n.textContent)`);
+  check(nombres.every((n, i) => !i || nombres[i - 1].localeCompare(n, 'es') <= 0), `orden por nombre: ${nombres.slice(0, 3).join(', ')}…`);
+  const buscar = nombres[2];
+  await ev(`(() => { const e = document.querySelector('.slr-catalogo [data-f="texto"]'); e.value = ${JSON.stringify('')} + ${JSON.stringify(buscar)}.slice(0, 5); e.dispatchEvent(new Event('input')); return 0; })()`);
+  await dormir(400);
+  check(await ev(`[...document.querySelectorAll('.slr-catalogo .slr-carta__nombre')].some(n => n.textContent === ${JSON.stringify(buscar)})`), `buscador: «${buscar.slice(0, 5)}» encuentra «${buscar}»`);
+  await ev(`(() => { const e = document.querySelector('.slr-catalogo [data-f="texto"]'); e.value = ''; e.dispatchEvent(new Event('input')); return 0; })()`);
+  await dormir(300);
+  await clic('.slr-catalogo [data-inactivas]');
+  await dormir(300);
+  const conInact = await ev(`Number(document.querySelector('.slr-catalogo__total b').textContent.replace(/\\./g, ''))`);
+  check(conInact === activos.length + inactivos, `interruptor «Incluir las inactivas»: ${conInact} (${inactivos} inactivas)`);
+  await clic('.slr-catalogo [data-inactivas]');
+  await dormir(300);
+  await clic('.slr-catalogo .slr-ficha');
+  check(await esperar(`!!document.querySelector('.slr-detalle')`, 10000) && await ev(`!!document.querySelector('[data-editar-carta]')`),
+    'tocar una carta abre su detalle con «Editar carta»');
+  await atras(); await atras();
 
   console.log('\nHerramienta de plantillas');
   await clic('[data-pruebas=plantillas]');

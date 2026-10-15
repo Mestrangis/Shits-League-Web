@@ -11,12 +11,12 @@ import { estaTocada, configLiga } from '../rush.js';
 import { chipsEstado } from './plantilla.js';
 import { abrirEditorCarta } from './editor-carta.js';
 
-const barras = c => [['ATA', c.ata], ['DEF', c.def], ['CON', c.con]].map(([k, v]) => `
+export const barras = c => [['ATA', c.ata], ['DEF', c.def], ['CON', c.con]].map(([k, v]) => `
   <div class="slr-barra-stat">
     <span>${k}</span><div><i style="width:${Math.min(100, v)}%"></i></div><b>${v}</b>
   </div>`).join('');
 
-function poderes(lista) {
+export function poderes(lista) {
   if (!lista.length) return '<p class="slr-suave">Sin poderes.</p>';
   return `<ul class="slr-poderes">${lista.map(describirPoder).map(p => `
     <li>

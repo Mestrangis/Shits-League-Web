@@ -10,7 +10,7 @@
 import { leer } from '../api.js';
 import { esc, hoja, fechaCorta, miles, scrollDeHoja } from '../ui.js';
 import { cartaHTML, normalizarCarta, TIPOS, ACABADOS } from '../carta.js';
-import { precargar, urlFoto } from '../imagenes.js';
+import { rejillaPorBloques } from '../bloques.js';
 import { abrirDetalle } from './detalle.js';
 
 const TODAS_DE_GOLPE = 60;
@@ -66,8 +66,6 @@ export async function abrirAlbum(ctx) {
     </div>`, { titulo: 'Álbum', completa: true });
 
   const rejilla = el.querySelector('[data-rejilla]');
-  const cuerpo = scrollDeHoja(el);
-  let lista = [], pintadas = 0;
   const ficha = c => `
       <button class="slr-ficha" type="button" data-id="${esc(c.id)}">
         ${cartaHTML(c, { tam: 's' })}
@@ -76,37 +74,14 @@ export async function abrirAlbum(ctx) {
           <span class="${c.dueno === miEquipo ? 'slr-propio' : ''}">${c.dueno === miEquipo ? '✓ Tuya' : `Ahora: ${esc(quien(c.dueno))}`} · ${miles(c.valor)}</span>
         </span>
       </button>`;
-
-  // Fotos del bloque siguiente, al ancho de las que ya se ven
-  function precargarSiguiente() {
-    const ancho = rejilla.querySelector('.slr-carta')?.getBoundingClientRect().width || 170;
-    precargar(lista.slice(pintadas, pintadas + BLOQUE).filter(c => c.imagen_url).map(c => urlFoto(c.imagen_url, ancho)));
-  }
-  function pintarBloque() {
-    const n = lista.length <= TODAS_DE_GOLPE ? lista.length : BLOQUE;
-    rejilla.insertAdjacentHTML('beforeend', lista.slice(pintadas, pintadas + n).map(ficha).join(''));
-    pintadas = Math.min(lista.length, pintadas + n);
-    rejilla.dataset.pintadas = pintadas;
-    if (pintadas < lista.length) {
-      precargarSiguiente();
-      // En pantallas altas o anchas un bloque puede no llenar: se sigue sin esperar al scroll
-      requestAnimationFrame(() => { if (pintadas < lista.length && cuerpo.scrollHeight < cuerpo.clientHeight * 2.5) pintarBloque(); });
-    }
-  }
+  const bloques = rejilla && rejillaPorBloques({ rejilla, cuerpo: scrollDeHoja(el), ficha, todasDeGolpe: TODAS_DE_GOLPE, bloque: BLOQUE });
   function pintarRejilla() {
     if (!rejilla) return;
-    lista = items
+    bloques.poner(items
       .filter(c => (!filtro.tipo || c.tipo === filtro.tipo) && (!filtro.acabado || c.acabado === filtro.acabado))
-      .sort((a, b) => (filtro.orden === 'valor' ? b.valor - a.valor : new Date(b.fecha) - new Date(a.fecha)) || a.nombre.localeCompare(b.nombre));
-    pintadas = 0;
-    rejilla.innerHTML = lista.length ? '' : '<p class="slr-suave">Ninguna carta con esos filtros.</p>';
-    pintarBloque();
+      .sort((a, b) => (filtro.orden === 'valor' ? b.valor - a.valor : new Date(b.fecha) - new Date(a.fecha)) || a.nombre.localeCompare(b.nombre)),
+      '<p class="slr-suave">Ninguna carta con esos filtros.</p>');
   }
-  // Scroll infinito: a menos de 1,5 pantallas del final se pinta el bloque siguiente
-  // (sus fotos ya vienen precargadas)
-  cuerpo.addEventListener('scroll', () => {
-    if (pintadas < lista.length && cuerpo.scrollTop + cuerpo.clientHeight > cuerpo.scrollHeight - 1.5 * cuerpo.clientHeight) pintarBloque();
-  }, { passive: true });
   rejilla?.addEventListener('click', e => {
     const b = e.target.closest('[data-id]');
     if (b) abrirDetalle(b.dataset.id, ctx).catch(() => {});
