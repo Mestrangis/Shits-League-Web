@@ -7,7 +7,7 @@
    (En localhost, con un bot, la liga es su liga de prueba.)
 ═══════════════════════════════════════════════ */
 import { rpc } from '../api.js';
-import { conEspera, toast } from '../ui.js';
+import { conEspera, toast, miles } from '../ui.js';
 import { panelAdmin } from './perfil.js';
 
 function portada(titulo, texto, extra = '') {
@@ -42,9 +42,11 @@ export async function pintar(cont, ctx) {
       conEspera(form.querySelector('button'), async () => {
         const nombre = form.nombre.value;
         // La liga de prueba (solo en localhost) se une con su código; la real, sin código
-        if (liga.es_prueba) await rpc('slr_unirse_liga', { codigo_invitacion: liga.codigo_invitacion, nombre_equipo: nombre });
-        else await rpc('slr_unirse_liga_principal', { nombre_equipo: nombre });
-        toast(`¡Bienvenido, ${nombre}! Ya tienes 11 cartas y 5.000 monedas.`, 'ok');
+        const r = liga.es_prueba
+          ? await rpc('slr_unirse_liga', { codigo_invitacion: liga.codigo_invitacion, nombre_equipo: nombre })
+          : await rpc('slr_unirse_liga_principal', { nombre_equipo: nombre });
+        toast(`¡Bienvenido, ${nombre}! Ya tienes ${r.cartas} ${r.cartas === 1 ? 'carta' : 'cartas'} y ${miles(r.equipo.saldo)} monedas.`, 'ok');
+        if (r.aviso) toast(r.aviso, 'error');
         await recargar();
         navegar('equipo');
       }).catch(() => {});

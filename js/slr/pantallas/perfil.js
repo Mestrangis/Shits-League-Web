@@ -13,6 +13,7 @@ import { abrirAlbum } from './album.js';
 import { abrirPlantillas } from './plantillas-admin.js';
 import { abrirMuestrario } from './muestrario.js';
 import { abrirEditorCarta } from './editor-carta.js';
+import { TIPOS } from '../carta.js';
 
 const TIPOS_MOV = {
   saldo_inicial: 'Saldo inicial', reinicio_temporada: 'Nueva temporada', salario: 'Salario de la jornada',
@@ -37,6 +38,7 @@ export async function panelAdmin(cont, ctx) {
   const miembros = await leer(`equipos?select=id,nombre,saldo,creado_en,usuarios(nombre,interno)&liga_id=eq.${liga.id}&order=creado_en`);
   const bots = miembros.filter(m => m.usuarios?.interno);
   const modoBeta = info.config?.modo_beta === true;
+  const bombo = modoBeta ? await rpc('slr_admin_bombo', { liga_id: liga.id }, { silencioso: true }).catch(() => null) : null;
   const sinTemporada = ['preparacion', 'entre_temporadas'].includes(estado);
   const j = proximaJornada();
 
@@ -72,6 +74,7 @@ export async function panelAdmin(cont, ctx) {
     <section class="slr-tarjeta slr-pruebas">
       <div class="slr-tarjeta__cabeza"><span>🧪 Modo pruebas</span><span>${bots.length} ${bots.length === 1 ? 'bot' : 'bots'}</span></div>
       <p class="slr-suave">Herramientas para probar la beta. Los bots no tocan el mercado y su alineación (la mejor 2-2-2) se rehace sola antes de cada cierre.</p>
+      ${bombo ? contadorBombo(bombo) : ''}
       <div class="slr-admin__acciones">
         ${estado === 'en_curso' && j ? `<button class="slr-btn slr-btn--pruebas" type="button" data-pruebas="jugar">▶ Jugar la jornada ${j.numero} ahora</button>` : ''}
         ${sinTemporada ? '<button class="slr-btn slr-btn--pruebas" type="button" data-pruebas="anadir">+ Añadir bot</button>' : ''}
@@ -79,6 +82,7 @@ export async function panelAdmin(cont, ctx) {
         <button class="slr-btn slr-btn--pruebas" type="button" data-pruebas="nueva-carta">➕ Nueva carta</button>
         <button class="slr-btn slr-btn--pruebas" type="button" data-pruebas="plantillas">🃏 Plantillas: dar o quitar cartas</button>
         <button class="slr-btn slr-btn--pruebas" type="button" data-pruebas="muestrario">✨ Muestrario de cartas</button>
+        <button class="slr-btn slr-btn--peligro" type="button" data-pruebas="borrar-beta">Borrar cartas beta (sin foto)</button>
         <button class="slr-btn slr-btn--peligro" type="button" data-pruebas="reiniciar">Reiniciar beta</button>
       </div>
       ${!sinTemporada ? '<p class="slr-suave">Los bots se añaden o quitan antes de empezar la temporada o entre temporadas.</p>' : ''}
@@ -88,6 +92,7 @@ export async function panelAdmin(cont, ctx) {
     if (b.dataset.pruebas === 'plantillas') abrirPlantillas(ctx).catch(() => {});
     else if (b.dataset.pruebas === 'nueva-carta') abrirEditorCarta(ctx).catch(e => toast(e.message, 'error'));
     else if (b.dataset.pruebas === 'muestrario') abrirMuestrario(ctx);
+    else if (b.dataset.pruebas === 'borrar-beta') borrarBeta(b, ctx);
     else accionPruebas(b, ctx);
   }));
 
@@ -142,14 +147,60 @@ async function jugarJornada(boton, liga) {
   throw new Error('La simulación está tardando demasiado: vuelve a pulsar en un momento');
 }
 
+// Plantillas iniciales completas que salen de las individuales libres del bombo
+// (sin el 20 % más caro); si no llegan, el reparto tira de las caras
+const EQUIPOS_OBJETIVO = 18;
+function contadorBombo(b) {
+  const faltan = Math.max(0, EQUIPOS_OBJETIVO * b.por_equipo - b.bombo);
+  return `<div class="slr-bombo ${b.equipos < 2 ? 'es-corto' : ''}" data-bombo>
+    <p><span>Plantillas iniciales disponibles</span><b>${b.equipos} ${b.equipos === 1 ? 'equipo' : 'equipos'}</b></p>
+    <small>${miles(b.bombo)} individuales libres en el bombo (${b.por_equipo} por equipo)` +
+      `${b.caras ? ` · con las ${miles(b.caras)} caras de reserva, ${b.equipos_con_caras}` : ''}` +
+      `${faltan ? ` · para ${EQUIPOS_OBJETIVO} equipos faltan ${miles(faltan)}` : ''}</small>
+  </div>`;
+}
+
+// Borra del catálogo las cartas beta sin foto (slr_admin_borrar_disenos): antes
+// cuenta lo que se borraría (solo_contar) y pide escribir BORRAR
+const PLURAL_TIPO = { individual: 'individuales', duo: 'dúos', trio: 'tríos', unica: 'únicas' };
+async function borrarBeta(boton, ctx) {
+  const filtro = { liga_id: ctx.datos.liga.id, beta: true, sin_foto: true };
+  const plural = (n, uno, varios) => `${miles(n)} ${n === 1 ? uno : varios}`;
+  let cuenta;
+  try {
+    cuenta = await conEspera(boton, () => rpc('slr_admin_borrar_disenos', { filtro, solo_contar: true }));
+  } catch { return; }
+  if (!cuenta?.disenos) { toast('No hay cartas beta sin foto que borrar', 'info'); return; }
+  const tipos = Object.entries(cuenta.por_tipo).map(([t, n]) => `${miles(n)} ${esc(n === 1 ? (TIPOS[t] ?? t).toLowerCase() : PLURAL_TIPO[t] ?? t)}`).join(', ');
+  const equipos = cuenta.equipos.length
+    ? `<br><br>Equipos que pierden cartas: ${cuenta.equipos.map(e => `<b>${esc(e.nombre)}</b> (−${e.pierde}, le quedan ${e.quedan})`).join(', ')}.`
+    : '<br><br>Ningún equipo tiene ahora cartas beta.';
+  const ok = await confirmar({
+    titulo: 'Borrar cartas beta',
+    texto: `Se borran <b>${plural(cuenta.disenos, 'carta beta', 'cartas beta')}</b> sin foto (${tipos}) y sus ` +
+      `${plural(cuenta.cartas, 'ejemplar', 'ejemplares')} en todas las ligas, con lo que dependa de ellos: alineaciones, ` +
+      `subastas, ventas, ofertas, intercambios, sobres, álbum, historial y avisos. ` +
+      `Quedan <b>${plural(cuenta.quedan, 'carta', 'cartas')}</b> en el catálogo.${equipos}`,
+    ok: 'Borrar', peligro: true, escribir: 'BORRAR',
+  });
+  if (!ok) return;
+  await conEspera(boton, async () => {
+    const r = await rpc('slr_admin_borrar_disenos', { filtro });
+    toast(`Borradas ${plural(r.borrado.disenos, 'carta', 'cartas')} y ${plural(r.borrado.cartas, 'ejemplar', 'ejemplares')}`, 'ok');
+    await ctx.recargar();
+    await ctx.pintar();
+  }).catch(() => {});
+}
+
 async function accionPruebas(boton, ctx) {
   const liga = ctx.datos.liga.id;
   const accion = boton.dataset.pruebas;
   if (accion === 'reiniciar') {
     const ok = await confirmar({
       titulo: 'Reiniciar beta',
-      texto: 'Se borran <b>todos</b> los equipos, cartas, álbumes, temporadas, partidos, mercado y movimientos de esta liga. ' +
-        'Queda en preparación con un ejemplar libre de cada carta. La liga y su configuración se conservan.',
+      texto: 'Se borran las cartas de todos los equipos, álbumes, temporadas, partidos, mercado y movimientos de esta liga, y se quitan los bots. ' +
+        'Queda en preparación con un ejemplar libre de cada carta, y <b>los equipos de personas vuelven a unirse</b> con su nombre: ' +
+        'plantilla inicial, saldo y alineación nuevos, por orden de llegada.',
       ok: 'Reiniciar', peligro: true, escribir: 'REINICIAR',
     });
     if (!ok) return;
@@ -163,13 +214,16 @@ async function accionPruebas(boton, ctx) {
         : 'No queda ninguna jornada por jugar', 'ok');
     } else if (accion === 'anadir') {
       const r = await rpc('slr_admin_anadir_bot', { liga_id: liga });
-      toast(`🤖 ${r.nombre} se une a la liga`, 'ok');
+      if (r.aviso) toast(`🤖 ${r.nombre} se une con solo ${r.cartas} cartas: no quedan individuales libres para una plantilla completa`, 'error');
+      else toast(`🤖 ${r.nombre} se une a la liga`, 'ok');
     } else if (accion === 'quitar') {
       const r = await rpc('slr_admin_quitar_bot', { liga_id: liga });
       toast(`${r.quitado} deja la liga`, 'ok');
     } else if (accion === 'reiniciar') {
-      await rpc('slr_admin_reiniciar_beta', { liga_id: liga });
-      toast('Liga reiniciada', 'ok');
+      const r = await rpc('slr_admin_reiniciar_beta', { liga_id: liga });
+      const cortos = r.equipos.filter(e => e.aviso || e.error);
+      toast(`Liga reiniciada · ${r.equipos.length ? r.equipos.map(e => `${e.nombre}: ${e.cartas} cartas`).join(', ') : 'sin equipos'}`, 'ok');
+      for (const e of cortos) toast(e.error ? `${e.nombre} no ha podido volver a unirse: ${e.error}` : `${e.nombre} empieza con ${e.cartas} cartas: el bombo no llega`, 'error');
     }
     await ctx.recargar();
     await ctx.pintar();

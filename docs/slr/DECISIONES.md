@@ -580,3 +580,65 @@ Los goles dependen mucho de la formación (con un solo defensa la ocasión llega
   - Ninguna pantalla tiene scroll interno ni horizontal.
   - La carta arrastrada sale del panel sin cortarse.
   - Swipe, `#rush` y la vuelta a otras pestañas con su scroll funcionan.
+
+## Borrado del catálogo beta y bombo corto
+
+### Decisiones de Marcos
+
+- Borrar del catálogo las 283 cartas beta (sin foto y con nombres inventados) y quedarse solo con las nuevas, con foto.
+- La función de admin `slr_admin_borrar_disenos(token, filtro)`, solo para el admin con el modo pruebas, borra en una transacción todo lo que depende de los diseños y devuelve un resumen. En el Modo pruebas, el botón "Borrar cartas beta (sin foto)" dice antes cuántas se borran y pide escribir BORRAR.
+- Que unirse, reiniciar la beta y añadir un bot no fallen aunque el bombo no llegue: primero se completa con las caras y, si aun así no llega, el equipo empieza con las que haya y recibe un aviso claro (y el admin lo ve en el Modo pruebas).
+- Contador "Plantillas iniciales disponibles: X equipos" en el Modo pruebas.
+- Tras el borrado, reiniciar la beta para que CD Prostitutas reciba su plantilla con las cartas nuevas.
+
+### Decisiones mías
+
+- **Filtro de `slr_admin_borrar_disenos`** (jsonb):
+  - `liga_id`, la liga desde la que actúa el admin (obligatoria);
+  - `beta`, `sin_foto` e `ids`, que se suman;
+  - hace falta `beta = true` o `ids`: un filtro vacío no borra el catálogo entero.
+- **Alcance**, como en `slr_admin_guardar_diseno`:
+  - Desde una liga de prueba solo llega a las cartas creadas en ella. Así los tests pueden probar el borrado sin tocar el catálogo real.
+  - Desde una liga real llega al catálogo común, y el usuario tiene que ser admin con modo pruebas de **todas** las ligas reales, porque los ejemplares están en todas.
+- **Tercer parámetro `solo_contar`:**
+  - Hace el borrado completo dentro de un bloque que se deshace al final (`raise` con un SQLSTATE propio, `SLRSC`). El recuento que enseña el botón es exactamente lo que se borrará.
+  - Comprobado: el recuento previo y el resumen real coinciden.
+- **Orden del borrado:**
+  1. Alineaciones: los ejemplares salen de los huecos, del banquillo y de la capitanía, con `quitar_de_alineacion`.
+  2. Pujas, subastas, ventas, ofertas, intercambios y sobres que los contengan. Las demás cartas reservadas por un sobre de elección quedan libres.
+  3. Historial y avisos: se borran los que mencionan un ejemplar o un diseño (cualquier uuid dentro de `datos`).
+  4. Álbum, ejemplares y diseños.
+  
+  Además, avisa a los dueños que pierden cartas y lo apunta en el historial.
+- **Los partidos jugados no se tocan:** guardan su copia congelada de las alineaciones y se siguen pudiendo reproducir.
+- **Cómo se ejecutó en la liga principal:** como admin, con una sesión interna de un solo uso (como la de los bots) que se borró en la misma operación.
+  - Resultado: 283 diseños, 283 ejemplares, 8 subastas abiertas (todas de cartas beta), 11 entradas del álbum, 11 del historial y 11 avisos. Coincide con el recuento previo.
+  - Quedan 54 diseños, ninguno beta y todos con foto.
+- **Reiniciar beta ya no borra a las personas:**
+  - Antes borraba todos los equipos, así que CD Prostitutas habría desaparecido en vez de recibir plantilla.
+  - Ahora vacía la liga igual que antes y quita los bots. Las personas vuelven a unirse con el mismo nombre y escudo y por orden de llegada, por el camino normal de `slr_unirse_liga` (con una sesión interna de un solo uso), con plantilla inicial, saldo y alineación nuevos.
+  - Si alguien no puede volver (p. ej. ya no tiene acceso a la beta), se queda fuera y la respuesta dice por qué.
+  - También recrea el ejemplar de las cartas creadas en esa liga de prueba, que nacen inactivas y antes se perdían.
+  - Cada equipo recupera su `creado_en` original (migración `20261015000400`). Si no, todos salían con el mismo `now()` de la transacción y el orden de llegada quedaba al azar; los tests lo detectaron.
+- **Bombo corto:**
+  - `asignar_plantilla_inicial` ya completaba con las caras más baratas y nunca fallaba.
+  - Lo que fallaba a medias era la alineación: con menos de 7 cartas no se creaba. Ahora `crear_alineacion_por_defecto` coloca las cartas que haya y deja vacíos los demás huecos (siempre 2 por línea); en el partido juegan Canteranos.
+  - `slr_unirse_liga` devuelve `cartas` y `aviso`. Con plantilla incompleta deja el aviso en la campana del equipo (`plantilla_incompleta`) y en el historial de la liga.
+  - La bienvenida dice las cartas reales y, si hace falta, muestra el aviso.
+  - `slr_admin_anadir_bot` y `slr_admin_reiniciar_beta` devuelven las cartas y el aviso de cada equipo, y el Modo pruebas los enseña.
+- **Contador del bombo:** `slr_admin_bombo` (y `bombo_plantillas`) cuenta las individuales **libres** del bombo y de las caras (sin las reservadas ni las que están en subasta).
+  - Las plantillas completas son bombo / 11.
+  - Debajo dice cuántas salen contando las caras y cuántas faltan para 18 equipos.
+  - En rojo si no llega para 2.
+- **Estado final de la liga principal:**
+  - En preparación, con CD Prostitutas (Marcos), 11 cartas de valor 1.996, alineación 2-2-2 completa con capitán, 5.000 monedas y 11 entradas en el álbum.
+  - Quedan 18 individuales libres en el bombo y 7 caras: 1 plantilla completa más (2 con las caras).
+- **Tests:**
+  - `tests/slr/api-paso8.mjs`, nuevo: borrado, permisos, alcance, `solo_contar`, reinicio con personas y bots, y bombo corto con bots y con una persona.
+  - `banco/equipo.mjs`: el botón con el diálogo de BORRAR y el contador.
+  - **Tests adaptados al catálogo corto:**
+    - api-paso4 solo exige el ±10 % de valor y "ninguna cara" si el bombo llega para todos. Si no llega, exige 11 cartas y solo las caras imprescindibles.
+    - api-paso5 comprueba el reinicio nuevo y que los bots que se quedan cortos llevan aviso.
+    - api-paso6 y api-paso7 ya no exigen que el catálogo beta siga en la base, ni partidos v1.1.0: los amistosos se fueron con un reinicio anterior. Los partidos v1.1.0 se siguen comprobando con el dorado.
+    - `valor-sql.test.mjs` exige un catálogo no vacío en vez de más de 100 cartas.
+

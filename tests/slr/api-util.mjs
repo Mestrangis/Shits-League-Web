@@ -107,5 +107,5 @@ export async function bomboInicial(excluir = 0.20, n = 11) {
   const caras = new Set(ind.slice(0, nCaras).map(d => d.id));
   const resto = ind.slice(nCaras);
   const objetivo = n * resto.reduce((s, d) => s + d.valor, 0) / resto.length;
-  return { caras, objetivo, umbral: ind[nCaras - 1]?.valor, total: ind.length };
+  return { caras, objetivo, umbral: ind[nCaras - 1]?.valor, total: ind.length, bombo: resto.length, porEquipo: n };
 }

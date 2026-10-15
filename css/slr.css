@@ -854,6 +854,13 @@ button.slr-aviso:active { background: rgba(57,255,136,.08) !important; }
   background: repeating-linear-gradient(-45deg, rgba(255,138,61,.05) 0 12px, transparent 12px 24px), var(--slr-tarjeta);
 }
 .slr-pruebas .slr-tarjeta__cabeza > span:first-child { color: var(--slr-rival); }
+/* Contador de plantillas iniciales que salen del bombo */
+.slr-bombo { margin: 10px 0 12px; padding: 10px 12px; border-radius: 12px; background: rgba(57,255,136,.07); border: 1px solid rgba(57,255,136,.25); }
+.slr-bombo p { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin: 0; }
+.slr-bombo b { font-size: 1.15rem; color: var(--slr-propio); white-space: nowrap; }
+.slr-bombo small { display: block; margin-top: 4px; opacity: .75; line-height: 1.35; }
+.slr-bombo.es-corto { background: rgba(255,80,80,.08); border-color: rgba(255,80,80,.4); }
+.slr-bombo.es-corto b { color: #ff6b6b; }
 .slr-btn--pruebas {
   background: transparent !important;
   color: var(--slr-rival) !important;

@@ -35,12 +35,12 @@ try {
   seccion('Catálogo por tiers');
   {
     const ds = (await leer('disenos_carta?select=id,tier,perfil,color,poderes,beta&limit=5000')).datos;
-    check(ds.length > 250 && ds.every(d => 'SABCDEF'.includes(d.tier) && d.tier.length === 1 && d.perfil),
+    check(ds.length > 0 && ds.every(d => 'SABCDEF'.includes(d.tier) && d.tier.length === 1 && d.perfil),
       `todas las cartas (${ds.length}) con tier y perfil`);
     const reparto = Object.fromEntries('SABCDEF'.split('').map(t => [t, ds.filter(d => d.tier === t).length]));
     check(true, `reparto por tier: ${Object.entries(reparto).map(([t, n]) => `${t} ${n}`).join(' · ')}`);
     const sorteados = ds.filter(d => d.beta).flatMap(d => d.poderes).filter(p => p.probabilidad !== 'siempre');
-    check(sorteados.length > 40 && sorteados.every(p => p.probabilidades?.join() === PROBABILIDADES[p.nivel].join() && !('probabilidad' in p)),
+    check((!ds.some(d => d.beta) || sorteados.length > 40) && sorteados.every(p => p.probabilidades?.join() === PROBABILIDADES[p.nivel].join() && !('probabilidad' in p)),
       `poderes beta con probabilidades [${PROBABILIDADES.simple.join(', ')}] (${sorteados.length})`);
   }
 
@@ -79,7 +79,7 @@ try {
     check(sinPoderes.poderes.length === 0, 'poderes = [] es "sin poderes" (no se generan)');
     rechaza(await rpc('slr_admin_guardar_diseno', { token: U.token, liga_id: L, diseno: { ...base, poderes: [{ nombre: 'Mal', momento: 'chut', nivel: 'simple', efecto: 0.2, probabilidades: [0.1, 0.5] }] } }),
       'no puede ser mayor', 'probabilidades crecientes: rechazadas con un mensaje claro');
-    const beta = (await leer('disenos_carta?select=id&beta=eq.true&limit=1')).datos[0];
+    const beta = (await leer('disenos_carta?select=id&liga_prueba_id=is.null&limit=1')).datos[0];
     rechaza(await rpc('slr_admin_guardar_diseno', { token: U.token, liga_id: L, diseno: { id: beta.id, ...base } }),
       'solo se editan las cartas creadas en ella', 'desde una liga de prueba no se tocan las cartas del catálogo');
 

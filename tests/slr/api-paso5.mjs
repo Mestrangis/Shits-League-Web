@@ -71,7 +71,9 @@ try {
   const internos = eqs.filter(e => e.usuarios.interno);
   check(internos.length === 4 && new Set(internos.map(e => e.nombre)).size === 4, `4 bots añadidos: ${internos.map(e => e.nombre).join(', ')}`);
   const cs = await cartasLiga(L);
-  check(internos.every(e => cs.filter(c => c.equipo_id === e.id).length === 11), 'cada bot recibe su plantilla inicial de 11 cartas');
+  // Con el catálogo corto no hay individuales para todos: los últimos se quedan cortos, sin error y con aviso
+  check(bots.every(b => cs.filter(c => c.equipo_id === b.equipo_id).length === b.cartas && (b.cartas === 11 || /incompleta/.test(b.aviso ?? ''))),
+    `cada bot recibe su plantilla inicial (${bots.map(b => b.cartas).join(' · ')}; las incompletas, con aviso)`);
   const als = (await leer(`alineaciones?select=equipo_id,formacion,automatica&equipo_id=in.(${internos.map(e => e.id).join(',')})`)).datos;
   check(als.length === 4 && als.every(a => a.formacion === '2-2-2'), 'y su alineación 2-2-2 por defecto');
   const quitado = await rpcOk('slr_admin_quitar_bot', { token: U.token, liga_id: L });
@@ -168,14 +170,21 @@ try {
     temporadas: (await leer(`temporadas?select=id&liga_id=eq.${L}`)).datos.length,
     partidos: (await leer(`partidos?select=id&liga_id=eq.${L}`)).datos.length,
     album: (await leer(`album?select=diseno_id&liga_id=eq.${L}`)).datos.length,
-    historial: (await leer(`historial?select=tipo&liga_id=eq.${L}`)).datos.map(h => h.tipo),
+    historial: (await leer(`historial?select=tipo&liga_id=eq.${L}&order=id`)).datos.map(h => h.tipo),
     internos: (await leer(`usuarios?select=id&interno=eq.true`)).datos.length,
   };
   check(tras.liga.estado === 'preparacion' && tras.liga.temporada === 1, 'la liga vuelve a preparación');
   check(tras.liga.config.modo_beta === true && tras.liga.nombre.startsWith('Prueba paso 5'), 'la liga y su configuración se conservan');
-  check(tras.equipos === 0 && tras.temporadas === 0 && tras.partidos === 0 && tras.album === 0, 'sin equipos, temporadas, partidos ni álbum');
-  check(tras.cartas.length === nDisenos && tras.cartas.every(c => !c.equipo_id) && r.cartas === nDisenos, `un ejemplar libre de cada diseño (${tras.cartas.length})`);
-  check(tras.historial.join() === 'beta_reiniciada', 'el historial empieza de cero (solo el aviso del reinicio)');
+  // Las personas (Bot Uno y Bot Dos, que no son internos) vuelven a unirse con plantilla nueva; los bots se van
+  const personas = await equiposLiga();
+  check(personas.map(e => e.nombre).join() === 'Bot Uno FC,Bot Dos FC' && r.equipos.every(e => e.cartas === 11) && r.bots_quitados === 3,
+    `quedan las dos personas con 11 cartas cada una; los 3 bots que quedaban se van`);
+  check(tras.temporadas === 0 && tras.partidos === 0 && tras.album === 22, 'sin temporadas ni partidos; álbum solo con las plantillas nuevas');
+  check(tras.cartas.length === nDisenos && r.cartas === nDisenos &&
+        tras.cartas.filter(c => c.equipo_id).length === 22 && tras.cartas.filter(c => c.equipo_id).every(c => personas.some(e => e.id === c.equipo_id)),
+    `un ejemplar de cada diseño (${tras.cartas.length}); solo 22 con dueño`);
+  check(tras.historial[0] === 'beta_reiniciada' && tras.historial.slice(1).every(t => t === 'equipo_unido') && tras.historial.length === 3,
+    'el historial empieza de cero (el reinicio y las dos vueltas)');
   check(tras.internos === 0, 'los usuarios internos de los bots se borran');
   const m = await rpc('slr_movimientos', { token: U.token, equipo_id: U.equipo });
   check(!m.ok, 'los movimientos del equipo ya no existen');

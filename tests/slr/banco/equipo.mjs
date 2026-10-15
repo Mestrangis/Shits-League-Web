@@ -1,6 +1,6 @@
 // Prueba en Chrome headless (móvil 390×844) de la
 // pestaña Equipo, avisos, fichas, pronóstico, crónica, álbum, plantillas,
-// muestrario y la rueda del pull-to-refresh de Shits League.
+// muestrario, el botón «Borrar cartas beta» y la rueda del pull-to-refresh de Shits League.
 //   node tests/slr/banco/equipo.mjs   (servidor local en :3000 y .env.local; SALIDA=carpeta guarda capturas)
 // Crea una liga de prueba con Bot Uno y 3 bots y la borra al terminar.
 import { spawn } from 'node:child_process';
@@ -78,7 +78,8 @@ try {
     estado: document.querySelector('.slr-franja .slr-estado')?.textContent, campo: !!document.querySelector('.slr-campo-juego'),
     banner: document.querySelector('.slr-banner b')?.textContent ?? null })`);
   check(franja.campo && franja.rival && franja.estado, `franja: «${franja.rival}» · cierre en ${franja.cuenta} · último ${franja.ultimo ?? '—'} · ${franja.estado}`);
-  const campana = await ev(`document.querySelector('.slr-barra__avisos b').textContent`);
+  await esperar(`Number(document.querySelector('.slr-barra__avisos b')?.textContent) > 0`, 10000);
+  const campana = await ev(`document.querySelector('.slr-barra__avisos b')?.textContent`);
   check(Number(campana) > 0, `campana con ${campana} avisos sin leer`);
   await foto('equipo');
 
@@ -128,12 +129,15 @@ try {
   await clic('[data-deshacer]'); await dormir(400);
 
   console.log('\nFicha del próximo rival');
+  const rivalId = await ev(`document.querySelector('.slr-franja__rival[data-equipo]')?.dataset.equipo`);
   if (await clic('.slr-franja__rival[data-equipo]')) {
+    // Con el catálogo corto el rival puede tener menos de 11: se compara con su plantilla real
+    const nRival = (await leer(`cartas?select=id&equipo_id=eq.${rivalId}`)).datos.length;
     await esperar(`!!document.querySelector('.slr-ficha-eq')`);
     await dormir(800);
     const ficha = await ev(`({ nombre: document.querySelector('.slr-ficha-eq h2').textContent, cartas: document.querySelectorAll('.slr-ficha-eq .slr-carta').length,
       campo: !!document.querySelector('.slr-ficha-eq .slr-campito'), resultados: document.querySelectorAll('.slr-ficha-eq__resultado').length })`);
-    check(ficha.cartas >= 11 && ficha.campo && ficha.resultados >= 1, `${ficha.nombre}: plantilla de ${ficha.cartas}, ${ficha.resultados} resultados y la alineación de su último partido`);
+    check(nRival > 0 && ficha.cartas >= nRival && ficha.campo && ficha.resultados >= 1, `${ficha.nombre}: plantilla de ${ficha.cartas}, ${ficha.resultados} resultados y la alineación de su último partido`);
     await foto('ficha-rival');
     await foto('ficha-rival-campo', '.slr-ficha-eq .slr-campito');
     await atras();
@@ -218,6 +222,38 @@ try {
   await foto('muestrario-fotos', '.slr-muestrario__fotos');
   await foto('muestrario-grande', '.slr-muestrario__grande');
   await atras();
+
+  console.log('\nBorrar cartas beta (sin foto)');
+  const bomboTxt = await ev(`document.querySelector('[data-bombo]')?.innerText.replace(/\\s+/g, ' ')`);
+  const bomboApi = await rpcOk('slr_admin_bombo', { token: t, liga_id: L });
+  check(new RegExp(`Plantillas iniciales disponibles ${bomboApi.equipos} equipos?`, 'i').test(bomboTxt ?? '') && bomboTxt.includes(`${bomboApi.bombo} individuales`),
+    `contador del bombo: «${bomboTxt}»`);
+  await foto('bombo', '[data-bombo]');
+  // En una liga de prueba no alcanza al catálogo común: 0 cartas, solo un aviso
+  await clic('[data-pruebas=borrar-beta]');
+  check(await esperar(`[...document.querySelectorAll('.slr-toast')].some(t => /No hay cartas beta/.test(t.textContent))`, 10000),
+    'desde una liga de prueba: «No hay cartas beta sin foto que borrar»');
+  // Con un recuento simulado (fetch interceptado, no se borra nada): el diálogo y el BORRAR
+  await ev(`(() => { const f = window.fetch; window.__fetch = f; window.__borrados = 0;
+    window.fetch = (u, o) => { if (!String(u).includes('slr_admin_borrar_disenos')) return f(u, o);
+      const b = JSON.parse(o.body); if (!b.solo_contar) { window.__borrados++; return Promise.resolve(new Response('{}', { status: 500 })); }
+      return Promise.resolve(new Response(JSON.stringify({ solo_contar: true, disenos: 283, cartas: 283, quedan: 51,
+        por_tipo: { individual: 250, duo: 24, trio: 8, unica: 1 }, equipos: [{ nombre: 'CD Ejemplo', pierde: 3, quedan: 8 }], borrado: {} }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } })); }; return 0; })()`);
+  await clic('[data-pruebas=borrar-beta]');
+  await esperar(`!!document.querySelector('.slr-confirmar input')`);
+  const conf = await ev(`({ texto: document.querySelector('.slr-confirmar__texto').innerText, bloqueado: document.querySelector('.slr-confirmar [data-si]').disabled })`);
+  check(/283 cartas beta/.test(conf.texto) && /250 individuales/.test(conf.texto) && /Quedan 51 cartas/.test(conf.texto) && /CD Ejemplo \(−3, le quedan 8\)/.test(conf.texto),
+    `la confirmación dice cuántas se borran, por tipo, cuántas quedan y qué equipos pierden cartas`);
+  await ev(`(() => { const i = document.querySelector('.slr-confirmar input'); i.value = 'borra'; i.dispatchEvent(new Event('input')); return 0; })()`);
+  const aMedias = await ev(`document.querySelector('.slr-confirmar [data-si]').disabled`);
+  await ev(`(() => { const i = document.querySelector('.slr-confirmar input'); i.value = 'BORRAR'; i.dispatchEvent(new Event('input')); return 0; })()`);
+  check(conf.bloqueado && aMedias && !(await ev(`document.querySelector('.slr-confirmar [data-si]').disabled`)), 'el botón solo se activa al escribir BORRAR');
+  await foto('borrar-beta', '.slr-confirmar');
+  await ev(`document.querySelector('.slr-confirmar [data-no]').click(); 0`);
+  await dormir(500);
+  check(await ev('window.__borrados') === 0, 'al cancelar no se llama al borrado');
+  await ev('window.fetch = window.__fetch; 0');
   await clic('.slr-barra__salir'); await dormir(800);
 
   console.log('\nShits League: pull-to-refresh');

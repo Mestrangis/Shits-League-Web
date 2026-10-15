@@ -55,6 +55,9 @@ try {
   seccion(`Catálogo beta con los poderes de la v${ACTUAL}`);
   {
     const bd = (await leer('disenos_carta?select=id,ata,def,con,poderes,valor&beta=eq.true&limit=5000')).datos;
+    // El catálogo beta se borró de la base el 15/10/2026 (slr_admin_borrar_disenos)
+    if (!bd.length) check(true, 'no quedan cartas beta en la base: nada que comparar');
+    else {
     const porId = new Map(bd.map(d => [d.id, d]));
     const esperado = catalogoBeta().filter(c => porId.has(c.id));
     const clave = ps => JSON.stringify(ps.map(p => [p.nombre, p.momento, p.probabilidad, p.probabilidades, p.efecto, p.nivel]));
@@ -71,6 +74,7 @@ try {
       'efectos: simple +0,20, fuerte +0,30, muy fuerte +0,40');
     check(todos.filter(p => p.probabilidad === 'siempre').every(p => p.momento === 'tirador' && p.efecto === 2), 'los "siempre" de tirador no cambian (×2)');
     check(bd.every(d => d.valor === calcularValor({ ATA: d.ata, DEF: d.def, CON: d.con, poderes: d.poderes })), 'el valor sigue cuadrando con valor.js');
+    }
   }
 
   seccion('Partidos antiguos: se reproducen con el motor con el que se jugaron');
@@ -85,8 +89,10 @@ try {
       if (r.version === '1.1.0' && r.goles.join() === goles) bien++;
       if (motorDe('1.2.0').simularPartido(al.local, al.visitante, d.semilla).goles.join() !== goles) distintos++;
     }
-    check(ps.length > 0 && bien === ps.length, `${bien}/${ps.length} partidos de la v1.1.0 dan el mismo resultado con motor-v1.1.0.js`);
-    check(distintos > 0, `(con la v1.2.0, ${distintos} de ellos darían otro resultado: por eso cada partido guarda su versión)`);
+    // Los amistosos v1.1.0 de la liga real se fueron con el reinicio de la beta: si no queda ninguno, no hay nada que reproducir
+    check(bien === ps.length, ps.length ? `${bien}/${ps.length} partidos de la v1.1.0 dan el mismo resultado con motor-v1.1.0.js`
+      : 'no queda ningún partido v1.1.0 en la base (borrados al reiniciar la beta)');
+    check(!ps.length || distintos > 0, `(con la v1.2.0, ${distintos} de ellos darían otro resultado: por eso cada partido guarda su versión)`);
   }
 
   seccion('Liga de prueba');
@@ -104,7 +110,7 @@ try {
     rechaza(await rpc('slr_admin_cartas', { token: D.token, liga_id: L }), 'administrador', 'slr_admin_cartas: solo el admin');
     const r = await rpcOk('slr_admin_cartas', { token: U.token, liga_id: L });
     const cs = await cartasLiga(L);
-    check(r.cartas.length === cs.length && r.cartas.length > 200, `devuelve las ${r.cartas.length} cartas de la liga (antes solo 40)`);
+    check(r.cartas.length === cs.length && cs.length > 0, `devuelve las ${r.cartas.length} cartas de la liga (antes solo 40)`);
     check(r.cartas.every((c, i) => i === 0 || r.cartas[i - 1].valor >= c.valor), 'ordenadas por valor, de mayor a menor');
     check(r.cartas.every(c => c.nombre && c.tipo && c.acabado && 'equipo_id' in c && Number.isInteger(c.valor)), 'cada una con nombre, tipo, acabado, valor y dueño');
     const eqD = r.equipos.find(e => e.id === D.equipo);

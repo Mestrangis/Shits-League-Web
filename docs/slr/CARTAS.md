@@ -77,7 +77,9 @@ Por qué tantas D, E y F:
 - Las S, A y B (y parte de las C) caen en ese 20 % caro: no entran en las plantillas iniciales, se consiguen en el mercado.
 - Resumen: unas **300 individuales**, casi todas D, E y F; los **dúos** (unos 25) entre C y A, los **tríos** (unos 8) entre A y S, y **1 o 2 únicas** en S.
 
-Ahora mismo el catálogo beta tiene S 1 · A 6 · B 20 · C 31 · D 83 · E 69 · F 74 (calculado de sus stats).
+El catálogo beta inicial (283 cartas sin foto) se borró el 15 de octubre de 2026. Ahora mismo hay 54 cartas, todas con foto: 36 individuales (D 15 · E 14 · F 7), 12 dúos, 2 tríos y 4 únicas. Con 36 individuales el bombo da para 2 plantillas iniciales (3 contando las caras); para 18 equipos hacen falta unas 250. El contador de **Modo pruebas → Plantillas iniciales disponibles** dice cuántas salen ahora mismo.
+
+Si el bombo no llega, nadie se queda sin poder unirse: el reparto tira de las individuales caras más baratas y, si aun así faltan, el equipo empieza con las que haya y recibe un aviso. Los huecos vacíos los juegan Canteranos.
 
 **Perfil**, la forma de las stats:
 
@@ -226,7 +228,16 @@ Pon **`activo` = `false`**. A partir de ese momento:
 - **quien ya la tiene la conserva** y puede seguir alineándola;
 - si vuelves a ponerla a `true`, vuelve a salir. Si no existía en la liga, se le crea su ejemplar.
 
-No borres filas de `disenos_carta`: las cartas de las ligas apuntan a ellas.
+No borres filas de `disenos_carta` en el Table Editor: las cartas de las ligas apuntan a ellas y Supabase no te dejará.
+
+## Borrar cartas del catálogo
+
+Solo mientras la liga esté en modo pruebas. **Rush → Perfil → Modo pruebas → Borrar cartas beta (sin foto)** borra las que tengan `beta` = `true` y no tengan foto:
+- primero dice cuántas se borran (por tipo), cuántas quedan y qué equipos pierden cartas;
+- para confirmar hay que escribir BORRAR;
+- borra también todo lo que depende de ellas: sus ejemplares en todas las ligas, sus huecos en las alineaciones, subastas, pujas, ventas, ofertas, intercambios, sobres, álbum, historial y avisos. Los partidos ya jugados no se tocan.
+
+Para borrar otras cartas concretas, la función es `slr_admin_borrar_disenos` con `{"liga_id": …, "ids": [...]}`. Si solo quieres que dejen de salir, mejor desactívalas.
 
 ## Dar o quitar una carta a alguien (pruebas)
 

@@ -93,13 +93,21 @@ try {
     b.equipo = u.equipo.id; b.union = u;
   }
   const cs0 = await cartasLiga(L);
+  // Con el catálogo corto el bombo no llega para los tres: el reparto tira de las caras
+  // más baratas y el equilibrio de valor ya no se puede exigir
+  const alcanza = bombo.bombo >= bombo.porEquipo * bots.length;
+  if (!alcanza) check(true, `bombo corto (${bombo.bombo} individuales para ${bots.length} equipos): se completan con caras`);
   for (const b of bots) {
     const mias = cs0.filter(c => c.equipo_id === b.equipo);
     const total = mias.reduce((s, c) => s + c.disenos_carta.valor, 0);
-    check(mias.length === 11 && mias.every(c => !bombo.caras.has(c.diseno_id)), `${b.nombre}: 11 cartas, ninguna del 20 % más caro`);
-    check(Math.abs(total - bombo.objetivo) <= 0.1 * bombo.objetivo,
-      `${b.nombre}: valor ${total} dentro de ±10 % del objetivo común ${bombo.objetivo.toFixed(0)}`);
+    if (alcanza) {
+      check(mias.length === 11 && mias.every(c => !bombo.caras.has(c.diseno_id)), `${b.nombre}: 11 cartas, ninguna del 20 % más caro`);
+      check(Math.abs(total - bombo.objetivo) <= 0.1 * bombo.objetivo,
+        `${b.nombre}: valor ${total} dentro de ±10 % del objetivo común ${bombo.objetivo.toFixed(0)}`);
+    } else check(mias.length === 11, `${b.nombre}: 11 cartas (${mias.filter(c => bombo.caras.has(c.diseno_id)).length} caras), valor ${total}`);
   }
+  if (!alcanza) check(cs0.filter(c => bots.some(b => b.equipo === c.equipo_id) && bombo.caras.has(c.diseno_id)).length === bombo.porEquipo * bots.length - bombo.bombo,
+    'solo las caras imprescindibles');
   await invariantes(L, bots, 'inicio');
 
   /* ── Nadie se une con una temporada en marcha ──────────────────────────── */
@@ -330,7 +338,10 @@ try {
     check(n.some(x => x.tipo === 'liga_pausada') && n.some(x => x.tipo === 'liga_reanudada'), 'pausar y reanudar se notifican a todos');
     const madridHoy = madrid(reanudar.getTime()).fecha;
     const tanda = (await leer(`tandas_mercado?liga_id=eq.${L}&fecha=eq.${madridHoy}`)).datos[0];
-    check(tanda?.cartas === 0, 'las subastas no se reabren hasta la siguiente medianoche');
+    // Hoy cuenta como día servido: hay tanda de hoy (el cron no abrirá otra) y ninguna subasta abierta.
+    // (Según el día en que se ejecute, la tanda de hoy puede venir ya de antes de la pausa.)
+    const abiertasTras = (await leer(`subastas?select=id&liga_id=eq.${L}&estado=eq.abierta`)).datos.length;
+    check(tanda && abiertasTras === 0, 'las subastas no se reabren hasta la siguiente medianoche', `tanda ${JSON.stringify(tanda)}, ${abiertasTras} abiertas`);
     await rpcOk('slr_retirar_oferta', { token: B2.token, oferta_id: of.oferta_id });
   }
   await invariantes(L, bots, 'pausa');
@@ -395,11 +406,15 @@ try {
       const exclusivasBombo = [...albumInd[b.equipo]].filter(d => !tieneOtro(b, d) && !bombo.caras.has(d)).length;
       const compartidas = mias.filter(c => tieneOtro(b, c.diseno_id)).length;
       const caras = mias.filter(c => bombo.caras.has(c.diseno_id)).length;
-      check(mias.length === 11 && mias.every(c => c.disenos_carta.tipo === 'individual' && albumInd[b.equipo].has(c.diseno_id)),
-        `${b.nombre}: 11 individuales, todas de su álbum`);
+      // Con el catálogo corto las compartidas no llegan para todos: quien se queda por debajo de 11
+      // es porque no queda libre ninguna individual de su álbum
+      const libresSuyas = cs.filter(c => !c.equipo_id && c.disenos_carta.tipo === 'individual' && albumInd[b.equipo].has(c.diseno_id)).length;
+      check((mias.length === 11 || (!alcanza && mias.length < 11 && libresSuyas === 0)) &&
+            mias.every(c => c.disenos_carta.tipo === 'individual' && albumInd[b.equipo].has(c.diseno_id)),
+        `${b.nombre}: ${mias.length} individuales, todas de su álbum${mias.length < 11 ? ' (no queda libre ninguna más de su álbum)' : ''}`);
       check(compartidas === 0 || exclusivasBombo < 11, `${b.nombre}: prioridad a las exclusivas (${exclusivasBombo} exclusivas del bombo, ${compartidas} compartidas)`);
       check(caras === 0 || exclusivasBombo + compartidas < 11, `${b.nombre}: ${caras} caras (solo si no queda otra)`);
-      check(Math.abs(total - bombo.objetivo) <= 0.1 * bombo.objetivo, `${b.nombre}: valor ${total} dentro de ±10 % del objetivo ${bombo.objetivo.toFixed(0)}`);
+      if (alcanza) check(Math.abs(total - bombo.objetivo) <= 0.1 * bombo.objetivo, `${b.nombre}: valor ${total} dentro de ±10 % del objetivo ${bombo.objetivo.toFixed(0)}`);
       check(await saldoDe(b) === 5000 && (await movimientos(b)).some(m => m.tipo === 'reinicio_temporada'),
         `${b.nombre}: saldo reiniciado a 5.000 con un movimiento «reinicio_temporada»`);
       const a = (await leer(`album?select=diseno_id&usuario_id=eq.${b.usuario}&liga_id=eq.${L}`)).datos.length;
@@ -407,8 +422,9 @@ try {
       const al = (await leer(`alineaciones?equipo_id=eq.${b.equipo}`)).datos[0];
       check(al?.formacion === '2-2-2' && al.automatica === true, `${b.nombre}: alineación 2-2-2 por defecto`);
     }
-    check(cs.filter(c => c.equipo_id).length === 33 && cs.every(c => !c.equipo_id || bots.some(b => b.equipo === c.equipo_id)),
-      'sin duplicados: 33 cartas repartidas y el resto libres');
+    const repartidas = cs.filter(c => c.equipo_id).length;
+    check((repartidas === 33 || (!alcanza && repartidas < 33)) && cs.every(c => !c.equipo_id || bots.some(b => b.equipo === c.equipo_id)),
+      `sin duplicados: ${repartidas} cartas repartidas y el resto libres`);
     check(cs.every(c => !c.equipo_id || new Date(c.blindada_hasta) > new Date(Date.now() + 6.9 * DIA)), 'todas blindadas 7 días');
     check((await leer(`subastas?select=id&liga_id=eq.${L}&estado=eq.abierta`)).datos.length === 0, 'sin subastas abiertas al empezar');
     const clas = (await rpcOk('slr_clasificacion', { token: B1.token, liga_id: L })).clasificacion;
