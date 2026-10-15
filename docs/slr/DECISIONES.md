@@ -642,3 +642,60 @@ Los goles dependen mucho de la formación (con un solo defensa la ocasión llega
     - api-paso6 y api-paso7 ya no exigen que el catálogo beta siga en la base, ni partidos v1.1.0: los amistosos se fueron con un reinicio anterior. Los partidos v1.1.0 se siguen comprobando con el dorado.
     - `valor-sql.test.mjs` exige un catálogo no vacío en vez de más de 100 cartas.
 
+## Carga de las fotos, listas largas y reparto que completa desde el bombo
+
+### Decisiones de Marcos
+
+- Las fotos se precargan al abrir la pantalla, sin esperar al scroll: primero las visibles y luego el resto, con prioridad baja. Al paginar, también la página siguiente.
+- Vista previa con los colores reales (blur-up): una versión diminuta de Cloudinary de fondo y la buena encima con un fundido de unos 250 ms cuando ha cargado y está decodificada.
+- Esqueleto mientras tanto: marco, fondo, nombre y stats, y un brillo diagonal en la zona de la foto. Ni huecos ni saltos de tamaño.
+- Si la foto falla: el esqueleto sin brillo y las iniciales.
+- Caché para que volver a una pantalla sea instantáneo, sin que el service worker interfiera; sin brillo con `prefers-reduced-motion`.
+- Pocos anchos fijos en Cloudinary (160, 240, 320, 480, 640, 960 × DPR), siempre con `f_auto` y `q_auto`.
+- Herramienta de plantillas paginada: 24, 48 o 96 por página, o todas. Botones de página, total de resultados y la opción recordada.
+- Álbum: con menos de unas 60 cartas, todas de golpe; con más, por bloques al hacer scroll, con el siguiente precargado. La plantilla, sin paginar.
+- Reparto entre temporadas: si a un equipo le faltan cartas tras repartir desde los álbumes, se completa con individuales libres del bombo, las más baratas primero y respetando el ±10 %. Entran en su álbum. Si aun así no llega, se queda con las que haya y recibe aviso.
+
+### Decisiones mías
+
+- **Módulo propio:** `js/slr/imagenes.js`, al que llama `carta.js` cada vez que aparecen cartas en Rush (el `MutationObserver` que ya tenía).
+  - El atributo pasa de `data-cld` a `data-foto`. `js/ui.js` (la web de Shits League) también usa `img[data-cld]` con su propio cargador, y así no se pisan.
+- **Precarga:**
+  - Cada carta pide su foto en cuanto se pinta. Las que están en pantalla, al momento y con `fetchpriority="high"`. Las demás, en un `requestIdleCallback` posterior con `fetchpriority="low"`.
+  - `precargar(urls)` descarga y decodifica con `new Image()` (prioridad baja) las de la página o el bloque siguiente, al ancho de las que ya se ven: la URL es la misma y sale de la caché.
+- **Ancho:** el de la carta en pantalla × DPR (máximo 3), redondeado al siguiente de la lista y con 960 como tope. Si la carta aún no tiene tamaño (una hoja que se está abriendo), se usa uno de reserva según el tamaño de la carta.
+- **Vista previa:** `c_fill,ar_5:7,g_auto,w_24,f_auto,q_auto:low,e_blur:400`, más un `filter: blur()` suave en CSS para que el escalado no se vea pixelado.
+  - Solo hay una por foto, de unos cientos de bytes.
+  - `f_auto` conserva la transparencia de los PNG, así que el fondo de la carta sigue viéndose detrás.
+- **Estados, con clases en la carta:**
+  - Sin nada: esqueleto con brillo. El brillo es un `::after` que se mueve con `transform` y solo existe dentro de `prefers-reduced-motion: no-preference`.
+  - `con-mini`: la vista previa.
+  - `con-foto`: la foto buena, con fundido de opacidad de 250 ms tras `img.decode()`.
+  - `slr-carta--sin-foto`: la foto falló.
+- **Caché:**
+  - El módulo recuerda las URLs ya decodificadas (y guarda las últimas 400 `Image` para que el navegador no las suelte). Al volver a una pantalla, esas cartas salen con `sin-fundido`, sin vista previa ni brillo.
+  - El service worker deja pasar las peticiones a `res.cloudinary.com` sin tocarlas. Antes las pedía siempre a la red (network-first) y guardaba cada foto, opaca, en Cache Storage (Chrome cuenta varios MB por cada respuesta opaca). Ahora las cachea el navegador con las cabeceras de Cloudinary.
+- **Rendimiento:**
+  - Primero se miden todas las cartas que aparecen de una vez y luego se tocan. Medir y escribir carta a carta obligaba a recalcular la maquetación una vez por carta.
+  - Probé `content-visibility: auto` en las filas de la herramienta y lo descarté: medir las cartas de una fila «saltada» obliga a maquetarla expresamente, y la tarea larga subió de 244 a 928 ms.
+- **Herramienta de plantillas:**
+  - 24 por página por defecto. La opción se guarda en `localStorage` (`SLR_PLANTILLAS_POR_PAGINA`).
+  - Botones ‹ 1 … 4 5 [6] 7 8 … 14 › arriba y abajo, con «Página X de Y». Cambiar un filtro vuelve a la página 1; dar o quitar una carta deja la misma página.
+- **Álbum:**
+  - Con más de 60 cartas, bloques de 30, y se pinta el siguiente a 1,5 pantallas del final. Si un bloque no llena la pantalla (PC), se pinta otro sin esperar al scroll.
+  - Los ejemplares se piden por liga en vez de con `diseno_id=in.(…)`: con cientos de entradas, la URL sería demasiado larga.
+- **Medido** (`tests/slr/banco/listas.mjs`, Chrome headless a 390×844 con 335 cartas en la liga y 262 en el álbum):
+  - Herramienta: se abre en unos 210 ms. «Todas» pinta las 335 filas en menos de 20 ms; la maquetación inicial es una tarea de unos 245 ms.
+  - Álbum: 30 fichas al abrir y todas al bajar, sin tareas largas.
+  - Plantilla con «Fast 3G» y sin caché: esqueleto, vista previa y fotos en unos 4 s. Sin saltos de tamaño y solo con anchos fijos.
+- **Reparto entre temporadas** (`repartir_desde_album`, migración `20261015000500`):
+  - Tras el reparto desde los álbumes y el ajuste de valor viene un paso más: las individuales libres sin el % caro que no se ha llevado nadie, incluidas las de algún álbum que han sobrado, se reparten por rondas entre los equipos cortos, una carta por equipo y ronda, en orden sorteado con la semilla.
+  - En cada ronda va la más barata que deja el valor del equipo dentro del ±10 % del objetivo proporcional. Si ninguna lo deja dentro, la que más se acerca.
+  - Entran en el álbum con la vía «inicial». El resultado de cada equipo dice cuántas vinieron `del_bombo`.
+  - Si aun así falta, aviso `plantilla_incompleta`.
+  - Las caras no se usan en este paso, como pediste.
+- **Tests:**
+  - `api-paso9.mjs`, nuevo (reparto). Bot Uno se une el último con el bombo casi vacío; al quitar el último bot, sus cartas quedan libres y fuera de los álbumes. En la temporada 2, Bot Uno se completa con ellas y, si no llega a 11, recibe aviso.
+  - `banco/listas.mjs`, nuevo (carga de fotos y listas largas). Con `SALIDA=carpeta` graba los GIF.
+  - `banco/equipo.mjs`: la herramienta ahora espera 24 por página.
+  - `api-paso3`: con el catálogo corto, la garantía premium tardaba más sobres y el bucle acababa vendiendo la carta clausulada que la sección 10 vuelve a leer. `bajarA` ya no la vende y el bucle admite hasta 120 sobres.

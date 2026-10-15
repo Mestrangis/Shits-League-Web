@@ -1073,8 +1073,38 @@ button.slr-aviso:active { background: rgba(57,255,136,.08) !important; }
 .slr-carta--con-imagen .slr-carta__nombre { text-shadow: 0 .6cqw 2cqw rgba(0,0,0,.8); }
 .slr-carta--con-imagen .slr-carta__stats { border-top-color: color-mix(in srgb, var(--c1) 60%, transparent); }
 .slr-carta--con-imagen.slr-carta--xs .slr-carta__tipo-pie { display: none; }
+/* Carga de la foto (js/slr/imagenes.js), sin saltos: la carta tiene su 5:7 desde
+   el principio. 1) Esqueleto: el fondo del tipo o del color, nombre y stats, y un
+   brillo diagonal en la zona de la foto. 2) Vista previa diminuta y borrosa con
+   los colores reales. 3) La foto buena encima, con un fundido de 250 ms.
+   Si falla: el esqueleto quieto y las iniciales. */
+.slr-carta__mini, .slr-carta--con-imagen .slr-carta__img {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 30%;
+}
+.slr-carta__mini { opacity: 0; filter: blur(1.6cqw); transform: scale(1.06); transition: opacity .2s ease; }
+.slr-carta.con-mini .slr-carta__mini { opacity: 1; }
+.slr-carta--con-imagen .slr-carta__img { opacity: 0; transition: opacity .25s ease; }
+.slr-carta.con-foto .slr-carta__img { opacity: 1; }
+.slr-carta.sin-fundido .slr-carta__img, .slr-carta.sin-fundido .slr-carta__mini { transition: none; }
+.slr-carta.con-foto.sin-fundido .slr-carta__mini { display: none; }
+@media (prefers-reduced-motion: no-preference) {
+  .slr-carta--con-imagen:not(.con-mini):not(.con-foto):not(.slr-carta--sin-foto) .slr-carta__arte::after {
+    content: ''; position: absolute; inset: 0 -100%;
+    background: linear-gradient(110deg, transparent 38%, rgba(255,255,255,.16) 50%, transparent 62%);
+    animation: slr-brillo-carga 1.4s linear infinite;
+    pointer-events: none;
+  }
+}
+@keyframes slr-brillo-carga { from { transform: translateX(-35%); } to { transform: translateX(35%); } }
+.slr-carta__iniciales--foto { display: none; }
+.slr-carta--sin-foto .slr-carta__iniciales--foto {
+  display: grid; place-items: center; position: absolute; inset: 0 0 30%;
+}
 /* Si la foto no carga, vuelve el fondo del tipo */
-.slr-carta--sin-foto .slr-carta__img { visibility: hidden; }
+.slr-carta--sin-foto .slr-carta__img, .slr-carta--sin-foto .slr-carta__mini { visibility: hidden; }
+@media (prefers-reduced-motion: reduce) {
+  .slr-carta__mini, .slr-carta--con-imagen .slr-carta__img { transition: none; }
+}
 
 /* Tamaños */
 .slr-carta--xs .slr-carta__tipo, .slr-carta--xs .slr-carta__stats span:not(.es-destacada) { display: none; }
@@ -1301,8 +1331,21 @@ button.slr-aviso:active { background: rgba(57,255,136,.08) !important; }
 .slr-filtros .slr-input { padding: 9px 8px; font-size: 14px; }
 .slr-filtros label:last-child { grid-column: 1 / -1; }   /* estado: nombres de equipo enteros */
 .slr-plantillas-admin__total { font-size: 12px; color: var(--slr-suave); }
-.slr-plantillas-admin__mas { display: flex; justify-content: center; padding: 6px 0 2px; }
-.slr-plantillas-admin__mas[hidden] { display: none; }
+/* Paginación (herramienta de plantillas) */
+.slr-paginas-cabeza { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.slr-por-pagina { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--slr-suave); }
+.slr-por-pagina .slr-input { width: auto; padding: 6px 28px 6px 10px; min-height: 0; }
+.slr-paginas { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 4px; margin: 8px 0; }
+.slr-paginas[hidden] { display: none; }
+.slr-paginas button {
+  min-width: 34px; height: 34px; padding: 0 8px; border-radius: 10px;
+  border: 1px solid var(--slr-borde, rgba(255,255,255,.12)); background: transparent; color: inherit;
+  font: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
+}
+.slr-paginas button.activo { background: var(--slr-propio); border-color: var(--slr-propio); color: #04130A; }
+.slr-paginas button:disabled { opacity: .35; cursor: default; }
+.slr-paginas__hueco { padding: 0 2px; color: var(--slr-suave); }
+.slr-paginas__texto { flex-basis: 100%; text-align: center; font-size: 11px; color: var(--slr-suave); }
 .slr-plantillas__texto { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .slr-plantillas__texto > b { font-weight: 700; font-size: 14px; overflow-wrap: anywhere; }
 .slr-plantillas__texto small { font-size: 11.5px; color: var(--slr-suave); overflow-wrap: anywhere; }

@@ -30,8 +30,11 @@ const tieneNotif = async (bot, tipo, campo, valor) =>
 
 // Deja al bot con como mucho n cartas vendiendo al banco las de menos valor
 async function bajarA(bot, n) {
-  const cs = (await misCartas(bot)).sort((a, b) => a.disenos_carta.valor - b.disenos_carta.valor);
-  for (const c of cs.slice(0, Math.max(0, cs.length - n))) await rpcOk('slr_vender_banco', { token: bot.token, carta_id: c.id });
+  // Nunca la carta clausulada que la sección 10 vuelve a leer (con el catálogo
+  // corto la garantía premium tarda más sobres y acababa vendiéndola)
+  const todas = await misCartas(bot);
+  const cs = todas.filter(c => c.id !== bot.cartaClausulada).sort((a, b) => a.disenos_carta.valor - b.disenos_carta.valor);
+  for (const c of cs.slice(0, Math.max(0, todas.length - n))) await rpcOk('slr_vender_banco', { token: bot.token, carta_id: c.id });
 }
 // Sube al bot hasta n cartas con sobres básicos (y elección para afinar)
 async function subirA(bot, n) {
@@ -299,7 +302,7 @@ try {
     // Garantía premium: se fuerza la primera carta a dúo o superior tras 2 sin especial
     await darDinero(B2, 200000);
     let vista = false, n = 0, contadorOk = true;
-    while (!vista && n < 40) {
+    while (!vista && n < 120) {   // con el catálogo corto salen más especiales: hacen falta más sobres
       await bajarA(B2, 12);
       const enSub = new Set((await subastasAbiertas(L)).map(s => s.carta_id));
       const cont = (await leer(`equipos?select=contador_garantia_premium&id=eq.${B2.equipo}`)).datos[0].contador_garantia_premium;

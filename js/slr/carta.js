@@ -8,8 +8,10 @@
    Acabados (especificación complementaria 2.1 y 2.2): registro en
    js/slr/acabados/ (un módulo JS y un CSS por acabado, mismo contrato).
    Con imagen_url, la foto ocupa toda la carta (5:7, a sangre, recortada por
-   Cloudinary al ancho real × DPR cuando la carta aparece en pantalla) y la app
-   pinta encima el OVR, el nombre, el tipo y las stats.
+   Cloudinary) y la app pinta encima el OVR, el nombre, el tipo y las stats.
+   Carga (js/slr/imagenes.js): al pintarse, cada carta pide su foto sin
+   esperar al scroll (las visibles primero); mientras, esqueleto con brillo,
+   luego la vista previa borrosa y por último la foto con un fundido.
    Todas las cartas se inclinan en 3D siguiendo el ratón (PC) o el giroscopio
    (móvil: todas las visibles a la vez); el brillo es solo de los acabados.
    Sin imagen (catálogo beta), un marcador con iniciales y silueta del color
@@ -28,6 +30,7 @@
 ═══════════════════════════════════════════════ */
 import { esc, iniciales } from './ui.js';
 import { acabado, listaAcabados } from './acabados/index.js';
+import { urlFoto, cargarFotos } from './imagenes.js';
 
 export const TIPOS = { individual: 'Individual', duo: 'Dúo', trio: 'Trío', unica: 'Única' };
 // Nombres de los acabados registrados ({ foil: 'Foil', … })
@@ -88,31 +91,19 @@ export function describirPoder(p) {
 }
 
 /* ── Marcado ─────────────────────────────────────────────────────────────── */
-// Cloudinary a medida, como imagenOptimizada() de js/ui.js: recorte 5:7 centrado
-// en lo importante (g_auto) al ancho real × DPR, redondeado a 100 px para la caché
-export function imagenCarta(url, ancho) {
-  if (!url || !url.includes('res.cloudinary.com')) return url;
-  const w = Math.max(100, Math.ceil(ancho * (window.devicePixelRatio || 1) / 100) * 100);
-  return url.replace(/(\/image\/upload\/)/, `$1c_fill,ar_5:7,g_auto,w_${w},f_auto,q_auto/`);
-}
-
-// Pone el src de las fotos pendientes (data-cld) midiendo el ancho real de la carta
-function cargarImagenes(carta) {
-  const img = carta.querySelector('img[data-cld]');
-  if (!img) return;
-  const ancho = carta.getBoundingClientRect().width || 160;
-  img.src = imagenCarta(img.dataset.cld, ancho);
-  img.removeAttribute('data-cld');
-  img.addEventListener('error', () => carta.classList.add('slr-carta--sin-foto'), { once: true });
-}
+// Cloudinary: recorte 5:7 al ancho fijo más cercano (js/slr/imagenes.js)
+export const imagenCarta = urlFoto;
 
 const SILUETA = `<svg class="slr-carta__silueta" viewBox="0 0 100 100" aria-hidden="true">
   <circle cx="50" cy="36" r="17"/><path d="M14 100c0-22 16-36 36-36s36 14 36 36z"/></svg>`;
 
 function arte(c) {
   if (c.imagen_url) {
-    // Sin src: se pone al aparecer en pantalla, con el ancho real (cargarImagenes)
-    return `<img class="slr-carta__img" data-cld="${esc(c.imagen_url)}" alt="" decoding="async" draggable="false">`;
+    // Sin src: lo pone cargarFotoCarta al pintarse (vista previa diminuta y la
+    // buena al ancho real). Las iniciales solo se ven si la foto falla.
+    return `<img class="slr-carta__mini" alt="" decoding="async" draggable="false">
+      <img class="slr-carta__img" data-foto="${esc(c.imagen_url)}" alt="" decoding="async" draggable="false">
+      <span class="slr-carta__iniciales slr-carta__iniciales--foto">${esc(iniciales(c.nombre))}</span>`;
   }
   const personas = c.personas.length ? c.personas : [c.nombre];
   const siluetas = personas.slice(0, 3).map(() => SILUETA).join('');
@@ -291,11 +282,13 @@ function precalentar(carta) {
   requestAnimationFrame(() => requestAnimationFrame(() => carta.classList.remove('is-calentando')));
 }
 
-function observar(nodo) {
-  const cartas = nodo.matches?.('.slr-carta') ? [nodo] : nodo.querySelectorAll?.('.slr-carta') ?? [];
+const cartasDe = nodo => nodo.matches?.('.slr-carta') ? [nodo] : [...(nodo.querySelectorAll?.('.slr-carta') ?? [])];
+
+function observar(cartas) {
+  cargarFotos(cartas);       // todas, sin esperar al scroll (visibles primero)
   for (const c of cartas) {
     if (io) io.observe(c);
-    else { c.classList.add('is-visible'); visibles.add(c); cargarImagenes(c); }
+    else { c.classList.add('is-visible'); visibles.add(c); }
   }
 }
 
@@ -305,7 +298,6 @@ function alVisibilidad(entradas) {
     c.classList.toggle('is-visible', e.isIntersecting);
     if (e.isIntersecting) {
       visibles.add(c);
-      cargarImagenes(c);
       precalentar(c);
       if (giro) activar(c);
     } else {
@@ -323,10 +315,13 @@ export function iniciarAcabados(raiz) {
   activarInclinacion();
 
   if ('IntersectionObserver' in window) io = new IntersectionObserver(alVisibilidad, { rootMargin: '40px' });
-  observar(raiz);
+  observar(cartasDe(raiz));
   // Las pantallas se pintan de nuevo a menudo: se observan las cartas que aparecen
+  // (todas las de un mismo cambio juntas, para medirlas de una vez)
   mo = new MutationObserver(cambios => {
-    for (const c of cambios) for (const n of c.addedNodes) if (n.nodeType === 1) observar(n);
+    const nuevas = [];
+    for (const c of cambios) for (const n of c.addedNodes) if (n.nodeType === 1) nuevas.push(...cartasDe(n));
+    if (nuevas.length) observar(nuevas);
   });
   mo.observe(raiz, { childList: true, subtree: true });
 

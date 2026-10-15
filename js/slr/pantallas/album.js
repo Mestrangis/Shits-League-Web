@@ -4,11 +4,17 @@
    ya no sean tuyas, sin huecos vacíos: "X de Y desbloqueadas", filtros por tipo
    y acabado, orden por fecha o valor, y en cada carta cómo y cuándo la
    conseguiste y quién la tiene ahora. Tocar una carta abre su detalle.
+   Hasta TODAS_DE_GOLPE cartas se pintan todas; con más, por bloques al hacer
+   scroll, y las fotos del bloque siguiente se precargan antes de llegar.
 ═══════════════════════════════════════════════ */
 import { leer } from '../api.js';
-import { esc, hoja, fechaCorta, miles } from '../ui.js';
+import { esc, hoja, fechaCorta, miles, scrollDeHoja } from '../ui.js';
 import { cartaHTML, normalizarCarta, TIPOS, ACABADOS } from '../carta.js';
+import { precargar, urlFoto } from '../imagenes.js';
 import { abrirDetalle } from './detalle.js';
+
+const TODAS_DE_GOLPE = 60;
+const BLOQUE = 30;
 
 const VIAS = {
   inicial: 'Plantilla inicial', sobre_basico: 'Sobre básico', sobre_premium: 'Sobre premium', sobre_eleccion: 'Sobre de elección',
@@ -23,13 +29,15 @@ export async function abrirAlbum(ctx) {
     leer('disenos_carta?select=id&activo=eq.true'),
     leer(`equipos?select=id,nombre&liga_id=eq.${liga}`),
   ]);
-  const ids = entradas.map(e => e.diseno_id);
-  const cartas = ids.length
-    ? await leer(`cartas?select=id,diseno_id,equipo_id,disenos_carta(nombre,tipo,acabado,color,tier,perfil,personas,ata,def,con,valor,poderes,imagen_url,texto)` +
-        `&liga_id=eq.${liga}&diseno_id=in.(${ids.join(',')})`)
+  // Los ejemplares de la liga (uno por diseño) y se quedan los del álbum: con
+  // cientos de entradas, una lista de ids en la URL sería demasiado larga
+  const porDiseno = new Map(entradas.map(e => [e.diseno_id, e]));
+  const cartas = entradas.length
+    ? (await leer(`cartas?select=id,diseno_id,equipo_id,disenos_carta(nombre,tipo,acabado,color,tier,perfil,personas,ata,def,con,valor,poderes,imagen_url,texto)` +
+        `&liga_id=eq.${liga}&limit=5000`)).filter(f => porDiseno.has(f.diseno_id))
     : [];
   const items = cartas.map(f => {
-    const e = entradas.find(x => x.diseno_id === f.diseno_id);
+    const e = porDiseno.get(f.diseno_id);
     return { ...normalizarCarta(f), via: e.via_adquisicion, fecha: e.primera_vez_en, dueno: f.equipo_id };
   });
   const quien = id => (!id ? 'Libre' : id === miEquipo ? 'Tuya' : equipos.find(e => e.id === id)?.nombre ?? 'Otro equipo');
@@ -58,21 +66,51 @@ export async function abrirAlbum(ctx) {
     </div>`, { titulo: 'Álbum', completa: true });
 
   const rejilla = el.querySelector('[data-rejilla]');
-  function pintarRejilla() {
-    if (!rejilla) return;
-    const lista = items
-      .filter(c => (!filtro.tipo || c.tipo === filtro.tipo) && (!filtro.acabado || c.acabado === filtro.acabado))
-      .sort((a, b) => (filtro.orden === 'valor' ? b.valor - a.valor : new Date(b.fecha) - new Date(a.fecha)) || a.nombre.localeCompare(b.nombre));
-    rejilla.innerHTML = lista.map(c => `
+  const cuerpo = scrollDeHoja(el);
+  let lista = [], pintadas = 0;
+  const ficha = c => `
       <button class="slr-ficha" type="button" data-id="${esc(c.id)}">
         ${cartaHTML(c, { tam: 's' })}
         <span class="slr-ficha__album">
           <span>${esc(VIAS[c.via] ?? c.via)} · ${esc(fechaCorta(c.fecha))}</span>
           <span class="${c.dueno === miEquipo ? 'slr-propio' : ''}">${c.dueno === miEquipo ? '✓ Tuya' : `Ahora: ${esc(quien(c.dueno))}`} · ${miles(c.valor)}</span>
         </span>
-      </button>`).join('') || '<p class="slr-suave">Ninguna carta con esos filtros.</p>';
-    rejilla.querySelectorAll('[data-id]').forEach(b => b.addEventListener('click', () => abrirDetalle(b.dataset.id, ctx).catch(() => {})));
+      </button>`;
+
+  // Fotos del bloque siguiente, al ancho de las que ya se ven
+  function precargarSiguiente() {
+    const ancho = rejilla.querySelector('.slr-carta')?.getBoundingClientRect().width || 170;
+    precargar(lista.slice(pintadas, pintadas + BLOQUE).filter(c => c.imagen_url).map(c => urlFoto(c.imagen_url, ancho)));
   }
+  function pintarBloque() {
+    const n = lista.length <= TODAS_DE_GOLPE ? lista.length : BLOQUE;
+    rejilla.insertAdjacentHTML('beforeend', lista.slice(pintadas, pintadas + n).map(ficha).join(''));
+    pintadas = Math.min(lista.length, pintadas + n);
+    rejilla.dataset.pintadas = pintadas;
+    if (pintadas < lista.length) {
+      precargarSiguiente();
+      // En pantallas altas o anchas un bloque puede no llenar: se sigue sin esperar al scroll
+      requestAnimationFrame(() => { if (pintadas < lista.length && cuerpo.scrollHeight < cuerpo.clientHeight * 2.5) pintarBloque(); });
+    }
+  }
+  function pintarRejilla() {
+    if (!rejilla) return;
+    lista = items
+      .filter(c => (!filtro.tipo || c.tipo === filtro.tipo) && (!filtro.acabado || c.acabado === filtro.acabado))
+      .sort((a, b) => (filtro.orden === 'valor' ? b.valor - a.valor : new Date(b.fecha) - new Date(a.fecha)) || a.nombre.localeCompare(b.nombre));
+    pintadas = 0;
+    rejilla.innerHTML = lista.length ? '' : '<p class="slr-suave">Ninguna carta con esos filtros.</p>';
+    pintarBloque();
+  }
+  // Scroll infinito: a menos de 1,5 pantallas del final se pinta el bloque siguiente
+  // (sus fotos ya vienen precargadas)
+  cuerpo.addEventListener('scroll', () => {
+    if (pintadas < lista.length && cuerpo.scrollTop + cuerpo.clientHeight > cuerpo.scrollHeight - 1.5 * cuerpo.clientHeight) pintarBloque();
+  }, { passive: true });
+  rejilla?.addEventListener('click', e => {
+    const b = e.target.closest('[data-id]');
+    if (b) abrirDetalle(b.dataset.id, ctx).catch(() => {});
+  });
   el.querySelectorAll('[data-filtro]').forEach(g => g.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
     g.querySelectorAll('button').forEach(x => x.classList.toggle('activo', x === b));
     filtro[g.dataset.filtro] = b.dataset.v;

@@ -191,8 +191,8 @@ try {
   await dormir(600);
   const total = await ev(`document.querySelector('[data-total]').textContent`);
   const nCartas = (await leer(`cartas?select=id&liga_id=eq.${L}`)).datos.length;
-  check(new RegExp(`de ${nCartas}\\b`).test(total) && await ev(`document.querySelectorAll('.slr-plantillas__fila').length === 30`),
-    `herramienta con todas las cartas (${total}), pintadas de 30 en 30`);
+  check(new RegExp(`de ${nCartas}\\b`).test(total) && await ev(`document.querySelectorAll('.slr-plantillas__fila').length === Math.min(24, ${nCartas})`),
+    `herramienta con todas las cartas (${total}), 24 por página`);
   await ev(`(() => { const e = document.querySelector('[data-f="tipo"]'); e.value = 'duo'; e.dispatchEvent(new Event('change')); return 0; })()`);
   await dormir(200);
   check(await ev(`[...document.querySelectorAll('.slr-plantillas__fila')].every(f => /Dúo/.test(f.textContent))`), 'filtro por tipo: solo dúos');

@@ -2,18 +2,27 @@
    SHITS LEAGUE RUSH — herramienta de plantillas (modo pruebas, solo admin)
    Todas las cartas de la liga (slr_admin_cartas) con buscador por nombre,
    filtros (tipo, acabado, estado: libre / con dueño / de un equipo) y orden
-   (valor por defecto, OVR, nombre o tipo). La lista se pinta por páginas de 30
-   y carga más al acercarse al final (o con «Ver más»). Cada carta se puede dar a un equipo o dejar
+   (valor por defecto, OVR, nombre o tipo). Paginada: 24 / 48 / 96 por página
+   o todas (se recuerda en localStorage), con botones de página y el total; las
+   fotos de la página siguiente se precargan. Cada carta se puede dar a un equipo o dejar
    libre: todo pasa por slr_admin_mover_carta, que respeta el límite de 15,
    apunta la entrada del álbum (vía 'admin'), la quita de alineaciones, cancela
    ventas, ofertas, intercambios y subastas y lo deja en el historial: no hay
    que tocar las tablas cartas o equipos a mano.
 ═══════════════════════════════════════════════ */
 import { rpc } from '../api.js';
-import { esc, hoja, cerrarCapa, conEspera, toast, monedas, scrollDeHoja } from '../ui.js';
+import { esc, hoja, cerrarCapa, conEspera, toast, monedas, miles, scrollDeHoja } from '../ui.js';
 import { cartaHTML, normalizarCarta, TIPOS, ACABADOS } from '../carta.js';
+import { precargar, urlFoto } from '../imagenes.js';
 
-const POR_PAGINA = 30;
+const TAMANOS = [24, 48, 96, 0];          // 0 = todas
+const CLAVE_TAMANO = 'SLR_PLANTILLAS_POR_PAGINA';
+function tamanoGuardado() {
+  try { const n = Number(localStorage.getItem(CLAVE_TAMANO) ?? 24); return TAMANOS.includes(n) ? n : 24; } catch { return 24; }
+}
+function guardarTamano(n) {
+  try { localStorage.setItem(CLAVE_TAMANO, String(n)); } catch { /* sin persistencia */ }
+}
 const ORDEN_TIPO = { unica: 0, trio: 1, duo: 2, individual: 3 };
 const ORDENES = {
   valor:  { texto: 'Valor',  cmp: (a, b) => b.valor - a.valor },
@@ -25,11 +34,13 @@ const sinAcentos = s => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLow
 
 // Estado de la herramienta entre aperturas (dentro de la misma sesión)
 const filtros = { texto: '', tipo: '', acabado: '', estado: '', orden: 'valor' };
+let pagina = 1;
 
 export async function abrirPlantillas(ctx) {
   const liga = ctx.datos.liga.id;
   let datos = await rpc('slr_admin_cartas', { liga_id: liga });
-  let cartas = [], equipos = [], porEquipo = new Map(), visibles = [], pintadas = 0;
+  let cartas = [], equipos = [], porEquipo = new Map(), visibles = [];
+  let porPagina = tamanoGuardado();
 
   function preparar() {
     equipos = datos.equipos;
@@ -55,12 +66,16 @@ export async function abrirPlantillas(ctx) {
         <label><span>Orden</span><select class="slr-input" data-f="orden">${opciones(Object.entries(ORDENES).map(([k, o]) => [k, o.texto]), filtros.orden)}</select></label>
         <label><span>Estado</span><select class="slr-input" data-f="estado">${opcionesEstado()}</select></label>
       </div>
-      <p class="slr-plantillas-admin__total" data-total></p>
+      <div class="slr-paginas-cabeza">
+        <p class="slr-plantillas-admin__total" data-total></p>
+        <label class="slr-por-pagina"><span>Por página</span><select class="slr-input" data-por-pagina>
+          ${TAMANOS.map(n => `<option value="${n}" ${n === porPagina ? 'selected' : ''}>${n || 'Todas'}</option>`).join('')}</select></label>
+      </div>
+      <nav class="slr-paginas" data-paginas aria-label="Páginas"></nav>
       <ul class="slr-plantillas" data-resultados></ul>
-      <div class="slr-plantillas-admin__mas" data-mas><button class="slr-btn slr-btn--fantasma" type="button">Ver más</button></div>
+      <nav class="slr-paginas" data-paginas aria-label="Páginas"></nav>
     </div>`, { titulo: 'Plantillas (modo pruebas)', completa: true });
   const lista = el.querySelector('[data-resultados]');
-  const mas = el.querySelector('[data-mas]');
 
   function filtrar() {
     const t = sinAcentos(filtros.texto.trim());
@@ -71,12 +86,29 @@ export async function abrirPlantillas(ctx) {
       (filtros.estado === '' || (filtros.estado === 'libre' ? !c.equipo_id
         : filtros.estado === 'dueno' ? !!c.equipo_id : c.equipo_id === filtros.estado.slice(3))))
       .sort(ORDENES[filtros.orden].cmp);
-    pintadas = 0;
-    lista.innerHTML = visibles.length ? '' : '<li class="slr-suave">Ninguna carta con esos filtros.</li>';
     const libres = visibles.filter(c => !c.equipo_id).length;
     el.querySelector('[data-total]').textContent =
-      `${visibles.length} ${visibles.length === 1 ? 'carta' : 'cartas'} de ${cartas.length} · ${libres} ${libres === 1 ? 'libre' : 'libres'}`;
+      `${miles(visibles.length)} ${visibles.length === 1 ? 'carta' : 'cartas'} de ${miles(cartas.length)} · ${miles(libres)} ${libres === 1 ? 'libre' : 'libres'}`;
     pintarPagina();
+  }
+
+  const paginas = () => porPagina ? Math.max(1, Math.ceil(visibles.length / porPagina)) : 1;
+  const trozo = p => porPagina ? visibles.slice((p - 1) * porPagina, p * porPagina) : visibles;
+
+  // ‹ 1 … 4 5 [6] 7 8 … 20 ›
+  function botonesPaginas() {
+    const n = paginas();
+    if (n <= 1) return '';
+    const nums = [...new Set([1, n, pagina - 2, pagina - 1, pagina, pagina + 1, pagina + 2])].filter(x => x >= 1 && x <= n).sort((a, b) => a - b);
+    const partes = [];
+    nums.forEach((x, i) => {
+      if (i && x - nums[i - 1] > 1) partes.push('<span class="slr-paginas__hueco">…</span>');
+      partes.push(`<button type="button" data-pag="${x}" class="${x === pagina ? 'activo' : ''}" ${x === pagina ? 'aria-current="page"' : ''}>${x}</button>`);
+    });
+    return `<button type="button" data-pag="${pagina - 1}" ${pagina === 1 ? 'disabled' : ''} aria-label="Anterior">‹</button>
+      ${partes.join('')}
+      <button type="button" data-pag="${pagina + 1}" ${pagina === n ? 'disabled' : ''} aria-label="Siguiente">›</button>
+      <span class="slr-paginas__texto">Página ${pagina} de ${n}</span>`;
   }
 
   function fila(c) {
@@ -95,18 +127,34 @@ export async function abrirPlantillas(ctx) {
   }
 
   function pintarPagina() {
-    const trozo = visibles.slice(pintadas, pintadas + POR_PAGINA);
-    pintadas += trozo.length;
-    lista.insertAdjacentHTML('beforeend', trozo.map(fila).join(''));
-    mas.hidden = pintadas >= visibles.length;
+    pagina = Math.min(Math.max(1, pagina), paginas());
+    const filas = trozo(pagina);
+    lista.innerHTML = filas.length ? filas.map(fila).join('') : '<li class="slr-suave">Ninguna carta con esos filtros.</li>';
+    const nav = botonesPaginas();
+    el.querySelectorAll('[data-paginas]').forEach(n => { n.innerHTML = nav; n.hidden = !nav; });
+    // Fotos de la página siguiente, en segundo plano y al ancho de las de esta
+    if (pagina < paginas()) {
+      const ancho = lista.querySelector('.slr-carta')?.getBoundingClientRect().width || 90;
+      precargar(trozo(pagina + 1).filter(c => c.imagen_url).map(c => urlFoto(c.imagen_url, ancho)));
+    }
   }
 
-  // Scroll infinito: a menos de 400 px del final se pinta otra página
   const cuerpo = scrollDeHoja(el);
-  cuerpo.addEventListener('scroll', () => {
-    if (pintadas < visibles.length && cuerpo.scrollTop + cuerpo.clientHeight > cuerpo.scrollHeight - 400) pintarPagina();
-  }, { passive: true });
-  mas.querySelector('button').addEventListener('click', pintarPagina);
+  el.querySelectorAll('[data-paginas]').forEach(nav => nav.addEventListener('click', e => {
+    const b = e.target.closest('[data-pag]');
+    if (!b || b.disabled) return;
+    pagina = Number(b.dataset.pag);
+    pintarPagina();
+    // Si se ha pulsado abajo (o la lista empieza más arriba), al principio de la lista
+    const arriba = lista.getBoundingClientRect().top - cuerpo.getBoundingClientRect().top + cuerpo.scrollTop - 120;
+    if (cuerpo.scrollTop > arriba) cuerpo.scrollTop = Math.max(0, arriba);
+  }));
+  el.querySelector('[data-por-pagina]').addEventListener('change', e => {
+    porPagina = Number(e.target.value);
+    guardarTamano(porPagina);
+    pagina = 1;
+    pintarPagina();
+  });
 
   // Acciones por delegación (las filas se añaden por páginas)
   lista.addEventListener('click', e => {
@@ -143,19 +191,19 @@ export async function abrirPlantillas(ctx) {
 
   // Lo propio puede haber cambiado (plantilla, alineación, saldo): se recarga
   async function despues() {
-    const scroll = cuerpo.scrollTop, ya = pintadas;
+    const scroll = cuerpo.scrollTop;
     await ctx.recargar('cartas', 'alineacion');
     datos = await rpc('slr_admin_cartas', { liga_id: liga });
     preparar();
     el.querySelector('[data-f="estado"]').innerHTML = opcionesEstado();
-    filtrar();
-    while (pintadas < Math.min(ya, visibles.length)) pintarPagina();
+    filtrar();                    // se queda en la misma página
     cuerpo.scrollTop = scroll;
   }
 
   let espera = null;
   el.querySelectorAll('[data-f]').forEach(c => c.addEventListener(c.tagName === 'SELECT' ? 'change' : 'input', () => {
     filtros[c.dataset.f] = c.value;
+    pagina = 1;
     clearTimeout(espera);
     espera = setTimeout(filtrar, c.tagName === 'SELECT' ? 0 : 150);
   }));

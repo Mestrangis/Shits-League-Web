@@ -5,7 +5,7 @@
    cambio relevante para forzar limpieza de cachés viejas.
 ═══════════════════════════════════════════════ */
 
-const CACHE_NAME = 'shits-league-v11';
+const CACHE_NAME = 'shits-league-v12';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -22,6 +22,10 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   // Los POST (votos al Apps Script) no se pueden cachear: que vayan directos a la red
   if (event.request.method !== 'GET') return;
+  // Las fotos de Cloudinary, directas: las cachea el navegador (cabeceras de larga
+  // duración). Pasarlas por aquí las pedía siempre a la red y guardaba cada una,
+  // opaca, en Cache Storage (cientos de entradas que cuentan varios MB cada una)
+  if (new URL(event.request.url).hostname === 'res.cloudinary.com') return;
   event.respondWith(
     fetch(event.request)
       .then(response => {
