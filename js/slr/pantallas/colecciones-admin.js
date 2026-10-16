@@ -4,8 +4,11 @@
    editar: nombre, color de la paleta, descripción y emblema (PNG o SVG
    monocromo con fondo transparente, cuadrado, unos 256×256; se sube a
    Cloudinary con el preset slr_cartas o se pega la URL), con vista previa en
-   una carta grande y en miniatura. Al editar, sus cartas (tocar abre el
-   detalle) y «Borrar colección» (sus cartas se quedan sin colección).
+   una carta grande y en miniatura. Al editar: sus cartas (tocar abre el
+   detalle; «Quitar» la saca de la colección), «Añadir cartas» con un
+   buscador de miniaturas (si alguna está en otra colección, avisa y la mueve)
+   y «Borrar colección» (sus cartas se quedan sin colección). Añadir y quitar
+   van por slr_admin_editar_disenos (una transacción).
    Guarda con slr_admin_guardar_coleccion / slr_admin_borrar_coleccion.
    formularioColeccion() lo usa también el formulario de carta («Nueva»).
 ═══════════════════════════════════════════════ */
@@ -16,6 +19,7 @@ import { COLORES } from '../generador.js';
 import { cargarColecciones, listaColecciones, urlEmblema } from '../colecciones.js';
 import { subirFoto } from './editor-carta.js';
 import { abrirDetalle } from './detalle.js';
+import { coleccion as coleccionDe } from '../colecciones.js';
 
 const opciones = (lista, actual) => Object.entries(lista).map(([v, t]) =>
   `<option value="${esc(v)}" ${v === actual ? 'selected' : ''}>${esc(t)}</option>`).join('');
@@ -57,12 +61,20 @@ export async function abrirColecciones(ctx) {
 export async function formularioColeccion(ctx, k, { alGuardar } = {}) {
   const liga = ctx.datos.liga.id;
   const f = { id: k?.id ?? null, nombre: k?.nombre ?? '', color: k?.color ?? '', descripcion: k?.descripcion ?? '', emblema_url: k?.emblema_url ?? '' };
-  // Sus cartas (con el ejemplar de esta liga, para abrir el detalle)
-  const suyas = f.id ? await leer(`disenos_carta?select=id,nombre,tipo,acabado,color,tier,rareza,coleccion_id,perfil,personas,ata,def,con,valor,poderes,imagen_url` +
-    `&coleccion_id=eq.${f.id}&order=nombre&limit=500`) : [];
-  const ejemplares = suyas.length ? await leer(`cartas?select=id,diseno_id&liga_id=eq.${liga}&diseno_id=in.(${suyas.map(d => d.id).join(',')})`) : [];
-  const ejemplarDe = new Map(ejemplares.map(c => [c.diseno_id, c.id]));
-  const muestra = suyas[0] ?? { id: 'muestra', nombre: 'Carta de muestra', tipo: 'individual', tier: 'B', ata: 70, def: 60, con: 64, valor: 300, poderes: [], personas: [] };
+  // Todas las cartas que se pueden tocar desde esta liga (para el buscador) y su ejemplar aquí
+  const CAMPOS = 'id,nombre,tipo,acabado,color,tier,rareza,coleccion_id,perfil,personas,ata,def,con,valor,poderes,imagen_url,liga_prueba_id';
+  let disenos = [], ejemplarDe = new Map();
+  async function cargarCartas() {
+    const [ds, ej] = await Promise.all([
+      leer(`disenos_carta?select=${CAMPOS}&${ctx.datos.liga.es_prueba ? `liga_prueba_id=eq.${liga}` : 'liga_prueba_id=is.null'}&order=nombre&limit=5000`),
+      leer(`cartas?select=id,diseno_id&liga_id=eq.${liga}&limit=5000`),
+    ]);
+    disenos = ds;
+    ejemplarDe = new Map(ej.map(c => [c.diseno_id, c.id]));
+  }
+  await cargarCartas();
+  const suyas = () => disenos.filter(d => f.id && d.coleccion_id === f.id);
+  const muestra = suyas()[0] ?? { id: 'muestra', nombre: 'Carta de muestra', tipo: 'individual', tier: 'B', ata: 70, def: 60, con: 64, valor: 300, poderes: [], personas: [] };
 
   const el = hoja(`
     <form class="slr-editor slr-editor--coleccion" data-form novalidate>
@@ -89,12 +101,9 @@ export async function formularioColeccion(ctx, k, { alGuardar } = {}) {
         <label class="slr-campo"><span>o pega la URL</span>
           <input class="slr-input" name="emblema_url" type="url" value="${esc(f.emblema_url)}" placeholder="https://res.cloudinary.com/…" autocomplete="off"></label>
       </fieldset>
-      ${f.id ? `<fieldset class="slr-editor__bloque">
-        <legend>Sus cartas (${suyas.length})</legend>
-        ${suyas.length ? `<div class="slr-rejilla slr-rejilla--compacta" data-suyas>${suyas.map(d => `
-          <button class="slr-ficha" type="button" data-diseno="${esc(d.id)}">${cartaHTML({ ...normalizarCarta(d), id: ejemplarDe.get(d.id) ?? `diseno-${d.id}` }, { tam: 's' })}</button>`).join('')}</div>`
-          : '<p class="slr-suave">Ninguna todavía: elige esta colección en el formulario de una carta.</p>'}
-      </fieldset>` : ''}
+      <fieldset class="slr-editor__bloque" data-bloque-cartas>
+        ${f.id ? '' : '<legend>Cartas</legend><p class="slr-suave">Crea la colección y después podrás añadirle cartas desde aquí.</p>'}
+      </fieldset>
       <p class="slr-editor__error" data-error hidden></p>
       <div class="slr-botones">
         <button class="slr-btn slr-btn--grande" type="submit" data-guardar>${f.id ? 'Guardar cambios' : 'Crear colección'}</button>
@@ -125,12 +134,98 @@ export async function formularioColeccion(ctx, k, { alGuardar } = {}) {
       pintarVista();
     } catch (err) { estado.textContent = err.message; }
   });
-  el.querySelector('[data-suyas]')?.addEventListener('click', e => {
+  // ── Sus cartas: lista, quitar y añadir ──
+  const bloque = el.querySelector('[data-bloque-cartas]');
+  const cartaDe = d => ({ ...normalizarCarta(d), id: ejemplarDe.get(d.id) ?? `diseno-${d.id}` });
+  // Cambia la colección de varias cartas en una transacción (edición múltiple)
+  async function ponerColeccion(ids, coleccionId) {
+    return rpc('slr_admin_editar_disenos', { liga_id: liga, ids, cambios: { coleccion_id: coleccionId } });
+  }
+  function pintarSuyas() {
+    if (!f.id) return;
+    const lista = suyas();
+    bloque.innerHTML = `
+      <legend>Sus cartas (${lista.length})</legend>
+      ${lista.length ? `<ul class="slr-coleccion-cartas" data-suyas>${lista.map(d => `
+        <li><button class="slr-ficha" type="button" data-diseno="${esc(d.id)}">${cartaHTML(cartaDe(d), { tam: 'xs', destacar: 'ATA' })}</button>
+          <span><b>${esc(d.nombre)}</b><small>Tier ${esc(d.tier)}</small></span>
+          <button class="slr-btn slr-btn--mini slr-btn--fantasma" type="button" data-quitar="${esc(d.id)}">Quitar</button></li>`).join('')}</ul>`
+        : '<p class="slr-suave">Ninguna todavía.</p>'}
+      <button class="slr-btn slr-btn--fantasma" type="button" data-anadir>＋ Añadir cartas</button>`;
+  }
+  bloque.addEventListener('click', async e => {
+    const quitar = e.target.closest('[data-quitar]');
+    if (quitar) {
+      await conEspera(quitar, async () => {
+        await ponerColeccion([quitar.dataset.quitar], null);
+        toast('Carta quitada de la colección', 'ok');
+        await cargarCartas(); pintarSuyas();
+      }).catch(() => {});
+      return;
+    }
+    if (e.target.closest('[data-anadir]')) { buscador(); return; }
     const b = e.target.closest('[data-diseno]');
     const id = b && ejemplarDe.get(b.dataset.diseno);
     if (id) abrirDetalle(id, ctx).catch(() => {});
     else if (b) toast('Esta carta no tiene ejemplar en esta liga', 'info');
   });
+
+  // Buscador con miniaturas: tocar marca o desmarca; «Añadir N» las mete en la colección
+  function buscador() {
+    const marcadas = new Set();
+    const h = hoja(`
+      <div class="slr-buscador-cartas">
+        <input class="slr-input" type="search" data-texto placeholder="Buscar carta por nombre" autocomplete="off">
+        <p class="slr-suave" data-aviso></p>
+        <div class="slr-rejilla slr-rejilla--compacta" data-resultados></div>
+        <div class="slr-botones slr-buscador-cartas__pie"><button class="slr-btn slr-btn--grande" type="button" data-confirmar disabled>Añadir</button></div>
+      </div>`, { titulo: `Añadir a ${f.nombre}`, completa: true });
+    const res = h.querySelector('[data-resultados]');
+    const sinAcentos = t => (t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+    function pintar() {
+      const t = sinAcentos(h.querySelector('[data-texto]').value.trim());
+      const lista = disenos.filter(d => d.coleccion_id !== f.id && (!t || sinAcentos(d.nombre).includes(t))).slice(0, 60);
+      res.innerHTML = lista.map(d => {
+        const otra = d.coleccion_id ? coleccionDe(d.coleccion_id)?.nombre ?? 'otra colección' : '';
+        return `<button class="slr-ficha slr-buscador-cartas__carta${marcadas.has(d.id) ? ' es-seleccionada' : ''}" type="button" data-diseno="${esc(d.id)}">
+          ${cartaHTML(cartaDe(d), { tam: 'xs', destacar: 'ATA' })}<small>${esc(d.nombre)}${otra ? `<em>en ${esc(otra)}</em>` : ''}</small></button>`;
+      }).join('') || '<p class="slr-suave">Ninguna carta con ese nombre.</p>';
+      const mover = [...marcadas].filter(id => disenos.find(d => d.id === id)?.coleccion_id);
+      h.querySelector('[data-aviso]').textContent = mover.length
+        ? `${mover.length} de las marcadas ${mover.length === 1 ? 'está' : 'están'} en otra colección: se ${mover.length === 1 ? 'moverá' : 'moverán'} a ${f.nombre}.` : '';
+      const boton = h.querySelector('[data-confirmar]');
+      boton.disabled = !marcadas.size;
+      boton.textContent = marcadas.size ? `Añadir ${marcadas.size}` : 'Añadir';
+    }
+    h.querySelector('[data-texto]').addEventListener('input', pintar);
+    res.addEventListener('click', e => {
+      const b = e.target.closest('[data-diseno]');
+      if (!b) return;
+      marcadas.has(b.dataset.diseno) ? marcadas.delete(b.dataset.diseno) : marcadas.add(b.dataset.diseno);
+      pintar();
+    });
+    h.querySelector('[data-confirmar]').addEventListener('click', async ev => {
+      const boton = ev.currentTarget;
+      const ids = [...marcadas];
+      const otras = ids.map(id => disenos.find(d => d.id === id)).filter(d => d?.coleccion_id);
+      if (otras.length) {
+        const ok = await confirmar({ titulo: 'Mover de colección', ok: `Mover y añadir ${ids.length}`,
+          texto: `${otras.map(d => `<b>${esc(d.nombre)}</b> (en ${esc(coleccionDe(d.coleccion_id)?.nombre ?? 'otra colección')})`).join(', ')} ` +
+            `${otras.length === 1 ? 'está' : 'están'} en otra colección: ${otras.length === 1 ? 'pasará' : 'pasarán'} a <b>${esc(f.nombre)}</b>.` });
+        if (!ok) return;
+      }
+      await conEspera(boton, async () => {
+        const r = await ponerColeccion(ids, f.id);
+        toast(`${r.cambian} ${r.cambian === 1 ? 'carta añadida' : 'cartas añadidas'} a ${f.nombre}`, 'ok');
+        await cargarCartas();
+        cerrarCapa();
+        pintarSuyas();
+      }).catch(() => {});
+    });
+    pintar();
+    setTimeout(() => h.querySelector('[data-texto]').focus(), 300);
+  }
+  pintarSuyas();
 
   form.addEventListener('submit', ev => {
     ev.preventDefault();
@@ -149,7 +244,7 @@ export async function formularioColeccion(ctx, k, { alGuardar } = {}) {
   el.querySelector('[data-borrar]')?.addEventListener('click', async e => {
     const boton = e.currentTarget;
     const ok = await confirmar({ titulo: 'Borrar colección', peligro: true, ok: 'Borrar',
-      texto: `Se borra <b>${esc(f.nombre)}</b>. Sus ${suyas.length} cartas se quedan sin colección (no se borra ninguna carta).` });
+      texto: `Se borra <b>${esc(f.nombre)}</b>. Sus ${suyas().length} cartas se quedan sin colección (no se borra ninguna carta).` });
     if (!ok) return;
     await conEspera(boton, async () => {
       await rpc('slr_admin_borrar_coleccion', { liga_id: liga, coleccion_id: f.id });

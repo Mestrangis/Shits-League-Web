@@ -5,12 +5,14 @@
 // el rango de su tier con la forma de su perfil.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { TIERS, PERFILES, MAX_STAT, generarStats, generarPoderes, ovr100, tierDeStats, perfilDeStats } from '../../js/slr/generador.js';
+import { TIERS, PERFILES, MAX_STAT_CARTA, generarStats, generarPoderes, ovr100, tierDeStats, perfilDeStats } from '../../js/slr/generador.js';
 import { SUPABASE_URL, SUPABASE_KEY } from '../../js/slr/config.js';
+
+const TIPOS = ['individual', 'duo', 'trio', 'grupo', 'especial'];
 
 const casos = [];
 let k = 1;
-for (const tier of Object.keys(TIERS)) for (const perfil of Object.keys(PERFILES)) for (const tipo of Object.keys(MAX_STAT)) {
+for (const tier of Object.keys(TIERS)) for (const perfil of Object.keys(PERFILES)) for (const tipo of TIPOS) {
   for (let i = 0; i < 4; i++, k++) {
     casos.push({ tier, perfil, tipo, semilla_stats: (k * 2654435761) % 2147483646, semilla_poderes: (k * 40503 + 7) % 2147483646 });
   }
@@ -34,15 +36,15 @@ test(`SQL y JS generan lo mismo (${casos.length} casos: todos los tiers, perfile
   assert.equal(distintos.length, 0, `distintos: ${JSON.stringify(distintos.slice(0, 3))}`);
 });
 
-test('stats en el rango del tier, entre 1 y el máximo del tipo, con la forma del perfil', () => {
-  for (const tier of Object.keys(TIERS)) for (const perfil of Object.keys(PERFILES)) for (const tipo of Object.keys(MAX_STAT)) {
+test('stats en el rango del tier, entre 1 y 101, con la forma del perfil', () => {
+  for (const tier of Object.keys(TIERS)) for (const perfil of Object.keys(PERFILES)) for (const tipo of TIPOS) {
     for (let s = 1; s <= 200; s++) {
       const st = generarStats(tier, perfil, tipo, s * 7919);
       const [lo, hi] = TIERS[tier];
       const o = ovr100(st);
       assert.ok(o >= 100 * lo && o < 100 * hi, `${tier} ${perfil} ${tipo} ${s}: OVR ${o / 100}`);
       assert.equal(tierDeStats(st), tier);
-      for (const v of Object.values(st)) assert.ok(Number.isInteger(v) && v >= 1 && v <= MAX_STAT[tipo]);
+      for (const v of Object.values(st)) assert.ok(Number.isInteger(v) && v >= 1 && v <= MAX_STAT_CARTA);
       const max = Math.max(st.ATA, st.DEF, st.CON);
       if (perfil === 'atacante') assert.equal(st.ATA, max);
       if (perfil === 'defensa') assert.equal(st.DEF, max);

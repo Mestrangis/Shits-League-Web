@@ -780,7 +780,7 @@ Los goles dependen mucho de la formación (con un solo defensa la ocasión llega
   - El nombre de la colección (solo en `tam: 'l'`), bajo el nombre de la carta, en el color de la colección.
   - Ya no hay píldora de tipo sobre el nombre.
 - **Iconos de tipo:** SVG en línea (`ICONOS_TIPO`): 1, 2 y 3 siluetas; para `grupo`, cinco pequeñas; para `especial`, una estrella.
-- **Tope de stats del generador:** el de `grupo` y `especial` es el de la antigua `unica` (101). Así la migración de tipos no cambia ninguna carta al regenerarla. Solo importa en el tier S. **Pendiente de que Marcos decida** si el tope deja de depender del tipo, ya que el tipo no debe dar ventajas.
+- **Tope de stats del generador:** el de `grupo` y `especial` es el de la antigua `unica` (101). Así la migración de tipos no cambia ninguna carta al regenerarla. Solo importa en el tier S. *(Marcos decidió después dejarlo en 101 para todos: ver la sección siguiente.)*
 - **Colecciones creadas desde una liga de prueba:**
   - Son de esa liga (`liga_prueba_id`) y se borran con ella, como sus cartas.
   - No se pueden usar en cartas de otras ligas (lo valida el trigger).
@@ -801,4 +801,50 @@ Los goles dependen mucho de la formación (con un solo defensa la ocasión llega
   - Tipos: las 8 «únicas», 7 a grupo y Cenicero de Mateo a especial (El Pozo, con duda); además, Inquina de trío a dúo (duda).
   - Las coincidencias al principio del nombre son nombres de persona y no se proponen.
   - Pendientes del OK de Marcos.
+
+## Migración del catálogo al modelo nuevo y edición múltiple
+
+### Decisiones de Marcos
+
+- **Colecciones**, con estos colores: Down (naranja), Dormidito (morado), Seductor (rojo), Muerto (negro) y Cazatiburones (azul). Cada carta se queda con lo que va delante del sufijo.
+- **Tipos:**
+  - a grupo: Abisal, El Pozo, La Familia, La Obra, Los Feministas, Seguratas y Sísifo;
+  - a especial: Cenicero de Mateo;
+  - Inquina sigue siendo trío.
+  - Se quita `unica`.
+- **Tope de stats del generador:** 101 para todos los tipos.
+- **Editor de colección:** desde la propia colección, añadir cartas (buscador con miniaturas) y quitarlas, viendo la lista. Si una carta está en otra colección, avisa y la mueve.
+- **Edición múltiple** en el catálogo y la herramienta de plantillas:
+  - selección con casillas, Ctrl/Cmd+clic, Mayús+clic y pulsación larga en el móvil (sin arrastre);
+  - «todas las visibles», «quitar selección» y el contador;
+  - cambiar colección, color, tipo, tier, perfil y acabado, activar o desactivar, y regenerar stats o poderes;
+  - resumen y confirmación antes de aplicar, en una sola transacción y con los triggers;
+  - si cambia el tier o el perfil, pregunta si regenerar las stats.
+
+### Decisiones mías
+
+- **Migración** (`20261016000200`):
+  - Por nombres exactos y solo en el catálogo común. Si en alguna colección no salen exactamente las cartas esperadas, falla entera.
+  - No cambia stats, valor ni rareza.
+  - Se probó antes dentro de una transacción deshecha. Resultado: 20 cartas en 5 colecciones, 7 grupos y 1 especial, sin ninguna `unica`.
+  - Las colecciones nacen sin emblema.
+- **Generador:** `MAX_STAT_CARTA = 101` en JS y `cap := 101` en SQL. El parámetro del tipo se conserva en la firma para no romper llamadas. Las cartas guardadas no cambian; solo saldrían distintas al regenerar una de tier S que antes topaba.
+- **`slr_admin_editar_disenos(token, liga_id, ids, cambios, solo_contar)`:**
+  - **Cambios:** solo las claves que cambian. `coleccion_id` y `color` admiten `null` («sin colección», «el de la colección»).
+  - **Regenerar:** se vacían las stats o los poderes y su semilla, y el trigger los genera con semilla nueva y el tier y perfil nuevos.
+  - **Resumen:** el previo se calcula aplicando y deshaciendo (`SLRSC`, como en el borrado), así que ya trae el valor y la rareza recalculados. Lleva el recuento por campo y hasta 8 ejemplos.
+  - **Alcance:** como el formulario (en una liga de prueba, solo sus cartas). Activar o desactivar desde una liga de prueba se rechaza, porque sus cartas son solo de esa liga.
+  - **Errores:** cualquier error (como un nombre repetido en la colección destino, que el trigger dice con claridad) deshace todo.
+- **Añadir y quitar en el editor de colección:** usan la misma función, así que el movimiento es una transacción y el aviso de nombre repetido es el mismo.
+- **Selección** (`js/slr/seleccion.js`):
+  - Vale para cualquier lista con `[data-sel-id]` (el id del diseño). Las marcas se reponen solas al repintar (filtros, páginas, bloques) con un `MutationObserver`.
+  - El clic se intercepta en captura: en modo selección marca en vez de abrir. Los botones de cada fila (Dar a…, Dejar libre) siguen funcionando.
+  - Pulsación larga de 450 ms, que se cancela si el dedo se mueve más de 10 px.
+  - Las listas con selección llevan `.slr-seleccionable`, que `carta.js` trata como «arrastre propio»: ahí las cartas no se levantan ni con el ratón ni con el dedo.
+  - Solo aparece con el modo pruebas activo.
+- **Tests:**
+  - `api-paso10`: edición múltiple, 44/44 en total.
+  - `banco/colecciones`: añadir y mover, quitar, selección (rango, Ctrl, todas, quitar), edición con la pregunta de las stats y el resumen, y pulsación larga sin levantar. 33/33.
+  - Ajustes: `generador-sql` (tope 101) y el nombre de prueba en `api-paso7`.
+  - En `banco/colecciones`, la colección de prueba se llama «Siesta» para no confundirse con «Dormidito», que ya existe.
 

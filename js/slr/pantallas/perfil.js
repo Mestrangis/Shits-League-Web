@@ -166,7 +166,7 @@ function contadorBombo(b) {
 
 // Borra del catálogo las cartas beta sin foto (slr_admin_borrar_disenos): antes
 // cuenta lo que se borraría (solo_contar) y pide escribir BORRAR
-const PLURAL_TIPO = { individual: 'individuales', duo: 'dúos', trio: 'tríos', grupo: 'grupos', especial: 'especiales', unica: 'únicas' };
+const PLURAL_TIPO = { individual: 'individuales', duo: 'dúos', trio: 'tríos', grupo: 'grupos', especial: 'especiales' };
 async function borrarBeta(boton, ctx) {
   const filtro = { liga_id: ctx.datos.liga.id, beta: true, sin_foto: true };
   const plural = (n, uno, varios) => `${miles(n)} ${n === 1 ? uno : varios}`;

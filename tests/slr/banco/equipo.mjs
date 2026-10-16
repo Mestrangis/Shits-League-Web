@@ -67,7 +67,7 @@ try {
   await cdp('Page.reload', {});
   await esperar(`!!document.getElementById('rushJugar')`, 30000);
   await clic('#rushJugar');
-  await esperar(`!!document.querySelector('.slr-franja')`, 20000);
+  await esperar(`!!document.querySelector('.slr-franja')`, 45000);   // con dos jornadas jugadas puede tardar
   await dormir(800);
 
   console.log('\nPestaña Equipo');
@@ -279,7 +279,7 @@ try {
     window.fetch = (u, o) => { if (!String(u).includes('slr_admin_borrar_disenos')) return f(u, o);
       const b = JSON.parse(o.body); if (!b.solo_contar) { window.__borrados++; return Promise.resolve(new Response('{}', { status: 500 })); }
       return Promise.resolve(new Response(JSON.stringify({ solo_contar: true, disenos: 283, cartas: 283, quedan: 51,
-        por_tipo: { individual: 250, duo: 24, trio: 8, unica: 1 }, equipos: [{ nombre: 'CD Ejemplo', pierde: 3, quedan: 8 }], borrado: {} }),
+        por_tipo: { individual: 250, duo: 24, trio: 8, grupo: 1 }, equipos: [{ nombre: 'CD Ejemplo', pierde: 3, quedan: 8 }], borrado: {} }),
         { status: 200, headers: { 'Content-Type': 'application/json' } })); }; return 0; })()`);
   await clic('[data-pruebas=borrar-beta]');
   await esperar(`!!document.querySelector('.slr-confirmar input')`);

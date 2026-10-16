@@ -15,6 +15,8 @@ import { esc, hoja, cerrarCapa, conEspera, toast, monedas, miles, scrollDeHoja }
 import { cartaHTML, normalizarCarta, TIPOS, ACABADOS, RAREZAS } from '../carta.js';
 import { listaColecciones } from '../colecciones.js';
 import { precargar, urlFoto } from '../imagenes.js';
+import { seleccionMultiple } from '../seleccion.js';
+import { abrirEdicionMultiple } from './edicion-multiple.js';
 
 const TAMANOS = [24, 48, 96, 0];          // 0 = todas
 const CLAVE_TAMANO = 'SLR_PLANTILLAS_POR_PAGINA';
@@ -24,7 +26,7 @@ function tamanoGuardado() {
 function guardarTamano(n) {
   try { localStorage.setItem(CLAVE_TAMANO, String(n)); } catch { /* sin persistencia */ }
 }
-const ORDEN_TIPO = { especial: 0, grupo: 1, unica: 1, trio: 2, duo: 3, individual: 4 };
+const ORDEN_TIPO = { especial: 0, grupo: 1, trio: 2, duo: 3, individual: 4 };
 const ORDENES = {
   valor:  { texto: 'Valor',  cmp: (a, b) => b.valor - a.valor },
   ovr:    { texto: 'OVR',    cmp: (a, b) => b.ovr - a.ovr || b.valor - a.valor },
@@ -74,6 +76,7 @@ export async function abrirPlantillas(ctx) {
         <label class="slr-por-pagina"><span>Por página</span><select class="slr-input" data-por-pagina>
           ${TAMANOS.map(n => `<option value="${n}" ${n === porPagina ? 'selected' : ''}>${n || 'Todas'}</option>`).join('')}</select></label>
       </div>
+      <div class="slr-seleccion-barra" data-barra-seleccion></div>
       <nav class="slr-paginas" data-paginas aria-label="Páginas"></nav>
       <ul class="slr-plantillas" data-resultados></ul>
       <nav class="slr-paginas" data-paginas aria-label="Páginas"></nav>
@@ -118,7 +121,7 @@ export async function abrirPlantillas(ctx) {
 
   function fila(c) {
     const eq = c.equipo_id ? porEquipo.get(c.equipo_id) : null;
-    return `<li class="slr-plantillas__fila" data-carta="${esc(c.id)}">
+    return `<li class="slr-plantillas__fila" data-carta="${esc(c.id)}" data-sel-id="${esc(c.diseno_id)}">
       <div class="slr-plantillas__carta">${cartaHTML(c, { tam: 'xs', destacar: 'ATA' })}</div>
       <span class="slr-plantillas__texto"><b>${esc(c.nombre)}</b>
         <span class="slr-plantillas__cifras"><span>OVR <b>${c.ovr}</b></span><span>${monedas(c.valor)}</span><span>${esc(TIPOS[c.tipo])}${c.acabado !== 'normal' ? ` · ${esc(ACABADOS[c.acabado] ?? c.acabado)}` : ''}</span></span>
@@ -204,6 +207,12 @@ export async function abrirPlantillas(ctx) {
     filtrar();                    // se queda en la misma página
     cuerpo.scrollTop = scroll;
   }
+
+  // Edición múltiple de los diseños de las cartas seleccionadas
+  seleccionMultiple({
+    contenedor: lista, barra: el.querySelector('[data-barra-seleccion]'), visibles: () => visibles.map(c => c.diseno_id),
+    alAccion: ids => abrirEdicionMultiple(ctx, ids, { alTerminar: despues }),
+  });
 
   let espera = null;
   el.querySelectorAll('[data-f]').forEach(c => c.addEventListener(c.tagName === 'SELECT' ? 'change' : 'input', () => {

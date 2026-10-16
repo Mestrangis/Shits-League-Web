@@ -131,7 +131,7 @@ Si el bombo no llega, nadie se queda sin poder unirse: el reparto tira de las in
 | `portero` | DEF muy alta y ATA muy baja (en S, con la DEF al tope, el ATA no puede bajar tanto) |
 | `equilibrado` | las tres parecidas |
 
-El generador nunca pasa de 97 en las individuales, 99 en los dúos, 100 en los tríos y 101 en los grupos y los especiales. Solo importa en el tier S, y la carta se puede retocar a mano.
+El generador nunca pasa de 101 en ninguna stat, sea cual sea el tipo.
 
 ## Poderes
 
@@ -222,12 +222,17 @@ Una colección agrupa cartas con algo en común (por ejemplo, *Dormidito*: «Mat
 - **En miniatura:** solo el emblema.
 - **El álbum** enseña el progreso de cada colección («Dormidito 3/5») y, al tocarla, filtra por ella. El catálogo y la herramienta de plantillas tienen filtro por colección.
 
-**Gestor:** *Rush → Perfil → Modo pruebas → 🏷 Colecciones*: crear, editar (con vista previa), ver sus cartas y borrar. Al borrar una colección, sus cartas se quedan sin colección. Si eso dejara dos cartas sin colección con el mismo nombre, no se borra y avisa.
+**Gestor:** *Rush → Perfil → Modo pruebas → 🏷 Colecciones*:
+- crear y editar (nombre, color, emblema y descripción), con vista previa en una carta grande y en miniatura;
+- **sus cartas**: la lista, con *Quitar* en cada una, y *＋ Añadir cartas* con un buscador de miniaturas. Si una carta ya está en otra colección, avisa y la mueve;
+- borrar: sus cartas se quedan sin colección. Si eso dejara dos cartas sin colección con el mismo nombre, no se borra y avisa.
+
+Colecciones actuales (16 de octubre de 2026): *Down* (naranja, 8), *Dormidito* (morado, 4), *Seductor* (rojo, 4), *Muerto* (negro, 2) y *Cazatiburones* (azul, 2). Todavía no tienen emblema.
 
 ### Emblemas
 
-- **Formato:** PNG o SVG **de un solo color** (da igual cuál) con **fondo transparente**.
-- **Forma:** cuadrado, de unos **256 × 256** píxeles, con un poco de margen.
+- **Formato:** **PNG transparente monocromo** (un solo color, da igual cuál, sobre fondo transparente) o **SVG** de un solo color.
+- **Forma:** cuadrado, de unos **256 × 256** píxeles, con un poco de margen alrededor del dibujo.
 - **Cómo se pinta:** la app usa la silueta del dibujo como máscara y la pinta con el color de la colección. Un mismo emblema sirve en cualquier color. Lo que no es transparente sale de un solo color plano, así que no sirven fotos ni degradados.
 - **Subida:** con *⬆ Subir emblema* en el gestor (preset `slr_cartas`, como las fotos), o pegando la URL.
 
@@ -286,6 +291,28 @@ Si la subida falla, el formulario lo dice y explica qué revisar. Mientras tanto
 Puedes verlos todos lado a lado, con y sin foto: **Rush → Perfil → Modo pruebas → Muestrario de acabados**.
 
 **Un acabado nuevo** (oro, purpurina…) se pide a quien programe. Hay que añadirlo a la base de datos y crear su efecto. Cada acabado es un archivo independiente, así que no toca a los demás: `js/slr/acabados/` y `css/acabados/`.
+
+## Edición múltiple
+
+En el **catálogo de cartas** y en la **herramienta de plantillas** (con el modo pruebas activo) se pueden cambiar varias cartas a la vez.
+
+**Seleccionar:**
+- con el botón *☑ Seleccionar*: cada carta muestra su casilla y tocarla la marca;
+- en PC, **Ctrl/Cmd+clic** añade o quita una y **Mayús+clic** marca el rango desde la última, como en el explorador de archivos;
+- en el móvil, **mantener pulsada** una carta entra en modo selección (en estas listas las cartas no se levantan);
+- *Seleccionar todas las visibles* marca todas las que pasan los filtros, aunque estén en otra página;
+- *Quitar selección* las desmarca, y el contador dice cuántas hay marcadas.
+
+**Editar:** en *✎ Editar* se elige qué cambiar; lo que se deje en «Sin cambios» no se toca. Se puede cambiar:
+- colección (o «Sin colección»);
+- color (o «El de la colección»);
+- tipo, tier, perfil y acabado;
+- activar o desactivar (no desde una liga de prueba);
+- regenerar stats o regenerar poderes, con semilla nueva.
+
+Si cambias el tier o el perfil sin regenerar las stats, pregunta si regenerarlas también: si no, cada carta conserva las suyas.
+
+Antes de aplicar sale un **resumen**: cuántas cartas cambian, qué cambia y algunos ejemplos («Mateo: tier C→A, rara→épica»), con el valor y la rareza ya recalculados. Se aplica todo de una vez: si algo falla (por ejemplo, un nombre repetido en la colección destino), no cambia ninguna.
 
 ## Desactivar una carta
 

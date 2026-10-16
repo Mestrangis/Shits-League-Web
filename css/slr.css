@@ -1566,3 +1566,38 @@ button.slr-aviso:active { background: rgba(57,255,136,.08) !important; }
 .slr-muestrario__tipos span { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 12px; background: var(--slr-tarjeta); border: 1px solid var(--slr-borde); font-weight: 700; font-size: 13px; }
 .slr-muestrario__tipos i { width: 26px; height: 26px; display: block; }
 .slr-muestrario__tipos svg { width: 100%; height: 100%; fill: currentColor; }
+
+/* ── Selección múltiple (seleccion.js) ───────────────────────────────────── */
+.slr-seleccion { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 10px; border-radius: 12px;
+  background: color-mix(in srgb, var(--slr-rival) 10%, var(--slr-tarjeta)); border: 1px dashed rgba(255,138,61,.5); }
+.slr-seleccion--fuera { background: transparent; border-color: var(--slr-borde); }
+.slr-seleccion--fuera small { font-size: 11px; }
+.slr-seleccion__n { margin-right: auto; font-size: 13px; }
+.slr-seleccion__n b { font-family: 'Anton', sans-serif; font-weight: 400; font-size: 20px; color: var(--slr-rival); margin-right: 3px; }
+.slr-seleccion-barra[hidden] { display: none; }
+/* Casilla en cada elemento (solo en modo selección) */
+.slr-seleccionable [data-sel-id] { position: relative; }
+.slr-seleccionable.en-seleccion [data-sel-id]::after {
+  content: ''; position: absolute; top: 6px; right: 6px; z-index: 5; width: 22px; height: 22px; border-radius: 7px;
+  border: 2px solid #fff; background: rgba(0,0,0,.55); box-shadow: 0 1px 4px rgba(0,0,0,.6); pointer-events: none;
+}
+.slr-seleccionable.en-seleccion [data-sel-id].es-seleccionada::after {
+  background: var(--slr-rival) center / 14px no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M2 8.5l4 4 8-9' fill='none' stroke='%2304130A' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  border-color: var(--slr-rival);
+}
+.slr-seleccionable.en-seleccion [data-sel-id].es-seleccionada { outline: 2px solid var(--slr-rival); outline-offset: 2px; border-radius: 12px; }
+.slr-seleccionable.en-seleccion [data-sel-id] { cursor: pointer; }
+.slr-plantillas__fila[data-sel-id]::after { top: 50%; right: auto; left: 4px; transform: translateY(-50%); }
+.slr-resumen-cambios { display: flex; flex-wrap: wrap; gap: 4px 10px; margin: 6px 0; }
+.slr-edicion-multiple { display: grid; gap: 12px; }
+/* Editor de colección: sus cartas y el buscador */
+.slr-coleccion-cartas { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 6px; }
+.slr-coleccion-cartas li { display: flex; align-items: center; gap: 10px; }
+.slr-coleccion-cartas .slr-ficha { width: 52px; flex: none; }
+.slr-coleccion-cartas li > span { flex: 1; display: grid; }
+.slr-coleccion-cartas small { color: var(--slr-suave); font-size: 11px; }
+.slr-buscador-cartas { display: grid; gap: 10px; }
+.slr-buscador-cartas__carta small { display: grid; font-size: 11px; text-align: center; margin-top: 4px; }
+.slr-buscador-cartas__carta em { font-style: normal; color: var(--slr-rival); }
+.slr-buscador-cartas__carta.es-seleccionada .slr-carta { outline: 3px solid var(--slr-propio); outline-offset: 2px; border-radius: 8px; }
+.slr-buscador-cartas__pie { position: sticky; bottom: 0; padding: 8px 0; background: var(--slr-fondo, #06140B); }

@@ -42,7 +42,7 @@ import { acabado, listaAcabados } from './acabados/index.js';
 import { urlFoto, cargarFotos } from './imagenes.js';
 import { coleccion, urlEmblema } from './colecciones.js';
 
-export const TIPOS = { individual: 'Individual', duo: 'Dúo', trio: 'Trío', grupo: 'Grupo', especial: 'Especial', unica: 'Única' };
+export const TIPOS = { individual: 'Individual', duo: 'Dúo', trio: 'Trío', grupo: 'Grupo', especial: 'Especial' };
 // Rareza: sale del tier (igual que la columna generada disenos_carta.rareza)
 export const RAREZAS = { comun: 'Común', rara: 'Rara', epica: 'Épica', legendaria: 'Legendaria' };
 export const rarezaDeTier = t => ({ S: 'legendaria', A: 'epica', B: 'rara', C: 'rara' })[t] ?? 'comun';
@@ -120,10 +120,9 @@ export const ICONOS_TIPO = {
   trio: persona(5.5, 10, .72) + persona(18.5, 10, .72) + persona(12, 8, .85),
   grupo: persona(5, 7, .62) + persona(12, 6, .62) + persona(19, 7, .62) + persona(8.5, 13, .62) + persona(15.5, 13, .62),
   especial: '<path d="M12 2.5l2.7 6.3 6.8.6-5.2 4.5 1.6 6.7L12 17.1l-5.9 3.5 1.6-6.7-5.2-4.5 6.8-.6z"/>',
-  unica: persona(12, 8, 1.15),
 };
 export const iconoTipo = tipo => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONOS_TIPO[tipo] ?? ICONOS_TIPO.individual}</svg>`;
-const PERSONAS_TIPO = { individual: 1, duo: 2, trio: 3, grupo: 3, especial: 0, unica: 1 };
+const PERSONAS_TIPO = { individual: 1, duo: 2, trio: 3, grupo: 3, especial: 0 };
 
 function arte(c) {
   if (c.imagen_url) {
@@ -410,8 +409,9 @@ export function iniciarAcabados(raiz) {
 }
 
 /* ── Interacción: levantar la carta (ratón o pulsación larga) ────────────── */
-// En la alineación las cartas se arrastran para colocarlas (alineacion.js)
-const CON_ARRASTRE_PROPIO = '.slr-hueco, .slr-libre, .slr-campo-juego, .slr-quietas';
+// En la alineación las cartas se arrastran para colocarlas (alineacion.js); en las listas con
+// selección múltiple (seleccion.js) la pulsación larga selecciona en vez de levantar
+const CON_ARRASTRE_PROPIO = '.slr-hueco, .slr-libre, .slr-campo-juego, .slr-quietas, .slr-seleccionable';
 const PULSACION_MS = 300;                 // dedo: mantener pulsado para levantar
 const UMBRAL_DEDO = 10, UMBRAL_RATON = 5;
 let levantada = null;   // { carta, id, tipo, x0, y0, dx, dy, ultX, ultT, giro, activa, frame, temporizador, copia }

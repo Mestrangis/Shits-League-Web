@@ -11,6 +11,8 @@
    dueño. Tocar una carta abre su detalle normal (con «Editar carta» del admin
    en modo pruebas); un diseño sin ejemplar en la liga (desactivado antes de un
    reinicio) abre una ficha del diseño con lo mismo.
+   Edición múltiple (modo pruebas): «Seleccionar» (o Ctrl/Cmd+clic, Mayús+clic,
+   pulsación larga) y «Editar» abre edicion-multiple.js con las seleccionadas.
 ═══════════════════════════════════════════════ */
 import { leer } from '../api.js';
 import { esc, hoja, miles, monedas, scrollDeHoja, toast } from '../ui.js';
@@ -21,9 +23,11 @@ import { configLiga } from '../rush.js';
 import { rejillaPorBloques } from '../bloques.js';
 import { abrirDetalle, barras, poderes } from './detalle.js';
 import { abrirEditorCarta } from './editor-carta.js';
+import { seleccionMultiple } from '../seleccion.js';
+import { abrirEdicionMultiple } from './edicion-multiple.js';
 
 const TIERS = ['S', 'A', 'B', 'C', 'D', 'E', 'F'];
-const ORDEN_TIPO = { especial: 0, grupo: 1, unica: 1, trio: 2, duo: 3, individual: 4 };
+const ORDEN_TIPO = { especial: 0, grupo: 1, trio: 2, duo: 3, individual: 4 };
 const ORDEN_RAREZA = { legendaria: 0, epica: 1, rara: 2, comun: 3 };
 const ORDENES = {
   valor:  ['Valor', (a, b) => b.valor - a.valor],
@@ -42,19 +46,24 @@ export async function abrirCatalogo(ctx) {
   const { datos } = ctx;
   const liga = datos.liga.id, miEquipo = datos.equipo?.id;
   const CAMPOS = 'id,nombre,tipo,acabado,color,tier,rareza,coleccion_id,perfil,personas,ata,def,con,valor,poderes,imagen_url,texto,activo,liga_prueba_id,creado_en';
-  const [disenos, ejemplares, equipos] = await Promise.all([
-    leer(`disenos_carta?select=${CAMPOS}&or=(liga_prueba_id.is.null,liga_prueba_id.eq.${liga})&limit=5000`),
-    leer(`cartas?select=id,diseno_id,equipo_id&liga_id=eq.${liga}&limit=5000`),
-    leer(`equipos?select=id,nombre&liga_id=eq.${liga}`),
-  ]);
-  const ejemplarDe = new Map(ejemplares.map(c => [c.diseno_id, c]));
-  const nombreEquipo = new Map(equipos.map(e => [e.id, e.nombre]));
-  const todas = disenos.map(d => {
-    const ej = ejemplarDe.get(d.id);
-    // Las creadas en esta liga de prueba nacen inactivas (no llegan a las ligas reales), pero aquí juegan
-    return { ...normalizarCarta(d), id: ej?.id ?? `diseno-${d.id}`, diseno_id: d.id, activo: d.activo || !!d.liga_prueba_id, creado_en: d.creado_en,
-             ejemplar: !!ej, dueno: ej?.equipo_id ?? null, clave: sinAcentos(d.nombre) };
-  });
+  let todas = [], nombreEquipo = new Map(), visiblesAhora = [];
+  // También tras una edición múltiple
+  async function cargarDatos() {
+    const [disenos, ejemplares, equipos] = await Promise.all([
+      leer(`disenos_carta?select=${CAMPOS}&or=(liga_prueba_id.is.null,liga_prueba_id.eq.${liga})&limit=5000`),
+      leer(`cartas?select=id,diseno_id,equipo_id&liga_id=eq.${liga}&limit=5000`),
+      leer(`equipos?select=id,nombre&liga_id=eq.${liga}`),
+    ]);
+    const ejemplarDe = new Map(ejemplares.map(c => [c.diseno_id, c]));
+    nombreEquipo = new Map(equipos.map(e => [e.id, e.nombre]));
+    todas = disenos.map(d => {
+      const ej = ejemplarDe.get(d.id);
+      // Las creadas en esta liga de prueba nacen inactivas (no llegan a las ligas reales), pero aquí juegan
+      return { ...normalizarCarta(d), id: ej?.id ?? `diseno-${d.id}`, diseno_id: d.id, activo: d.activo || !!d.liga_prueba_id, creado_en: d.creado_en,
+               ejemplar: !!ej, dueno: ej?.equipo_id ?? null, clave: sinAcentos(d.nombre) };
+    });
+  }
+  await cargarDatos();
 
   const opciones = (lista, actual) => lista.map(([v, t]) => `<option value="${esc(v)}" ${v === actual ? 'selected' : ''}>${esc(t)}</option>`).join('');
   const el = hoja(`
@@ -74,13 +83,14 @@ export async function abrirCatalogo(ctx) {
       </div>
       <label class="slr-interruptor"><input type="checkbox" data-inactivas ${filtro.inactivas ? 'checked' : ''}>Incluir las inactivas</label>
       <p class="slr-plantillas-admin__total" data-total></p>
+      <div class="slr-seleccion-barra" data-barra-seleccion></div>
       <div class="slr-rejilla slr-rejilla--catalogo" data-rejilla></div>
     </div>`, { titulo: 'Catálogo de cartas', completa: true });
 
   const rejilla = el.querySelector('[data-rejilla]');
   const quien = c => !c.ejemplar ? 'Sin ejemplar en la liga' : !c.dueno ? 'Libre' : c.dueno === miEquipo ? 'Tuya' : nombreEquipo.get(c.dueno) ?? 'Otro equipo';
   const ficha = c => `
-    <button class="slr-ficha slr-ficha--catalogo${c.activo ? '' : ' es-inactiva'}" type="button" data-id="${esc(c.id)}">
+    <button class="slr-ficha slr-ficha--catalogo${c.activo ? '' : ' es-inactiva'}" type="button" data-id="${esc(c.id)}" data-sel-id="${esc(c.diseno_id)}">
       ${cartaHTML(c, { tam: 's' })}
       <span class="slr-ficha__album">
         <span>${esc(RAREZAS[c.rareza])} · ${c.tier ? `Tier ${esc(c.tier)} · ` : ''}${esc(PERFILES[c.perfil] ?? c.perfil ?? '')}${coleccion(c.coleccion_id) ? ` · ${esc(coleccion(c.coleccion_id).nombre)}` : ''}${c.activo ? '' : ' · <b class="slr-rival">Inactiva</b>'}</span>
@@ -119,8 +129,18 @@ export async function abrirCatalogo(ctx) {
       .sort((a, b) => ORDENES[filtro.orden][1](a, b) || ORDEN_TIPO[a.tipo] - ORDEN_TIPO[b.tipo] || a.nombre.localeCompare(b.nombre, 'es'));
     el.querySelector('[data-total]').textContent = lista.length === base.length
       ? `Mostrando todas (${miles(lista.length)})` : `${miles(lista.length)} de ${miles(base.length)} con estos filtros`;
+    visiblesAhora = lista.map(c => c.diseno_id);
     bloques.poner(lista, '<p class="slr-suave">Ninguna carta con esos filtros.</p>');
   }
+
+  // Edición múltiple: solo con el modo pruebas (como el resto de herramientas de admin)
+  const barraSel = el.querySelector('[data-barra-seleccion]');
+  if (configLiga().modo_beta === true) {
+    seleccionMultiple({
+      contenedor: rejilla, barra: barraSel, visibles: () => visiblesAhora,
+      alAccion: ids => abrirEdicionMultiple(ctx, ids, { alTerminar: async () => { await cargarDatos(); pintar(); } }),
+    });
+  } else barraSel.hidden = true;
 
   rejilla.addEventListener('click', e => {
     const id = e.target.closest('[data-id]')?.dataset.id;

@@ -55,7 +55,7 @@ export function abrirMuestrario(ctx) {
       <section class="slr-muestrario__acabado" data-muestra="tipos">
         <h3 class="slr-subtitulo">Tipos <small>solo descriptivo: un icono bajo la media</small></h3>
         <div class="slr-muestrario__tipos">
-          ${Object.entries(TIPOS).filter(([k]) => k !== 'unica').map(([k, v]) => `<span><i>${iconoTipo(k)}</i>${esc(v)}</span>`).join('')}
+          ${Object.entries(TIPOS).map(([k, v]) => `<span><i>${iconoTipo(k)}</i>${esc(v)}</span>`).join('')}
         </div>
       </section>
       <section class="slr-muestrario__acabado" data-muestra="colecciones">

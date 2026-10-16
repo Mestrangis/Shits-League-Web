@@ -56,7 +56,7 @@ try {
     const s = b.stats;
     console.log(`Sobre ${b.tipo} (precio ${PRECIO[b.tipo].toLocaleString('es-ES')})${b.tipo === 'eleccion' ? ' — cuenta las 3 candidatas de cada sobre' : ''}`);
     console.log(`  Cartas: ${s.cartas}`);
-    console.log(`  Tipo:     ${['individual', 'duo', 'trio', 'unica'].map(t => `${t} ${pct(s.tipos[t] ?? 0, s.cartas)}`).join(' · ')}`);
+    console.log(`  Tipo:     ${['individual', 'duo', 'trio', 'grupo', 'especial'].map(t => `${t} ${pct(s.tipos[t] ?? 0, s.cartas)}`).join(' · ')}`);
     const medio = s.valorRecibido / N;
     console.log(`  Valor medio recibido por sobre: ${medio.toFixed(0)} (${(100 * medio / PRECIO[b.tipo]).toFixed(0)} % del precio)` +
       (b.tipo === 'eleccion' ? ` · eligiendo la de más valor; valor medio de una candidata: ${(s.valorCandidatas / N).toFixed(0)}` : ''));

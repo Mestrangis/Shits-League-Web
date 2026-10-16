@@ -5,6 +5,8 @@
 //   (sus cartas se quedan sin colección), y solo dentro de su liga de prueba.
 // · Nombre de carta único dentro de su colección (y entre las que no tienen).
 // · Tipos grupo y especial.
+// · Edición múltiple: recuento sin aplicar, una transacción, triggers (valor,
+//   rareza, regenerar), alcance y nombres repetidos.
 // · Sobres por rareza: el básico nunca da legendarias (peso 0); la garantía
 //   premium da al menos una rara o superior; las subastas de la tanda solo
 //   sacan rarezas con peso; la configuración tiene los pesos por rareza.
@@ -91,6 +93,53 @@ try {
   check(b.borrada === 'Down' && b.cartas_sin_coleccion === 3, `borrada «Down»: sus ${b.cartas_sin_coleccion} cartas se quedan sin colección`);
   check((await leer(`disenos_carta?select=coleccion_id&id=eq.${m2.id}`)).datos[0].coleccion_id === null && (await leer(`colecciones?select=id&id=eq.${k2.id}`)).datos.length === 0,
     'y siguen existiendo, sin colección');
+
+  seccion('Edición múltiple (slr_admin_editar_disenos)');
+  {
+    const k3 = await rpcOk('slr_admin_guardar_coleccion', { token: U.token, liga_id: L, coleccion: { nombre: 'Seductor', color: 'rojo' } });
+    const mk = async (nombre, extra = {}) => (await rpcOk('slr_admin_guardar_diseno', { token: U.token, liga_id: L, diseno: { ...base, nombre, ...extra } })).id;
+    const ids = [await mk('Multi Uno'), await mk('Multi Dos'), await mk('Multi Tres')];
+    const leerDs = async () => (await leer(`disenos_carta?select=id,nombre,tier,rareza,perfil,ata,def,con,poderes,valor,coleccion_id,color,tipo,acabado&id=in.(${ids.join(',')})&order=nombre`)).datos;
+    const antes = await leerDs();
+    rechaza(await rpc('slr_admin_editar_disenos', { token: D.token, liga_id: L, ids, cambios: { tier: 'B' } }), 'administrador', 'solo el admin');
+    rechaza(await rpc('slr_admin_editar_disenos', { token: U.token, liga_id: L, ids: [], cambios: { tier: 'B' } }), 'ninguna carta', 'sin cartas: rechazado');
+    rechaza(await rpc('slr_admin_editar_disenos', { token: U.token, liga_id: L, ids, cambios: {} }), 'al menos un cambio', 'sin cambios: rechazado');
+    rechaza(await rpc('slr_admin_editar_disenos', { token: U.token, liga_id: L, ids, cambios: { valor: 9 } }), 'desconocido', 'campo desconocido: rechazado');
+    rechaza(await rpc('slr_admin_editar_disenos', { token: U.token, liga_id: L, ids, cambios: { activo: false } }), 'no se activan', 'activar/desactivar desde una liga de prueba: rechazado');
+    const comun = (await leer('disenos_carta?select=id&liga_prueba_id=is.null&limit=1')).datos[0].id;
+    rechaza(await rpc('slr_admin_editar_disenos', { token: U.token, liga_id: L, ids: [...ids, comun], cambios: { tier: 'B' } }), 'no se pueden editar desde esta liga',
+      'una carta del catálogo común desde una liga de prueba: rechazado (y no se toca nada)');
+    // Recuento sin aplicar
+    const prev = await rpcOk('slr_admin_editar_disenos', { token: U.token, liga_id: L, ids, cambios: { tier: 'B', coleccion_id: k3.id, acabado: 'foil' }, solo_contar: true });
+    check(prev.solo_contar && prev.cartas === 3 && prev.cambian === 3 && prev.por_campo.tier === 3 && prev.por_campo.rareza === 3 && prev.por_campo.coleccion === 3 && !prev.por_campo.stats,
+      `recuento: 3 cambian (${Object.entries(prev.por_campo).map(([k, n]) => `${k} ${n}`).join(', ')}) · «${prev.ejemplos[0]}»`);
+    check(JSON.stringify(await leerDs()) === JSON.stringify(antes), 'el recuento no cambia nada');
+    // Aplicar: tier B (rara) sin regenerar → mismas stats; colección y acabado
+    const r1 = await rpcOk('slr_admin_editar_disenos', { token: U.token, liga_id: L, ids, cambios: { tier: 'B', coleccion_id: k3.id, acabado: 'foil' } });
+    const tras1 = await leerDs();
+    check(r1.cambian === 3 && tras1.every((d, i) => d.tier === 'B' && d.rareza === 'rara' && d.coleccion_id === k3.id && d.acabado === 'foil'
+      && d.ata === antes[i].ata && d.def === antes[i].def && d.con === antes[i].con), 'aplicado: tier B → rareza rara, colección y acabado; las stats se quedan');
+    // Regenerar stats y poderes: semilla nueva y valor recalculado
+    const r2 = await rpcOk('slr_admin_editar_disenos', { token: U.token, liga_id: L, ids, cambios: { regenerar_stats: true, regenerar_poderes: true } });
+    const tras2 = await leerDs();
+    const ovr = d => { const v = [d.ata, d.def, d.con].sort((a, b) => b - a); return 0.6 * v[0] + 0.25 * v[1] + 0.15 * v[2]; };
+    check(r2.por_campo.stats >= 2 && tras2.every(d => ovr(d) >= 72 && ovr(d) < 78), `regenerar: stats nuevas en ${r2.por_campo.stats} cartas, con el OVR del tier B (72–78)`);
+    // Color «el de la colección» (null), tipo y perfil
+    await rpcOk('slr_admin_editar_disenos', { token: U.token, liga_id: L, ids: ids.slice(0, 1), cambios: { color: 'azul' } });
+    const r3 = await rpcOk('slr_admin_editar_disenos', { token: U.token, liga_id: L, ids, cambios: { color: null, tipo: 'grupo', perfil: 'defensa' } });
+    const tras3 = await leerDs();
+    check(r3.por_campo.color === 1 && tras3.every(d => d.color === null && d.tipo === 'grupo' && d.perfil === 'defensa'), 'color «el de la colección», tipo y perfil para todas');
+    // Quitar la colección
+    await rpcOk('slr_admin_editar_disenos', { token: U.token, liga_id: L, ids: ids.slice(2), cambios: { coleccion_id: null } });
+    check((await leerDs()).find(d => d.id === ids[2]).coleccion_id === null, 'quitar la colección de una');
+    // Un nombre repetido en la colección destino: falla todo (una sola transacción)
+    const choque = await mk('Multi Uno', { coleccion_id: null });
+    const nombreAntes = (await leerDs()).map(d => d.coleccion_id).join();
+    rechaza(await rpc('slr_admin_editar_disenos', { token: U.token, liga_id: L, ids: [ids[2], choque], cambios: { coleccion_id: k3.id } }),
+      'Ya hay una carta «Multi Uno» en la colección Seductor', 'nombre repetido al cambiar de colección: rechazado con un mensaje claro');
+    check((await leerDs()).map(d => d.coleccion_id).join() === nombreAntes &&
+          (await leer(`disenos_carta?select=coleccion_id&id=eq.${choque}`)).datos[0].coleccion_id === null, 'y no se aplica nada');
+  }
 
   seccion('Sobres por rareza');
   const libres = async () => (await leer(`cartas?select=id,equipo_id,disenos_carta(rareza,activo)&liga_id=eq.${L}&limit=5000`)).datos

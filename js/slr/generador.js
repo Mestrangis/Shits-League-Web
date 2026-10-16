@@ -23,8 +23,8 @@ export const COLORES = Object.freeze({
   verde: 'Verde', morado: 'Morado', azul: 'Azul', rojo: 'Rojo',
   naranja: 'Naranja', dorado: 'Dorado', plata: 'Plata', negro: 'Negro',
 });
-// Stat máxima según el tipo de carta
-export const MAX_STAT = Object.freeze({ individual: 97, duo: 99, trio: 100, grupo: 101, especial: 101, unica: 101 });
+// Stat máxima: la misma para todos los tipos (el tipo no da ventajas)
+export const MAX_STAT_CARTA = 101;
 
 // Probabilidades [p1, p2, p3] que propone el generador (calibradas para ~5
 // activaciones por partido entre equipos con dúos y tríos; ver DECISIONES.md)
@@ -87,7 +87,7 @@ export function generarStats(tier, perfil, tipo, semilla) {
     const resto = ['ATA', 'DEF', 'CON'].filter(x => x !== principal);
     orden = [principal, ...(r(2) ? resto : [resto[1], resto[0]])];
   }
-  const cap = MAX_STAT[tipo] ?? 97;
+  const cap = MAX_STAT_CARTA;   // `tipo` se conserva en la firma (gemelo de generar_stats)
   // s1 = T + ⌈(0,40·d1 + 0,15·d2)⌉ → OVR en [T, T+1). Si pasa del tope, se
   // estrechan las diferencias hasta que quepa: primero d2 (en el portero,
   // primero d1, para que su ATA siga siendo la más baja posible).
