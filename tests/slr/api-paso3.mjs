@@ -218,8 +218,8 @@ try {
     tanda0 = await subastasAbiertas(L);
     const cs = await cartasLiga(L);
     check(t.tandas_abiertas === 1 && tanda0.length === 8, `se abre la tanda del día con 8 cartas`);
-    check(tanda0.every(s => { const c = cs.find(x => x.id === s.carta_id); return !c.equipo_id && c.disenos_carta.tipo !== 'unica'; }),
-      'todas libres y ninguna Única');
+    check(tanda0.every(s => { const c = cs.find(x => x.id === s.carta_id); return !c.equipo_id && !!c.disenos_carta.rareza; }),
+      'todas libres (y de rarezas con peso en las subastas)');
     check((await tareas(T0.toISOString())).tandas_abiertas === 0, 'idempotente: otra ejecución el mismo día no abre otra tanda');
 
     const valor = s => cs.find(x => x.id === s.carta_id).disenos_carta.valor;
@@ -299,35 +299,37 @@ try {
     rechaza(await rpc('slr_comprar_sobre', { token: B3.token, liga_id: L, tipo: 'basico' }), 'Saldo insuficiente', 'sobre sin saldo: rechazado');
     await darDinero(B3, s3 - 100);
 
-    // Garantía premium: se fuerza la primera carta a dúo o superior tras 2 sin especial
+    // Garantía premium: se fuerza la primera carta a rara o superior tras 2 sin ninguna (si queda alguna libre)
     await darDinero(B2, 200000);
     let vista = false, n = 0, contadorOk = true;
     while (!vista && n < 120) {   // con el catálogo corto salen más especiales: hacen falta más sobres
       await bajarA(B2, 12);
       const enSub = new Set((await subastasAbiertas(L)).map(s => s.carta_id));
       const cont = (await leer(`equipos?select=contador_garantia_premium&id=eq.${B2.equipo}`)).datos[0].contador_garantia_premium;
+      const hayRara = (await cartasLiga(L)).some(c => !c.equipo_id && !c.reservada_por && !enSub.has(c.id) && c.disenos_carta.rareza !== 'comun');
       const p = await rpcOk('slr_comprar_sobre', { token: B2.token, liga_id: L, tipo: 'premium' });
       n++;
       if (p.cartas.some(c => enSub.has(c.id))) contadorOk = false;
-      const especial = p.cartas.some(c => c.tipo !== 'individual');
+      const especial = p.cartas.some(c => c.rareza !== 'comun');
       const contDespues = (await leer(`equipos?select=contador_garantia_premium&id=eq.${B2.equipo}`)).datos[0].contador_garantia_premium;
       if (contDespues !== (especial ? 0 : cont + 1)) contadorOk = false;
       if (cont >= 2) {
         vista = true;
-        check(p.garantia_aplicada && p.cartas[0].tipo !== 'individual',
-          `garantía premium: con el contador en ${cont}, la primera carta es ${p.cartas[0].tipo} (sobre nº ${n})`);
+        if (hayRara) check(p.garantia_aplicada && p.cartas[0].rareza !== 'comun',
+          `garantía premium: con el contador en ${cont}, la primera carta es ${p.cartas[0].rareza} (sobre nº ${n})`);
+        else check(!p.garantia_aplicada, `con el contador en ${cont} pero sin raras o superiores libres, no se aplica (sobre nº ${n})`);
       } else if (p.garantia_aplicada) contadorOk = false;
     }
     check(vista, 'se llegó a aplicar la garantía premium');
-    check(contadorOk, `el contador vuelve a 0 con un dúo o mejor y si no suma 1; ninguna carta en subasta (${n} sobres premium)`);
+    check(contadorOk, `el contador vuelve a 0 con una rara o mejor y si no suma 1; ninguna carta en subasta (${n} sobres premium)`);
 
     // Sobre de elección: manual
     await bajarA(B3, 13);
     await darDinero(B3, 10000);
     const e1 = await rpcOk('slr_comprar_sobre', { token: B3.token, liga_id: L, tipo: 'eleccion' });
-    const libresEsp = (await cartasLiga(L)).some(c => !c.equipo_id && c.disenos_carta.tipo !== 'individual');
+    const libresEsp = (await cartasLiga(L)).some(c => !c.equipo_id && c.disenos_carta.rareza !== 'comun');
     check(e1.pendiente_eleccion && e1.cartas.length === 3, 'sobre de elección: 3 candidatas pendientes');
-    check(!libresEsp || e1.cartas.some(c => c.tipo !== 'individual'), 'al menos una candidata es dúo o superior');
+    check(!libresEsp || e1.cartas.some(c => c.rareza !== 'comun'), 'al menos una candidata es rara o superior');
     const cs = await cartasLiga(L);
     check(e1.cartas.every(c => cs.find(x => x.id === c.id).reservada_por === e1.sobre_id), 'las 3 quedan reservadas');
     const yo = await rpcOk('slr_yo', { token: B3.token });

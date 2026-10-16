@@ -21,7 +21,7 @@ export async function abrirEquipo(equipoId, ctx) {
     // RLS: solo se ven los partidos publicados
     leer(`partidos?select=id,jornada_id,local_id,visitante_id,goles_local,goles_visitante,alineaciones_congeladas,simulado_en,jornadas(numero)` +
       `&tipo=eq.liga&or=(local_id.eq.${equipoId},visitante_id.eq.${equipoId})&order=simulado_en.desc&limit=5`),
-    leer(`cartas?select=id,diseno_id,equipo_id,multiplicador_clausula,blindada_hasta,disenos_carta(nombre,tipo,acabado,color,tier,perfil,personas,ata,def,con,valor,poderes,imagen_url,texto)&equipo_id=eq.${equipoId}`),
+    leer(`cartas?select=id,diseno_id,equipo_id,multiplicador_clausula,blindada_hasta,disenos_carta(nombre,tipo,acabado,color,tier,rareza,coleccion_id,perfil,personas,ata,def,con,valor,poderes,imagen_url,texto)&equipo_id=eq.${equipoId}`),
     leer(`equipos?select=id,nombre&liga_id=eq.${datos.liga.id}`),
   ]);
   if (!eq) { toast('Ese equipo ya no existe', 'error'); return; }

@@ -2,7 +2,8 @@
    SHITS LEAGUE RUSH — álbum (desde Perfil)
    Todas las cartas que has tenido alguna vez en esta liga (tabla album), aunque
    ya no sean tuyas, sin huecos vacíos: "X de Y desbloqueadas", filtros por tipo
-   y acabado, orden por fecha o valor, y en cada carta cómo y cuándo la
+   y acabado, progreso por colección («Dormidito 3/5», que filtra al tocarlo),
+   orden por fecha o valor, y en cada carta cómo y cuándo la
    conseguiste y quién la tiene ahora. Tocar una carta abre su detalle.
    Hasta TODAS_DE_GOLPE cartas se pintan todas; con más, por bloques al hacer
    scroll, y las fotos del bloque siguiente se precargan antes de llegar.
@@ -10,6 +11,7 @@
 import { leer } from '../api.js';
 import { esc, hoja, fechaCorta, miles, scrollDeHoja } from '../ui.js';
 import { cartaHTML, normalizarCarta, TIPOS, ACABADOS } from '../carta.js';
+import { listaColecciones, urlEmblema } from '../colecciones.js';
 import { rejillaPorBloques } from '../bloques.js';
 import { abrirDetalle } from './detalle.js';
 
@@ -26,14 +28,15 @@ export async function abrirAlbum(ctx) {
   const liga = datos.liga.id, yo = datos.yo.usuario.id, miEquipo = datos.equipo?.id;
   const [entradas, total, equipos] = await Promise.all([
     leer(`album?select=diseno_id,via_adquisicion,primera_vez_en&usuario_id=eq.${yo}&liga_id=eq.${liga}`),
-    leer('disenos_carta?select=id&activo=eq.true'),
+    // Las activas del catálogo común y, en una liga de prueba, las creadas en ella (nacen inactivas)
+    leer(`disenos_carta?select=id,coleccion_id&or=(and(activo.eq.true,liga_prueba_id.is.null),liga_prueba_id.eq.${liga})&limit=5000`),
     leer(`equipos?select=id,nombre&liga_id=eq.${liga}`),
   ]);
   // Los ejemplares de la liga (uno por diseño) y se quedan los del álbum: con
   // cientos de entradas, una lista de ids en la URL sería demasiado larga
   const porDiseno = new Map(entradas.map(e => [e.diseno_id, e]));
   const cartas = entradas.length
-    ? (await leer(`cartas?select=id,diseno_id,equipo_id,disenos_carta(nombre,tipo,acabado,color,tier,perfil,personas,ata,def,con,valor,poderes,imagen_url,texto)` +
+    ? (await leer(`cartas?select=id,diseno_id,equipo_id,disenos_carta(nombre,tipo,acabado,color,tier,rareza,coleccion_id,perfil,personas,ata,def,con,valor,poderes,imagen_url,texto)` +
         `&liga_id=eq.${liga}&limit=5000`)).filter(f => porDiseno.has(f.diseno_id))
     : [];
   const items = cartas.map(f => {
@@ -42,7 +45,19 @@ export async function abrirAlbum(ctx) {
   });
   const quien = id => (!id ? 'Libre' : id === miEquipo ? 'Tuya' : equipos.find(e => e.id === id)?.nombre ?? 'Otro equipo');
 
-  const filtro = { tipo: '', acabado: '', orden: 'fecha' };
+  const filtro = { tipo: '', acabado: '', coleccion: '', orden: 'fecha' };
+  // Progreso por colección: las del álbum de cada una sobre las activas que tiene
+  const progreso = listaColecciones().map(k => ({
+    ...k, tengo: items.filter(c => c.coleccion_id === k.id).length, de: total.filter(d => d.coleccion_id === k.id).length,
+  })).filter(k => k.de > 0 || k.tengo > 0);
+  const colecciones = progreso.length ? `
+    <div class="slr-album__colecciones" data-filtro="coleccion">
+      <button type="button" data-v="" class="activo"><b>Todas</b></button>
+      ${progreso.map(k => `<button type="button" data-v="${esc(k.id)}" class="${k.color ? `slr-col-${esc(k.color)}` : ''}${k.tengo >= k.de ? ' es-completa' : ''}">
+        ${k.emblema_url ? `<i style="--emblema:url(&quot;${esc(urlEmblema(k.emblema_url, 64))}&quot;)"></i>` : ''}
+        <b>${esc(k.nombre)}</b><small>${k.tengo}/${k.de}</small><span><s style="width:${k.de ? Math.round(100 * k.tengo / k.de) : 0}%"></s></span>
+      </button>`).join('')}
+    </div>` : '';
   const tipos = [...new Set(items.map(c => c.tipo))];
   const acabados = [...new Set(items.map(c => c.acabado))];
   const chips = (campo, valores, nombres) => `
@@ -56,6 +71,7 @@ export async function abrirAlbum(ctx) {
       <p class="slr-album__contador"><b>${items.length}</b> de <b>${total.length}</b> desbloqueadas
         <span><i style="width:${total.length ? Math.round(100 * items.length / total.length) : 0}%"></i></span></p>
       ${items.length ? `
+        ${colecciones}
         ${chips('tipo', tipos, TIPOS)}
         ${acabados.length > 1 ? chips('acabado', acabados, ACABADOS) : ''}
         <div class="slr-segmentos" data-orden>
@@ -78,7 +94,8 @@ export async function abrirAlbum(ctx) {
   function pintarRejilla() {
     if (!rejilla) return;
     bloques.poner(items
-      .filter(c => (!filtro.tipo || c.tipo === filtro.tipo) && (!filtro.acabado || c.acabado === filtro.acabado))
+      .filter(c => (!filtro.tipo || c.tipo === filtro.tipo) && (!filtro.acabado || c.acabado === filtro.acabado) &&
+        (!filtro.coleccion || c.coleccion_id === filtro.coleccion))
       .sort((a, b) => (filtro.orden === 'valor' ? b.valor - a.valor : new Date(b.fecha) - new Date(a.fecha)) || a.nombre.localeCompare(b.nombre)),
       '<p class="slr-suave">Ninguna carta con esos filtros.</p>');
   }

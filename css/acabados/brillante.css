@@ -11,7 +11,6 @@
 ═══════════════════════════════════════════════ */
 
 /* Brillante: destello dorado pulsante (solo opacity y transform) */
-.slr-carta--brillante { --marco-carta: #C9932A; }
 .slr-carta--brillante .slr-carta__cara {
   box-shadow:
     inset 0 0 0 1.4cqw #C9932A,

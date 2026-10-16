@@ -60,7 +60,7 @@ export const seccion = t => console.log(`\n${t}`);
 // Todas las cartas de una liga con su diseño
 export async function cartasLiga(liga) {
   const r = await leer(`cartas?select=id,diseno_id,equipo_id,blindada_hasta,multiplicador_clausula,reservada_por,` +
-    `disenos_carta(nombre,tipo,acabado,valor,ata,def,con)&liga_id=eq.${liga}&limit=5000`);
+    `disenos_carta(nombre,tipo,rareza,acabado,valor,ata,def,con)&liga_id=eq.${liga}&limit=5000`);
   if (!r.ok) throw new Error(`cartas: ${r.mensaje}`);
   return r.datos;
 }

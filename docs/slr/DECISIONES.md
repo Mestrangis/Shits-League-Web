@@ -732,3 +732,73 @@ Los goles dependen mucho de la formación (con un solo defensa la ocasión llega
 
   Además, una captura a 1440×900.
 
+## Modelo de cartas: tipo, rareza y colecciones
+
+### Decisiones de Marcos
+
+- **Tipo, solo descriptivo:** `individual`, `duo`, `trio`, `grupo` (4 o más) y `especial` (sin personas). Desaparece `unica`. En la carta, un icono pequeño, no el color del marco.
+- **Rareza:** `comun` / `rara` / `epica` / `legendaria`, calculada del tier (F, E, D común; C, B rara; A épica; S legendaria).
+  - El marco indica la rareza: común gris metálico, rara azul, épica morado, legendaria dorado con brillo. Tiene que verse también en miniatura.
+  - Sobres y subastas reparten por rareza; la garantía premium pasa a ser «al menos una rara o superior».
+- **Colecciones:**
+  - Tabla `colecciones` (nombre único, color, emblema, descripción) y `disenos_carta.coleccion_id`.
+  - El nombre de carta es único dentro de su colección.
+  - Fondo del color de la colección; el color de la carta, como anulación manual.
+  - Emblema tintado con `mask-image` en una esquina. El nombre de la colección sale en la carta grande y la ficha; en miniatura, solo el emblema.
+  - En el admin: gestor de colecciones, selector en el formulario de carta (con «nueva al vuelo») y filtros en el catálogo, el álbum y la herramienta de plantillas. En el álbum, el progreso por colección.
+- **Migración de las cartas actuales:** primero una lista de propuestas; no se aplica nada sin OK.
+- Sin cambios en el motor ni en las reglas de partido.
+
+### Decisiones mías
+
+- **`unica`:** se admite todavía en el CHECK hasta aplicar la migración de tipos con el OK de Marcos. Después, una migración nueva la quita.
+- **`rareza`:** columna **generada** (`generated always as … stored`) a partir de `tier`, que nunca es nulo. No puede desincronizarse y no necesita trigger. El cliente la calcula igual si una lectura no la trae (`rarezaDeTier`).
+- **Sorteo por rareza** (`sortear_carta_libre`):
+  - Primero la rareza, ponderada solo entre las que tienen alguna carta libre (así una rareza sin cartas no deja el hueco vacío ni reparte su peso al azar). Luego una carta de esa rareza, uniforme.
+  - Las subastas sortean cada hueco de la tanda igual, sin repetir la tanda anterior.
+  - Lo forzado (la garantía premium y la tercera del sobre de elección si las dos primeras son comunes) pide «rara o superior» con los mismos pesos.
+  - Los pesos van en `ligas.config` (`sobres.*.pesos` y `pesos_mercado`, por rareza). La migración actualiza la configuración por defecto y la de las ligas que ya existen.
+- **Simulación** (20.000 sobres por tipo y 5.000 tandas):
+
+  | | Catálogo actual (82 comunes, 2 legendarias) | Catálogo objetivo de CARTAS.md (230 comunes, 73 raras, 13 épicas, 5 legendarias) |
+  |---|---|---|
+  | Básico | todo común | 84,8 / 13,1 / 2,0 / 0 |
+  | Premium | 87 % comunes, 13 % legendarias | 59 / 31 / 8 / 2 |
+  | Elección | 66 % comunes, 34 % legendarias | 42 / 37 / 16 / 5 |
+  | Subastas | 98,7 % comunes, 1,3 % legendarias | 70 / 22 / 7 / 1 |
+
+  Con el catálogo actual, como no hay raras ni épicas, lo forzado a «rara o superior» acaban siendo las 2 legendarias. Se acabará en cuanto alguien las tenga (un ejemplar por diseño), pero hace falta crear raras y épicas.
+- **Marco:** un elemento propio (`.slr-carta__borde`), un anillo con `mask-composite: exclude`.
+  - Más grueso en miniatura (4cqw) que en grande (1,8cqw) para que la rareza se lea en los huecos del campo.
+  - Cada rareza es un degradado metálico de su color.
+  - Legendaria: un brillo que recorre el marco con `transform` (sin repintar), en pausa fuera de pantalla y sin él con `prefers-reduced-motion`.
+  - Los acabados ya no cambian el color del marco (`--marco-carta` desaparece): su efecto sigue en la superficie.
+- **Fondo:** `carta.color` y, si no tiene, `colección.color` y, si no, el verde neutro. El color por tipo desaparece.
+- **Composición:**
+  - Arriba a la izquierda, la media con el icono del tipo debajo.
+  - Arriba a la derecha, el emblema, con una sombra para que se lea sobre cualquier foto.
+  - El nombre de la colección (solo en `tam: 'l'`), bajo el nombre de la carta, en el color de la colección.
+  - Ya no hay píldora de tipo sobre el nombre.
+- **Iconos de tipo:** SVG en línea (`ICONOS_TIPO`): 1, 2 y 3 siluetas; para `grupo`, cinco pequeñas; para `especial`, una estrella.
+- **Tope de stats del generador:** el de `grupo` y `especial` es el de la antigua `unica` (101). Así la migración de tipos no cambia ninguna carta al regenerarla. Solo importa en el tier S. **Pendiente de que Marcos decida** si el tope deja de depender del tipo, ya que el tipo no debe dar ventajas.
+- **Colecciones creadas desde una liga de prueba:**
+  - Son de esa liga (`liga_prueba_id`) y se borran con ella, como sus cartas.
+  - No se pueden usar en cartas de otras ligas (lo valida el trigger).
+  - Solo se editan desde su liga.
+  - El nombre es único entre las globales y, aparte, dentro de cada liga de prueba.
+- **Nombre de carta:** índice único por `(liga de prueba, colección, lower(nombre))`. El trigger lo comprueba antes con un mensaje claro: «Ya hay una carta «Mateo» en la colección Dormidito».
+- **Borrar una colección:** sus cartas se quedan sin colección. Si eso dejara dos cartas sin colección con el mismo nombre, no se borra y dice cuál.
+- **Emblema:**
+  - Cloudinary `c_pad,ar_1:1,w_128,b_transparent,f_auto` (cuadrado, sin recortar y con la transparencia).
+  - El muestrario usa un SVG incrustado como emblema de ejemplo: no hace falta subir nada.
+- **Caché de colecciones** (`js/slr/colecciones.js`): se carga con la liga. La vista previa del gestor pasa la colección sin guardar directamente a la carta, sin tocar la caché.
+- **En las ligas de prueba:** las cartas creadas en ellas (que nacen inactivas para no llegar a las reales) cuentan como activas en el álbum y el catálogo de esa liga.
+- **Tests:**
+  - `api-paso10.mjs`, nuevo: rareza, colecciones, nombres, tipos y sobres por rareza.
+  - `banco/colecciones.mjs`, nuevo: marco, fondo, emblema, icono, detalle, muestrario, gestor, formulario, álbum y catálogo. Con `SALIDA=carpeta` saca las capturas.
+- **Propuestas de migración:**
+  - Colecciones por palabra común al final: Down (8), Dormidito (4), Seductor (4), Muerto (2) y Cazatiburones (2).
+  - Tipos: las 8 «únicas», 7 a grupo y Cenicero de Mateo a especial (El Pozo, con duda); además, Inquina de trío a dúo (duda).
+  - Las coincidencias al principio del nombre son nombres de persona y no se proponen.
+  - Pendientes del OK de Marcos.
+

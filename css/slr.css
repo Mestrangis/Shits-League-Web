@@ -878,8 +878,9 @@ button.slr-aviso:active { background: rgba(57,255,136,.08) !important; }
    Tamaño fijado por el contenedor; todo dentro escala con cqw.
 ═══════════════════════════════════════════════ */
 .slr-carta {
-  --c1: #1FE065;              /* color del tipo */
+  --c1: #1FE065;              /* fondo: color de la carta, de su colección o este neutro */
   --c2: #0A3B1E;
+  --marco: #8C9893;           /* marco: la rareza (abajo) */
   container-type: inline-size;
   position: relative;
   width: 100%;
@@ -890,10 +891,7 @@ button.slr-aviso:active { background: rgba(57,255,136,.08) !important; }
   -webkit-touch-callout: none;   /* sin menú de "guardar imagen" al mantener pulsado */
 }
 .slr-carta img { -webkit-user-drag: none; -webkit-touch-callout: none; }
-.slr-carta--duo    { --c1: #35D3FF; --c2: #082F45; }
-.slr-carta--trio   { --c1: #B67CFF; --c2: #261048; }
-.slr-carta--unica  { --c1: #FFC94A; --c2: #4A1E06; }
-/* Color propio de la carta (disenos_carta.color): manda sobre el del tipo */
+/* Color de fondo (carta.js pone el de la carta o, si no tiene, el de su colección) */
 .slr-carta--color-verde   { --c1: #1FE065; --c2: #0A3B1E; }
 .slr-carta--color-morado  { --c1: #B67CFF; --c2: #261048; }
 .slr-carta--color-azul    { --c1: #4D8DFF; --c2: #0A1E4A; }
@@ -902,6 +900,39 @@ button.slr-aviso:active { background: rgba(57,255,136,.08) !important; }
 .slr-carta--color-dorado  { --c1: #FFC94A; --c2: #4A3206; }
 .slr-carta--color-plata   { --c1: #DCE4EC; --c2: #2B333C; }
 .slr-carta--color-negro   { --c1: #9AA39E; --c2: #050605; }
+/* Color de la colección, para su emblema y su nombre (aunque la carta tenga otro fondo) */
+.slr-carta--col-verde   { --col: #1FE065; } .slr-carta--col-morado { --col: #B67CFF; }
+.slr-carta--col-azul    { --col: #4D8DFF; } .slr-carta--col-rojo   { --col: #FF4D5E; }
+.slr-carta--col-naranja { --col: #FF8A2A; } .slr-carta--col-dorado { --col: #FFC94A; }
+.slr-carta--col-plata   { --col: #DCE4EC; } .slr-carta--col-negro  { --col: #9AA39E; }
+
+/* Rareza = marco (.slr-carta__borde): un anillo con el color o el degradado de la
+   rareza, más grueso en las cartas pequeñas para que se distinga de un vistazo */
+.slr-carta--r-comun      { --marco: #8C9893; --marco-fondo: linear-gradient(140deg, #5E6A64, #A9B3AE 45%, #6C7772 70%, #98A39D); }
+.slr-carta--r-rara       { --marco: #3D8BFF; --marco-fondo: linear-gradient(140deg, #1E5FD0, #6FB0FF 45%, #2A6FE0 70%, #58A0FF); }
+.slr-carta--r-epica      { --marco: #A55CFF; --marco-fondo: linear-gradient(140deg, #6E2BD6, #C99BFF 45%, #7D35E6 70%, #B57CFF); }
+.slr-carta--r-legendaria { --marco: #FFC94A; --marco-fondo: linear-gradient(140deg, #A8741C, #FFE38C 40%, #C8902A 65%, #FFD766); }
+.slr-carta__borde {
+  position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  border-radius: inherit; padding: 1.8cqw; overflow: hidden;
+  background: var(--marco-fondo, var(--marco));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+.slr-carta--s .slr-carta__borde { padding: 2.2cqw; }
+.slr-carta--xs .slr-carta__borde { padding: 4cqw; }
+.slr-carta__borde i { display: none; }
+/* Legendaria: un brillo sutil que recorre el marco (transform, sin repintar) */
+@media (prefers-reduced-motion: no-preference) {
+  .slr-carta--r-legendaria .slr-carta__borde i {
+    display: block; position: absolute; inset: -20% -60%;
+    background: linear-gradient(105deg, transparent 42%, rgba(255,255,255,.85) 50%, transparent 58%);
+    animation: slr-brillo-legendaria 3.2s ease-in-out infinite;
+  }
+}
+@keyframes slr-brillo-legendaria { 0%, 35% { transform: translateX(-45%); } 75%, 100% { transform: translateX(45%); } }
+.slr-carta:not(.is-visible) .slr-carta__borde i { animation-play-state: paused; }
 
 /* Carta levantada (ratón o pulsación larga, fuera de la alineación): una copia en
    una capa fija en <body> sigue al puntero y vuelve con rebote; la original
@@ -910,9 +941,7 @@ button.slr-aviso:active { background: rgba(57,255,136,.08) !important; }
 .slr-capa-arrastre *, .slr-capa-arrastre *::before, .slr-capa-arrastre *::after { box-sizing: border-box; }
 .slr-capa-arrastre .slr-carta { position: absolute; cursor: grabbing; will-change: transform; }
 .slr-carta.is-origen { visibility: hidden; }
-.slr-carta.is-levantada .slr-carta__cara { box-shadow:
-    inset 0 0 0 1.4cqw color-mix(in srgb, var(--c1) 70%, #000), inset 0 0 0 2.2cqw rgba(0,0,0,.35),
-    0 8cqw 18cqw rgba(0,0,0,.65); }
+.slr-carta.is-levantada .slr-carta__cara { box-shadow: inset 0 0 0 3cqw rgba(0,0,0,.35), 0 8cqw 18cqw rgba(0,0,0,.65); }
 .slr-carta.is-volviendo { transition: transform .6s cubic-bezier(.34, 1.56, .64, 1); }
 
 /* --x, --y ∈ [0, 1]: posición del ratón, del dedo o del giroscopio sobre la carta
@@ -936,10 +965,7 @@ button.slr-aviso:active { background: rgba(57,255,136,.08) !important; }
   background:
     radial-gradient(120% 70% at 50% 0%, color-mix(in srgb, var(--c1) 38%, transparent), transparent 70%),
     linear-gradient(170deg, var(--c2), #020A05 85%);
-  box-shadow:
-    inset 0 0 0 1.4cqw color-mix(in srgb, var(--c1) 70%, #000),
-    inset 0 0 0 2.2cqw rgba(0,0,0,.35),
-    0 3cqw 8cqw rgba(0,0,0,.5);
+  box-shadow: inset 0 0 0 3cqw rgba(0,0,0,.35), 0 3cqw 8cqw rgba(0,0,0,.5);
 }
 /* Durante la interacción: capas propias (will-change) y respuesta casi inmediata.
    is-calentando: lo mismo durante dos frames al aparecer, para crear las capas antes */
@@ -987,16 +1013,19 @@ button.slr-aviso:active { background: rgba(57,255,136,.08) !important; }
   color: #fff;
   text-shadow: 0 0 4cqw color-mix(in srgb, var(--c1) 80%, transparent), 0 .8cqw 0 rgba(0,0,0,.5);
 }
-.slr-carta__tipo {
-  margin-top: 1.5cqw;
-  padding: 1.2cqw 3.5cqw;
-  border-radius: 99px;
-  background: color-mix(in srgb, var(--c1) 85%, #000);
-  color: #04130A;
-  font-size: 6.2cqw;
-  font-weight: 800;
-  letter-spacing: .08em;
-  text-transform: uppercase;
+.slr-carta__media { display: flex; flex-direction: column; align-items: center; gap: 1cqw; }
+.slr-carta__tipo { display: block; width: 11cqw; height: 11cqw; color: #fff; filter: drop-shadow(0 .5cqw 1cqw rgba(0,0,0,.75)); }
+.slr-carta__tipo svg { display: block; width: 100%; height: 100%; fill: currentColor; }
+/* Emblema de la colección: el PNG/SVG como máscara, pintado con el color de la colección */
+.slr-carta__emblema { display: block; width: 17cqw; height: 17cqw; filter: drop-shadow(0 0 1.2cqw rgba(0,0,0,.8)) drop-shadow(0 .4cqw .4cqw rgba(0,0,0,.6)); }
+.slr-carta__emblema i {
+  display: block; width: 100%; height: 100%; background: var(--col, #fff);
+  -webkit-mask: var(--emblema) center / contain no-repeat; mask: var(--emblema) center / contain no-repeat;
+}
+.slr-carta--xs .slr-carta__emblema { width: 24cqw; height: 24cqw; }
+.slr-carta__coleccion {
+  margin-top: -1cqw; font-size: 4.6cqw; font-weight: 800; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--col, color-mix(in srgb, var(--c1) 60%, #fff)); text-shadow: 0 .4cqw 1.2cqw rgba(0,0,0,.8);
 }
 .slr-carta__pie { position: absolute; left: 6%; right: 6%; bottom: 5%; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 2.5cqw; }
 .slr-carta__nombre {
@@ -1044,7 +1073,6 @@ button.slr-aviso:active { background: rgba(57,255,136,.08) !important; }
    La foto ocupa toda la carta a sangre (object-fit: cover, recortada, nunca
    deformada). Encima: el OVR arriba a la izquierda y, en el tercio inferior,
    tipo, nombre y stats sobre un degradado oscuro que se lee con cualquier foto. */
-.slr-carta__tipo-pie { display: none; }
 .slr-carta--con-imagen .slr-carta__arte {
   inset: 0; border-radius: inherit;
   /* Detrás de la foto, el fondo de la carta: se ve en los PNG sin fondo */
@@ -1053,26 +1081,18 @@ button.slr-aviso:active { background: rgba(57,255,136,.08) !important; }
     radial-gradient(80% 70% at 50% 30%, color-mix(in srgb, var(--c1) 34%, transparent), transparent);
 }
 .slr-carta--con-imagen .slr-carta__img { object-position: 50% 30%; }
-/* Con foto, el marco se pinta encima (en el velo): la foto taparía el de la cara.
-   Cada acabado puede cambiar su color con --marco-carta */
+/* Con foto, el velo oscurece el borde interior y el tercio de abajo; el marco de
+   color (la rareza) lo pone .slr-carta__borde, por encima de la foto */
 .slr-carta--con-imagen .slr-carta__velo {
   border-radius: inherit;
-  box-shadow: inset 0 0 0 1.4cqw var(--marco-carta, color-mix(in srgb, var(--c1) 70%, #000)), inset 0 0 0 2.2cqw rgba(0,0,0,.3);
+  box-shadow: inset 0 0 0 3.4cqw rgba(0,0,0,.3);
   background:
     radial-gradient(60% 40% at 0% 0%, rgba(0,0,0,.55), transparent 70%),
     linear-gradient(180deg, transparent 52%, rgba(2,8,4,.55) 66%, rgba(2,8,4,.92) 84%, #020804 100%);
 }
-.slr-carta--con-imagen .slr-carta__cabeza .slr-carta__tipo { display: none; }
-.slr-carta--con-imagen .slr-carta__tipo-pie {
-  display: block;
-  padding: .6cqw 2.6cqw; border-radius: 99px;
-  background: color-mix(in srgb, var(--c1) 85%, #000); color: #04130A;
-  font-size: 5cqw; font-weight: 800; letter-spacing: .1em; text-transform: uppercase;
-}
 .slr-carta--con-imagen .slr-carta__ovr { text-shadow: 0 0 4cqw rgba(0,0,0,.8), 0 .8cqw 0 rgba(0,0,0,.6); }
 .slr-carta--con-imagen .slr-carta__nombre { text-shadow: 0 .6cqw 2cqw rgba(0,0,0,.8); }
 .slr-carta--con-imagen .slr-carta__stats { border-top-color: color-mix(in srgb, var(--c1) 60%, transparent); }
-.slr-carta--con-imagen.slr-carta--xs .slr-carta__tipo-pie { display: none; }
 /* Carga de la foto (js/slr/imagenes.js), sin saltos: la carta tiene su 5:7 desde
    el principio. 1) Esqueleto: el fondo del tipo o del color, nombre y stats, y un
    brillo diagonal en la zona de la foto. 2) Vista previa diminuta y borrosa con
@@ -1486,3 +1506,63 @@ button.slr-aviso:active { background: rgba(57,255,136,.08) !important; }
   /* Crónica y ficha de equipo: texto a un ancho cómodo dentro del panel */
   .slr-cronica, .slr-ficha-eq { max-width: 1100px; }
 }
+
+/* ── Colecciones y rareza fuera de la carta (fichas, álbum, gestor) ──────── */
+.slr-col-verde { --col: #1FE065; } .slr-col-morado { --col: #B67CFF; } .slr-col-azul { --col: #4D8DFF; }
+.slr-col-rojo { --col: #FF4D5E; } .slr-col-naranja { --col: #FF8A2A; } .slr-col-dorado { --col: #FFC94A; }
+.slr-col-plata { --col: #DCE4EC; } .slr-col-negro { --col: #9AA39E; }
+/* Emblema suelto (mask-image tintada con el color de la colección) */
+.slr-emblema-suelto, .slr-chip-coleccion i, .slr-album__colecciones i {
+  display: inline-block; flex: none; width: 40px; height: 40px; background: var(--col, var(--slr-texto));
+  -webkit-mask: var(--emblema) center / contain no-repeat; mask: var(--emblema) center / contain no-repeat;
+}
+.slr-emblema-suelto--vacio {
+  -webkit-mask: none; mask: none; border-radius: 12px; display: grid; place-items: center;
+  color: #04130A; font-family: 'Anton', sans-serif; font-size: 20px; font-style: normal;
+}
+/* Línea de la ficha: tipo, rareza, acabado y colección */
+.slr-linea-carta { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.slr-linea-carta > span { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 99px; background: rgba(255,255,255,.06); border: 1px solid var(--slr-borde); font-size: 12px; font-weight: 700; }
+.slr-chip-tipo svg { width: 15px; height: 15px; fill: currentColor; }
+.slr-chip-rareza--comun { color: #B9C3BE; border-color: #6C7772 !important; }
+.slr-chip-rareza--rara { color: #8DBDFF; border-color: #3D8BFF !important; }
+.slr-chip-rareza--epica { color: #CFA6FF; border-color: #A55CFF !important; }
+.slr-chip-rareza--legendaria { color: #FFD766; border-color: #FFC94A !important; }
+.slr-chip-coleccion { color: var(--col, var(--slr-texto)); }
+.slr-chip-coleccion i { width: 16px; height: 16px; }
+/* Álbum: progreso por colección (toca para filtrar) */
+.slr-album__colecciones { display: flex; gap: 8px; overflow-x: auto; padding: 2px 0 6px; scrollbar-width: thin; }
+.slr-album__colecciones button {
+  flex: none; display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto auto; column-gap: 8px; align-items: center;
+  min-width: 128px; padding: 8px 10px; border-radius: 12px; text-align: left; cursor: pointer;
+  background: var(--slr-tarjeta); border: 1px solid var(--slr-borde); color: inherit; font: inherit;
+}
+.slr-album__colecciones button.activo { border-color: var(--col, var(--slr-propio)); box-shadow: 0 0 0 1px var(--col, var(--slr-propio)); }
+.slr-album__colecciones i { grid-row: 1 / 3; width: 28px; height: 28px; }
+.slr-album__colecciones b { font-size: 13px; color: var(--col, var(--slr-texto)); }
+.slr-album__colecciones small { font-size: 11px; color: var(--slr-suave); }
+.slr-album__colecciones span { grid-column: 1 / -1; height: 4px; border-radius: 99px; background: rgba(255,255,255,.08); margin-top: 6px; overflow: hidden; }
+.slr-album__colecciones s { display: block; height: 100%; background: var(--col, var(--slr-propio)); text-decoration: none; }
+.slr-album__colecciones .es-completa small { color: var(--col, var(--slr-propio)); font-weight: 800; }
+/* Gestor de colecciones */
+.slr-colecciones-admin { display: grid; gap: 12px; }
+.slr-colecciones { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.slr-colecciones button {
+  width: 100%; display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 14px; cursor: pointer; text-align: left;
+  background: var(--slr-tarjeta); border: 1px solid var(--slr-borde); color: inherit; font: inherit;
+}
+.slr-colecciones__texto { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.slr-colecciones__texto small { color: var(--slr-suave); font-size: 12px; }
+.slr-colecciones__n { display: grid; justify-items: end; }
+.slr-colecciones__n b { font-family: 'Anton', sans-serif; font-weight: 400; font-size: 22px; line-height: 1; }
+.slr-colecciones__n small { font-size: 10px; color: var(--slr-suave); }
+.slr-coleccion-mini { display: flex; align-items: center; gap: 14px; margin-top: 12px; }
+.slr-coleccion-mini__carta { width: 84px; flex: none; }
+.slr-coleccion-mini > span { display: grid; justify-items: center; gap: 4px; }
+.slr-coleccion-mini small { font-size: 11px; color: var(--slr-suave); }
+.slr-editor__fila--coleccion { align-items: end; grid-template-columns: 1fr auto; }
+/* Muestrario: los tipos con su icono */
+.slr-muestrario__tipos { display: flex; flex-wrap: wrap; gap: 10px; }
+.slr-muestrario__tipos span { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 12px; background: var(--slr-tarjeta); border: 1px solid var(--slr-borde); font-weight: 700; font-size: 13px; }
+.slr-muestrario__tipos i { width: 26px; height: 26px; display: block; }
+.slr-muestrario__tipos svg { width: 100%; height: 100%; fill: currentColor; }

@@ -14,6 +14,7 @@ import { abrirCatalogo } from './catalogo.js';
 import { abrirPlantillas } from './plantillas-admin.js';
 import { abrirMuestrario } from './muestrario.js';
 import { abrirEditorCarta } from './editor-carta.js';
+import { abrirColecciones } from './colecciones-admin.js';
 import { TIPOS } from '../carta.js';
 
 const TIPOS_MOV = {
@@ -81,6 +82,7 @@ export async function panelAdmin(cont, ctx) {
         ${sinTemporada ? '<button class="slr-btn slr-btn--pruebas" type="button" data-pruebas="anadir">+ Añadir bot</button>' : ''}
         ${sinTemporada && bots.length ? `<button class="slr-btn slr-btn--pruebas" type="button" data-pruebas="quitar">− Quitar bot (${esc(bots[bots.length - 1].nombre)})</button>` : ''}
         <button class="slr-btn slr-btn--pruebas" type="button" data-pruebas="nueva-carta">➕ Nueva carta</button>
+        <button class="slr-btn slr-btn--pruebas" type="button" data-pruebas="colecciones">🏷 Colecciones</button>
         <button class="slr-btn slr-btn--pruebas" type="button" data-pruebas="plantillas">🃏 Plantillas: dar o quitar cartas</button>
         <button class="slr-btn slr-btn--pruebas" type="button" data-pruebas="muestrario">✨ Muestrario de cartas</button>
         <button class="slr-btn slr-btn--peligro" type="button" data-pruebas="borrar-beta">Borrar cartas beta (sin foto)</button>
@@ -93,6 +95,7 @@ export async function panelAdmin(cont, ctx) {
     if (b.dataset.pruebas === 'plantillas') abrirPlantillas(ctx).catch(() => {});
     else if (b.dataset.pruebas === 'nueva-carta') abrirEditorCarta(ctx).catch(e => toast(e.message, 'error'));
     else if (b.dataset.pruebas === 'muestrario') abrirMuestrario(ctx);
+    else if (b.dataset.pruebas === 'colecciones') abrirColecciones(ctx).catch(e => toast(e.message, 'error'));
     else if (b.dataset.pruebas === 'borrar-beta') borrarBeta(b, ctx);
     else accionPruebas(b, ctx);
   }));
@@ -163,7 +166,7 @@ function contadorBombo(b) {
 
 // Borra del catálogo las cartas beta sin foto (slr_admin_borrar_disenos): antes
 // cuenta lo que se borraría (solo_contar) y pide escribir BORRAR
-const PLURAL_TIPO = { individual: 'individuales', duo: 'dúos', trio: 'tríos', unica: 'únicas' };
+const PLURAL_TIPO = { individual: 'individuales', duo: 'dúos', trio: 'tríos', grupo: 'grupos', especial: 'especiales', unica: 'únicas' };
 async function borrarBeta(boton, ctx) {
   const filtro = { liga_id: ctx.datos.liga.id, beta: true, sin_foto: true };
   const plural = (n, uno, varios) => `${miles(n)} ${n === 1 ? uno : varios}`;

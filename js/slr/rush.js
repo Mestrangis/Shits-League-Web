@@ -12,6 +12,7 @@
 import { rpc, leer, configurarSesion, borrarToken, ErrorSesion } from './api.js';
 import { esc, miles, crear, fijarRaiz, ajustarCapas, capasAbiertas, toast, hoja, cerrarCapa, fechaHora } from './ui.js';
 import { normalizarCarta, iniciarAcabados, pararAcabados } from './carta.js';
+import { cargarColecciones } from './colecciones.js';
 import * as previa from './pantallas/previa.js';
 import * as plantilla from './pantallas/plantilla.js';
 import * as mercado from './pantallas/mercado.js';
@@ -109,7 +110,7 @@ async function cargarCartas() {
   const eq = datos.equipo.id;
   const [filas, ventas] = await Promise.all([
     leer(`cartas?select=id,diseno_id,equipo_id,multiplicador_clausula,blindada_hasta,tocada_en_jornada,adquirida_en,` +
-      `disenos_carta(nombre,tipo,acabado,color,tier,perfil,personas,ata,def,con,valor,poderes,imagen_url,texto)&equipo_id=eq.${eq}`),
+      `disenos_carta(nombre,tipo,acabado,color,tier,rareza,coleccion_id,perfil,personas,ata,def,con,valor,poderes,imagen_url,texto)&equipo_id=eq.${eq}`),
     leer(`ventas?select=id,carta_id,precio&vendedor_id=eq.${eq}&estado=eq.activa`),
   ]);
   datos.cartas = filas.map(f => ({
@@ -125,7 +126,10 @@ async function cargarCartas() {
 
 async function cargarLiga() {
   const id = datos.liga.id;
-  const [info] = await leer(`ligas?select=id,nombre,estado,temporada,config,pausada_en&id=eq.${id}`);
+  const [[info]] = await Promise.all([
+    leer(`ligas?select=id,nombre,estado,temporada,config,pausada_en&id=eq.${id}`),
+    cargarColecciones(id),            // para el fondo, el emblema y el nombre de la colección de cada carta
+  ]);
   datos.ligaInfo = info;
   const [temporada] = await leer(`temporadas?select=id,numero,estado,iniciada_en,terminada_en&liga_id=eq.${id}&order=numero.desc&limit=1`);
   datos.temporada = temporada ?? null;

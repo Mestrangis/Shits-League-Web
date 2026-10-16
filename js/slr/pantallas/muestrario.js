@@ -1,6 +1,10 @@
 /* ═══════════════════════════════════════════════
-   SHITS LEAGUE RUSH — muestrario de acabados (modo pruebas)
-   La misma carta en todos los acabados registrados, sin y con foto, lado a lado
+   SHITS LEAGUE RUSH — muestrario de cartas (modo pruebas)
+   Arriba, el modelo de carta: las cuatro rarezas (el marco) en grande y en
+   miniatura, los cinco tipos (el icono) y una colección de muestra (fondo,
+   emblema tintado y nombre bajo el nombre de la carta, en grande; en
+   miniatura solo el emblema). Después, la misma carta en todos los acabados
+   registrados, sin y con foto, lado a lado
    y con el movimiento activo (ratón, dedo o giroscopio), para comparar. Debajo,
    la composición de la carta con varias fotos en tamaño pequeño y grande, los
    colores de la paleta, una foto PNG sin fondo (assets/slr-muestra-sin-fondo.png:
@@ -8,12 +12,21 @@
    tamaños. Las fotos de muestra son las de perfil de Shits League (JUGADORES_FOTOS).
 ═══════════════════════════════════════════════ */
 import { esc, hoja } from '../ui.js';
-import { cartaHTML } from '../carta.js';
+import { cartaHTML, RAREZAS, TIPOS, iconoTipo } from '../carta.js';
 import { listaAcabados } from '../acabados/index.js';
 import { COLORES } from '../generador.js';
 
 const PNG_SIN_FONDO = new URL('../../../assets/slr-muestra-sin-fondo.png', import.meta.url).href;
 const NOMBRES_LARGOS = ['Los Tres Caballeros', 'El Trío Calavera de Getafe', 'Los Hermanos Ibáñez Montero'];
+const TIER_DE = { comun: 'D', rara: 'B', epica: 'A', legendaria: 'S' };
+// Emblema de muestra: SVG monocromo (una luna con estrellas) como data URI; la app lo tiñe
+const EMBLEMA_MUESTRA = 'data:image/svg+xml,' + encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><path d="M40 6a26 26 0 1 0 18 44A22 22 0 0 1 40 6z"/>' +
+  '<path d="M48 14l2 5 5 2-5 2-2 5-2-5-5-2 5-2zM54 32l1.3 3 3 1.3-3 1.3-1.3 3-1.3-3-3-1.3 3-1.3z"/></svg>');
+const COLECCIONES_MUESTRA = [
+  { id: 'muestra-dormidito', nombre: 'Dormidito', color: 'morado', emblema_url: EMBLEMA_MUESTRA },
+  { id: 'muestra-down', nombre: 'Down', color: 'naranja', emblema_url: EMBLEMA_MUESTRA },
+];
 
 function fotosDeMuestra() {
   // const global de js/session.js (script clásico): visible por su nombre, no en window
@@ -27,10 +40,38 @@ export function abrirMuestrario(ctx) {
   const fotos = fotosDeMuestra();
   const carta = (extra, opciones = {}) => cartaHTML({ ...base, id: `muestra-${Math.random().toString(36).slice(2, 8)}`, ...extra }, opciones);
 
+  const [colA, colB] = COLECCIONES_MUESTRA;
   hoja(`
     <div class="slr-muestrario">
+      <section class="slr-muestrario__acabado" data-muestra="rarezas">
+        <h3 class="slr-subtitulo">Rarezas <small>el marco; sale del tier (F, E, D común · C, B rara · A épica · S legendaria)</small></h3>
+        <div class="slr-muestrario__colores">
+          ${Object.entries(RAREZAS).map(([k, v]) => `<figure>${carta({ tier: TIER_DE[k], rareza: k, nombre: v, coleccion_id: null }, { tam: 's' })}<figcaption>${esc(v)}</figcaption></figure>`).join('')}
+        </div>
+        <div class="slr-muestrario__fotos">
+          ${Object.entries(RAREZAS).map(([k, v]) => `<figure class="slr-muestrario__xs">${carta({ tier: TIER_DE[k], rareza: k, nombre: v, coleccion_id: null }, { tam: 'xs', destacar: 'ATA' })}</figure>`).join('')}
+        </div>
+      </section>
+      <section class="slr-muestrario__acabado" data-muestra="tipos">
+        <h3 class="slr-subtitulo">Tipos <small>solo descriptivo: un icono bajo la media</small></h3>
+        <div class="slr-muestrario__tipos">
+          ${Object.entries(TIPOS).filter(([k]) => k !== 'unica').map(([k, v]) => `<span><i>${iconoTipo(k)}</i>${esc(v)}</span>`).join('')}
+        </div>
+      </section>
+      <section class="slr-muestrario__acabado" data-muestra="colecciones">
+        <h3 class="slr-subtitulo">Colecciones <small>fondo del color de la colección, emblema tintado y su nombre bajo el de la carta</small></h3>
+        <div class="slr-muestrario__grande">${carta({ coleccion: colA, coleccion_id: colA.id, color: null, tier: 'B', rareza: 'rara', nombre: 'Mateo' }, { tam: 'l' })}</div>
+        <div class="slr-muestrario__par">
+          <figure>${carta({ coleccion: colA, coleccion_id: colA.id, color: null, tier: 'D', rareza: 'comun', nombre: 'Jorge' }, { tam: 's' })}<figcaption>Dormidito (morado)</figcaption></figure>
+          <figure>${carta({ coleccion: colB, coleccion_id: colB.id, color: null, tier: 'S', rareza: 'legendaria', nombre: 'Mateo' }, { tam: 's' })}<figcaption>Down (naranja), legendaria</figcaption></figure>
+        </div>
+        <div class="slr-muestrario__fotos">
+          ${[colA, colB, colA, colB].map((k, i) => `<figure class="slr-muestrario__xs">${carta({ coleccion: k, coleccion_id: k.id, color: null, tier: 'DBAS'[i], rareza: ['comun', 'rara', 'epica', 'legendaria'][i], nombre: k.nombre }, { tam: 'xs', destacar: 'ATA' })}</figure>`).join('')}
+        </div>
+        <p class="slr-suave">En miniatura, solo el emblema. El color propio de una carta (disenos_carta.color) manda sobre el de su colección.</p>
+      </section>
       <section class="slr-muestrario__acabado" data-muestra="colores">
-        <h3 class="slr-subtitulo">Colores <small>disenos_carta.color; sin color, el del tipo</small></h3>
+        <h3 class="slr-subtitulo">Colores <small>disenos_carta.color (anula el de la colección); sin color, el neutro</small></h3>
         <div class="slr-muestrario__colores">
           ${Object.entries(COLORES).map(([k, v]) => `<figure>${carta({ color: k, imagen_url: null, nombre: v }, { tam: 's' })}<figcaption>${esc(v)}</figcaption></figure>`).join('')}
         </div>

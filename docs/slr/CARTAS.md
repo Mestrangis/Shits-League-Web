@@ -15,7 +15,7 @@ En los dos casos, un trigger de la base de datos:
 ## Crear una carta con el formulario
 
 1. **Foto.** Pulsa *📷 Subir foto*: va directa a Cloudinary (ver "Cloudinary" más abajo). Sirven **PNG sin fondo** (se respeta la transparencia: detrás se ve el fondo de la carta) y JPG. También puedes pegar la URL de una foto que ya esté subida.
-2. **Nombre, tipo, perfil, tier, acabado y color.** El color es opcional: sin color, la carta usa el del tipo.
+2. **Nombre, tipo, perfil, tier, colección, acabado y color.** El tier fija la rareza (el marco). La colección es opcional: *＋ Nueva* crea una sin salir del formulario. El color también es opcional: sin color, la carta usa el de su colección (o el neutro).
 3. **Stats y poderes.** Salen solos del tier y el perfil. *🎲 Regenerar stats* y *🎲 Regenerar poderes* proponen otros. Se pueden cambiar a mano: las stats, y en cada poder el momento, el nombre (hay sugerencias, pero es libre), el nivel y las probabilidades.
 4. Arriba se ve la carta en grande, tal como quedará (con el acabado y la inclinación), con su OVR, tier y valor.
 5. **Crear carta** o **Crear y dar a…** (la da directamente a un equipo).
@@ -34,13 +34,14 @@ Para regenerar una carta que ya existe, vacía sus stats o sus poderes y guarda.
 
 | Columna | ¿Rellenar? | Qué es |
 |---|---|---|
-| `nombre` | **Sí** | Nombre de la carta tal como se verá. Los nombres largos se ven enteros: la letra se hace más pequeña y, si hace falta, pasa a dos líneas. |
-| `tipo` | **Sí** | `individual`, `duo`, `trio` o `unica`. |
+| `nombre` | **Sí** | Nombre de la carta tal como se verá. Único **dentro de su colección** (y entre las que no tienen colección): puede haber un «Mateo» en *Dormidito* y otro en *Down*. Los nombres largos se ven enteros: la letra se hace más pequeña y, si hace falta, pasa a dos líneas. |
+| `tipo` | **Sí** | `individual`, `duo`, `trio`, `grupo` o `especial` (ver "Tipos"). Solo describe la carta. |
+| `coleccion_id` | Opcional | La colección (ver "Colecciones"). Vacío = sin colección. |
 | `tier` | **Sí** (si no pones stats) | `S`, `A`, `B`, `C`, `D`, `E` o `F` (ver "Tiers"). Si pones las stats y no el tier, se calcula de su OVR. |
 | `perfil` | **Sí** (si no pones stats) | `atacante`, `defensa`, `control`, `portero` o `equilibrado`. Si no lo pones, se deduce de las stats. |
 | `ata`, `def`, `con` | Opcional | Ataque, defensa y control, de 1 a 101. Vacías = se generan. |
 | `poderes` | Opcional | Lista de poderes (ver abajo). Vacío = se generan; `[]` = sin poderes. |
-| `color` | Opcional | Color de la carta (ver "Colores"). Vacío = el del tipo. |
+| `color` | Opcional | Color de fondo de la carta (ver "Colores"). Vacío = el de su colección; si no tiene, el neutro. |
 | `imagen_url` | Opcional | La foto (ver "Imagen"). Sin foto se pinta una silueta con las iniciales. |
 | `acabado` | Opcional | `normal` (por defecto), `foil`, `brillante` o `plateada`. |
 | `personas` | Opcional | Quiénes salen en la carta. Sirve para el dibujo sin foto de los dúos y tríos. Formato: `{"Marcos","Nacho"}`. |
@@ -51,10 +52,49 @@ Para regenerar una carta que ya existe, vacía sus stats o sus poderes y guarda.
 | `liga_prueba_id` | **No** | Solo en las cartas creadas desde una liga de prueba. |
 | `id`, `creado_en` | **No** | Se rellenan solas. |
 | `valor` | **No** | Se calcula solo cada vez que guardas, aunque escribas otro número. |
+| `rareza` | **No** | Sale sola del tier (ver "Rareza"). |
 
 El **OVR** no se guarda en ningún sitio: el juego lo calcula al vuelo con las tres stats. Cuenta el 60 % la mejor, el 25 % la del medio y el 15 % la peor.
 
 El **valor** sale del OVR y de los poderes. Cada poder lo sube un 15 % (`simple`), un 35 % (`fuerte`) o un 60 % (`muy fuerte`).
+
+## Tipos
+
+El tipo **solo describe** la carta (cuántas personas salen); no da ninguna ventaja en el partido. En la carta es un icono pequeño debajo de la media.
+
+| `tipo` | Quién sale | Icono |
+|---|---|---|
+| `individual` | 1 persona | una silueta |
+| `duo` | 2 personas | dos siluetas |
+| `trio` | 3 personas | tres siluetas |
+| `grupo` | 4 o más | cinco siluetas pequeñas |
+| `especial` | nadie: un objeto, un lugar… | una estrella |
+
+Las plantillas iniciales se reparten con cartas `individual`.
+
+## Rareza
+
+La rareza dice **lo buena que es** una carta y es lo que marca el **marco**. Sale sola del tier, no se rellena:
+
+| Tier | Rareza | Marco |
+|---|---|---|
+| F, E, D | **común** | gris metálico apagado |
+| C, B | **rara** | azul |
+| A | **épica** | morado |
+| S | **legendaria** | dorado, con un brillo que lo recorre |
+
+Los sobres y las subastas reparten **por rareza**: primero se sortea la rareza y luego una carta de esa rareza al azar. Solo entran las rarezas que tengan alguna carta libre. Los pesos están en la configuración de la liga (`ligas.config`):
+
+| | Común | Rara | Épica | Legendaria |
+|---|---|---|---|---|
+| Sobre básico | 85 | 13 | 2 | 0 |
+| Sobre premium | 60 | 30 | 8 | 2 |
+| Sobre de elección | 45 | 35 | 15 | 5 |
+| Subastas (cada carta de la tanda) | 70 | 22 | 7 | 1 |
+
+- **Garantía premium:** tras 2 sobres premium seguidos sin ninguna rara o superior, la primera carta del siguiente es rara o superior.
+- **Sobre de elección:** si las dos primeras candidatas son comunes, la tercera es rara o superior.
+- Con pocas raras y épicas en el catálogo, esas cartas forzadas acaban siendo legendarias: conviene que haya raras y épicas.
 
 ## Tiers
 
@@ -75,9 +115,9 @@ Por qué tantas D, E y F:
 - Cada equipo empieza con **11 individuales** sacadas del "bombo": las individuales **sin el 20 % más caro**.
 - Con 18 equipos son **198 cartas** solo para las plantillas iniciales, y conviene que sobren para que el reparto tenga donde elegir (±10 % de valor entre equipos) y para los sobres y las subastas.
 - Las S, A y B (y parte de las C) caen en ese 20 % caro: no entran en las plantillas iniciales, se consiguen en el mercado.
-- Resumen: unas **300 individuales**, casi todas D, E y F; los **dúos** (unos 25) entre C y A, los **tríos** (unos 8) entre A y S, y **1 o 2 únicas** en S.
+- Resumen: unas **300 individuales**, casi todas D, E y F (comunes), y el resto repartido entre raras (C, B), épicas (A) y unas pocas legendarias (S), de cualquier tipo. El tipo ya no marca lo buena que es una carta: lo marca el tier, que da la rareza.
 
-El catálogo beta inicial (283 cartas sin foto) se borró el 15 de octubre de 2026. Ahora mismo hay 54 cartas, todas con foto: 36 individuales (D 15 · E 14 · F 7), 12 dúos, 2 tríos y 4 únicas. Con 36 individuales el bombo da para 2 plantillas iniciales (3 contando las caras); para 18 equipos hacen falta unas 250. El contador de **Modo pruebas → Plantillas iniciales disponibles** dice cuántas salen ahora mismo.
+El catálogo beta inicial (283 cartas sin foto) se borró el 15 de octubre de 2026. El 16 de octubre hay 84 cartas, todas con foto: 82 comunes (D, E y F) y 2 legendarias (S); 48 individuales. Con 48 individuales el bombo da para 3 plantillas iniciales; para 18 equipos hacen falta unas 250. El contador de **Modo pruebas → Plantillas iniciales disponibles** dice cuántas salen ahora mismo.
 
 Si el bombo no llega, nadie se queda sin poder unirse: el reparto tira de las individuales caras más baratas y, si aun así faltan, el equipo empieza con las que haya y recibe un aviso. Los huecos vacíos los juegan Canteranos.
 
@@ -91,7 +131,7 @@ Si el bombo no llega, nadie se queda sin poder unirse: el reparto tira de las in
 | `portero` | DEF muy alta y ATA muy baja (en S, con la DEF al tope, el ATA no puede bajar tanto) |
 | `equilibrado` | las tres parecidas |
 
-Las stats nunca pasan de 97 en las individuales, 99 en los dúos, 100 en los tríos y 101 en las únicas.
+El generador nunca pasa de 97 en las individuales, 99 en los dúos, 100 en los tríos y 101 en los grupos y los especiales. Solo importa en el tier S, y la carta se puede retocar a mano.
 
 ## Poderes
 
@@ -157,12 +197,39 @@ Los poderes antiguos con `"probabilidad": 0.25` siguen valiendo: el motor lo tom
 
 ## Colores
 
-| `color` | Cómo se ve |
-|---|---|
-| vacío | El color del tipo: verde (individual), azul claro (dúo), morado (trío), dorado (única). |
-| `verde`, `morado`, `azul`, `rojo`, `naranja`, `dorado`, `plata`, `negro` | El fondo, el borde y los detalles de la carta en ese color. |
+El **fondo** de la carta usa, por orden:
+1. el `color` de la carta, si tiene (sirve para anular a mano el de la colección);
+2. si no, el color de su **colección**;
+3. si tampoco, el verde neutro.
 
-Se ven todos en *Rush → Perfil → Modo pruebas → ✨ Muestrario de cartas*.
+El **marco** no depende del color: es la rareza.
+
+Colores de la paleta: `verde`, `morado`, `azul`, `rojo`, `naranja`, `dorado`, `plata` y `negro`. Se ven todos en *Rush → Perfil → Modo pruebas → ✨ Muestrario de cartas*, junto con las rarezas, los tipos y una colección de ejemplo.
+
+## Colecciones
+
+Una colección agrupa cartas con algo en común (por ejemplo, *Dormidito*: «Mateo», «Jorge», «Nico»…). Cada una tiene:
+
+| Campo | Qué es |
+|---|---|
+| `nombre` | Único (no distingue mayúsculas). |
+| `color` | De la paleta. Es el fondo de sus cartas (salvo las que tengan color propio) y el color de su emblema. |
+| `emblema_url` | El emblema, en Cloudinary (ver abajo). |
+| `descripcion` | Opcional. |
+
+- **En la carta:** el emblema va en la esquina de arriba a la derecha, sin tapar la cara ni la media.
+- **En la carta grande y en la ficha:** además, el nombre de la colección en pequeño, debajo del nombre de la carta.
+- **En miniatura:** solo el emblema.
+- **El álbum** enseña el progreso de cada colección («Dormidito 3/5») y, al tocarla, filtra por ella. El catálogo y la herramienta de plantillas tienen filtro por colección.
+
+**Gestor:** *Rush → Perfil → Modo pruebas → 🏷 Colecciones*: crear, editar (con vista previa), ver sus cartas y borrar. Al borrar una colección, sus cartas se quedan sin colección. Si eso dejara dos cartas sin colección con el mismo nombre, no se borra y avisa.
+
+### Emblemas
+
+- **Formato:** PNG o SVG **de un solo color** (da igual cuál) con **fondo transparente**.
+- **Forma:** cuadrado, de unos **256 × 256** píxeles, con un poco de margen.
+- **Cómo se pinta:** la app usa la silueta del dibujo como máscara y la pinta con el color de la colección. Un mismo emblema sirve en cualquier color. Lo que no es transparente sale de un solo color plano, así que no sirven fotos ni degradados.
+- **Subida:** con *⬆ Subir emblema* en el gestor (preset `slr_cartas`, como las fotos), o pegando la URL.
 
 ## Imagen
 
@@ -177,17 +244,17 @@ Zonas de la carta, de arriba abajo:
 
 ```
 ┌──────────────────────┐
-│ 74 ·                 │  ← OVR arriba a la izquierda (no pongas aquí nada importante)
+│ 74               ☾  │  ← OVR (con el icono del tipo debajo) y emblema de la colección
 │                      │
 │      ☺  CARA         │  ← lo importante: mitad de arriba y centrado
 │     /|\              │
 │                      │
 │ ░░░░░░░░░░░░░░░░░░░░ │  ← desde aquí, degradado oscuro
-│ ░░  INDIVIDUAL   ░░░ │  ← tipo
 │ ░░  NOMBRE       ░░░ │  ← nombre (una o dos líneas)
+│ ░░  COLECCIÓN    ░░░ │  ← solo en la carta grande
 │ ░  ATA  DEF  CON  ░░ │  ← stats: el tercio de abajo queda tapado en parte
 └──────────────────────┘
-   deja un poco de margen en los bordes: el marco tapa unos píxeles
+   deja un poco de margen en los bordes: el marco (la rareza) tapa unos píxeles
 ```
 
 Funcionan bien:

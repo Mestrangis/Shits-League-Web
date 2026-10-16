@@ -194,7 +194,7 @@ try {
   const cat = await ev(`({ total: document.querySelector('.slr-catalogo__total b').textContent, cuentas: [...document.querySelectorAll('.slr-catalogo__cuentas')].map(x => x.innerText.replace(/\\s+/g, ' ')),
     pintadas: document.querySelectorAll('.slr-catalogo .slr-ficha').length, filtros: document.querySelectorAll('.slr-filtros--catalogo select').length,
     columnas: getComputedStyle(document.querySelector('.slr-rejilla--catalogo')).gridTemplateColumns.split(' ').length })`);
-  check(Number(cat.total.replace(/\./g, '')) === activos.length && cat.cuentas.length === 2 && cat.filtros === 7,
+  check(Number(cat.total.replace(/\./g, '')) === activos.length && cat.cuentas.length === 3 && cat.filtros === 9,
     `catálogo: ${cat.total} activas · ${cat.cuentas.join(' · ')} · ${cat.filtros} filtros, ${cat.columnas} columnas en móvil`);
   check(cat.pintadas === Math.min(activos.length, activos.length <= 60 ? activos.length : 30), `pinta ${cat.pintadas} (como el álbum: todas hasta 60, luego por bloques)`);
   await foto('catalogo');

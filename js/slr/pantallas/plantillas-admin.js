@@ -12,7 +12,8 @@
 ═══════════════════════════════════════════════ */
 import { rpc } from '../api.js';
 import { esc, hoja, cerrarCapa, conEspera, toast, monedas, miles, scrollDeHoja } from '../ui.js';
-import { cartaHTML, normalizarCarta, TIPOS, ACABADOS } from '../carta.js';
+import { cartaHTML, normalizarCarta, TIPOS, ACABADOS, RAREZAS } from '../carta.js';
+import { listaColecciones } from '../colecciones.js';
 import { precargar, urlFoto } from '../imagenes.js';
 
 const TAMANOS = [24, 48, 96, 0];          // 0 = todas
@@ -23,7 +24,7 @@ function tamanoGuardado() {
 function guardarTamano(n) {
   try { localStorage.setItem(CLAVE_TAMANO, String(n)); } catch { /* sin persistencia */ }
 }
-const ORDEN_TIPO = { unica: 0, trio: 1, duo: 2, individual: 3 };
+const ORDEN_TIPO = { especial: 0, grupo: 1, unica: 1, trio: 2, duo: 3, individual: 4 };
 const ORDENES = {
   valor:  { texto: 'Valor',  cmp: (a, b) => b.valor - a.valor },
   ovr:    { texto: 'OVR',    cmp: (a, b) => b.ovr - a.ovr || b.valor - a.valor },
@@ -33,7 +34,7 @@ const ORDENES = {
 const sinAcentos = s => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 // Estado de la herramienta entre aperturas (dentro de la misma sesión)
-const filtros = { texto: '', tipo: '', acabado: '', estado: '', orden: 'valor' };
+const filtros = { texto: '', tipo: '', rareza: '', coleccion: '', acabado: '', estado: '', orden: 'valor' };
 let pagina = 1;
 
 export async function abrirPlantillas(ctx) {
@@ -62,6 +63,8 @@ export async function abrirPlantillas(ctx) {
       <input class="slr-input" type="search" data-f="texto" placeholder="Buscar carta por nombre" autocomplete="off" value="${esc(filtros.texto)}">
       <div class="slr-filtros">
         <label><span>Tipo</span><select class="slr-input" data-f="tipo">${opciones([['', 'Todos'], ...Object.entries(TIPOS)], filtros.tipo)}</select></label>
+        <label><span>Rareza</span><select class="slr-input" data-f="rareza">${opciones([['', 'Todas'], ...Object.entries(RAREZAS)], filtros.rareza)}</select></label>
+        <label><span>Colección</span><select class="slr-input" data-f="coleccion">${opciones([['', 'Todas'], ['-', 'Sin colección'], ...listaColecciones().map(k => [k.id, k.nombre])], filtros.coleccion)}</select></label>
         <label><span>Acabado</span><select class="slr-input" data-f="acabado">${opciones([['', 'Todos'], ['normal', 'Normal'], ...Object.entries(ACABADOS)], filtros.acabado)}</select></label>
         <label><span>Orden</span><select class="slr-input" data-f="orden">${opciones(Object.entries(ORDENES).map(([k, o]) => [k, o.texto]), filtros.orden)}</select></label>
         <label><span>Estado</span><select class="slr-input" data-f="estado">${opcionesEstado()}</select></label>
@@ -82,6 +85,8 @@ export async function abrirPlantillas(ctx) {
     visibles = cartas.filter(c =>
       (!t || c.clave.includes(t)) &&
       (!filtros.tipo || c.tipo === filtros.tipo) &&
+      (!filtros.rareza || c.rareza === filtros.rareza) &&
+      (!filtros.coleccion || (filtros.coleccion === '-' ? !c.coleccion_id : c.coleccion_id === filtros.coleccion)) &&
       (!filtros.acabado || c.acabado === filtros.acabado) &&
       (filtros.estado === '' || (filtros.estado === 'libre' ? !c.equipo_id
         : filtros.estado === 'dueno' ? !!c.equipo_id : c.equipo_id === filtros.estado.slice(3))))

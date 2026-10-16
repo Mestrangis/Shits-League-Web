@@ -77,7 +77,7 @@ try {
       'editar con stats y poderes a mano: se respetan');
     const sinPoderes = await rpcOk('slr_admin_guardar_diseno', { token: U.token, liga_id: L, diseno: { id: r.id, ...base, ata: 99, def: 40, con: 60, poderes: [] } });
     check(sinPoderes.poderes.length === 0, 'poderes = [] es "sin poderes" (no se generan)');
-    rechaza(await rpc('slr_admin_guardar_diseno', { token: U.token, liga_id: L, diseno: { ...base, poderes: [{ nombre: 'Mal', momento: 'chut', nivel: 'simple', efecto: 0.2, probabilidades: [0.1, 0.5] }] } }),
+    rechaza(await rpc('slr_admin_guardar_diseno', { token: U.token, liga_id: L, diseno: { ...base, nombre: 'Prueba Mal Formada', poderes: [{ nombre: 'Mal', momento: 'chut', nivel: 'simple', efecto: 0.2, probabilidades: [0.1, 0.5] }] } }),
       'no puede ser mayor', 'probabilidades crecientes: rechazadas con un mensaje claro');
     const beta = (await leer('disenos_carta?select=id&liga_prueba_id=is.null&limit=1')).datos[0];
     rechaza(await rpc('slr_admin_guardar_diseno', { token: U.token, liga_id: L, diseno: { id: beta.id, ...base } }),

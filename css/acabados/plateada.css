@@ -11,7 +11,6 @@
 ═══════════════════════════════════════════════ */
 
 /* Plateada: tono metálico monocromo con brillo */
-.slr-carta--plateada { --marco-carta: #C9D3DC; }
 .slr-carta--plateada .slr-carta__cara {
   background: linear-gradient(160deg, #5B6670, #1B2128 55%, #0B0E12);
   box-shadow:

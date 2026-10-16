@@ -24,7 +24,7 @@ export const COLORES = Object.freeze({
   naranja: 'Naranja', dorado: 'Dorado', plata: 'Plata', negro: 'Negro',
 });
 // Stat máxima según el tipo de carta
-export const MAX_STAT = Object.freeze({ individual: 97, duo: 99, trio: 100, unica: 101 });
+export const MAX_STAT = Object.freeze({ individual: 97, duo: 99, trio: 100, grupo: 101, especial: 101, unica: 101 });
 
 // Probabilidades [p1, p2, p3] que propone el generador (calibradas para ~5
 // activaciones por partido entre equipos con dúos y tríos; ver DECISIONES.md)

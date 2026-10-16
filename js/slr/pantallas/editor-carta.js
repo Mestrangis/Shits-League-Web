@@ -3,7 +3,9 @@
    (modo pruebas, solo el administrador)
    · Foto: subida directa a Cloudinary (preset unsigned, ver CLOUDINARY); PNG
      con transparencia o JPG. También se puede pegar una URL.
-   · Nombre, tipo, perfil, tier, acabado y color (opcional).
+   · Nombre, tipo, perfil, tier (que da la rareza: el marco), colección (con
+     «＋ Nueva» para crearla al vuelo), acabado y color (opcional: anula el de
+     la colección).
    · Stats y poderes los propone el generador (js/slr/generador.js, gemelo del
      de la base de datos) a partir de tier + perfil + tipo y una semilla;
      "Regenerar" cambia la semilla. Se pueden editar a mano.
@@ -14,7 +16,9 @@
 ═══════════════════════════════════════════════ */
 import { rpc, leer } from '../api.js';
 import { esc, hoja, cerrarCapa, conEspera, toast, monedas } from '../ui.js';
-import { cartaHTML, TIPOS, ACABADOS } from '../carta.js';
+import { cartaHTML, TIPOS, ACABADOS, RAREZAS, rarezaDeTier } from '../carta.js';
+import { listaColecciones } from '../colecciones.js';
+import { formularioColeccion } from './colecciones-admin.js';
 import { calcularValor } from '../valor.js';
 import {
   TIERS, PERFILES, COLORES, EFECTOS, PROBABILIDADES, NOMBRES_PODER,
@@ -63,11 +67,11 @@ export async function abrirEditorCarta(ctx, { disenoId = null } = {}) {
   // Estado del formulario (stats en mayúsculas, como el motor)
   const f = d ? {
     id: d.id, nombre: d.nombre, tipo: d.tipo, perfil: d.perfil, tier: d.tier, acabado: d.acabado ?? 'normal',
-    color: d.color ?? '', imagen_url: d.imagen_url ?? '', texto: d.texto ?? '', personas: d.personas ?? [],
+    color: d.color ?? '', coleccion_id: d.coleccion_id ?? '', imagen_url: d.imagen_url ?? '', texto: d.texto ?? '', personas: d.personas ?? [],
     stats: { ATA: d.ata, DEF: d.def, CON: d.con }, poderes: structuredClone(d.poderes ?? []),
     semilla_stats: d.semilla_stats, semilla_poderes: d.semilla_poderes,
   } : {
-    id: null, nombre: '', tipo: 'individual', perfil: 'atacante', tier: 'C', acabado: 'normal', color: '',
+    id: null, nombre: '', tipo: 'individual', perfil: 'atacante', tier: 'C', acabado: 'normal', color: '', coleccion_id: '',
     imagen_url: '', texto: '', personas: [], semilla_stats: semillaNueva(), semilla_poderes: semillaNueva(),
   };
   if (!d) {
@@ -104,9 +108,14 @@ export async function abrirEditorCarta(ctx, { disenoId = null } = {}) {
           <label class="slr-campo"><span>Perfil</span><select class="slr-input" name="perfil">${opciones(PERFILES, f.perfil)}</select></label>
           <label class="slr-campo"><span>Tier</span><select class="slr-input" name="tier">${opciones(Object.fromEntries(Object.entries(TIERS).map(([k, [lo, hi]]) => [k, `${k} · ${lo}–${hi}`])), f.tier)}</select></label>
         </div>
+        <p class="slr-suave" data-rareza></p>
+        <div class="slr-editor__fila slr-editor__fila--coleccion">
+          <label class="slr-campo"><span>Colección</span><select class="slr-input" name="coleccion_id" data-colecciones></select></label>
+          <button class="slr-btn slr-btn--mini slr-btn--fantasma" type="button" data-nueva-coleccion>＋ Nueva</button>
+        </div>
         <div class="slr-editor__fila">
           <label class="slr-campo"><span>Acabado</span><select class="slr-input" name="acabado">${opciones({ normal: 'Normal', ...ACABADOS }, f.acabado)}</select></label>
-          <label class="slr-campo"><span>Color</span><select class="slr-input" name="color">${opciones({ '': 'Del tipo', ...COLORES }, f.color)}</select></label>
+          <label class="slr-campo"><span>Color</span><select class="slr-input" name="color">${opciones({ '': 'El de la colección', ...COLORES }, f.color)}</select></label>
         </div>
         <label class="slr-campo"><span>Frase (opcional)</span>
           <input class="slr-input" name="texto" maxlength="140" value="${esc(f.texto)}" autocomplete="off"></label>
@@ -142,8 +151,8 @@ export async function abrirEditorCarta(ctx, { disenoId = null } = {}) {
 
   /* ── Pintado ── */
   function cartaActual() {
-    const c = { id: f.id ?? 'nueva', nombre: f.nombre || 'Nombre de la carta', tipo: f.tipo, acabado: f.acabado,
-      color: f.color || null, personas: f.personas, imagen_url: fotoLocal ?? (f.imagen_url || null),
+    const c = { id: f.id ?? 'nueva', nombre: f.nombre || 'Nombre de la carta', tipo: f.tipo, acabado: f.acabado, tier: f.tier,
+      color: f.color || null, coleccion_id: f.coleccion_id || null, personas: f.personas, imagen_url: fotoLocal ?? (f.imagen_url || null),
       ata: f.stats.ATA, def: f.stats.DEF, con: f.stats.CON, poderes: f.poderes };
     c.ovr = Math.round(ovr100(f.stats) / 100);
     return c;
@@ -151,8 +160,14 @@ export async function abrirEditorCarta(ctx, { disenoId = null } = {}) {
   function valorActual() {
     try { return calcularValor({ ...f.stats, poderes: f.poderes }); } catch { return null; }
   }
+  // Colecciones del selector (se vuelve a pintar al crear una nueva)
+  function pintarColecciones() {
+    el.querySelector('[data-colecciones]').innerHTML = opciones(
+      { '': 'Sin colección', ...Object.fromEntries(listaColecciones().map(k => [k.id, k.nombre])) }, f.coleccion_id);
+  }
   function pintarVista() {
     const c = cartaActual();
+    el.querySelector('[data-rareza]').textContent = `Rareza ${RAREZAS[rarezaDeTier(f.tier)]} (sale del tier: F, E y D común; C y B rara; A épica; S legendaria).`;
     el.querySelector('[data-vista]').innerHTML = cartaHTML(c, { tam: 'l' });
     const v = valorActual();
     const ovr = ovr100(f.stats) / 100;
@@ -225,7 +240,7 @@ export async function abrirEditorCarta(ctx, { disenoId = null } = {}) {
       regenerarStats();
       if (t.name !== 'tipo') regenerarPoderes();
     }
-    if (t.name === 'acabado' || t.name === 'color') { f[t.name] = t.value; pintarVista(); }
+    if (t.name === 'acabado' || t.name === 'color' || t.name === 'coleccion_id') { f[t.name] = t.value; pintarVista(); }
     const li = t.closest('[data-i]');
     if (li && (t.dataset.p === 'momento' || t.dataset.p === 'nivel')) {
       const p = f.poderes[Number(li.dataset.i)];
@@ -306,7 +321,8 @@ export async function abrirEditorCarta(ctx, { disenoId = null } = {}) {
     await conEspera(boton, async () => {
       const r = await rpc('slr_admin_guardar_diseno', { liga_id: liga, diseno: {
         id: f.id, nombre: f.nombre.trim(), tipo: f.tipo, perfil: f.perfil, tier: f.tier, acabado: f.acabado,
-        color: f.color || null, ata: f.stats.ATA, def: f.stats.DEF, con: f.stats.CON, poderes: f.poderes,
+        color: f.color || null, coleccion_id: f.coleccion_id || null,
+        ata: f.stats.ATA, def: f.stats.DEF, con: f.stats.CON, poderes: f.poderes,
         imagen_url: f.imagen_url || null, texto: f.texto || null, personas: f.personas,
         semilla_stats: f.semilla_stats, semilla_poderes: f.semilla_poderes,
       } });
@@ -319,8 +335,12 @@ export async function abrirEditorCarta(ctx, { disenoId = null } = {}) {
     }).catch(() => {});
   }
   form.addEventListener('submit', e => { e.preventDefault(); guardar(el.querySelector('[data-guardar]'), false); });
+  // Crear una colección sin salir del formulario: al guardarla queda elegida
+  el.querySelector('[data-nueva-coleccion]').addEventListener('click', () =>
+    formularioColeccion(ctx, null, { alGuardar: k => { if (k) { f.coleccion_id = k.id; pintarColecciones(); pintarVista(); } } }));
   el.querySelector('[data-crear-dar]')?.addEventListener('click', e => guardar(e.currentTarget, true));
 
+  pintarColecciones();
   pintarPoderes();
 }
 

@@ -14,9 +14,18 @@
    luego la vista previa borrosa y por último la foto con un fundido.
    Todas las cartas se inclinan en 3D siguiendo el ratón (PC) o el giroscopio
    (móvil: todas las visibles a la vez); el brillo es solo de los acabados.
-   Sin imagen (catálogo beta), un marcador con iniciales y silueta del color
-   de la carta (`color` de la paleta o, si no tiene, el del tipo). Con una foto
-   PNG sin fondo, el fondo de la carta se ve detrás.
+   Sin imagen, un marcador con iniciales y siluetas. Con una foto PNG sin
+   fondo, el fondo de la carta se ve detrás.
+   Modelo (docs/slr/CARTAS.md):
+   · MARCO = rareza (común gris metálico, rara azul, épica morado, legendaria
+     dorado con brillo), en .slr-carta__borde: se distingue también en pequeño.
+   · FONDO = color propio de la carta (anulación manual) o, si no tiene, el de
+     su colección; si tampoco, el verde neutro.
+   · TIPO = icono pequeño bajo la media (siluetas 1/2/3/grupo, estrella para
+     especial): solo descriptivo.
+   · COLECCIÓN = emblema en la esquina de arriba a la derecha, tintado con el
+     color de la colección (mask-image); en la carta grande, además, su nombre
+     en pequeño bajo el nombre de la carta.
    El nombre se ajusta a su largo (--n): letra más pequeña hasta un mínimo y,
    si aun así no cabe, dos líneas.
    Interacción (iniciarAcabados): sin menú de "guardar imagen" ni arrastre del
@@ -31,8 +40,12 @@
 import { esc, iniciales } from './ui.js';
 import { acabado, listaAcabados } from './acabados/index.js';
 import { urlFoto, cargarFotos } from './imagenes.js';
+import { coleccion, urlEmblema } from './colecciones.js';
 
-export const TIPOS = { individual: 'Individual', duo: 'Dúo', trio: 'Trío', unica: 'Única' };
+export const TIPOS = { individual: 'Individual', duo: 'Dúo', trio: 'Trío', grupo: 'Grupo', especial: 'Especial', unica: 'Única' };
+// Rareza: sale del tier (igual que la columna generada disenos_carta.rareza)
+export const RAREZAS = { comun: 'Común', rara: 'Rara', epica: 'Épica', legendaria: 'Legendaria' };
+export const rarezaDeTier = t => ({ S: 'legendaria', A: 'epica', B: 'rara', C: 'rara' })[t] ?? 'comun';
 // Nombres de los acabados registrados ({ foil: 'Foil', … })
 export const ACABADOS = Object.fromEntries(listaAcabados().map(a => [a.id, a.nombre]));
 
@@ -52,6 +65,8 @@ export function normalizarCarta(f) {
     acabado: d.acabado ?? 'normal',
     color: d.color ?? null,
     tier: d.tier ?? null,
+    rareza: d.rareza ?? rarezaDeTier(d.tier),
+    coleccion_id: d.coleccion_id ?? null,
     perfil: d.perfil ?? null,
     personas: d.personas ?? [],
     ata: d.ata, def: d.def, con: d.con,
@@ -97,6 +112,19 @@ export const imagenCarta = urlFoto;
 const SILUETA = `<svg class="slr-carta__silueta" viewBox="0 0 100 100" aria-hidden="true">
   <circle cx="50" cy="36" r="17"/><path d="M14 100c0-22 16-36 36-36s36 14 36 36z"/></svg>`;
 
+// Icono del tipo (24×24, currentColor): una, dos, tres o cuatro siluetas; estrella para especial
+const persona = (x, y, e) => `<circle cx="${x}" cy="${y}" r="${3.1 * e}"/><path d="M${x - 5.6 * e} ${y + 10 * e}c0-3.6 2.5-6 ${5.6 * e}-6s${5.6 * e} 2.4 ${5.6 * e} 6z"/>`;
+export const ICONOS_TIPO = {
+  individual: persona(12, 8, 1.15),
+  duo: persona(8, 9, .9) + persona(16, 9, .9),
+  trio: persona(5.5, 10, .72) + persona(18.5, 10, .72) + persona(12, 8, .85),
+  grupo: persona(5, 7, .62) + persona(12, 6, .62) + persona(19, 7, .62) + persona(8.5, 13, .62) + persona(15.5, 13, .62),
+  especial: '<path d="M12 2.5l2.7 6.3 6.8.6-5.2 4.5 1.6 6.7L12 17.1l-5.9 3.5 1.6-6.7-5.2-4.5 6.8-.6z"/>',
+  unica: persona(12, 8, 1.15),
+};
+export const iconoTipo = tipo => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONOS_TIPO[tipo] ?? ICONOS_TIPO.individual}</svg>`;
+const PERSONAS_TIPO = { individual: 1, duo: 2, trio: 3, grupo: 3, especial: 0, unica: 1 };
+
 function arte(c) {
   if (c.imagen_url) {
     // Sin src: lo pone cargarFotoCarta al pintarse (vista previa diminuta y la
@@ -105,9 +133,9 @@ function arte(c) {
       <img class="slr-carta__img" data-foto="${esc(c.imagen_url)}" alt="" decoding="async" draggable="false">
       <span class="slr-carta__iniciales slr-carta__iniciales--foto">${esc(iniciales(c.nombre))}</span>`;
   }
-  const personas = c.personas.length ? c.personas : [c.nombre];
-  const siluetas = personas.slice(0, 3).map(() => SILUETA).join('');
-  return `<div class="slr-carta__marcador slr-carta__marcador--${Math.min(3, personas.length)}">
+  const n = c.personas.length || (PERSONAS_TIPO[c.tipo] ?? 1);
+  const siluetas = Array.from({ length: Math.min(3, n) }, () => SILUETA).join('');
+  return `<div class="slr-carta__marcador slr-carta__marcador--${Math.min(3, n)}">
       <div class="slr-carta__siluetas">${siluetas}</div>
       <span class="slr-carta__iniciales">${esc(iniciales(c.nombre))}</span>
     </div>`;
@@ -129,6 +157,11 @@ function largoNombre(nombre) {
 export function cartaHTML(c, { tam = 's', destacar = null, capitan = false, tocada = false, blindada = false, enVenta = false } = {}) {
   const stats = [['ATA', c.ata], ['DEF', c.def], ['CON', c.con]];
   const def = acabado(c.acabado);
+  const rareza = c.rareza ?? rarezaDeTier(c.tier);
+  const col = c.coleccion ?? coleccion(c.coleccion_id);
+  const color = c.color ?? col?.color ?? null;          // el de la carta manda sobre el de la colección
+  const emblema = col?.emblema_url
+    ? `<span class="slr-carta__emblema" title="${esc(col.nombre)}"><i style="--emblema:url(&quot;${esc(urlEmblema(col.emblema_url))}&quot;)"></i></span>` : '';
   const marcas = [
     capitan && '<span class="slr-carta__marca slr-carta__marca--capitan" title="Capitán">C</span>',
     tocada && '<span class="slr-carta__marca slr-carta__marca--tocada" title="Tocada: juega al 85 %">+</span>',
@@ -136,19 +169,23 @@ export function cartaHTML(c, { tam = 's', destacar = null, capitan = false, toca
     enVenta && '<span class="slr-carta__marca slr-carta__marca--venta" title="En venta">€</span>',
   ].filter(Boolean).join('');
   return `
-    <div class="slr-carta slr-carta--${tam} slr-carta--${esc(c.tipo)} slr-carta--${esc(def.id)}${c.color ? ` slr-carta--color-${esc(c.color)}` : ''}${c.imagen_url ? ' slr-carta--con-imagen' : ''}${tocada ? ' slr-carta--tocada' : ''}"
+    <div class="slr-carta slr-carta--${tam} slr-carta--${esc(c.tipo)} slr-carta--r-${esc(rareza)} slr-carta--${esc(def.id)}${color ? ` slr-carta--color-${esc(color)}` : ''}${col?.color ? ` slr-carta--col-${esc(col.color)}` : ''}${c.imagen_url ? ' slr-carta--con-imagen' : ''}${tocada ? ' slr-carta--tocada' : ''}"
          data-carta="${esc(c.id)}" data-acabado="${esc(def.id)}"${def.sigue ? ' data-sigue' : ''}>
       <div class="slr-carta__marco"><div class="slr-carta__cara">
         <div class="slr-carta__arte">${arte(c)}</div>
         <div class="slr-carta__velo"></div>
+        <div class="slr-carta__borde" aria-hidden="true"><i></i></div>
         <div class="slr-carta__cabeza">
-          <span class="slr-carta__ovr">${c.ovr}</span>
-          <span class="slr-carta__tipo">${esc(TIPOS[c.tipo] ?? c.tipo)}</span>
+          <span class="slr-carta__media">
+            <span class="slr-carta__ovr">${c.ovr}</span>
+            <span class="slr-carta__tipo" title="${esc(TIPOS[c.tipo] ?? c.tipo)}">${iconoTipo(c.tipo)}</span>
+          </span>
+          ${emblema}
         </div>
         <div class="slr-carta__pie">
           ${marcas ? `<span class="slr-carta__marcas">${marcas}</span>` : ''}
-          <span class="slr-carta__tipo-pie">${esc(TIPOS[c.tipo] ?? c.tipo)}</span>
           <span class="slr-carta__nombre" style="--n:${largoNombre(c.nombre)}">${esc(c.nombre)}</span>
+          ${tam === 'l' && col ? `<span class="slr-carta__coleccion">${esc(col.nombre)}</span>` : ''}
           <span class="slr-carta__stats">
             ${stats.map(([k, v]) => `<span class="${destacar === k ? 'es-destacada' : ''}"><b>${v}</b>${k}</span>`).join('')}
           </span>
@@ -157,6 +194,20 @@ export function cartaHTML(c, { tam = 's', destacar = null, capitan = false, toca
         <div class="slr-carta__destello" aria-hidden="true"><i class="slr-carta__capa"></i></div>
       </div></div>
     </div>`;
+}
+
+// Línea de la ficha: tipo (con su icono), rareza, acabado y colección (con su emblema)
+export function lineaCarta(c) {
+  const r = c.rareza ?? rarezaDeTier(c.tier);
+  const col = c.coleccion ?? coleccion(c.coleccion_id);
+  const def = acabado(c.acabado);
+  return `<span class="slr-linea-carta">
+    <span class="slr-chip-tipo">${iconoTipo(c.tipo)}${esc(TIPOS[c.tipo] ?? c.tipo)}</span>
+    <span class="slr-chip-rareza slr-chip-rareza--${esc(r)}">${esc(RAREZAS[r])}</span>
+    ${def.id !== 'normal' ? `<span class="slr-acabado-${esc(def.id)}">${esc(ACABADOS[def.id] ?? def.id)}</span>` : ''}
+    ${col ? `<span class="slr-chip-coleccion${col.color ? ` slr-col-${esc(col.color)}` : ''}">${col.emblema_url
+      ? `<i style="--emblema:url(&quot;${esc(urlEmblema(col.emblema_url, 64))}&quot;)"></i>` : ''}${esc(col.nombre)}</span>` : ''}
+  </span>`;
 }
 
 /* ── Movimiento 3D y acabados ────────────────────────────────────────────── */

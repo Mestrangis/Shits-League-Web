@@ -6,7 +6,7 @@
 ═══════════════════════════════════════════════ */
 import { rpc } from '../api.js';
 import { esc, miles, monedas, hoja, cerrarCapa, confirmar, conEspera, toast, fechaCorta, diaHora } from '../ui.js';
-import { cartaHTML, normalizarCarta, describirPoder, TIPOS, ACABADOS } from '../carta.js';
+import { cartaHTML, normalizarCarta, describirPoder, lineaCarta } from '../carta.js';
 import { estaTocada, configLiga } from '../rush.js';
 import { chipsEstado } from './plantilla.js';
 import { abrirEditorCarta } from './editor-carta.js';
@@ -42,7 +42,7 @@ export async function abrirDetalle(cartaId, ctx) {
     <div class="slr-detalle">
       <div class="slr-detalle__carta">${cartaHTML(c, { tam: 'l', ancho: 300, tocada: propia && estaTocada(propia) })}</div>
       <div class="slr-detalle__info">
-        <p class="slr-detalle__tipo">${esc(TIPOS[c.tipo])}${c.acabado !== 'normal' ? ` · <span class="slr-acabado-${esc(c.acabado)}">${esc(ACABADOS[c.acabado])}</span>` : ''}</p>
+        <p class="slr-detalle__tipo">${lineaCarta(c)}</p>
         ${propia ? `<div class="slr-ficha__chips">${chipsEstado(propia)}</div>` : ''}
         <div class="slr-stats">${barras(c)}</div>
         <div class="slr-cifras">

@@ -2,9 +2,9 @@
    SHITS LEAGUE RUSH — catálogo de cartas (desde Perfil, solo el admin)
    Todos los diseños del juego como en el álbum, pero todos y sin herramientas
    de gestión: los activos (interruptor para ver también los inactivos), con
-   el total y el recuento por tipo y por tier; filtros (tipo, tier, perfil,
-   acabado, color, libre / con dueño), buscador y orden (valor, OVR, nombre,
-   tier, fecha de creación). Misma carga que el álbum (bloques al hacer scroll,
+   el total y el recuento por tipo, rareza y tier; filtros (tipo, rareza, tier,
+   colección, perfil, acabado, color, libre / con dueño), buscador y orden
+   (valor, OVR, nombre, rareza, tier, fecha de creación). Misma carga que el álbum (bloques al hacer scroll,
    precarga, vista previa y esqueleto).
    Datos: disenos_carta (lectura pública; los del catálogo común y los creados
    en esta liga de prueba) y el ejemplar de cada uno en la liga, para saber el
@@ -14,7 +14,8 @@
 ═══════════════════════════════════════════════ */
 import { leer } from '../api.js';
 import { esc, hoja, miles, monedas, scrollDeHoja, toast } from '../ui.js';
-import { cartaHTML, normalizarCarta, TIPOS, ACABADOS } from '../carta.js';
+import { cartaHTML, normalizarCarta, lineaCarta, TIPOS, ACABADOS, RAREZAS } from '../carta.js';
+import { listaColecciones, coleccion } from '../colecciones.js';
 import { PERFILES, COLORES } from '../generador.js';
 import { configLiga } from '../rush.js';
 import { rejillaPorBloques } from '../bloques.js';
@@ -22,23 +23,25 @@ import { abrirDetalle, barras, poderes } from './detalle.js';
 import { abrirEditorCarta } from './editor-carta.js';
 
 const TIERS = ['S', 'A', 'B', 'C', 'D', 'E', 'F'];
-const ORDEN_TIPO = { unica: 0, trio: 1, duo: 2, individual: 3 };
+const ORDEN_TIPO = { especial: 0, grupo: 1, unica: 1, trio: 2, duo: 3, individual: 4 };
+const ORDEN_RAREZA = { legendaria: 0, epica: 1, rara: 2, comun: 3 };
 const ORDENES = {
   valor:  ['Valor', (a, b) => b.valor - a.valor],
   ovr:    ['OVR', (a, b) => b.ovr - a.ovr || b.valor - a.valor],
   nombre: ['Nombre', (a, b) => a.nombre.localeCompare(b.nombre, 'es')],
+  rareza: ['Rareza', (a, b) => ORDEN_RAREZA[a.rareza] - ORDEN_RAREZA[b.rareza] || b.valor - a.valor],
   tier:   ['Tier', (a, b) => TIERS.indexOf(a.tier) - TIERS.indexOf(b.tier) || b.valor - a.valor],
   fecha:  ['Más recientes', (a, b) => new Date(b.creado_en) - new Date(a.creado_en)],
 };
 const sinAcentos = s => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 // Se recuerdan mientras dura la sesión
-const filtro = { texto: '', tipo: '', tier: '', perfil: '', acabado: '', color: '', estado: '', orden: 'valor', inactivas: false };
+const filtro = { texto: '', tipo: '', rareza: '', tier: '', coleccion: '', perfil: '', acabado: '', color: '', estado: '', orden: 'valor', inactivas: false };
 
 export async function abrirCatalogo(ctx) {
   const { datos } = ctx;
   const liga = datos.liga.id, miEquipo = datos.equipo?.id;
-  const CAMPOS = 'id,nombre,tipo,acabado,color,tier,perfil,personas,ata,def,con,valor,poderes,imagen_url,texto,activo,creado_en';
+  const CAMPOS = 'id,nombre,tipo,acabado,color,tier,rareza,coleccion_id,perfil,personas,ata,def,con,valor,poderes,imagen_url,texto,activo,liga_prueba_id,creado_en';
   const [disenos, ejemplares, equipos] = await Promise.all([
     leer(`disenos_carta?select=${CAMPOS}&or=(liga_prueba_id.is.null,liga_prueba_id.eq.${liga})&limit=5000`),
     leer(`cartas?select=id,diseno_id,equipo_id&liga_id=eq.${liga}&limit=5000`),
@@ -48,7 +51,8 @@ export async function abrirCatalogo(ctx) {
   const nombreEquipo = new Map(equipos.map(e => [e.id, e.nombre]));
   const todas = disenos.map(d => {
     const ej = ejemplarDe.get(d.id);
-    return { ...normalizarCarta(d), id: ej?.id ?? `diseno-${d.id}`, diseno_id: d.id, activo: d.activo, creado_en: d.creado_en,
+    // Las creadas en esta liga de prueba nacen inactivas (no llegan a las ligas reales), pero aquí juegan
+    return { ...normalizarCarta(d), id: ej?.id ?? `diseno-${d.id}`, diseno_id: d.id, activo: d.activo || !!d.liga_prueba_id, creado_en: d.creado_en,
              ejemplar: !!ej, dueno: ej?.equipo_id ?? null, clave: sinAcentos(d.nombre) };
   });
 
@@ -59,6 +63,8 @@ export async function abrirCatalogo(ctx) {
       <input class="slr-input" type="search" data-f="texto" placeholder="Buscar carta por nombre" autocomplete="off" value="${esc(filtro.texto)}">
       <div class="slr-filtros slr-filtros--catalogo">
         <label><span>Tipo</span><select class="slr-input" data-f="tipo">${opciones([['', 'Todos'], ...Object.entries(TIPOS)], filtro.tipo)}</select></label>
+        <label><span>Rareza</span><select class="slr-input" data-f="rareza">${opciones([['', 'Todas'], ...Object.entries(RAREZAS)], filtro.rareza)}</select></label>
+        <label><span>Colección</span><select class="slr-input" data-f="coleccion">${opciones([['', 'Todas'], ['-', 'Sin colección'], ...listaColecciones().map(k => [k.id, k.nombre])], filtro.coleccion)}</select></label>
         <label><span>Tier</span><select class="slr-input" data-f="tier">${opciones([['', 'Todos'], ...TIERS.map(t => [t, t])], filtro.tier)}</select></label>
         <label><span>Perfil</span><select class="slr-input" data-f="perfil">${opciones([['', 'Todos'], ...Object.entries(PERFILES)], filtro.perfil)}</select></label>
         <label><span>Acabado</span><select class="slr-input" data-f="acabado">${opciones([['', 'Todos'], ['normal', 'Normal'], ...Object.entries(ACABADOS)], filtro.acabado)}</select></label>
@@ -77,7 +83,7 @@ export async function abrirCatalogo(ctx) {
     <button class="slr-ficha slr-ficha--catalogo${c.activo ? '' : ' es-inactiva'}" type="button" data-id="${esc(c.id)}">
       ${cartaHTML(c, { tam: 's' })}
       <span class="slr-ficha__album">
-        <span>${c.tier ? `Tier ${esc(c.tier)} · ` : ''}${esc(PERFILES[c.perfil] ?? c.perfil ?? '')}${c.activo ? '' : ' · <b class="slr-rival">Inactiva</b>'}</span>
+        <span>${esc(RAREZAS[c.rareza])} · ${c.tier ? `Tier ${esc(c.tier)} · ` : ''}${esc(PERFILES[c.perfil] ?? c.perfil ?? '')}${coleccion(c.coleccion_id) ? ` · ${esc(coleccion(c.coleccion_id).nombre)}` : ''}${c.activo ? '' : ' · <b class="slr-rival">Inactiva</b>'}</span>
         <span class="${c.dueno === miEquipo ? 'slr-propio' : ''}">${esc(quien(c))} · ${miles(c.valor)}</span>
       </span>
     </button>`;
@@ -92,6 +98,7 @@ export async function abrirCatalogo(ctx) {
       <p class="slr-catalogo__total"><b>${miles(base.length)}</b> ${base.length === 1 ? 'carta' : 'cartas'}
         <small>${filtro.inactivas ? `incluidas ${inactivas} inactivas` : `activas${inactivas ? ` · ${inactivas} inactivas ocultas` : ''}`}</small></p>
       <div class="slr-catalogo__cuentas"><small>Tipo</small>${cuenta('tipo', Object.keys(TIPOS), TIPOS)}</div>
+      <div class="slr-catalogo__cuentas"><small>Rareza</small>${cuenta('rareza', Object.keys(RAREZAS), RAREZAS)}</div>
       <div class="slr-catalogo__cuentas"><small>Tier</small>${cuenta('tier', TIERS)}</div>`;
   }
 
@@ -102,6 +109,8 @@ export async function abrirCatalogo(ctx) {
     const lista = base.filter(c =>
       (!t || c.clave.includes(t)) &&
       (!filtro.tipo || c.tipo === filtro.tipo) &&
+      (!filtro.rareza || c.rareza === filtro.rareza) &&
+      (!filtro.coleccion || (filtro.coleccion === '-' ? !c.coleccion_id : c.coleccion_id === filtro.coleccion)) &&
       (!filtro.tier || c.tier === filtro.tier) &&
       (!filtro.perfil || c.perfil === filtro.perfil) &&
       (!filtro.acabado || c.acabado === filtro.acabado) &&
@@ -137,7 +146,7 @@ function fichaDiseno(c, ctx) {
     <div class="slr-detalle">
       <div class="slr-detalle__carta">${cartaHTML(c, { tam: 'l' })}</div>
       <div class="slr-detalle__info">
-        <p class="slr-detalle__tipo">${esc(TIPOS[c.tipo])}${c.acabado !== 'normal' ? ` · ${esc(ACABADOS[c.acabado] ?? c.acabado)}` : ''}${c.activo ? '' : ' · <b class="slr-rival">Inactiva</b>'}</p>
+        <p class="slr-detalle__tipo">${lineaCarta(c)}${c.activo ? '' : ' <b class="slr-rival">Inactiva</b>'}</p>
         <div class="slr-stats">${barras(c)}</div>
         <div class="slr-cifras"><div><small>Valor</small><b>${monedas(c.valor)}</b></div>
           <div><small>Tier</small><b>${esc(c.tier ?? '—')}</b></div><div><small>Ejemplar</small><b>No hay en esta liga</b></div></div>
