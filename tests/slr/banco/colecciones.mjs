@@ -215,12 +215,12 @@ try {
 
   console.log('\nEdición múltiple en el catálogo');
   await clic('[data-catalogo]');
-  await esperar(`!!document.querySelector('.slr-catalogo [data-sel=entrar]')`);
+  await esperar(`!!document.querySelector(':is(.slr-seleccion-barra:not([hidden]), .slr-seleccion-fija:not([hidden])) [data-sel=entrar]')`);
   await ev(`(() => { const s = document.querySelector('.slr-catalogo [data-f=coleccion]'); s.value = ${JSON.stringify(col.id)}; s.dispatchEvent(new Event('change')); return 0; })()`);
   await dormir(300);
   const fichas = `[...document.querySelectorAll('.slr-catalogo [data-sel-id]')]`;
   const n = () => ev(`Number(document.querySelector('.slr-seleccion__n b')?.textContent ?? -1)`);
-  await clic('.slr-catalogo [data-sel=entrar]');
+  await clic(':is(.slr-seleccion-barra:not([hidden]), .slr-seleccion-fija:not([hidden])) [data-sel=entrar]');
   await ev(`${fichas}[0].click(); 0`);
   await ev(`${fichas}[2].dispatchEvent(new MouseEvent('click', { bubbles: true, shiftKey: true })); 0`);
   const trasRango = await n();
@@ -228,12 +228,12 @@ try {
   const trasCtrl = await n();
   check(trasRango === 3 && trasCtrl === 4, `clic + Mayús+clic: rango de 3; Ctrl+clic: 4 (casillas marcadas: ${await ev(`${fichas}.filter(b => b.classList.contains('es-seleccionada')).length`)})`);
   await foto('seleccion-catalogo', '.slr-seleccion-barra');
-  await clic('.slr-catalogo [data-sel=ninguna]');
+  await clic(':is(.slr-seleccion-barra:not([hidden]), .slr-seleccion-fija:not([hidden])) [data-sel=ninguna]');
   check(await n() === 0, '«Quitar selección»: 0');
-  await clic('.slr-catalogo [data-sel=todas]');
+  await clic(':is(.slr-seleccion-barra:not([hidden]), .slr-seleccion-fija:not([hidden])) [data-sel=todas]');
   check(await n() === 5, '«Seleccionar todas las visibles»: las 5 del filtro');
   check(await ev(`!document.querySelector('.slr-detalle')`), 'en modo selección, tocar no abre el detalle');
-  await clic('.slr-catalogo [data-sel=editar]');
+  await clic(':is(.slr-seleccion-barra:not([hidden]), .slr-seleccion-fija:not([hidden])) [data-sel=editar]');
   await esperar(`!!document.querySelector('.slr-edicion-multiple')`);
   await ev(`(() => { const s = document.querySelector('.slr-edicion-multiple [name=tier]'); s.value = 'A'; s.dispatchEvent(new Event('change', { bubbles: true }));
     const a = document.querySelector('.slr-edicion-multiple [name=acabado]'); a.value = 'plateada'; a.dispatchEvent(new Event('change', { bubbles: true })); return 0; })()`);
@@ -251,7 +251,7 @@ try {
   check(tras.length === 5 && tras.every(d => d.tier === 'A' && d.rareza === 'epica' && d.acabado === 'plateada'), 'en la base: las 5 en tier A (épica) y plateadas');
   check(await esperar(`[...document.querySelectorAll('.slr-catalogo .slr-carta')].filter(c => c.classList.contains('slr-carta--r-epica')).length === 5`, 10000),
     'el catálogo se recarga: marco épico en las 5');
-  await clic('.slr-catalogo [data-sel=salir]');
+  await clic(':is(.slr-seleccion-barra:not([hidden]), .slr-seleccion-fija:not([hidden])) [data-sel=salir]');
   // Pulsación larga (dedo): entra en modo selección y no levanta la carta
   await ev(`${fichas}[1].scrollIntoView({ block: 'center' }); 0`);
   await dormir(400);
@@ -262,8 +262,94 @@ try {
   await cdp('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   await dormir(300);
   check(await n() === 1 && !levantada && await ev(`!document.querySelector('.slr-detalle')`), 'pulsación larga: modo selección con esa carta, sin levantarla ni abrir el detalle');
-  await clic('.slr-catalogo [data-sel=salir]');
+  await clic(':is(.slr-seleccion-barra:not([hidden]), .slr-seleccion-fija:not([hidden])) [data-sel=salir]');
   await atras();
+
+  console.log('\nBarra de selección fija y sin selección de texto');
+  // Una pantalla y otra (móvil y PC): la barra se ve siempre y no tapa la última fila
+  const probarBarra = async etiqueta => {
+    await clic('[data-catalogo]');
+    await esperar(`!!document.querySelector('.slr-catalogo [data-sel=entrar]')`);
+    await ev(`(() => { const s = document.querySelector('.slr-catalogo [data-f=coleccion]'); s.value = ''; s.dispatchEvent(new Event('change')); return 0; })()`);
+    await dormir(400);
+    await clic(':is(.slr-seleccion-barra:not([hidden]), .slr-seleccion-fija:not([hidden])) [data-sel=entrar]');
+    await dormir(200);
+    const sc = `((h => getComputedStyle(h).overflowY === 'auto' ? h : h.querySelector('.slr-hoja__cuerpo'))([...document.querySelectorAll('.slr-hoja')].pop()))`;
+    const enMedio = await ev(`(() => { const c = ${sc}; c.scrollTop = c.scrollHeight / 2; return 0; })()`);
+    await dormir(300);
+    const medio = await ev(`(() => { const b = document.querySelector('.slr-seleccion-fija').getBoundingClientRect(); return { top: Math.round(b.top), bottom: Math.round(b.bottom), alto: innerHeight, visible: !document.querySelector('.slr-seleccion-fija').hidden }; })()`);
+    check(medio.visible && medio.bottom <= medio.alto + 1 && medio.top > medio.alto - 160, `${etiqueta}: a media lista, la barra fija abajo (${medio.top}–${medio.bottom} de ${medio.alto} px)`);
+    await foto(`barra-fija-${etiqueta}`);
+    // Hasta el final de verdad: el catálogo carga por bloques al bajar
+    for (let i = 0, n = -1; i < 20; i++) {
+      await ev(`(() => { const c = ${sc}; c.scrollTop = c.scrollHeight; return 0; })()`);
+      await dormir(300);
+      const m = await ev(`document.querySelectorAll('.slr-catalogo .slr-ficha').length`);
+      if (m === n) break;
+      n = m;
+    }
+    const fin = await ev(`(() => { const f = document.querySelector('.slr-seleccion-fija').getBoundingClientRect();
+      const ult = [...document.querySelectorAll('.slr-catalogo .slr-ficha')].pop().getBoundingClientRect();
+      return { ultimaAbajo: Math.round(ult.bottom), barraArriba: Math.round(f.top), rejilla: Math.round(document.querySelector('.slr-catalogo .slr-rejilla').getBoundingClientRect().bottom), catalogo: Math.round(document.querySelector('.slr-catalogo').getBoundingClientRect().bottom), ficha: getComputedStyle([...document.querySelectorAll('.slr-catalogo .slr-ficha')].pop()).height }; })()`);
+    check(fin.ultimaAbajo <= fin.barraArriba, `${etiqueta}: al final, la última fila (hasta ${fin.ultimaAbajo} px) queda por encima de la barra (${fin.barraArriba} px)`);
+    // «Terminar» sale sin mover el scroll
+    await ev(`(() => { const c = ${sc}; c.scrollTop = Math.round(c.scrollHeight / 3); return 0; })()`);
+    await dormir(200);
+    const y0 = await ev(`${sc}.scrollTop`);
+    await clic(':is(.slr-seleccion-barra:not([hidden]), .slr-seleccion-fija:not([hidden])) [data-sel=salir]');
+    await dormir(500);
+    const y1 = await ev(`${sc}.scrollTop`);
+    check(Math.abs(y1 - y0) <= 2 && await ev(`document.querySelector('.slr-seleccion-fija').hidden && !document.querySelector('.slr-catalogo .en-seleccion')`),
+      `${etiqueta}: «Terminar» sale del modo sin mover el scroll (${y0} → ${y1})`);
+    // Botón atrás: sale del modo y el catálogo sigue abierto
+    await clic(':is(.slr-seleccion-barra:not([hidden]), .slr-seleccion-fija:not([hidden])) [data-sel=entrar]');
+    await dormir(200);
+    await ev('history.back(); 0');
+    await dormir(600);
+    check(await ev(`!!document.querySelector('.slr-catalogo') && document.querySelector('.slr-seleccion-fija').hidden`), `${etiqueta}: el botón atrás sale del modo selección y el catálogo sigue abierto`);
+    // La ✕ con el modo activo cierra el catálogo (y el modo) de una vez
+    await clic(':is(.slr-seleccion-barra:not([hidden]), .slr-seleccion-fija:not([hidden])) [data-sel=entrar]');
+    await dormir(200);
+    await ev(`[...document.querySelectorAll('.slr-hoja')].pop().querySelector('.slr-hoja__cerrar').click(); 0`);
+    check(await esperar(`!document.querySelector('.slr-catalogo')`, 3000), `${etiqueta}: la ✕ cierra el catálogo aunque esté en modo selección`);
+    await dormir(400);
+  };
+  await probarBarra('movil');
+  // Mantener pulsada una carta: ni selección de texto ni menú (y en los campos de texto sí se puede)
+  await clic('[data-catalogo]');
+  await esperar(`!!document.querySelector('.slr-catalogo .slr-carta')`);
+  await dormir(500);
+  // (-webkit-touch-callout solo existe en iOS: Chrome no lo expone, no se puede comprobar aquí)
+  const estilos = await ev(`({ carta: getComputedStyle(document.querySelector('.slr-catalogo .slr-carta')).userSelect, titulo: getComputedStyle(document.querySelector('.slr-hoja__titulo')).userSelect,
+    chip: getComputedStyle(document.querySelector('.slr-catalogo__cuentas span')).userSelect, buscador: getComputedStyle(document.querySelector('.slr-catalogo [data-f=texto]')).userSelect })`);
+  check(estilos.carta === 'none' && estilos.titulo === 'none' && estilos.chip === 'none' && estilos.buscador === 'text',
+    `user-select: carta ${estilos.carta}, título ${estilos.titulo}, chip ${estilos.chip}; buscador ${estilos.buscador}`);
+  await ev(`document.querySelector('.slr-catalogo .slr-ficha').scrollIntoView({ block: 'center' }); 0`);
+  await dormir(300);
+  const rc = await ev(`(() => { const b = document.querySelector('.slr-catalogo .slr-ficha').getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; })()`);
+  await cdp('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: rc.x, y: rc.y, id: 1 }] });
+  await dormir(150);
+  // Aunque el navegador llegue a empezar una selección, se limpia mientras dura la pulsación
+  await ev(`(() => { const r = document.createRange(); r.selectNodeContents(document.querySelector('.slr-hoja__titulo')); getSelection().addRange(r); return 0; })()`);
+  await dormir(150);
+  const durante = await ev(`({ clase: document.documentElement.classList.contains('slr-sin-seleccion'), texto: getSelection().toString() })`);
+  await cdp('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await dormir(300);
+  const despues = await ev(`document.documentElement.classList.contains('slr-sin-seleccion')`);
+  check(durante.clase && durante.texto === '' && !despues, `pulsación larga: selección bloqueada y limpiada mientras dura («${durante.texto}»), y se desbloquea al soltar`);
+  await ev(`(() => { const i = document.querySelector('.slr-catalogo [data-f=texto]'); i.value = 'Mateo'; i.focus(); i.select(); return 0; })()`);
+  check(await ev(`document.activeElement.selectionEnd - document.activeElement.selectionStart`) === 5, 'en el buscador sí se puede seleccionar el texto');
+  await ev(`(() => { const i = document.querySelector('.slr-catalogo [data-f=texto]'); i.value = ''; i.dispatchEvent(new Event('input')); i.blur(); return 0; })()`);
+  // La pulsación larga ha podido entrar en modo selección: atrás hasta cerrar el catálogo
+  for (let i = 0; i < 4 && await ev(`!!document.querySelector('.slr-catalogo')`); i++) await atras();
+  // PC
+  await cdp('Emulation.setDeviceMetricsOverride', { width: 1366, height: 860, deviceScaleFactor: 1, mobile: false });
+  await cdp('Emulation.setTouchEmulationEnabled', { enabled: false });
+  await dormir(600);
+  await probarBarra('pc');
+  await cdp('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
+  await cdp('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
+  await dormir(600);
 
   console.log('\nEdición múltiple en la herramienta de plantillas');
   await clic('[data-pruebas=plantillas]');

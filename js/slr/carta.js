@@ -37,7 +37,7 @@
    Solo depende de ui.js (esc, iniciales); los estilos están en
    css/slr.css bajo .slr-carta.
 ═══════════════════════════════════════════════ */
-import { esc, iniciales } from './ui.js';
+import { esc, iniciales, bloquearSeleccion, desbloquearSeleccion } from './ui.js';
 import { acabado, listaAcabados } from './acabados/index.js';
 import { urlFoto, cargarFotos } from './imagenes.js';
 import { coleccion, urlEmblema } from './colecciones.js';
@@ -435,6 +435,7 @@ function bloquearScroll(e) { if (levantada?.activa) e.preventDefault(); }
 function levantar() {
   const l = levantada;
   l.activa = true;
+  if (!l.bloqueo) { bloquearSeleccion(); l.bloqueo = true; }
   const r = l.carta.getBoundingClientRect();
   const copia = l.carta.cloneNode(true);
   copia.classList.add('is-levantada');
@@ -460,6 +461,7 @@ function soltarLevantada() {
   clearTimeout(l.temporizador);
   document.removeEventListener('touchmove', bloquearScroll);
   if (l.frame) cancelAnimationFrame(l.frame);
+  if (l.bloqueo) desbloquearSeleccion();
   if (!l.activa) return;
   anularClicHasta = Date.now() + 400;      // ha sido un arrastre, no un toque ni un clic
   const { copia, carta } = l;
@@ -483,6 +485,8 @@ function enlazarInteraccion(raiz) {
     levantada = { carta, id: e.pointerId, tipo: e.pointerType, x0: e.clientX, y0: e.clientY, dx: 0, dy: 0,
                   ultX: e.clientX, ultT: performance.now(), giro: 0, activa: false, frame: 0, copia: null };
     if (!raton) {
+      // Mantener pulsado no selecciona texto ni saca el menú de copiar
+      bloquearSeleccion(); levantada.bloqueo = true;
       // Antes de que empiece el scroll, para poder cancelarlo si la carta se levanta
       document.addEventListener('touchmove', bloquearScroll, { passive: false });
       levantada.temporizador = setTimeout(() => { if (levantada && !levantada.activa) levantar(); }, PULSACION_MS);

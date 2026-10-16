@@ -875,3 +875,35 @@ Los goles dependen mucho de la formación (con un solo defensa la ocasión llega
   - Cargar los ~40 módulos de Rush desde el servidor local son unos 60 ms.
 - **Picos sueltos:** justo después de jugar 16 jornadas de golpe se vieron aperturas de 2,1 s, 2,3 s y una de 5,9 s (`slr_calendario` y una simple lectura de `jornadas` tardaron 4-6 s). No se reproducen: 24 lecturas seguidas desde Node justo después de jugarlas respondieron en 70-265 ms. Apuntan a variaciones de la red o de Supabase tras muchas escrituras seguidas. En una liga real se publica una jornada por semana.
 
+## Barra de selección fija y nada de selección de texto
+
+### Decisiones de Marcos
+
+- **Barra de selección fija:** en el modo selección, la barra (contador, «Terminar», «Seleccionar todas», acciones) queda fija y visible siempre. En móvil va abajo, respetando la safe area; en PC, abajo o arriba fija. Tiene que dejar ver la última fila.
+- **Salir del modo:** «Terminar» sale sin mover el scroll, y el botón atrás del móvil también sale del modo.
+- **Sin selección de texto:** mantener pulsado (para arrastrar, seleccionar o abrir) no debe seleccionar texto ni sacar el menú de copiar, salvo en los campos de texto. Hay que revisar también la app general.
+
+### Decisiones mías
+
+- **Barra:** el último elemento del contenido de la hoja, con `position: sticky; bottom`.
+  - Así funciona igual en móvil (hace scroll el cuerpo de la hoja) y en PC (hace scroll la capa entera). Como ocupa su propio sitio, no hace falta añadir margen para que se vea la última fila.
+  - `sticky` se queda a la distancia del padding del contenedor con scroll (22 px más la safe area en el cuerpo de la hoja, 48 px en la capa de PC). El `bottom` negativo lo compensa para que quede pegada al borde. Lo detectó el test: la barra pisaba 6 px de la última fila.
+  - Las hojas completas tapan la barra de navegación de Rush, así que la barra de selección va al borde de abajo, con la safe area.
+- **Historial:**
+  - El modo selección es una «capa virtual» (`abrirCapaVirtual` en `ui.js`, sin elemento): ocupa una entrada del historial, así que el botón atrás sale del modo antes de cerrar la hoja.
+  - «Terminar» pasa por el historial (`cerrarCapa`) y recupera el scroll que había.
+  - La ✕ y el fondo de una hoja usan `cerrarHasta(el)`, que cierra esa hoja y lo que tenga encima de una vez.
+- **Selección de texto:**
+  - `user-select: none` y `-webkit-touch-callout: none` en todo Rush (`.slr` y la capa de arrastre), con `user-select: text` en `input`, `textarea` y `contenteditable`. Es más seguro que ir elemento por elemento.
+  - Mientras dura una pulsación larga o un arrastre (levantar carta, alineación, selección múltiple): `bloquearSeleccion()` pone `html.slr-sin-seleccion` (`user-select: none !important` en todo el documento salvo los campos) y limpia la selección que haya empezado (`selectionchange` → `removeAllRanges`). Lleva la cuenta, así que cada módulo libera solo lo suyo.
+- **App general:** `.card-wrap` (cartas de la plantilla) ya tenía `user-select: none`. Se añaden `-webkit-touch-callout: none` y `-webkit-user-drag: none` en sus fotos y en las cartas de votación y de medios.
+- **Probado** en `banco/colecciones.mjs`, en móvil (390×844) y en PC (1366×860):
+  - la barra a media lista y al final, sin tapar la última fila;
+  - «Terminar» sin mover el scroll;
+  - el botón atrás sale del modo y deja el catálogo abierto;
+  - la ✕ con el modo activo cierra el catálogo;
+  - `user-select` de carta, título, chip y buscador;
+  - durante una pulsación, la clase de bloqueo está puesta y la selección se limpia; al soltar, se quita.
+
+  `-webkit-touch-callout` solo existe en iOS y no se puede comprobar en Chrome.
+

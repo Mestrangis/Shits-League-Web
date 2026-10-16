@@ -1601,3 +1601,36 @@ button.slr-aviso:active { background: rgba(57,255,136,.08) !important; }
 .slr-buscador-cartas__carta em { font-style: normal; color: var(--slr-rival); }
 .slr-buscador-cartas__carta.es-seleccionada .slr-carta { outline: 3px solid var(--slr-propio); outline-offset: 2px; border-radius: 8px; }
 .slr-buscador-cartas__pie { position: sticky; bottom: 0; padding: 8px 0; background: var(--slr-fondo, #06140B); }
+
+/* ── Sin selección de texto ni menú de copiar ────────────────────────────── */
+/* En todo Rush (cartas, rejillas, campo, barras, botones, chips, títulos):
+   mantener pulsado no selecciona texto ni saca el menú del navegador. En los
+   campos de texto sí se puede seleccionar y pegar. */
+.slr, .slr-capa-arrastre { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.slr img { -webkit-user-drag: none; }
+.slr input, .slr textarea, .slr [contenteditable="true"] {
+  -webkit-user-select: text; user-select: text; -webkit-touch-callout: default;
+}
+/* Durante una pulsación larga o un arrastre (ui.js bloquearSeleccion): en todo el documento */
+html.slr-sin-seleccion, html.slr-sin-seleccion * { -webkit-user-select: none !important; user-select: none !important; -webkit-touch-callout: none !important; }
+html.slr-sin-seleccion input, html.slr-sin-seleccion textarea { -webkit-user-select: text !important; user-select: text !important; }
+
+/* ── Barra de selección fija (seleccion.js) ──────────────────────────────── */
+/* Último elemento del contenido de la hoja, pegado abajo (sticky): se ve haga
+   el scroll que haga y, como ocupa su sitio, no tapa la última fila */
+/* sticky se para a la distancia del padding del contenedor con scroll: el bottom
+   negativo lo compensa (22px + safe area del cuerpo de la hoja; 48px de la capa en PC) */
+.slr-seleccion-fija {
+  position: sticky; bottom: calc(-22px - var(--slr-bottom)); z-index: 8;
+  margin: 4px -20px calc(-22px - var(--slr-bottom));
+  padding: 10px calc(14px + var(--slr-der)) calc(10px + var(--slr-bottom)) calc(14px + var(--slr-izq));
+  background: rgba(4, 16, 9, .97);
+  border-top: 1px solid rgba(255,138,61,.45);
+  box-shadow: 0 -10px 24px rgba(0,0,0,.45);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+}
+.slr-seleccion-fija[hidden], .slr-seleccion-barra[hidden] { display: none; }
+.slr-seleccion-fija .slr-seleccion { padding: 0; border: none; background: none; }
+@media (min-width: 900px) {
+  .slr-seleccion-fija { bottom: -48px; margin: 8px -28px -32px; padding: 12px 28px; border-radius: 0 0 22px 22px; }
+}

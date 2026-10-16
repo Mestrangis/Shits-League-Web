@@ -73,19 +73,59 @@ export function abrirCapa(el, alCerrar) {
   requestAnimationFrame(() => el.classList.add('abierta'));
 }
 
+// Capa sin elemento (p. ej. el modo selección): ocupa una entrada del historial
+// para que el botón atrás del móvil la cierre antes que la hoja de debajo
+export function abrirCapaVirtual(alCerrar) {
+  capas.push({ el: null, alCerrar });
+  history.pushState({ slr: capas.length }, '');
+}
+
 // Cierra la capa de arriba pasando por el historial (como el botón atrás)
 export function cerrarCapa() {
   if (capas.length) history.back();
+}
+
+// Cierra esa capa y las que tenga encima (la ✕ de una hoja con el modo
+// selección activo cierra las dos de una vez)
+export function cerrarHasta(el) {
+  const i = capas.findIndex(c => c.el === el);
+  if (i >= 0) history.go(-(capas.length - i));
 }
 
 // popstate: deja abiertas tantas capas como diga la entrada del historial
 export function ajustarCapas(profundidad) {
   while (capas.length > profundidad) {
     const { el, alCerrar } = capas.pop();
-    el.classList.remove('abierta');
-    el.classList.add('cerrando');
-    setTimeout(() => el.remove(), 260);
+    if (el) {
+      el.classList.remove('abierta');
+      el.classList.add('cerrando');
+      setTimeout(() => el.remove(), 260);
+    }
     alCerrar?.();
+  }
+}
+
+/* ── Selección de texto ──────────────────────────────────────────────────── */
+// Mientras dura una pulsación larga o un arrastre, nada de seleccionar texto en
+// todo el documento (salvo en los campos de texto) y fuera la selección que el
+// navegador haya empezado. Lleva la cuenta: cada bloquear() con su desbloquear().
+let bloqueosSeleccion = 0;
+const enCampo = () => document.activeElement?.matches?.('input, textarea, [contenteditable]');
+export function limpiarSeleccion() {
+  const s = window.getSelection?.();
+  if (s?.rangeCount && !enCampo()) s.removeAllRanges();
+}
+export function bloquearSeleccion() {
+  if (bloqueosSeleccion++ === 0) {
+    document.documentElement.classList.add('slr-sin-seleccion');
+    document.addEventListener('selectionchange', limpiarSeleccion);
+  }
+  limpiarSeleccion();
+}
+export function desbloquearSeleccion() {
+  if (bloqueosSeleccion > 0 && --bloqueosSeleccion === 0) {
+    document.documentElement.classList.remove('slr-sin-seleccion');
+    document.removeEventListener('selectionchange', limpiarSeleccion);
   }
 }
 export const capasAbiertas = () => capas.length;
@@ -104,8 +144,8 @@ export function hoja(html, { titulo = '', completa = false, clase = '', alCerrar
         <div class="slr-hoja__cuerpo">${html}</div>
       </div>
     </div>`);
-  el.querySelector('.slr-hoja__fondo').addEventListener('click', cerrarCapa);
-  el.querySelector('.slr-hoja__cerrar').addEventListener('click', cerrarCapa);
+  el.querySelector('.slr-hoja__fondo').addEventListener('click', () => cerrarHasta(el));
+  el.querySelector('.slr-hoja__cerrar').addEventListener('click', () => cerrarHasta(el));
   abrirCapa(el, alCerrar);
   return el;
 }

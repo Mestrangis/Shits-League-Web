@@ -15,7 +15,7 @@
    (ambos dan el bonus de participación de la próxima jornada).
 ═══════════════════════════════════════════════ */
 import { rpc, funcion, leer as leerTabla } from '../api.js';
-import { esc, hoja, cerrarCapa, conEspera, toast, hora, faltan as quedan, diaHora } from '../ui.js';
+import { esc, hoja, cerrarCapa, conEspera, toast, hora, faltan as quedan, diaHora, bloquearSeleccion, desbloquearSeleccion } from '../ui.js';
 import { cartaHTML, describirPoder } from '../carta.js';
 import { fuerzaPosesion, fuerzaAtaque, fuerzaDefensa, probabilidadesTirador, CONFIG } from '../motor-v1.3.0.js';
 import { estaTocada, alineacionBloqueada, alineacionConfirmada, proximaJornada, pausada, configLiga, ventanaCierre, miPartido, enJuego } from '../rush.js';
@@ -487,6 +487,7 @@ function activarArrastre(cont, ctx, porId) {
     raiz = cont.closest('.slr') ?? document.body;
     main = cont.closest('.slr-main');
     a.activo = true;
+    if (!a.bloqueo) { bloquearSeleccion(); a.bloqueo = true; }   // ratón: al empezar a arrastrar
     clearTimeout(a.temporizador);
     const carta = a.el.querySelector('.slr-carta');
     const r = carta.getBoundingClientRect();
@@ -555,6 +556,7 @@ function activarArrastre(cont, ctx, porId) {
     raiz?.classList.remove('slr-arrastrando');
     document.removeEventListener('touchmove', bloquearScroll);
     window.removeEventListener('popstate', cancelar);
+    if (a.bloqueo) desbloquearSeleccion();
     a = null;
     if (!activo) return;
     ultimoArrastre = Date.now();
@@ -573,6 +575,8 @@ function activarArrastre(cont, ctx, porId) {
     if (!el || el.disabled || e.button > 0 || a) return;
     a = { el, origen: origenDe(el), pointerId: e.pointerId, tipo: e.pointerType,
           x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, activo: false };
+    // Dedo: mantener pulsado no selecciona texto ni saca el menú de copiar
+    if (e.pointerType !== 'mouse') { bloquearSeleccion(); a.bloqueo = true; }
     // Antes de que empiece el scroll: así se puede cancelar desde el primer touchmove
     document.addEventListener('touchmove', bloquearScroll, { passive: false });
     window.addEventListener('popstate', cancelar);   // el botón atrás cancela el arrastre
