@@ -64,10 +64,13 @@ try {
   await ev(`localStorage.setItem('SESSION_PLAYER', 'Bot Uno'); localStorage.setItem('SESSION_CODE', ${JSON.stringify(env.SLR_BOT_UNO_CODIGO)});
     localStorage.setItem('RUSH_ACCESO', JSON.stringify({ jugador: 'Bot Uno', acceso: true })); 0`);
   await cdp('Page.navigate', { url: 'http://localhost:3000/#rush' });
+  // Page.reload no espera: se marca la página vieja y se espera al botón de la NUEVA
+  // (si no, a veces se pulsaba el «Jugar» de la página que se estaba recargando)
+  await ev('window.__paginaVieja = true; 0');
   await cdp('Page.reload', {});
-  await esperar(`!!document.getElementById('rushJugar')`, 30000);
+  await esperar(`!window.__paginaVieja && !!document.getElementById('rushJugar')`, 30000);
   await clic('#rushJugar');
-  await esperar(`!!document.querySelector('.slr-franja')`, 45000);   // con dos jornadas jugadas puede tardar
+  await esperar(`!!document.querySelector('.slr-franja')`, 10000);
   await dormir(800);
 
   console.log('\nPestaña Equipo');

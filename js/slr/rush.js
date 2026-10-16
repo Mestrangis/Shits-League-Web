@@ -126,18 +126,17 @@ async function cargarCartas() {
 
 async function cargarLiga() {
   const id = datos.liga.id;
-  const [[info]] = await Promise.all([
+  // Todo a la vez (antes iban en tres tandas: liga → temporada → calendario)
+  const [[info], [temporada], cal, publicadas] = await Promise.all([
     leer(`ligas?select=id,nombre,estado,temporada,config,pausada_en&id=eq.${id}`),
+    leer(`temporadas?select=id,numero,estado,iniciada_en,terminada_en&liga_id=eq.${id}&order=numero.desc&limit=1`),
+    datos.equipo ? rpc('slr_calendario', { liga_id: id }) : null,
+    datos.equipo ? leer(`jornadas?select=id,publicada_en&liga_id=eq.${id}&limit=500`) : [],
     cargarColecciones(id),            // para el fondo, el emblema y el nombre de la colección de cada carta
   ]);
   datos.ligaInfo = info;
-  const [temporada] = await leer(`temporadas?select=id,numero,estado,iniciada_en,terminada_en&liga_id=eq.${id}&order=numero.desc&limit=1`);
   datos.temporada = temporada ?? null;
   if (!datos.equipo) { datos.jornadas = []; return; }
-  const [cal, publicadas] = await Promise.all([
-    rpc('slr_calendario', { liga_id: id }),
-    temporada ? leer(`jornadas?select=id,publicada_en&temporada_id=eq.${temporada.id}`) : [],
-  ]);
   // slr_calendario no trae publicada_en (hace falta para saber si la alineación está confirmada)
   datos.jornadas = (cal.temporada && cal.temporada.id === temporada?.id ? cal.jornadas : [])
     .map(j => ({ ...j, publicada_en: publicadas.find(p => p.id === j.id)?.publicada_en ?? null }));

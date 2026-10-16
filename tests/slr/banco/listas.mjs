@@ -107,8 +107,11 @@ try {
   await ev(`localStorage.setItem('SESSION_PLAYER', 'Bot Uno'); localStorage.setItem('SESSION_CODE', ${JSON.stringify(env.SLR_BOT_UNO_CODIGO)});
     localStorage.setItem('RUSH_ACCESO', JSON.stringify({ jugador: 'Bot Uno', acceso: true })); 0`);
   await cdp('Page.navigate', { url: 'http://localhost:3000/#rush' });
+  // Page.reload no espera: se marca la página vieja y se espera al botón de la NUEVA
+  // (si no, a veces se pulsaba el «Jugar» de la página que se estaba recargando)
+  await ev('window.__paginaVieja = true; 0');
   await cdp('Page.reload', {});
-  await esperar(`!!document.getElementById('rushJugar')`, 30000);
+  await esperar(`!window.__paginaVieja && !!document.getElementById('rushJugar')`, 30000);
   // Tareas largas (> 50 ms) del hilo principal desde aquí
   await ev(`window.__largas = []; new PerformanceObserver(l => l.getEntries().forEach(e => window.__largas.push(Math.round(e.duration)))).observe({ type: 'longtask', buffered: false }); 0`);
 

@@ -848,3 +848,30 @@ Los goles dependen mucho de la formación (con un solo defensa la ocasión llega
   - Ajustes: `generador-sql` (tope 101) y el nombre de prueba en `api-paso7`.
   - En `banco/colecciones`, la colección de prueba se llama «Siesta» para no confundirse con «Dormidito», que ya existe.
 
+## Rendimiento de la apertura de Rush (pestaña Equipo)
+
+### Qué pasaba
+
+- **No era la app.** La pestaña Equipo no tardaba 20 s: el test `banco/equipo.mjs` (y los demás de `banco/`) tenía una carrera.
+  - Navegaba a `#rush`, llamaba a `Page.reload` (que no espera) y buscaba el botón «Jugar». A veces lo encontraba en la página **anterior**, que se estaba recargando.
+  - Pulsaba ese botón, la página se recargaba y Rush no llegaba a abrirse. Por eso fallaba al azar, y subir la espera a 45 s solo lo disimulaba.
+- **Cómo se encontró:** reproduciendo el escenario del test cinco veces con el registro de peticiones. En las que fallaban, las peticiones eran las de una página que volvía a cargarse *después* del clic.
+- **Arreglo:** antes de recargar se marca la página (`window.__paginaVieja`) y se espera al botón de la página **nueva**. La espera de la franja vuelve a 10 s.
+
+### Medidas
+
+`tests/slr/banco/rendimiento.mjs`: liga de prueba con 18 equipos y una temporada de 17 jornadas (16 jugadas y la última por jugar, o `--jugadas=N`). Chrome headless a 390×844, sin caché, desde el clic en «Jugar» hasta la franja y el campo pintados. Exige una mediana de menos de 2 s en 5 aperturas.
+
+- **Antes:**
+  - con la temporada terminada (17 jugadas): 973 / 524 / 433 ms;
+  - con la temporada en curso (16 jugadas): 628 / 472 / 418 ms;
+  - en ambos casos, 13 peticiones a Supabase de 0,1 a 0,2 s, en cuatro tandas (`slr_yo` → liga, cartas, ventas y alineación → temporada → calendario y jornadas) y después los avisos.
+- **Mejora** (`cargarLiga` en `rush.js`): la liga, la temporada, el calendario, las jornadas y las colecciones se piden a la vez.
+  - Antes iban en tres tandas, una detrás de otra.
+  - Las jornadas se piden por liga, no por temporada, así que no esperan a saber la temporada.
+  - Ahorra dos viajes al servidor.
+- **Después:**
+  - 15 aperturas en una liga ya creada: entre 243 y 763 ms (mediana de unos 300 ms; la primera, sin nada en la caché del navegador, unos 400-750 ms).
+  - Cargar los ~40 módulos de Rush desde el servidor local son unos 60 ms.
+- **Picos sueltos:** justo después de jugar 16 jornadas de golpe se vieron aperturas de 2,1 s, 2,3 s y una de 5,9 s (`slr_calendario` y una simple lectura de `jornadas` tardaron 4-6 s). No se reproducen: 24 lecturas seguidas desde Node justo después de jugarlas respondieron en 70-265 ms. Apuntan a variaciones de la red o de Supabase tras muchas escrituras seguidas. En una liga real se publica una jornada por semana.
+
