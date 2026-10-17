@@ -69,6 +69,38 @@ export function losDelFondo() {
   };
 }
 
+// v2.0.0: los mismos equipos con tácticas, plan B, gestión, tácticas favoritas,
+// colecciones y energía (ya aplicada a las stats, como al congelar la alineación)
+const v2 = (x, extra) => ({ ...x, poderes: x.poderes.map(p => ({ ...p })), ...extra });
+export function marcosFCv2(aplicarEnergia = x => x) {
+  const al = marcosFC();
+  const extra = {
+    'm-muro':     { energia: 90, tactica_favorita: 'contraataque' },
+    'm-pitbull':  { energia: 45, tactica_favorita: 'presion', coleccion_id: 'dormidito' },
+    'm-cerebro':  { energia: 72, tactica_favorita: 'posesion', coleccion_id: 'dormidito' },
+    'm-rayo':     { energia: 60, coleccion_id: 'dormidito' },
+    'm-zurdo':    { energia: 35 },
+    'm-pichichi': { energia: 100, tactica_favorita: 'contraataque' },
+    'm-mosq':     { energia: 80, tactica_favorita: 'contraataque', coleccion_id: 'down' },
+    'm-lucas':    { energia: 100 }, 'm-ruben': { energia: 100, tactica_favorita: 'presion' }, 'm-nacho': { energia: 95 },
+  };
+  const f = x => aplicarEnergia(v2(x, extra[x.id]));
+  return { ...al, por: f(al.por), def: al.def.map(f), med: al.med.map(f), del: al.del.map(f), banquillo: al.banquillo.map(f),
+    tactica: 'contraataque', plan_b: { condicion: 'perdiendo', tactica: 'presion' }, gestion: 'reservon' };
+}
+export function losDelFondoV2(aplicarEnergia = x => x) {
+  const al = losDelFondo();
+  const extra = {
+    'f-manos':   { energia: 100 }, 'f-cerrojo': { energia: 88, tactica_favorita: 'posesion', coleccion_id: 'seductor' },
+    'f-victor':  { energia: 40, coleccion_id: 'seductor' }, 'f-carlos': { energia: 70, tactica_favorita: 'posesion' },
+    'f-capi':    { energia: 66, tactica_favorita: 'posesion' }, 'f-bala': { energia: 52 }, 'f-oscar': { energia: 95, tactica_favorita: 'presion' },
+    'f-javi':    { energia: 100 }, 'f-iker': { energia: 100 }, 'f-martin': { energia: 100 },
+  };
+  const f = x => aplicarEnergia(v2(x, extra[x.id]));
+  return { ...al, por: f(al.por), def: al.def.map(f), med: al.med.map(f), del: al.del.map(f), banquillo: al.banquillo.map(f),
+    tactica: 'posesion', gestion: 'normal' };
+}
+
 // Copia profunda con los ids prefijados (para equipos espejo sin ids repetidos)
 export function conPrefijo(al, prefijo) {
   const cc = x => ({ ...x, id: prefijo + x.id, poderes: x.poderes.map(p => ({ ...p })) });

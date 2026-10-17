@@ -907,3 +907,65 @@ Los goles dependen mucho de la formación (con un solo defensa la ocasión llega
 
   `-webkit-touch-callout` solo existe en iOS y no se puede comprobar en Chrome.
 
+## Motor v2.0.0: tácticas, táctica favorita, sinergias, energía y cambios en el descanso (fase 1: motor)
+
+### Decisiones de Marcos
+
+- **Tácticas:** posesión, contraataque y presión, con los números de `CONFIG`.
+  - Posesión: posesión ×1,06 y sus contraataques sin bonus.
+  - Contraataque: sus contraataques ×1,25 y su defensa ×1,04.
+  - Presión: posesión ×1,06 cuando saca el rival.
+  - Cruce: posesión, ataque y defensa ×1,06 para quien lo gana.
+  - Plan B al descanso.
+- **Táctica favorita:** ×1,05 a las stats.
+- **Sinergias de colección:** 2 cartas ×1,02, 3 ×1,04, 4 o más ×1,06.
+- **Energía:** ≥70 ×1, 50–69 ×0,95, 30–49 ×0,88, <30 ×0,75, aplicada al congelar la alineación.
+- **Cambios en el descanso:** gestión (reservón, normal, a tope) o cambios avanzados, dentro del máximo de 3.
+- Motor nuevo, `js/slr/motor-v2.0.0.js`; las versiones anteriores se quedan.
+
+### Decisiones mías
+
+- **Partir de la v1.3.0:** poderes, duelos, saque, cansancio en el partido y lesiones, igual. El descanso no consume números del PRNG, así que el orden de sorteos es el de la v1.3.0.
+- **Stats de cada carta:** se guarda su `base` (sin la táctica favorita). El cansancio (−4) y las lesiones (×0,7) van sobre la base, y las de juego se recalculan al cambiar de tramo o de carta.
+- **Energía:** el motor no la aplica. `aplicarEnergia()` multiplica las stats al congelar (como «tocada»), y dentro del motor solo decide los cambios del descanso.
+- **Orden del descanso:** primero el plan B de A y de B (con el marcador de ese momento) y después los cambios de A y de B.
+  - **Reservón:** los 2 titulares con menos energía (en empate, por orden de hueco), por el mejor suplente libre según la stat de su hueco.
+  - **Normal:** el titular con menos energía si está por debajo de 50.
+  - **Cambios avanzados:** van en su orden. Uno se salta si su carta ya no está en el campo o el suplente ya se ha usado.
+- **Sinergia:** se calcula en cada jugada con los titulares que hay en el campo (así cuenta también tras una lesión). En empate entre dos colecciones, la primera que aparece.
+- **Eventos nuevos:**
+  - `tacticas` (jugada 0: tácticas, cruce, sinergias);
+  - `plan_b`;
+  - `cambio` (sale, entra, hueco, motivo: reservón, cansado o programado, con su condición y la energía de la que sale);
+  - `descanso` (tácticas, cruce y sinergias del segundo tramo).
+- **Resultado:** añade `tacticas`, `cruce`, `plan_b`, `participacion` (completo y parcial por equipo) y `cambios_descanso`.
+- **Validación:** rechaza tácticas, plan B, gestión, condiciones o energías no válidas, y más de 3 cambios avanzados.
+- **Solo para el informe:** `opciones.sinCruce` quita el bonus del cruce, para medir cada táctica por sí sola. Los partidos de verdad no lo usan.
+- **Aún no es el motor actual:** no está en `MOTORES` ni en la Edge Function, porque el servidor todavía no guarda tácticas ni energía. Entra en la fase 2.
+  - `generar-dorado.mjs` carga del archivo una versión que no esté registrada.
+  - El dorado de la v2 usa `marcosFCv2` y `losDelFondoV2` (con contraataque, plan B, reservón, favoritas, dos colecciones y energías) y da 2-2, con 3 cambios al descanso.
+- **Tests:** `motor-v2.0.0.test.mjs` (15), además de los de las versiones anteriores sin cambios. El informe sale con `node tests/slr/balance-v2.mjs`.
+
+### Informe de balance (20.000 partidos por caso; equipos de 70 sin poderes con suplentes de 66)
+
+| Caso | Resultado | Objetivo |
+|---|---|---|
+| Quien gana el cruce | gana 48,5 % · empata 24,1 % · pierde 27,4 % | ~49 / 24 |
+| Misma táctica | 37,8 / 25,3 / 36,9 % | ~37 / 26 / 37 |
+| Cada táctica por sí sola, sin cruce | mayor diferencia 1,6 puntos | ≤ ±3 |
+| +6 de media, misma táctica | gana 60,3 % | ~62 % |
+| +6 de media, perdiendo el cruce | gana 50,0 % | ~50 % |
+| Goles por partido | 2,51 (posesión contra posesión) · 2,68 (contraataque) · 2,74 (presión) · 2,64 de media en los 9 cruces | ~3 |
+| Temporada de 17 jornadas: rota contra siempre los mismos | rota gana 48–51 %, empata ~28 %, pierde ~22 % | ~55 % |
+
+- **Sinergias** (contra el mismo equipo sin colección):
+  - 2 cartas: gana 41,0 %, pierde 33,2 %;
+  - 3 cartas: 44,6 % / 30,2 %;
+  - 4 o más: 48,0 % / 27,2 %.
+- **Cambios al descanso de media**, con energías entre 30 y 100: reservón 2,00 · normal 0,90 · a tope 0.
+  - En la temporada, el que rota con gestión normal hace 0,56 cambios por partido, y el que pone siempre a los mismos, 0,78 (sus titulares acaban a 31 de energía).
+- **Plan B** (al descanso, entre equipos iguales): «ganando» se cumple el 31 % de las veces, «empatando» el 37 % y «perdiendo» el 31 %.
+- **Dos desviaciones, sin tocar nada hasta que Marcos decida:**
+  - **Goles:** la v1.3.0 da 2,71 con los mismos equipos, y la v2 baja a 2,51 cuando los dos juegan posesión, porque sus contraataques pierden el bonus (×1,0). Con contraataque o presión queda igual (2,68–2,74).
+  - **Temporada con cansancio:** quien rota gana el 48–51 % (no el 55 %) con plantillas de 15 hechas con el generador (tiers D/E/F, estamina 25/50/25). Pero solo pierde el 22 %, y los titulares fijos acaban a 31 de energía. La cifra depende mucho de lo buenos que sean los suplentes: con estas plantillas, el que rota pone a menudo cartas F.
+
