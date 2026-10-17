@@ -109,8 +109,8 @@ async function cargarYo() {
 async function cargarCartas() {
   const eq = datos.equipo.id;
   const [filas, ventas] = await Promise.all([
-    leer(`cartas?select=id,diseno_id,equipo_id,multiplicador_clausula,blindada_hasta,tocada_en_jornada,adquirida_en,` +
-      `disenos_carta(nombre,tipo,acabado,color,tier,rareza,coleccion_id,perfil,personas,ata,def,con,valor,poderes,imagen_url,texto)&equipo_id=eq.${eq}`),
+    leer(`cartas?select=id,diseno_id,equipo_id,multiplicador_clausula,blindada_hasta,tocada_en_jornada,adquirida_en,energia,` +
+      `disenos_carta(nombre,tipo,acabado,color,tier,rareza,coleccion_id,perfil,personas,ata,def,con,valor,poderes,imagen_url,texto,estamina,tactica_favorita)&equipo_id=eq.${eq}`),
     leer(`ventas?select=id,carta_id,precio&vendedor_id=eq.${eq}&estado=eq.activa`),
   ]);
   datos.cartas = filas.map(f => ({
@@ -142,9 +142,14 @@ async function cargarLiga() {
     .map(j => ({ ...j, publicada_en: publicadas.find(p => p.id === j.id)?.publicada_en ?? null }));
 }
 
+// La alineación es pública; las tácticas guardadas (motor v2) solo las lee su dueño
 async function cargarAlineacion() {
-  const [al] = await leer(`alineaciones?equipo_id=eq.${datos.equipo.id}`);
+  const [[al], tac] = await Promise.all([
+    leer(`alineaciones?equipo_id=eq.${datos.equipo.id}`),
+    rpc('slr_mis_tacticas', { equipo_id: datos.equipo.id }, { silencioso: true }).catch(() => null),
+  ]);
   datos.alineacion = al ?? null;
+  datos.tacticas = tac ?? { tactica: 'posesion', plan_b: null, gestion: 'normal', cambios_avanzados: [] };
 }
 
 // partes: 'yo', 'liga', 'cartas', 'alineacion' (sin partes, todo)

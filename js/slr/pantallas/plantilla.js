@@ -1,15 +1,16 @@
 /* ═══════════════════════════════════════════════
    SHITS LEAGUE RUSH — Plantilla
    Cuadrícula de cartas propias con OVR, stats, valor, cláusula y estado
-   (blindada, tocada, en venta). Orden por OVR, valor o una stat. Tocar una
-   carta abre su detalle.
+   (blindada, tocada, en venta) y energía. Orden por OVR, valor, una stat o
+   energía. Tocar una carta abre su detalle.
 ═══════════════════════════════════════════════ */
 import { esc, miles, fechaCorta } from '../ui.js';
 import { cartaHTML } from '../carta.js';
 import { estaTocada, configLiga } from '../rush.js';
 import { abrirDetalle } from './detalle.js';
+import { barraEnergia } from '../tactica.js';
 
-const ORDENES = { ovr: 'OVR', valor: 'Valor', ata: 'ATA', def: 'DEF', con: 'CON' };
+const ORDENES = { ovr: 'OVR', valor: 'Valor', ata: 'ATA', def: 'DEF', con: 'CON', energia: 'Energía' };
 let orden = 'ovr';
 
 export function chipsEstado(c) {
@@ -40,6 +41,7 @@ export async function pintar(cont, ctx) {
             <span><small>Valor</small><b>${miles(c.valor)}</b></span>
             <span><small>Cláusula</small><b>${miles(c.clausula)}</b></span>
           </span>
+          ${c.energia != null ? `<span class="slr-ficha__energia">${barraEnergia(c.energia, { aviso: true })}</span>` : ''}
           <span class="slr-ficha__chips">${chipsEstado(c)}</span>
         </button>`).join('')}
     </div>` : '<div class="slr-vacio"><b>No tienes cartas</b><p>Consíguelas en el mercado cuando abra.</p></div>'}`;

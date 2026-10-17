@@ -1634,3 +1634,123 @@ html.slr-sin-seleccion input, html.slr-sin-seleccion textarea { -webkit-user-sel
 @media (min-width: 900px) {
   .slr-seleccion-fija { bottom: -48px; margin: 8px -28px -32px; padding: 12px 28px; border-radius: 0 0 22px 22px; }
 }
+
+/* ── Motor v2: energía, táctica favorita, tácticas, gestión y sinergias ───── */
+.slr { --e-llena: #39FF88; --e-media: #C8F04A; --e-cansada: #FFB23D; --e-agotada: #FF5A5A; }
+.slr-energia--llena { --e: var(--e-llena); }
+.slr-energia--media { --e: var(--e-media); }
+.slr-energia--cansada { --e: var(--e-cansada); }
+.slr-energia--agotada { --e: var(--e-agotada); }
+/* En la carta: barra fina abajo, dentro del marco */
+.slr-carta__energia {
+  position: absolute; left: 12%; right: 12%; bottom: 2.4%; height: 2.2cqw; z-index: 3;
+  border-radius: 99px; background: rgba(0,0,0,.55); overflow: hidden;
+}
+.slr-carta--xs .slr-carta__energia { height: 4cqw; bottom: 2%; }
+.slr-carta__energia i { display: block; height: 100%; border-radius: inherit; background: var(--e); box-shadow: 0 0 1.5cqw var(--e); }
+.slr-carta__favorita { display: block; font-size: 8.5cqw; line-height: 1; filter: drop-shadow(0 .5cqw 1cqw rgba(0,0,0,.75)); }
+.slr-carta--xs .slr-carta__favorita { font-size: 13cqw; }
+.slr-carta--encaja .slr-carta__marco { box-shadow: 0 0 0 2px var(--slr-oro), 0 0 12px rgba(255,201,74,.55); }
+/* Barra con número (fichas y listas) */
+.slr-energia { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; }
+.slr-energia__barra { width: 56px; height: 6px; border-radius: 99px; background: rgba(255,255,255,.1); overflow: hidden; flex: none; }
+.slr-energia__barra i { display: block; height: 100%; border-radius: inherit; background: var(--e); }
+.slr-energia b { font-family: 'Anton', sans-serif; font-weight: 400; font-size: 14px; color: var(--e); }
+.slr-energia em { font-style: normal; font-weight: 700; font-size: 11.5px; color: var(--e); }
+.slr-hueco__energia { margin-left: 2px; color: var(--e); }
+.slr-ficha-hueco__energia { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.slr-ficha-hueco__energia small { color: var(--slr-suave); font-size: 11px; }
+.slr-ficha-hueco__rasgos { margin-top: 4px; font-size: 12px; color: var(--slr-suave); }
+.slr-ficha-hueco__rasgos b { color: var(--slr-oro); }
+
+/* Táctica: tres botones grandes */
+.slr-tacticas { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.slr-tactica-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 8px; border-radius: 14px; text-align: center;
+  background: rgba(3,12,7,.55) !important; border: 1px solid var(--slr-borde) !important; transition: transform .12s, box-shadow .12s;
+}
+.slr-tactica-btn__icono { font-size: 28px; line-height: 1; }
+.slr-tactica-btn b { font-family: 'Anton', sans-serif; font-weight: 400; font-size: 17px; letter-spacing: .04em; text-transform: uppercase; }
+.slr-tactica-btn small { font-size: 11px; line-height: 1.35; color: var(--slr-suave); }
+.slr-tactica-btn__cruce { color: var(--slr-texto) !important; opacity: .8; }
+.slr-tactica-btn__encajan { font-style: normal; font-size: 11px; font-weight: 800; color: var(--slr-oro); }
+.slr-tactica-btn.activo { border-color: var(--slr-propio) !important; background: rgba(57,255,136,.12) !important; box-shadow: 0 0 0 1px var(--slr-propio), 0 0 18px rgba(57,255,136,.18); }
+.slr-tactica-btn.activo b { color: var(--slr-propio); }
+.slr-tactica-btn:not(:disabled):active { transform: scale(.97); }
+/* En el móvil, la frase solo en la elegida (y debajo de los tres botones) */
+.slr-tactica__frase { margin: 0; font-size: 12.5px; line-height: 1.4; color: var(--slr-texto); }
+@media (max-width: 520px) {
+  .slr-tactica-btn small:not(.slr-tactica-btn__cruce) { display: none; }
+  .slr-tactica-btn { padding: 10px 4px; }
+}
+@media (min-width: 521px) { .slr-tactica__frase { display: none; } }
+.slr-enlace { color: var(--slr-propio); font-size: 12px; font-weight: 700; text-transform: none; letter-spacing: 0; text-decoration: underline; text-underline-offset: 3px; }
+.slr-gestion { display: flex; flex-direction: column; gap: 6px; }
+.slr-gestion__titulo, .slr-avanzado summary { font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--slr-suave); }
+.slr-gestion p { margin: 0; }
+.slr-avanzado { border-top: 1px solid var(--slr-borde); padding-top: 10px; }
+.slr-avanzado summary { cursor: pointer; list-style: none; display: flex; align-items: baseline; gap: 8px; }
+.slr-avanzado summary::-webkit-details-marker { display: none; }
+.slr-avanzado summary::before { content: "\25B8"; color: var(--slr-propio); transition: transform .15s; }
+.slr-avanzado[open] summary::before { transform: rotate(90deg); }
+.slr-avanzado summary small { text-transform: none; letter-spacing: 0; font-weight: 600; color: var(--slr-texto); opacity: .8; }
+.slr-avanzado__bloque { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; font-size: 13px; }
+.slr-avanzado__bloque p { margin: 0; }
+.slr-planb { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.slr-planb .slr-input { flex: 1 1 140px; width: auto; }
+@media (max-width: 520px) { .slr-planb { flex-direction: column; align-items: stretch; } .slr-planb > span { display: none; } }
+.slr-cambios { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.slr-cambio {
+  position: relative; display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 6px; padding: 10px 34px 10px 10px;
+  border-radius: 12px; background: rgba(3,12,7,.5); border: 1px solid var(--slr-borde);
+}
+.slr-cambio label { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.slr-cambio label span { font-size: 10.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--slr-suave); }
+.slr-cambio .slr-input { width: 100%; min-width: 0; }
+@media (max-width: 520px) { .slr-cambio label:nth-of-type(3) { grid-column: 1 / -1; } }
+.slr-cambio__quitar { position: absolute; top: 6px; right: 6px; width: 26px; height: 26px; border-radius: 50%; color: var(--slr-suave); }
+.slr-sugerir { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.slr-sugerir small { font-size: 11px; font-weight: 500; color: var(--slr-suave); }
+
+/* Chips: táctica y sinergia */
+.slr-chips-once { display: flex; flex-wrap: wrap; gap: 6px; }
+.slr-chip-tactica, .slr-chip-sinergia {
+  display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 99px; white-space: nowrap;
+  font-size: 12px; font-weight: 700; background: rgba(255,255,255,.06); border: 1px solid var(--slr-borde);
+}
+.slr-chip-sinergia { color: var(--col, var(--slr-oro)); border-color: var(--col, var(--slr-oro)); }
+
+/* Ficha del rival: tácticas de sus últimos partidos */
+.slr-ficha-eq__tacticas { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.slr-ficha-eq__tactica { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 10px; padding: 8px 10px; border-radius: 12px; background: rgba(3,12,7,.5); border: 1px solid var(--slr-borde); }
+.slr-ficha-eq__tactica small { font-size: 11.5px; color: var(--slr-suave); }
+.slr-ficha-eq__tactica em { font-style: normal; font-size: 11px; font-weight: 800; color: var(--slr-oro); }
+.slr-ficha-eq__tactica .es-bien { color: var(--slr-propio); }
+.slr-ficha-eq__tactica .es-mal { color: var(--slr-rival); }
+
+/* Ayuda */
+.slr-ayuda { display: flex; flex-direction: column; gap: 10px; font-size: 14px; line-height: 1.5; }
+.slr-ayuda p { margin: 0; }
+.slr-ayuda__intro { padding: 10px 12px; border-radius: 12px; background: rgba(57,255,136,.08); border: 1px solid rgba(57,255,136,.25); }
+.slr-ayuda__lista { margin: 0; padding-left: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.slr-ayuda__lista small { display: block; color: var(--slr-suave); font-size: 12px; }
+.slr-ayuda__tramos li { display: flex; align-items: center; gap: 10px; }
+
+/* Crónica: tácticas, cruce, plan B, cambios del descanso y energía */
+.slr-cronica__tacticas { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; gap: 8px; padding: 10px 12px; border-radius: 14px; background: rgba(3,12,7,.5); border: 1px solid var(--slr-borde); }
+.slr-cronica__tacticas > div { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; min-width: 0; }
+.slr-cronica__tacticas > div:last-child { align-items: flex-end; }
+.slr-cronica__cruce { grid-column: 1 / -1; order: 3; padding-top: 8px; border-top: 1px solid var(--slr-borde); font-size: 11.5px; font-weight: 700; color: var(--slr-suave); text-align: center; }
+.slr-cronica__tacticas small { font-size: 12px; }
+.slr-cronica__tacticas .slr-chip-sinergia { white-space: normal; }
+.slr-cronica__cruce b { display: block; color: var(--slr-oro); }
+.slr-suceso--tactica { font-weight: 700; }
+.slr-suceso--cambio small { color: var(--slr-suave); }
+.slr-jugada--descanso { border-style: dashed !important; }
+.slr-cronica__energia { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.slr-cronica__energia ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; }
+.slr-cronica__energia li { display: flex; justify-content: space-between; gap: 8px; }
+.slr-cronica__energia li b { font-family: 'Anton', sans-serif; font-weight: 400; color: var(--e, var(--slr-texto)); white-space: nowrap; }
+.slr-ficha__energia { display: flex; justify-content: center; min-height: 16px; }
+.slr-ficha__energia .slr-energia { flex-wrap: wrap; justify-content: center; row-gap: 2px; }
+.slr-cronica__tacticas > .slr-cronica__cruce { align-items: center; }

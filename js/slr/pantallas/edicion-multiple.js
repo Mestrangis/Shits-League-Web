@@ -2,8 +2,8 @@
    SHITS LEAGUE RUSH — edición múltiple (modo pruebas, solo el admin)
    Para las cartas seleccionadas en el catálogo o en la herramienta de
    plantillas: colección (o quitarla), color (o «el de la colección»), tipo,
-   tier, perfil, acabado, activar o desactivar, regenerar stats y regenerar
-   poderes. Cada campo empieza en «Sin cambios».
+   tier, perfil, acabado, estamina, táctica favorita, activar o desactivar,
+   regenerar stats y regenerar poderes. Cada campo empieza en «Sin cambios».
    Si cambia el tier o el perfil y no se regeneran las stats, pregunta si
    regenerarlas también. Antes de aplicar, el servidor calcula el resumen
    (slr_admin_editar_disenos con solo_contar: cuántas cambian, qué, y ejemplos
@@ -13,13 +13,14 @@
 import { rpc } from '../api.js';
 import { esc, hoja, cerrarCapa, conEspera, toast, confirmar, miles } from '../ui.js';
 import { TIPOS, ACABADOS, RAREZAS } from '../carta.js';
-import { TIERS, PERFILES, COLORES } from '../generador.js';
+import { TIERS, PERFILES, COLORES, ESTAMINAS, TACTICAS } from '../generador.js';
 import { listaColecciones, cargarColecciones } from '../colecciones.js';
 
 const SIN = '__sin_cambios__';
 const CAMPOS = {
   coleccion: 'colección', color: 'color', tipo: 'tipo', tier: 'tier', rareza: 'rareza', perfil: 'perfil',
   acabado: 'acabado', activo: 'activas/inactivas', stats: 'stats', poderes: 'poderes', valor: 'valor',
+  estamina: 'estamina', tactica_favorita: 'táctica favorita',
 };
 const opciones = (lista, extra = []) => [[SIN, '— Sin cambios —'], ...extra, ...Object.entries(lista)]
   .map(([v, t]) => `<option value="${esc(v)}">${esc(t)}</option>`).join('');
@@ -39,6 +40,8 @@ export function abrirEdicionMultiple(ctx, ids, { alTerminar } = {}) {
         <label><span>Tier</span><select class="slr-input" name="tier">${opciones(Object.fromEntries(Object.keys(TIERS).map(t => [t, t])))}</select></label>
         <label><span>Perfil</span><select class="slr-input" name="perfil">${opciones(PERFILES)}</select></label>
         <label><span>Acabado</span><select class="slr-input" name="acabado">${opciones({ normal: 'Normal', ...ACABADOS })}</select></label>
+        <label><span>Estamina</span><select class="slr-input" name="estamina">${opciones(ESTAMINAS)}</select></label>
+        <label><span>Táctica favorita</span><select class="slr-input" name="tactica_favorita">${opciones(TACTICAS, [['', 'Ninguna']])}</select></label>
         ${esPrueba ? '' : `<label><span>Estado</span><select class="slr-input" name="activo">${opciones({ true: 'Activar', false: 'Desactivar' })}</select></label>`}
       </div>
       <label class="slr-interruptor"><input type="checkbox" name="regenerar_stats">🎲 Regenerar stats (semilla nueva)</label>

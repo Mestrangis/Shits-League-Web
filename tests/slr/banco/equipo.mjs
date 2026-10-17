@@ -155,7 +155,7 @@ try {
   await esperar(`!!document.querySelector('.slr-cronica .slr-jugada')`, 20000);
   await dormir(600);
   const cr = await ev(`({ campos: document.querySelectorAll('.slr-cronica .slr-campito').length, leyenda: document.querySelector('.slr-cronica__leyenda').textContent.replace(/\\s+/g, ' ').trim(),
-    jugadas: document.querySelectorAll('.slr-jugada').length, aviso: document.querySelector('.slr-cronica .slr-banner')?.textContent ?? null,
+    jugadas: document.querySelectorAll('.slr-jugada:not(.slr-jugada--descanso)').length, aviso: document.querySelector('.slr-cronica .slr-banner')?.textContent ?? null,
     lineas: [...document.querySelectorAll('.slr-jugada')].slice(0, 3).map(j => [...j.querySelectorAll('.slr-suceso')].map(s => s.textContent.replace(/\\s+/g, ' ').trim())),
     nota: document.querySelector('.slr-cronica__nota')?.textContent, resumen: [...document.querySelectorAll('.slr-resumen tbody th')].map(t => t.textContent),
     poderes: document.querySelectorAll('.slr-suceso__poder').length })`);

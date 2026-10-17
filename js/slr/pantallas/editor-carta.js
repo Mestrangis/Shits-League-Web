@@ -22,7 +22,7 @@ import { formularioColeccion } from './colecciones-admin.js';
 import { calcularValor } from '../valor.js';
 import {
   TIERS, PERFILES, COLORES, EFECTOS, PROBABILIDADES, NOMBRES_PODER,
-  generarStats, generarPoderes, semillaNueva, ovr100,
+  generarStats, generarPoderes, generarRasgos, ESTAMINAS, TACTICAS, semillaNueva, ovr100,
 } from '../generador.js';
 
 export const CLOUDINARY = Object.freeze({ nube: 'dnd3g3zgm', preset: 'slr_cartas' });
@@ -70,13 +70,22 @@ export async function abrirEditorCarta(ctx, { disenoId = null } = {}) {
     color: d.color ?? '', coleccion_id: d.coleccion_id ?? '', imagen_url: d.imagen_url ?? '', texto: d.texto ?? '', personas: d.personas ?? [],
     stats: { ATA: d.ata, DEF: d.def, CON: d.con }, poderes: structuredClone(d.poderes ?? []),
     semilla_stats: d.semilla_stats, semilla_poderes: d.semilla_poderes,
+    estamina: d.estamina ?? 'media', tactica_favorita: d.tactica_favorita ?? '', rasgosAMano: true,
   } : {
     id: null, nombre: '', tipo: 'individual', perfil: 'atacante', tier: 'C', acabado: 'normal', color: '', coleccion_id: '',
     imagen_url: '', texto: '', personas: [], semilla_stats: semillaNueva(), semilla_poderes: semillaNueva(),
   };
+  // Estamina y táctica favorita (motor v2): las propone el generador hasta que se tocan a mano
+  const proponerRasgos = () => {
+    if (f.rasgosAMano) return;
+    const g = generarRasgos(f.perfil, f.semilla_stats);
+    f.estamina = g.estamina;
+    f.tactica_favorita = g.tactica_favorita ?? '';
+  };
   if (!d) {
     f.stats = generarStats(f.tier, f.perfil, f.tipo, f.semilla_stats);
     f.poderes = generarPoderes(f.tier, f.perfil, f.semilla_poderes);
+    proponerRasgos();
   }
   let fotoLocal = null;      // URL temporal (blob:) mientras sube la foto
 
@@ -117,6 +126,10 @@ export async function abrirEditorCarta(ctx, { disenoId = null } = {}) {
           <label class="slr-campo"><span>Acabado</span><select class="slr-input" name="acabado">${opciones({ normal: 'Normal', ...ACABADOS }, f.acabado)}</select></label>
           <label class="slr-campo"><span>Color</span><select class="slr-input" name="color">${opciones({ '': 'El de la colección', ...COLORES }, f.color)}</select></label>
         </div>
+        <div class="slr-editor__fila">
+          <label class="slr-campo"><span>Estamina</span><select class="slr-input" name="estamina" data-rasgo>${opciones(ESTAMINAS, f.estamina)}</select></label>
+          <label class="slr-campo"><span>Táctica favorita</span><select class="slr-input" name="tactica_favorita" data-rasgo>${opciones({ '': 'Ninguna', ...TACTICAS }, f.tactica_favorita)}</select></label>
+        </div>
         <label class="slr-campo"><span>Frase (opcional)</span>
           <input class="slr-input" name="texto" maxlength="140" value="${esc(f.texto)}" autocomplete="off"></label>
       </fieldset>
@@ -153,7 +166,7 @@ export async function abrirEditorCarta(ctx, { disenoId = null } = {}) {
   function cartaActual() {
     const c = { id: f.id ?? 'nueva', nombre: f.nombre || 'Nombre de la carta', tipo: f.tipo, acabado: f.acabado, tier: f.tier,
       color: f.color || null, coleccion_id: f.coleccion_id || null, personas: f.personas, imagen_url: fotoLocal ?? (f.imagen_url || null),
-      ata: f.stats.ATA, def: f.stats.DEF, con: f.stats.CON, poderes: f.poderes };
+      ata: f.stats.ATA, def: f.stats.DEF, con: f.stats.CON, poderes: f.poderes, tactica_favorita: f.tactica_favorita || null };
     c.ovr = Math.round(ovr100(f.stats) / 100);
     return c;
   }
@@ -204,6 +217,14 @@ export async function abrirEditorCarta(ctx, { disenoId = null } = {}) {
     `<datalist id="slr-nombres-${m}">${ns.map(n => `<option value="${esc(n)}">`).join('')}</datalist>`).join(''));
 
   /* ── Cambios ── */
+  // Si no se han tocado a mano, los rasgos siguen al perfil y a la semilla de stats
+  const pintarRasgos = () => {
+    if (f.rasgosAMano) return;
+    proponerRasgos();
+    form.elements.estamina.value = f.estamina;
+    form.elements.tactica_favorita.value = f.tactica_favorita;
+    pintarVista();
+  };
   const regenerarStats = () => { f.stats = generarStats(f.tier, f.perfil, f.tipo, f.semilla_stats); pintarStats(); };
   const regenerarPoderes = () => { f.poderes = generarPoderes(f.tier, f.perfil, f.semilla_poderes); pintarPoderes(); };
   function pintarStats() {
@@ -239,7 +260,9 @@ export async function abrirEditorCarta(ctx, { disenoId = null } = {}) {
       // Tier y perfil cambian lo que toca: se vuelve a generar con la misma semilla
       regenerarStats();
       if (t.name !== 'tipo') regenerarPoderes();
+      if (t.name === 'perfil') pintarRasgos();
     }
+    if (t.dataset.rasgo != null) { f[t.name] = t.value; f.rasgosAMano = true; pintarVista(); }
     if (t.name === 'acabado' || t.name === 'color' || t.name === 'coleccion_id') { f[t.name] = t.value; pintarVista(); }
     const li = t.closest('[data-i]');
     if (li && (t.dataset.p === 'momento' || t.dataset.p === 'nivel')) {
@@ -256,7 +279,7 @@ export async function abrirEditorCarta(ctx, { disenoId = null } = {}) {
     }
   });
   el.querySelector('[data-regenerar="stats"]').addEventListener('click', () => {
-    f.semilla_stats = semillaNueva(f.semilla_stats); regenerarStats();
+    f.semilla_stats = semillaNueva(f.semilla_stats); regenerarStats(); pintarRasgos();
   });
   el.querySelector('[data-regenerar="poderes"]').addEventListener('click', () => {
     f.semilla_poderes = semillaNueva(f.semilla_poderes); regenerarPoderes();
@@ -325,6 +348,7 @@ export async function abrirEditorCarta(ctx, { disenoId = null } = {}) {
         ata: f.stats.ATA, def: f.stats.DEF, con: f.stats.CON, poderes: f.poderes,
         imagen_url: f.imagen_url || null, texto: f.texto || null, personas: f.personas,
         semilla_stats: f.semilla_stats, semilla_poderes: f.semilla_poderes,
+        estamina: f.estamina, tactica_favorita: f.tactica_favorita || '',
       } });
       toast(`${r.nombre}: ${f.id ? 'cambios guardados' : 'carta creada'} (valor ${r.valor})`, 'ok');
       await ctx.recargar('cartas');

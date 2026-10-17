@@ -1015,3 +1015,33 @@ Los goles dependen mucho de la formación (con un solo defensa la ocasión llega
 - **Nueva temporada:** un trigger al crear la temporada pone la energía a 100, sea cual sea el camino (temporada nueva o reinicio de la beta).
 - **Motor actual: 2.0.0**, en `motores.js` y en la Edge Function (que guarda además tácticas y participación).
 - **Tests:** `api-paso11.mjs` (~54 comprobaciones). Entre otras cosas, recalcula la energía de todas las cartas de la liga tras dos jornadas y comprueba que la alineación de los bots es la de «Sugerir» de la web. `generador-sql.test.mjs` compara también los rasgos.
+
+## Motor v2.0.0 (fase 3: interfaz)
+
+### Decisiones de Marcos
+
+- Lo básico, a la vista; lo avanzado, plegado. Quien no toque nada juega con posesión, gestión normal y su once guardado.
+- **Pestaña Equipo:** táctica (3 botones grandes, con icono, qué hace y a qué gana y pierde), gestión, «Avanzado» (plan B y cambios programados) y «Sugerir alineación».
+- **Energía** en la carta, la ficha, la alineación, la plantilla y las listas para elegir, con avisos («Cansado: −12 %»).
+- **Táctica favorita** con icono en la carta y en la ficha; en la alineación se resaltan las que encajan.
+- **Sinergias:** chip en la alineación y en la crónica.
+- **Crónica:** tácticas y cruce al principio, plan B y cambios del descanso con su motivo, y energía gastada al final.
+- **Ficha del rival:** tácticas de sus últimos partidos publicados.
+- **Ayuda:** «¿Cómo funciona?», desde la pestaña Equipo.
+
+### Decisiones mías
+
+- **Iconos de táctica:** 🔄 posesión, 🏹 contraataque y 🔥 presión. Los textos y los números salen de `CONFIG` del motor, en `js/slr/tactica.js`, que también tiene los chips, la barra de energía y la ayuda.
+- **Colores de energía** por tramo del motor: verde (≥70), lima (50–69), naranja (30–49) y rojo (<30). En la carta va una barra fina abajo; en las fichas y las listas, la barra con el número y el aviso.
+- **Las tácticas se guardan con la alineación** (un solo botón «Guardar»), con el parámetro `tacticas` de `slr_guardar_alineacion`. Cambiarlas deja la pantalla en «Cambios sin guardar», igual que mover una carta.
+- **En el móvil**, los botones de táctica enseñan solo el icono, el nombre, el cruce y cuántas favoritas hay en el once. La frase de la elegida va debajo. En PC, cada botón lleva su frase.
+- **«Avanzado»:** la fila plegada resume lo que hay dentro (p. ej. «plan B · 1 cambio») y sigue abierta al repintar.
+  - Con cambios programados, la gestión avisa de que no se aplica, porque el motor los usa en su lugar.
+  - Al guardar se quitan, avisando, los cambios que ya no cuadran con la alineación; si falta quién sale o quién entra, no se guarda.
+- **«Sugerir alineación»** usa la misma función que el servidor para los bots (`sugerirAlineacion`, en `js/slr/energia.js`). No guarda: queda como «Cambios sin guardar».
+- **Stats en la alineación:** el valor de cada hueco y las fuerzas de línea ya incluyen la tocada, la energía, la táctica favorita y la sinergia. Los bonus de táctica no, porque dependen del momento del partido.
+- **Crónica:** el descanso es un bloque propio entre las jugadas 5 y 6, con el plan B, los cambios (con la energía de quien sale y el motivo: reservón, cansado o programado con su condición) y las tácticas y el cruce de la segunda parte. Al final, por equipo: energía antes → después del partido (sin la recuperación) y el gasto.
+- **Amistosos de otros:** en la lista de la pestaña Liga se ve el resultado, pero no se abre la crónica: el servidor no la da, porque lleva las tácticas guardadas de quien lo jugó.
+- **Plantilla:** se puede ordenar por energía.
+- **Formulario de carta:** estamina y táctica favorita, propuestas por el generador mientras no se toquen a mano (siguen al perfil y a la semilla de stats). La edición múltiple las cambia también.
+- **Tests:** `tests/slr/banco/tacticas.mjs` (30 comprobaciones, con las capturas de la entrega). `banco/alineacion.mjs` ahora coloca el scroll en el campo, porque la táctica va encima; `banco/equipo.mjs` no cuenta el bloque del descanso como jugada.

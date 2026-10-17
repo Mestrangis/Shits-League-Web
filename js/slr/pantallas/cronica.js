@@ -13,12 +13,17 @@
      va junto al equipo o la carta que lo consiguió.
    · Al final, un resumen: posesiones, ocasiones, tiros, paradas, poderes por
      equipo y la carta con más PR de cada lado.
+   · Motor v2: arriba, la táctica de cada equipo, quién ganó el cruce y las
+     sinergias; en el descanso, el plan B y los cambios (con su motivo); y al
+     final, la energía que gastó cada carta (solo en liga).
 ═══════════════════════════════════════════════ */
 import { rpc, leer } from '../api.js';
 import { esc, hoja } from '../ui.js';
 import { describirPoder } from '../carta.js';
 import { campoHTML, enlazarCampo } from '../campo.js';
 import { motorDe } from '../motores.js';
+import { TACTICA, CONDICION_PLAN_B, CONDICION_CAMBIO, MOTIVO_CAMBIO, chipTactica, textoSinergia } from '../tactica.js';
+import { tramoEnergia } from '../energia.js';
 
 const pct = p => `${Math.round(p * 100)} %`;
 const LETRAS = ['A', 'B'];
@@ -37,10 +42,15 @@ const CORTO = {
   parada: e => `+${Math.round(e * 100)} % a su parada`,
 };
 
+const DESCANSO = new Set(['plan_b', 'cambio', 'descanso']);
+
 function jugadas(eventos, eq, nombre, poderDe) {
   const bloques = new Map();
+  const descanso = [];
+  let tras = null;   // jugada tras la que va el descanso
   for (const e of eventos) {
-    if (e.jugada == null || e.tipo === 'fin_partido') continue;
+    if (e.jugada == null || e.tipo === 'fin_partido' || e.tipo === 'tacticas') continue;
+    if (DESCANSO.has(e.tipo)) { descanso.push(e); tras = e.jugada; continue; }
     if (!bloques.has(e.jugada)) bloques.set(e.jugada, []);
     bloques.get(e.jugada).push(e);
   }
@@ -48,7 +58,31 @@ function jugadas(eventos, eq, nombre, poderDe) {
   const quien = l => `<b class="${eq[l].clase}">${esc(eq[l].nombre)}</b>`;
   const carta = (id, l) => `<span class="${eq[l].clase}">${esc(nombre[id] ?? '?')}</span>`;
   const html = [];
-  for (const [, evs] of bloques) {
+  const pintarDescanso = () => {
+    const lineas = descanso.map(e => {
+      if (e.tipo === 'plan_b') {
+        return `<li class="slr-suceso slr-suceso--tactica ${eq[e.equipo].clase}">🔁 ${quien(e.equipo)} activa el plan B (${esc(CONDICION_PLAN_B[e.condicion] ?? e.condicion)}):
+          ${chipTactica(e.de)} → ${chipTactica(e.a)}</li>`;
+      }
+      if (e.tipo === 'cambio') {
+        const motivo = e.motivo === 'programado'
+          ? `programado${e.condicion ? `: ${esc((CONDICION_CAMBIO[e.condicion] ?? e.condicion).toLowerCase().replace('…', ''))}` : ''}`
+          : esc(MOTIVO_CAMBIO[e.motivo] ?? e.motivo);
+        return `<li class="slr-suceso slr-suceso--cambio ${eq[e.equipo].clase}">↔ Sale ${carta(e.sale, e.equipo)}${e.energia != null ? ` <small>(energía ${e.energia})</small>` : ''},
+          entra ${carta(e.entra, e.equipo)} <small>· ${motivo}</small></li>`;
+      }
+      // descanso: tácticas y cruce de la segunda parte
+      const cr = e.cruce ? `gana el cruce ${quien(e.cruce)}` : 'cruce igualado';
+      return `<li class="slr-suceso slr-suceso--menor">Segunda parte: ${chipTactica(e.tacticas.A)} contra ${chipTactica(e.tacticas.B)} · ${cr}</li>`;
+    });
+    html.push(`
+      <li class="slr-jugada slr-jugada--descanso">
+        <div class="slr-jugada__cabeza"><time>Descanso</time><span>${descanso.some(e => e.tipo === 'cambio') ? 'cambios' : 'sin cambios'}</span>
+          <em>${goles[0]}-${goles[1]}</em></div>
+        <ul>${lineas.join('')}</ul>
+      </li>`);
+  };
+  for (const [jugada, evs] of bloques) {
     const inicio = evs.find(e => e.tipo === 'inicio_jugada');
     const minuto = (evs.find(e => e.tipo === 'posesion') ?? evs[0]).minuto;
     const lineas = [];
@@ -95,8 +129,32 @@ function jugadas(eventos, eq, nombre, poderDe) {
           <em>${goles[0]}-${goles[1]}</em></div>
         <ul>${lineas.join('')}</ul>
       </li>`);
+    if (jugada === tras) pintarDescanso();
   }
   return `<ol class="slr-jugadas">${html.join('')}</ol>`;
+}
+
+// Arriba: la táctica con la que salió cada equipo, quién ganó el cruce y sus sinergias
+function cabeceraTacticas(sim, eq) {
+  const ev = sim?.eventos?.find(e => e.tipo === 'tacticas');
+  if (!ev) return '';
+  const lado = l => `<div class="${eq[l].clase}">${chipTactica(ev.tacticas[l])}${textoSinergia(ev.sinergias?.[l])}
+    ${sim.plan_b?.[l] ? `<small>plan B → ${TACTICA[sim.tacticas[l][1]]?.icono ?? ''} ${esc(TACTICA[sim.tacticas[l][1]]?.nombre ?? '')}</small>` : ''}</div>`;
+  return `<div class="slr-cronica__tacticas">${lado('A')}
+    <div class="slr-cronica__cruce">Cruce<b>${ev.cruce ? `${TACTICA[ev.tacticas[ev.cruce]].icono} ${esc(eq[ev.cruce].nombre)}` : 'igualado'}</b></div>
+    ${lado('B')}</div>`;
+}
+
+// Al final: la energía que gastó cada carta (liga). Solo la guardada al publicar.
+function energiaGastada(p, eq) {
+  if (!p.energia) return '';
+  const col = l => `<ul class="${eq[l].clase}">${(p.energia[l] ?? []).map(x => {
+    const queda = Math.max(0, x.antes - x.gasto);
+    return `<li><span>${esc(x.nombre)}</span><b class="slr-energia--${tramoEnergia(queda).clase}">${x.antes} → ${queda} <small>(−${x.gasto})</small></b></li>`;
+  }).join('')}</ul>`;
+  return `<h3 class="slr-subtitulo">Energía gastada</h3>
+    <div class="slr-cronica__energia">${col('A')}${col('B')}</div>
+    <p class="slr-suave">Después, todas las cartas recuperan 20 (y las que no jugaron, 20 más).</p>`;
 }
 
 function resumen(sim, eq, p, al, nombre) {
@@ -179,6 +237,7 @@ export async function abrirCronica(partidoId, ctx) {
         <span class="${eq.B.clase}">● ${esc(eq.B.nombre)}</span> <small>visitante</small></p>
       ${p.p_local != null ? `<p class="slr-suave slr-cronica__prev">Antes del partido: gana ${esc(eq.A.nombre)} ${pct(p.p_local)} · empate ${pct(1 - p.p_local - p.p_visitante)} · gana ${esc(eq.B.nombre)} ${pct(p.p_visitante)}</p>` : ''}
       ${aviso ? `<div class="slr-banner slr-banner--pausa"><b>Aviso</b><span>${esc(aviso)}</span></div>` : ''}
+      ${cabeceraTacticas(sim, eq)}
 
       <div class="slr-cronica__campos">
         ${campoHTML(al.local, { titulo: eq.A.nombre, clase: eq.A.clase, nota: 'local' })}
@@ -192,6 +251,8 @@ export async function abrirCronica(partidoId, ctx) {
       <h3 class="slr-subtitulo">Resumen</h3>
       ${resumen(sim, eq, p, al, nombre)}
       ${(p.lesiones ?? []).length ? `<p class="slr-cronica__lesiones">🚑 Lesiones: ${p.lesiones.map(id => esc(nombre[id] ?? id)).join(', ')}${p.tipo === 'liga' ? ' (tocadas la próxima jornada)' : ''}</p>` : ''}
+
+      ${energiaGastada(p, eq)}
 
       <h3 class="slr-subtitulo">Rendimiento (PR) de cada carta</h3>
       <p class="slr-suave">«esp.» es lo esperado según las 200 simulaciones previas.</p>

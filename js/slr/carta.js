@@ -41,6 +41,8 @@ import { esc, iniciales, bloquearSeleccion, desbloquearSeleccion } from './ui.js
 import { acabado, listaAcabados } from './acabados/index.js';
 import { urlFoto, cargarFotos } from './imagenes.js';
 import { coleccion, urlEmblema } from './colecciones.js';
+import { TACTICA } from './tactica.js';
+import { tramoEnergia } from './energia.js';
 
 export const TIPOS = { individual: 'Individual', duo: 'Dúo', trio: 'Trío', grupo: 'Grupo', especial: 'Especial' };
 // Rareza: sale del tier (igual que la columna generada disenos_carta.rareza)
@@ -75,6 +77,9 @@ export function normalizarCarta(f) {
     poderes: d.poderes ?? [],
     imagen_url: d.imagen_url ?? null,
     texto: d.texto ?? null,
+    estamina: d.estamina ?? null,
+    tactica_favorita: d.tactica_favorita ?? null,
+    energia: f.energia ?? null,          // del ejemplar (cartas.energia); null en el catálogo
   };
 }
 
@@ -152,8 +157,10 @@ function largoNombre(nombre) {
 
 // tam: 'xs' (huecos del campo) | 's' (cuadrícula) | 'l' (detalle). destacar: la stat
 // del hueco (en 'xs' solo se ve esa). Marcas de estado (en la franja de abajo, para
-// no tapar la cara): capitan, tocada, blindada, enVenta.
-export function cartaHTML(c, { tam = 's', destacar = null, capitan = false, tocada = false, blindada = false, enVenta = false } = {}) {
+// no tapar la cara): capitan, tocada, blindada, enVenta. energia: barra fina abajo si
+// la carta trae energía (las del equipo). encaja: su táctica favorita es la elegida.
+export function cartaHTML(c, { tam = 's', destacar = null, capitan = false, tocada = false, blindada = false, enVenta = false,
+                               energia = true, encaja = false } = {}) {
   const stats = [['ATA', c.ata], ['DEF', c.def], ['CON', c.con]];
   const def = acabado(c.acabado);
   const rareza = c.rareza ?? rarezaDeTier(c.tier);
@@ -167,8 +174,10 @@ export function cartaHTML(c, { tam = 's', destacar = null, capitan = false, toca
     blindada && '<span class="slr-carta__marca slr-carta__marca--blindada" title="Blindada">🛡</span>',
     enVenta && '<span class="slr-carta__marca slr-carta__marca--venta" title="En venta">€</span>',
   ].filter(Boolean).join('');
+  const fav = TACTICA[c.tactica_favorita];
+  const tramo = energia && c.energia != null ? tramoEnergia(c.energia) : null;
   return `
-    <div class="slr-carta slr-carta--${tam} slr-carta--${esc(c.tipo)} slr-carta--r-${esc(rareza)} slr-carta--${esc(def.id)}${color ? ` slr-carta--color-${esc(color)}` : ''}${col?.color ? ` slr-carta--col-${esc(col.color)}` : ''}${c.imagen_url ? ' slr-carta--con-imagen' : ''}${tocada ? ' slr-carta--tocada' : ''}"
+    <div class="slr-carta slr-carta--${tam} slr-carta--${esc(c.tipo)} slr-carta--r-${esc(rareza)} slr-carta--${esc(def.id)}${color ? ` slr-carta--color-${esc(color)}` : ''}${col?.color ? ` slr-carta--col-${esc(col.color)}` : ''}${c.imagen_url ? ' slr-carta--con-imagen' : ''}${tocada ? ' slr-carta--tocada' : ''}${encaja ? ' slr-carta--encaja' : ''}"
          data-carta="${esc(c.id)}" data-acabado="${esc(def.id)}"${def.sigue ? ' data-sigue' : ''}>
       <div class="slr-carta__marco"><div class="slr-carta__cara">
         <div class="slr-carta__arte">${arte(c)}</div>
@@ -178,6 +187,7 @@ export function cartaHTML(c, { tam = 's', destacar = null, capitan = false, toca
           <span class="slr-carta__media">
             <span class="slr-carta__ovr">${c.ovr}</span>
             <span class="slr-carta__tipo" title="${esc(TIPOS[c.tipo] ?? c.tipo)}">${iconoTipo(c.tipo)}</span>
+            ${fav ? `<span class="slr-carta__favorita" title="Táctica favorita: ${esc(fav.nombre)}">${fav.icono}</span>` : ''}
           </span>
           ${emblema}
         </div>
@@ -189,6 +199,7 @@ export function cartaHTML(c, { tam = 's', destacar = null, capitan = false, toca
             ${stats.map(([k, v]) => `<span class="${destacar === k ? 'es-destacada' : ''}"><b>${v}</b>${k}</span>`).join('')}
           </span>
         </div>
+        ${tramo ? `<div class="slr-carta__energia slr-energia--${tramo.clase}" title="Energía ${c.energia} · ${esc(tramo.texto)}"><i style="width:${Math.max(0, Math.min(100, c.energia))}%"></i></div>` : ''}
         <div class="slr-carta__acabado" aria-hidden="true"><i class="slr-carta__capa"></i></div>
         <div class="slr-carta__destello" aria-hidden="true"><i class="slr-carta__capa"></i></div>
       </div></div>

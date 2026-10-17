@@ -82,8 +82,8 @@ console.log('\nEscritorio (ratón)');
   const { ch, cdp, ev, foto } = await navegador(false);
   const raton = (type, p, extra = {}) => cdp('Input.dispatchMouseEvent', { type, x: p.x, y: p.y, button: 'left', buttons: type === 'mouseReleased' ? 0 : 1, clickCount: 1, ...extra });
   async function arrastrar(desde, hasta, { fotoMedio } = {}) {
-    // Ventana alta: con el scroll arriba se ven el campo, el banquillo y «Sin colocar»
-    await ev(`document.querySelector('.slr-main').scrollTop = 0; 0`);
+    // Ventana alta: con las formaciones arriba se ven el campo, el banquillo y «Sin colocar»
+    await ev(`document.querySelector('.slr-formaciones').scrollIntoView({ block: 'start' }); 0`);
     await dormir(100);
     const a = await ev(`(() => { const r = document.querySelector(${JSON.stringify(desde)}).getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
     await raton('mousePressed', a);
@@ -242,7 +242,7 @@ console.log('\nMóvil 390×844 (táctil)');
   await dormir(500);
 
   // Desplazamiento automático al llevar la carta al borde
-  await ev(`document.querySelector('.slr-main').scrollTop = 0; 0`);
+  await ev(`document.querySelector('.slr-formaciones').scrollIntoView({ block: 'start' }); 0`);
   await dormir(200);
   const a = await pos('.slr-hueco[data-l="del"][data-i="1"]');
   await toque('touchStart', a);

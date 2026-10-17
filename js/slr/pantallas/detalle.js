@@ -10,6 +10,7 @@ import { cartaHTML, normalizarCarta, describirPoder, lineaCarta } from '../carta
 import { estaTocada, configLiga } from '../rush.js';
 import { chipsEstado } from './plantilla.js';
 import { abrirEditorCarta } from './editor-carta.js';
+import { TACTICA, ESTAMINA, barraEnergia } from '../tactica.js';
 
 export const barras = c => [['ATA', c.ata], ['DEF', c.def], ['CON', c.con]].map(([k, v]) => `
   <div class="slr-barra-stat">
@@ -24,6 +25,17 @@ export function poderes(lista) {
       <p>${esc(p.momento)}: ${esc(p.efecto)}.</p>
       <small>${esc(p.probabilidad)}</small>
     </li>`).join('')}</ul>`;
+}
+
+// Motor v2: energía (del ejemplar), estamina y táctica favorita (del diseño)
+export function rasgosCarta(c) {
+  const est = ESTAMINA[c.estamina], fav = TACTICA[c.tactica_favorita];
+  if (!est && c.energia == null) return '';
+  return `<div class="slr-cifras slr-detalle__rasgos">
+    ${c.energia != null ? `<div><small>Energía</small>${barraEnergia(c.energia, { aviso: true })}</div>` : ''}
+    ${est ? `<div><small>Estamina</small><b>${est.icono} ${est.nombre}</b><em>−${est.gasto} por partido</em></div>` : ''}
+    <div><small>Táctica favorita</small><b>${fav ? `${fav.icono} ${esc(fav.nombre)}` : 'Ninguna'}</b>${fav ? '<em>+5 % si su equipo la juega</em>' : ''}</div>
+  </div>`;
 }
 
 export async function abrirDetalle(cartaId, ctx) {
@@ -45,6 +57,7 @@ export async function abrirDetalle(cartaId, ctx) {
         <p class="slr-detalle__tipo">${lineaCarta(c)}</p>
         ${propia ? `<div class="slr-ficha__chips">${chipsEstado(propia)}</div>` : ''}
         <div class="slr-stats">${barras(c)}</div>
+        ${rasgosCarta(c)}
         <div class="slr-cifras">
           <div><small>Valor</small><b>${monedas(c.valor)}</b></div>
           <div><small>Cláusula</small><b>${info.clausula != null ? monedas(info.clausula) : '—'}</b>

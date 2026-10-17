@@ -36,7 +36,7 @@ export async function abrirAlbum(ctx) {
   // cientos de entradas, una lista de ids en la URL sería demasiado larga
   const porDiseno = new Map(entradas.map(e => [e.diseno_id, e]));
   const cartas = entradas.length
-    ? (await leer(`cartas?select=id,diseno_id,equipo_id,disenos_carta(nombre,tipo,acabado,color,tier,rareza,coleccion_id,perfil,personas,ata,def,con,valor,poderes,imagen_url,texto)` +
+    ? (await leer(`cartas?select=id,diseno_id,equipo_id,disenos_carta(nombre,tipo,acabado,color,tier,rareza,coleccion_id,perfil,personas,ata,def,con,valor,poderes,imagen_url,texto,estamina,tactica_favorita)` +
         `&liga_id=eq.${liga}&limit=5000`)).filter(f => porDiseno.has(f.diseno_id))
     : [];
   const items = cartas.map(f => {

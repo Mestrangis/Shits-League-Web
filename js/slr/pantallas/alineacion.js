@@ -13,11 +13,18 @@
    demanda (Edge Function) con la alineación guardada.
    Guardar = slr_guardar_alineacion; Confirmar = slr_confirmar_alineacion
    (ambos dan el bonus de participación de la próxima jornada).
+   Motor v2: táctica (3 botones grandes), gestión y, plegado en «Avanzado», el
+   plan B y los cambios programados; se guardan con la alineación (las tácticas
+   son privadas). «Sugerir alineación» propone un 2-2-2 con stats, energía y
+   puesto (la misma regla que los bots). La energía se ve en cada carta, las que
+   encajan con la táctica se resaltan y la sinergia de colección sale en un chip.
 ═══════════════════════════════════════════════ */
 import { rpc, funcion, leer as leerTabla } from '../api.js';
 import { esc, hoja, cerrarCapa, conEspera, toast, hora, faltan as quedan, diaHora, bloquearSeleccion, desbloquearSeleccion } from '../ui.js';
 import { cartaHTML, describirPoder } from '../carta.js';
-import { fuerzaPosesion, fuerzaAtaque, fuerzaDefensa, probabilidadesTirador, CONFIG } from '../motor-v1.3.0.js';
+import { fuerzaPosesion, fuerzaAtaque, fuerzaDefensa, probabilidadesTirador, sinergia, CONFIG } from '../motor-v2.0.0.js';
+import { factorEnergia, tramoEnergia, sugerirAlineacion, GESTIONES } from '../energia.js';
+import { TACTICA, ESTAMINA, CONDICION_PLAN_B, CONDICION_CAMBIO, ganaA, pierdeCon, barraEnergia, textoSinergia, abrirAyuda } from '../tactica.js';
 import { estaTocada, alineacionBloqueada, alineacionConfirmada, proximaJornada, pausada, configLiga, ventanaCierre, miPartido, enJuego } from '../rush.js';
 import { abrirDetalle } from './detalle.js';
 import { abrirEquipo } from './ficha-equipo.js';
@@ -28,10 +35,10 @@ const CAMPO = { por: 'def', def: 'def', med: 'con', del: 'ata' };
 const NOMBRE_LINEA = { por: 'POR', def: 'DEF', med: 'MED', del: 'DEL', banco: 'SUP' };
 const MAL_RINDE = 12; // puntos por debajo de su mejor stat
 
-let borrador = null, original = '';
+let borrador = null, original = '', avanzadoAbierto = false;
 
 /* ── Borrador ────────────────────────────────────────────────────────────── */
-function desdeGuardada(al, mias) {
+function desdeGuardada(al, mias, tac) {
   const ok = id => (id && mias.has(id) ? id : null);
   const [nd, nm, nl] = (al?.formacion ?? '2-2-2').split('-').map(Number);
   const linea = (lista, n) => Array.from({ length: n }, (_, i) => ok(lista?.[i]));
@@ -44,9 +51,23 @@ function desdeGuardada(al, mias) {
     banco: linea(al?.banquillo, 3),
     orden_manual: !!al?.orden_manual,
     capitan: ok(al?.capitan_id),
+    tac: {
+      tactica: tac?.tactica ?? 'posesion',
+      plan_b: tac?.plan_b ? { ...tac.plan_b } : null,
+      gestion: tac?.gestion ?? 'normal',
+      cambios: (tac?.cambios_avanzados ?? []).map(c => ({ ...c })),
+    },
   };
   if (!titulares(b).includes(b.capitan)) b.capitan = null;
   return b;
+}
+// Cambios programados que ya no cuadran con la alineación (sale un no titular o
+// entra uno que no está en el banquillo): se quitan, y se dice cuántos
+function podarCambios() {
+  const tit = titulares(borrador), banco = borrador.banco;
+  const antes = borrador.tac.cambios.length;
+  borrador.tac.cambios = borrador.tac.cambios.filter(c => !c.sale || !c.entra || (tit.includes(c.sale) && banco.includes(c.entra)));
+  return antes - borrador.tac.cambios.length;
 }
 const titulares = b => [b.por, ...b.def, ...b.med, ...b.del];
 const firma = b => JSON.stringify(b);
@@ -104,9 +125,13 @@ const AVISO_CAPITAN = 'El capitán ha salido del once y pierde la capitanía: el
 
 /* ── Stats efectivas y fuerzas ───────────────────────────────────────────── */
 const factorTocada = () => configLiga().lesion_tocada_factor ?? 0.85;
+// Como en el servidor: tocada, después energía (mínimo 1) y, si encaja, ×1,05 de la táctica favorita
+const encaja = c => !!c.tactica_favorita && c.tactica_favorita === borrador.tac.tactica;
 function efectiva(c) {
-  const f = estaTocada(c) ? factorTocada() : 1;
-  return { id: c.id, ATA: Math.round(c.ata * f), DEF: Math.round(c.def * f), CON: Math.round(c.con * f) };
+  const ft = estaTocada(c) ? factorTocada() : 1, fe = factorEnergia(c.energia ?? 100);
+  const fav = encaja(c) ? CONFIG.MULT_TACTICA_FAVORITA : 1;
+  const v = x => Math.round(Math.max(1, Math.round(Math.round(x * ft) * fe)) * fav);
+  return { id: c.id, ATA: v(c.ata), DEF: v(c.def), CON: v(c.con), coleccion_id: c.coleccion_id };
 }
 function valorEnHueco(c, l) {
   if (l === 'banco') return c.ovr;
@@ -120,13 +145,16 @@ function rindeMal(c, l) {
 function fuerzas(porId) {
   const eq = { def: [], med: [], del: [] };
   for (const l of ['def', 'med', 'del']) eq[l] = borrador[l].filter(Boolean).map(id => efectiva(porId.get(id)));
+  const sin = sinergiaOnce(porId).mult;   // la sinergia multiplica las tres fuerzas
   return {
-    posesion: fuerzaPosesion(eq),
-    ataque: fuerzaAtaque(eq),
-    defensa: fuerzaDefensa(eq),
+    posesion: fuerzaPosesion(eq) * sin,
+    ataque: fuerzaAtaque(eq) * sin,
+    defensa: fuerzaDefensa(eq) * sin,
     portero: borrador.por ? efectiva(porId.get(borrador.por)).DEF : 0,
   };
 }
+
+const sinergiaOnce = porId => sinergia(titulares(borrador).filter(Boolean).map(id => porId.get(id)).filter(Boolean));
 
 /* ── Pintado ─────────────────────────────────────────────────────────────── */
 function hueco(l, i, porId, bloqueada) {
@@ -135,11 +163,78 @@ function hueco(l, i, porId, bloqueada) {
   return `
     <button class="slr-hueco slr-hueco--${l} ${c ? 'lleno' : ''}" type="button" data-l="${l}" data-i="${i}"
             ${c ? `data-id="${esc(id)}"` : ''} ${bloqueada ? 'disabled' : ''}>
-      ${c ? `${cartaHTML(c, { tam: 'xs', ancho: 80, destacar: STAT[l], capitan, tocada: estaTocada(c) })}
+      ${c ? `${cartaHTML(c, { tam: 'xs', ancho: 80, destacar: STAT[l], capitan, tocada: estaTocada(c), encaja: encaja(c) })}
              ${rindeMal(c, l) ? '<span class="slr-hueco__aviso" title="Rinde mal aquí">!</span>' : ''}`
           : `<span class="slr-hueco__vacio">+</span>`}
-      <span class="slr-hueco__etiqueta">${NOMBRE_LINEA[l]}${c && l !== 'banco' ? ` · ${valorEnHueco(c, l)}` : ''}</span>
+      <span class="slr-hueco__etiqueta">${NOMBRE_LINEA[l]}${c && l !== 'banco' ? ` · ${valorEnHueco(c, l)}` : ''}${c && c.energia != null ? ` <span class="slr-hueco__energia slr-energia--${tramoEnergia(c.energia).clase}">${c.energia}</span>` : ''}</span>
     </button>`;
+}
+
+function bloqueTactica(porId, bloqueada) {
+  const t = borrador.tac;
+  const tit = titulares(borrador).filter(Boolean).map(id => porId.get(id)).filter(Boolean);
+  const nEncajan = k => tit.filter(c => c.tactica_favorita === k).length;
+  const dis = bloqueada ? 'disabled' : '';
+  const opcion = (v, txt, sel) => `<option value="${esc(v)}" ${v === sel ? 'selected' : ''}>${esc(txt)}</option>`;
+  const nombreCarta = id => esc(porId.get(id)?.nombre ?? '—');
+  const cambios = t.cambios.map((c, k) => `
+    <li class="slr-cambio" data-cambio="${k}">
+      <label><span>Sale</span><select class="slr-input" data-c="sale" ${dis}>
+        ${opcion('', 'Elige…', c.sale ?? '')}${titulares(borrador).filter(Boolean).map(id => opcion(id, porId.get(id)?.nombre ?? id, c.sale)).join('')}</select></label>
+      <label><span>Entra</span><select class="slr-input" data-c="entra" ${dis}>
+        ${opcion('', 'Elige…', c.entra ?? '')}${borrador.banco.filter(Boolean).map(id => opcion(id, porId.get(id)?.nombre ?? id, c.entra)).join('')}</select></label>
+      <label><span>Cuándo</span><select class="slr-input" data-c="condicion" ${dis}>
+        ${Object.entries(CONDICION_CAMBIO).map(([v, txt]) => opcion(v, txt, c.condicion)).join('')}</select></label>
+      ${c.condicion === 'energia_menor' ? `<label class="slr-cambio__umbral"><span>Energía</span>
+        <input class="slr-input" type="number" min="1" max="99" step="1" inputmode="numeric" data-c="umbral" value="${esc(c.umbral ?? 50)}" ${dis}></label>` : ''}
+      ${bloqueada ? '' : `<button class="slr-cambio__quitar" type="button" data-quitar-cambio="${k}" aria-label="Quitar cambio">✕</button>`}
+    </li>`).join('');
+  const sin = textoSinergia(sinergiaOnce(porId));
+  return `
+    <section class="slr-tarjeta slr-tactica" data-bloque-tactica>
+      <div class="slr-tarjeta__cabeza"><span>Táctica</span>
+        <button class="slr-enlace" type="button" data-ayuda>¿Cómo funciona?</button></div>
+      <div class="slr-tacticas" role="radiogroup" aria-label="Táctica">
+        ${CONFIG.TACTICAS.map(k => `
+          <button type="button" role="radio" aria-checked="${k === t.tactica}" class="slr-tactica-btn ${k === t.tactica ? 'activo' : ''}" data-tactica="${k}" ${dis}>
+            <span class="slr-tactica-btn__icono">${TACTICA[k].icono}</span>
+            <b>${esc(TACTICA[k].nombre)}</b>
+            <small>${esc(TACTICA[k].frase)}</small>
+            <small class="slr-tactica-btn__cruce">Gana a ${TACTICA[ganaA(k)].icono} · pierde con ${TACTICA[pierdeCon(k)].icono}</small>
+            ${nEncajan(k) ? `<em class="slr-tactica-btn__encajan">${nEncajan(k)} ${nEncajan(k) === 1 ? 'favorita' : 'favoritas'} en el once</em>` : ''}
+          </button>`).join('')}
+      </div>
+      <p class="slr-tactica__frase">${TACTICA[t.tactica].icono} ${esc(TACTICA[t.tactica].frase)}</p>
+      ${sin ? `<div class="slr-chips-once">${sin}</div>` : ''}
+      <div class="slr-gestion">
+        <span class="slr-gestion__titulo">Gestión</span>
+        <div class="slr-segmentos" role="group" aria-label="Gestión">
+          ${Object.entries(GESTIONES).map(([k, g]) => `<button type="button" data-gestion="${k}" class="${k === t.gestion ? 'activo' : ''}" ${dis}>${esc(g.nombre)}</button>`).join('')}
+        </div>
+        <p class="slr-suave">${t.cambios.length ? 'Tienes cambios programados en «Avanzado»: la gestión no se aplica.' : esc(GESTIONES[t.gestion].frase)}</p>
+      </div>
+      <details class="slr-avanzado" data-avanzado ${avanzadoAbierto ? 'open' : ''}>
+        <summary>Avanzado <small>${[t.plan_b && 'plan B', t.cambios.length && `${t.cambios.length} ${t.cambios.length === 1 ? 'cambio' : 'cambios'}`].filter(Boolean).join(' · ') || 'plan B y cambios programados'}</small></summary>
+        <div class="slr-avanzado__bloque">
+          <b>Plan B</b> <small class="slr-suave">al descanso, cambia de táctica para la segunda parte</small>
+          <div class="slr-planb">
+            <select class="slr-input" data-planb="condicion" ${dis}>
+              ${opcion('', 'Sin plan B', t.plan_b?.condicion ?? '')}
+              ${Object.entries(CONDICION_PLAN_B).map(([v, txt]) => opcion(v, txt[0].toUpperCase() + txt.slice(1), t.plan_b?.condicion)).join('')}
+            </select>
+            ${t.plan_b ? `<span>→</span><select class="slr-input" data-planb="tactica" ${dis}>
+              ${CONFIG.TACTICAS.filter(k => k !== t.tactica).map(k => opcion(k, `${TACTICA[k].icono} ${TACTICA[k].nombre}`, t.plan_b.tactica)).join('')}
+            </select>` : ''}
+          </div>
+        </div>
+        <div class="slr-avanzado__bloque">
+          <b>Cambios programados</b> <small class="slr-suave">al descanso, en este orden (máximo ${CONFIG.MAX_CAMBIOS_AVANZADOS})</small>
+          ${t.cambios.length ? `<ol class="slr-cambios">${cambios}</ol>` : '<p class="slr-suave">Ninguno: manda la gestión.</p>'}
+          ${!bloqueada && t.cambios.length < CONFIG.MAX_CAMBIOS_AVANZADOS
+            ? '<button class="slr-btn slr-btn--fantasma" type="button" data-anadir-cambio>＋ Añadir cambio</button>' : ''}
+        </div>
+      </details>
+    </section>`;
 }
 
 function barraFuerza(nombre, valor, maximo) {
@@ -173,9 +268,12 @@ function pintarTodo(cont, ctx) {
   cont.innerHTML = `
     ${franja(datos, j, estadoTexto)}
     ${aviso}
+    ${bloqueTactica(porId, bloqueada)}
     <div class="slr-segmentos slr-formaciones" role="group" aria-label="Formación">
       ${CONFIG.FORMACIONES.map(x => `<button type="button" data-formacion="${x}" class="${x === borrador.formacion ? 'activo' : ''}" ${bloqueada ? 'disabled' : ''}>${x}</button>`).join('')}
     </div>
+    ${bloqueada ? '' : `<button class="slr-btn slr-btn--fantasma slr-sugerir" type="button" data-sugerir>✨ Sugerir alineación
+      <small>según stats, energía y puesto (no mira al rival ni la táctica)</small></button>`}
 
     <div class="slr-campo-juego">
       <div class="slr-campo-juego__lineas" aria-hidden="true"></div>
@@ -205,7 +303,7 @@ function pintarTodo(cont, ctx) {
       <div class="slr-tarjeta__cabeza"><span>Sin colocar</span><span>${libres.length}</span></div>
       ${libres.length ? `<div class="slr-sincolocar__fila">
         ${libres.map(c => `<div class="slr-libre ${bloqueada ? 'es-bloqueada' : ''}" data-id="${esc(c.id)}">
-          ${cartaHTML(c, { tam: 'xs', ancho: 70, tocada: estaTocada(c) })}</div>`).join('')}
+          ${cartaHTML(c, { tam: 'xs', ancho: 70, tocada: estaTocada(c), encaja: encaja(c) })}</div>`).join('')}
       </div>` : '<p class="slr-suave">Todas tus cartas están en el once o en el banquillo.</p>'}
       ${bloqueada ? '' : `<p class="slr-suave">Mantén pulsada una carta (o arrástrala con el ratón) y suéltala en un hueco.
         Si está ocupado, se intercambian.</p>`}
@@ -309,11 +407,12 @@ function filaCarta(c, l, actual) {
   const p = posicion(c.id);
   return `
     <li><button type="button" data-id="${esc(c.id)}" class="${c.id === actual ? 'es-actual' : ''}">
-      ${cartaHTML(c, { tam: 'xs', ancho: 60, destacar: stat, tocada: estaTocada(c) })}
+      ${cartaHTML(c, { tam: 'xs', ancho: 60, destacar: stat, tocada: estaTocada(c), encaja: encaja(c) })}
       <span class="slr-lista-cartas__texto">
         <b>${esc(c.nombre)}</b>
         <span class="slr-lista-cartas__stats">ATA ${c.ata} · DEF ${c.def} · CON ${c.con}</span>
-        <small>${c.id === actual ? 'En este hueco' : p ? `Ahora en <strong>${DONDE[p[0]]}</strong>` : 'Sin colocar'}${estaTocada(c) ? ' · tocada (85 %)' : ''}</small>
+        <small>${c.id === actual ? 'En este hueco' : p ? `Ahora en <strong>${DONDE[p[0]]}</strong>` : 'Sin colocar'}${estaTocada(c) ? ' · tocada (85 %)' : ''}${encaja(c) ? ` · ${TACTICA[c.tactica_favorita].icono} encaja` : ''}</small>
+        ${barraEnergia(c.energia, { aviso: true })}
         ${mal ? `<em>Rinde mal aquí: su fuerte es ${mejor}</em>` : ''}
       </span>
       <span class="slr-lista-cartas__stat ${mal ? 'es-mal' : ''}"><b>${valorEnHueco(c, l)}</b><small>${stat}</small></span>
@@ -341,6 +440,13 @@ function aporte(c, l, i, porId) {
     (borrador.orden_manual ? `es el ${i + 1}º en el orden` : 'entra el que mejor rinde en ese hueco');
 }
 
+function rasgos(c) {
+  const est = ESTAMINA[c.estamina], fav = TACTICA[c.tactica_favorita];
+  return `${c.energia != null ? `<div class="slr-ficha-hueco__energia"><small>Energía</small>${barraEnergia(c.energia, { aviso: true })}</div>` : ''}
+    <p class="slr-ficha-hueco__rasgos">${est ? `${est.icono} Estamina ${est.nombre.toLowerCase()} (−${est.gasto}/partido)` : ''}
+      ${fav ? ` · ${fav.icono} Favorita: ${esc(fav.nombre)}${encaja(c) ? ' <b>(encaja: +5 %)</b>' : ''}` : ''}</p>`;
+}
+
 function fichaEnHueco(c, l, i, porId) {
   const poderes = (c.poderes ?? []).map(describirPoder);
   return `
@@ -353,6 +459,7 @@ function fichaEnHueco(c, l, i, porId) {
           <span><small>ATA</small><b>${c.ata}</b></span><span><small>DEF</small><b>${c.def}</b></span><span><small>CON</small><b>${c.con}</b></span>
         </div>
         ${estaTocada(c) ? '<p class="slr-ficha-hueco__tocada">Tocada: juega al 85 % la próxima jornada</p>' : ''}
+        ${rasgos(c)}
       </div>
     </div>
     <p class="slr-ficha-hueco__aporte"><span>En ${DONDE[l]}</span> ${aporte(c, l, i, porId)}${borrador.capitan === c.id ? ' · ★ capitán: sus poderes saltan ×1,5' : ''}</p>
@@ -389,6 +496,7 @@ function fichaLibre(id, cont, ctx, porId) {
           <span><small>ATA</small><b>${c.ata}</b></span><span><small>DEF</small><b>${c.def}</b></span><span><small>CON</small><b>${c.con}</b></span>
         </div>
         ${estaTocada(c) ? '<p class="slr-ficha-hueco__tocada">Tocada: juega al 85 % la próxima jornada</p>' : ''}
+        ${rasgos(c)}
       </div>
     </div>
     <h3 class="slr-subtitulo">Qué aportaría en cada puesto</h3>
@@ -628,9 +736,70 @@ function enlazar(cont, ctx, porId, bloqueada) {
   }));
   cont.querySelector('[data-deshacer]')?.addEventListener('click', () => { borrador = JSON.parse(original); repintar(); });
 
+  // Táctica, gestión y avanzado
+  cont.querySelector('[data-ayuda]')?.addEventListener('click', () => abrirAyuda());
+  cont.querySelectorAll('[data-tactica]').forEach(b => b.addEventListener('click', () => {
+    borrador.tac.tactica = b.dataset.tactica;
+    // El plan B no puede ser la misma táctica: pasa a otra
+    if (borrador.tac.plan_b?.tactica === borrador.tac.tactica) borrador.tac.plan_b.tactica = CONFIG.TACTICAS.find(k => k !== borrador.tac.tactica);
+    repintar();
+  }));
+  cont.querySelectorAll('[data-gestion]').forEach(b => b.addEventListener('click', () => { borrador.tac.gestion = b.dataset.gestion; repintar(); }));
+  cont.querySelector('[data-avanzado]')?.addEventListener('toggle', e => { avanzadoAbierto = e.currentTarget.open; });
+  cont.querySelectorAll('[data-planb]').forEach(sel => sel.addEventListener('change', () => {
+    if (sel.dataset.planb === 'condicion') {
+      borrador.tac.plan_b = sel.value
+        ? { condicion: sel.value, tactica: borrador.tac.plan_b?.tactica ?? CONFIG.TACTICAS.find(k => k !== borrador.tac.tactica) }
+        : null;
+    } else borrador.tac.plan_b.tactica = sel.value;
+    repintar();
+  }));
+  cont.querySelector('[data-anadir-cambio]')?.addEventListener('click', () => {
+    const usados = new Set(borrador.tac.cambios.flatMap(c => [c.sale, c.entra]));
+    const sale = titulares(borrador).find(id => id && !usados.has(id)) ?? null;
+    const entra = borrador.banco.find(id => id && !usados.has(id)) ?? null;
+    borrador.tac.cambios.push({ sale, entra, condicion: 'siempre' });
+    repintar();
+  });
+  cont.querySelectorAll('[data-quitar-cambio]').forEach(b => b.addEventListener('click', () => {
+    borrador.tac.cambios.splice(Number(b.dataset.quitarCambio), 1);
+    repintar();
+  }));
+  cont.querySelectorAll('[data-cambio] [data-c]').forEach(inp => inp.addEventListener('change', () => {
+    const c = borrador.tac.cambios[Number(inp.closest('[data-cambio]').dataset.cambio)];
+    const campo = inp.dataset.c;
+    if (campo === 'umbral') c.umbral = Math.max(1, Math.min(99, Math.round(Number(inp.value) || 50)));
+    else c[campo] = inp.value || null;
+    if (campo === 'condicion') { if (c.condicion === 'energia_menor') c.umbral = c.umbral ?? 50; else delete c.umbral; }
+    repintar();
+  }));
+
+  // Sugerir alineación: 2-2-2 por stats, energía y puesto (como los bots)
+  cont.querySelector('[data-sugerir]')?.addEventListener('click', () => {
+    const s = sugerirAlineacion(datos.cartas.map(c => ({ id: c.id, ATA: c.ata, DEF: c.def, CON: c.con, energia: c.energia ?? 100 })));
+    borrador.formacion = s.formacion;
+    borrador.por = s.huecos.por;
+    borrador.def = s.huecos.def;
+    borrador.med = s.huecos.med;
+    borrador.del = s.huecos.del;
+    borrador.banco = [...s.banquillo, null, null, null].slice(0, 3);
+    borrador.capitan = s.capitan_id;
+    const quitados = podarCambios();
+    repintar();
+    toast(`Alineación sugerida: revísala y guárdala${quitados ? ` (se quitan ${quitados} cambios programados que ya no cuadran)` : ''}`, 'info');
+  });
+
   cont.querySelector('[data-guardar]')?.addEventListener('click', e => {
     if (titulares(borrador).some(x => !x)) { toast('Rellena todos los huecos del once antes de guardar', 'error'); return; }
     if (!borrador.capitan) { toast('Elige un capitán: toca un titular y márcalo', 'error'); return; }
+    if (borrador.tac.cambios.some(c => !c.sale || !c.entra)) {
+      avanzadoAbierto = true; repintar();
+      toast('Completa los cambios programados (quién sale y quién entra) o quítalos', 'error');
+      return;
+    }
+    const quitados = podarCambios();
+    if (quitados) toast(`Se quitan ${quitados} cambios programados que ya no cuadran con la alineación`, 'info');
+    const t = borrador.tac;
     conEspera(e.currentTarget, async () => {
       await rpc('slr_guardar_alineacion', {
         equipo_id: datos.equipo.id,
@@ -639,6 +808,11 @@ function enlazar(cont, ctx, porId, bloqueada) {
         banquillo: borrador.banco.filter(Boolean),
         orden_manual: borrador.orden_manual,
         capitan_id: borrador.capitan,
+        tacticas: {
+          tactica: t.tactica, plan_b: t.plan_b, gestion: t.gestion,
+          cambios_avanzados: t.cambios.map(c => ({ sale: c.sale, entra: c.entra, condicion: c.condicion,
+            ...(c.condicion === 'energia_menor' ? { umbral: c.umbral ?? 50 } : {}) })),
+        },
       });
       await ctx.recargar('alineacion');
       reiniciar(datos);
@@ -659,7 +833,7 @@ function enlazar(cont, ctx, porId, bloqueada) {
 }
 
 function reiniciar(datos) {
-  borrador = desdeGuardada(datos.alineacion, new Set(datos.cartas.map(c => c.id)));
+  borrador = desdeGuardada(datos.alineacion, new Set(datos.cartas.map(c => c.id)), datos.tacticas);
   original = firma(borrador);
 }
 

@@ -3,7 +3,8 @@
    Desde la clasificación, el calendario o el próximo rival: nombre, posición,
    últimos resultados, la plantilla completa (siempre visible: hace falta para
    fichar y clausular) y la alineación que usó en su ÚLTIMO partido oficial
-   publicado. Nunca su alineación guardada actual.
+   publicado. Nunca su alineación guardada actual. Con el motor v2, las tácticas
+   que usó en sus últimos partidos publicados (nunca la guardada para el próximo).
 ═══════════════════════════════════════════════ */
 import { rpc, leer, funcion } from '../api.js';
 import { esc, hoja, conEspera, toast, miles } from '../ui.js';
@@ -11,6 +12,7 @@ import { cartaHTML, normalizarCarta } from '../carta.js';
 import { campoHTML, enlazarCampo } from '../campo.js';
 import { abrirDetalle } from './detalle.js';
 import { abrirCronica } from './cronica.js';
+import { TACTICA, chipTactica } from '../tactica.js';
 
 export async function abrirEquipo(equipoId, ctx) {
   const { datos } = ctx;
@@ -19,9 +21,9 @@ export async function abrirEquipo(equipoId, ctx) {
     leer(`equipos?select=id,nombre,usuarios(nombre,interno)&id=eq.${equipoId}`),
     rpc('slr_clasificacion', { liga_id: datos.liga.id }).catch(() => ({ clasificacion: [] })),
     // RLS: solo se ven los partidos publicados
-    leer(`partidos?select=id,jornada_id,local_id,visitante_id,goles_local,goles_visitante,alineaciones_congeladas,simulado_en,jornadas(numero)` +
+    leer(`partidos?select=id,jornada_id,local_id,visitante_id,goles_local,goles_visitante,alineaciones_congeladas,tacticas,simulado_en,jornadas(numero)` +
       `&tipo=eq.liga&or=(local_id.eq.${equipoId},visitante_id.eq.${equipoId})&order=simulado_en.desc&limit=5`),
-    leer(`cartas?select=id,diseno_id,equipo_id,multiplicador_clausula,blindada_hasta,disenos_carta(nombre,tipo,acabado,color,tier,rareza,coleccion_id,perfil,personas,ata,def,con,valor,poderes,imagen_url,texto)&equipo_id=eq.${equipoId}`),
+    leer(`cartas?select=id,diseno_id,equipo_id,multiplicador_clausula,blindada_hasta,energia,disenos_carta(nombre,tipo,acabado,color,tier,rareza,coleccion_id,perfil,personas,ata,def,con,valor,poderes,imagen_url,texto,estamina,tactica_favorita)&equipo_id=eq.${equipoId}`),
     leer(`equipos?select=id,nombre&liga_id=eq.${datos.liga.id}`),
   ]);
   if (!eq) { toast('Ese equipo ya no existe', 'error'); return; }
@@ -41,6 +43,18 @@ export async function abrirEquipo(equipoId, ctx) {
       <span class="slr-res slr-res--${r}">${r}</span><b>${a}-${b}</b><small>J${p.jornadas?.numero ?? '?'} · ${local ? 'vs' : 'en'} ${esc(nombre(local ? p.visitante_id : p.local_id))}</small></button>`;
   }).join('');
 
+  // Tácticas de sus últimos partidos publicados (desde el motor v2)
+  const tacticas = partidos.filter(p => p.tacticas?.A).map(p => {
+    const lado = p.local_id === equipoId ? 'A' : 'B', otro = lado === 'A' ? 'B' : 'A';
+    const [t1, t2] = p.tacticas[lado], planB = p.tacticas.plan_b?.[lado];
+    const gano = p.tacticas.cruce?.[0] === lado, perdio = p.tacticas.cruce?.[0] === otro;
+    return `<li class="slr-ficha-eq__tactica">
+      <small>J${p.jornadas?.numero ?? '?'} vs ${esc(nombre(lado === 'A' ? p.visitante_id : p.local_id))}</small>
+      <span>${chipTactica(t1)}${t2 !== t1 ? ` → ${chipTactica(t2)}${planB ? ' <em>plan B</em>' : ''}` : ''}</span>
+      <small class="${gano ? 'es-bien' : perdio ? 'es-mal' : ''}">rival: ${TACTICA[p.tacticas[otro][0]]?.icono ?? ''} · cruce ${gano ? 'ganado' : perdio ? 'perdido' : 'igualado'}</small>
+    </li>`;
+  }).join('');
+
   const el = hoja(`
     <div class="slr-ficha-eq">
       <header class="slr-ficha-eq__cabeza">
@@ -56,6 +70,10 @@ export async function abrirEquipo(equipoId, ctx) {
 
       <h3 class="slr-subtitulo">Últimos resultados</h3>
       ${resultados || '<p class="slr-suave">Todavía no ha jugado ningún partido oficial.</p>'}
+
+      ${tacticas ? `<h3 class="slr-subtitulo">Tácticas en sus últimos partidos</h3>
+      <ul class="slr-ficha-eq__tacticas">${tacticas}</ul>
+      <p class="slr-suave">La que tenga guardada para el próximo partido no se ve hasta que se publique.</p>` : ''}
 
       <h3 class="slr-subtitulo">Alineación en su último partido</h3>
       ${ultimo ? campoHTML(ultimo.alineaciones_congeladas[ultimo.local_id === equipoId ? 'local' : 'visitante'],

@@ -88,9 +88,10 @@ async function filasSinTemporada(liga) {
     usuario: e.usuarios?.interno ? 'bot de pruebas' : e.usuarios?.nombre, pj: 0, g: 0, e: 0, p: 0, dg: 0, puntos: 0 }));
 }
 
-async function amistosos(liga, yo, dueno) {
+// La crónica de un amistoso lleva las tácticas guardadas de quien lo jugó: solo él la abre
+async function amistosos(liga, yo, dueno, usuario) {
   const [ps, eqs] = await Promise.all([
-    leer(`partidos?select=id,local_id,visitante_id,goles_local,goles_visitante,simulado_en&liga_id=eq.${liga}&tipo=eq.amistoso&order=simulado_en.desc&limit=8`),
+    leer(`partidos?select=id,local_id,visitante_id,goles_local,goles_visitante,simulado_en,creado_por&liga_id=eq.${liga}&tipo=eq.amistoso&order=simulado_en.desc&limit=8`),
     leer(`equipos?select=id,nombre&liga_id=eq.${liga}`),
   ]);
   if (!ps.length) return '';
@@ -100,7 +101,7 @@ async function amistosos(liga, yo, dueno) {
     <section class="slr-jornada">
       <div class="slr-jornada__cabeza"><b>Amistosos</b><span>los últimos ${ps.length}</span></div>
       ${ps.map(p => `
-        <button class="slr-cruce ${claseResultado(p.local_id, p.visitante_id, [p.goles_local, p.goles_visitante], yo)}" type="button" data-partido="${esc(p.id)}" data-jugado="1">
+        <button class="slr-cruce ${claseResultado(p.local_id, p.visitante_id, [p.goles_local, p.goles_visitante], yo)}" type="button" data-partido="${esc(p.id)}" data-jugado="1"${p.creado_por !== usuario ? ' data-ajeno="1"' : ''}>
           <span class="slr-cruce__equipo slr-cruce__equipo--local"><span class="${lado(p.local_id)}">${n(p.local_id)}</span>${avatar(dueno[p.local_id])}</span>
           <b class="slr-cruce__marcador">${p.goles_local}<i>–</i>${p.goles_visitante}</b>
           <span class="slr-cruce__equipo">${avatar(dueno[p.visitante_id])}<span class="${lado(p.visitante_id)}">${n(p.visitante_id)}</span></span>
@@ -144,13 +145,14 @@ export async function pintar(cont, ctx) {
     ${estadoLiga(datos)}
     ${vista === 'clasificacion'
       ? `${tabla(clas.clasificacion, yo)}<p class="slr-suave">Un amistoso se juega al momento con las alineaciones guardadas: no da puntos, dinero ni lesiones.</p>`
-      : `${calendario(datos.jornadas, yo, dueno)}${await amistosos(datos.liga.id, yo, dueno)}`}`;
+      : `${calendario(datos.jornadas, yo, dueno)}${await amistosos(datos.liga.id, yo, dueno, datos.yo?.usuario?.id)}`}`;
   pintarAvatares(cont);
 
   cont.querySelectorAll('[data-vista]').forEach(b => b.addEventListener('click', () => { vista = b.dataset.vista; ctx.pintar(); }));
   cont.querySelectorAll('[data-equipo]').forEach(b => b.addEventListener('click', () => abrirEquipo(b.dataset.equipo, ctx).catch(() => {})));
   cont.querySelectorAll('[data-partido]').forEach(b => b.addEventListener('click', () => {
     if (!b.dataset.jugado) { toast('Este partido todavía no se ha jugado', 'info'); return; }
+    if (b.dataset.ajeno) { toast('La crónica de un amistoso solo la ve quien lo jugó: lleva su táctica', 'info'); return; }
     abrirCronica(b.dataset.partido, ctx).catch(() => {});
   }));
   cont.querySelectorAll('[data-amistoso]').forEach(b => b.addEventListener('click', () => conEspera(b, async () => {
