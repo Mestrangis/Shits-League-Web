@@ -40,6 +40,8 @@ Para regenerar una carta que ya existe, vacía sus stats o sus poderes y guarda.
 | `tier` | **Sí** (si no pones stats) | `S`, `A`, `B`, `C`, `D`, `E` o `F` (ver "Tiers"). Si pones las stats y no el tier, se calcula de su OVR. |
 | `perfil` | **Sí** (si no pones stats) | `atacante`, `defensa`, `control`, `portero` o `equilibrado`. Si no lo pones, se deduce de las stats. |
 | `ata`, `def`, `con` | Opcional | Ataque, defensa y control, de 1 a 101. Vacías = se generan. |
+| `estamina` | Opcional | `alta`, `media` o `baja`: cuánta energía gasta en cada partido (ver "Estamina y táctica favorita"). Vacía = se genera. |
+| `tactica_favorita` | Opcional | `posesion`, `contraataque`, `presion` o vacía (ninguna). Al crear la carta, si está vacía se genera según el perfil. |
 | `poderes` | Opcional | Lista de poderes (ver abajo). Vacío = se generan; `[]` = sin poderes. |
 | `color` | Opcional | Color de fondo de la carta (ver "Colores"). Vacío = el de su colección; si no tiene, el neutro. |
 | `imagen_url` | Opcional | La foto (ver "Imagen"). Sin foto se pinta una silueta con las iniciales. |
@@ -95,6 +97,25 @@ Los sobres y las subastas reparten **por rareza**: primero se sortea la rareza y
 - **Garantía premium:** tras 2 sobres premium seguidos sin ninguna rara o superior, la primera carta del siguiente es rara o superior.
 - **Sobre de elección:** si las dos primeras candidatas son comunes, la tercera es rara o superior.
 - Con pocas raras y épicas en el catálogo, esas cartas forzadas acaban siendo legendarias: conviene que haya raras y épicas.
+
+## Estamina y táctica favorita
+
+Desde el motor v2.0.0 cada carta tiene dos rasgos más:
+
+- **Estamina:** cuánta energía gasta en cada partido de liga: `alta` 22, `media` 30, `baja` 40 (×1,3 si su equipo presiona; la mitad si juega solo una parte). Tras cada jornada todas recuperan 20, y las que no jugaron, 20 más. Con poca energía rinde menos: desde 70 nada, de 50 a 69 −5 %, de 30 a 49 −12 % y por debajo de 30 −25 %.
+- **Táctica favorita:** si su equipo juega con ella, sus stats suben un 5 %.
+
+El generador propone:
+
+| Perfil | Estamina | Táctica favorita |
+|---|---|---|
+| Portero | alta 50 %, media 35 %, baja 15 % | ninguna |
+| Atacante | alta 20 %, media 52 %, baja 28 % | contraataque |
+| Control | igual | posesión |
+| Defensa | igual | presión |
+| Equilibrado | igual | una al azar |
+
+En total sale ~25 % alta, 50 % media y 25 % baja. Se cambian en el formulario (*Estamina* y *Táctica favorita*) o en la edición múltiple.
 
 ## Tiers
 
@@ -307,6 +328,7 @@ En el **catálogo de cartas** y en la **herramienta de plantillas** (con el modo
 - colección (o «Sin colección»);
 - color (o «El de la colección»);
 - tipo, tier, perfil y acabado;
+- estamina y táctica favorita (o «Ninguna»);
 - activar o desactivar (no desde una liga de prueba);
 - regenerar stats o regenerar poderes, con semilla nueva.
 

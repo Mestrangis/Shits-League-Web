@@ -969,3 +969,49 @@ Los goles dependen mucho de la formación (con un solo defensa la ocasión llega
   - **Goles:** la v1.3.0 da 2,71 con los mismos equipos, y la v2 baja a 2,51 cuando los dos juegan posesión, porque sus contraataques pierden el bonus (×1,0). Con contraataque o presión queda igual (2,68–2,74).
   - **Temporada con cansancio:** quien rota gana el 48–51 % (no el 55 %) con plantillas de 15 hechas con el generador (tiers D/E/F, estamina 25/50/25). Pero solo pierde el 22 %, y los titulares fijos acaban a 31 de energía. La cifra depende mucho de lo buenos que sean los suplentes: con estas plantillas, el que rota pone a menudo cartas F.
 
+- **Marcos (tras el informe):** se quedan las dos como están. El motor no se toca.
+
+## Motor v2.0.0 (fase 2: servidor)
+
+### Decisiones de Marcos
+
+- **Estamina** (`alta`, `media`, `baja`) y **táctica favorita** en `disenos_carta`:
+  - las genera el servidor (estamina ~25/50/25, los porteros con más alta);
+  - la táctica favorita sale del perfil: atacante → contraataque, control → posesión, defensa → presión, portero → ninguna, equilibrado → al azar;
+  - se pueden editar en el formulario y en la edición múltiple.
+- **Energía** en cada ejemplar (`cartas.energia`, 0–100, empieza en 100):
+  - al publicar cada jornada de liga, cada carta gasta según su estamina (alta 22, media 30, baja 40), ×1,3 si su equipo presionaba y la mitad si jugó solo una parte;
+  - después todas recuperan 20, y las que no jugaron, 20 más;
+  - quien descansa recupera como si no jugase nadie;
+  - los amistosos la usan, pero no la gastan ni la recuperan;
+  - al cambiar de dueño se conserva, y en cada temporada nueva vuelve a 100.
+- **Bots:** táctica al azar, gestión normal, y rotan con la regla de «Sugerir alineación».
+- **Privacidad:** la táctica de un partido solo se ve cuando está publicado; la guardada para el próximo, nunca.
+
+### Decisiones mías
+
+- **Las tácticas guardadas van en una tabla aparte, `alineaciones_tacticas`, sin lectura pública.** `alineaciones` se lee desde la web con `select *`, y ocultar columnas habría roto esas lecturas. El dueño las lee con `slr_mis_tacticas` y las guarda con `slr_guardar_tacticas` o junto con la alineación (`slr_guardar_alineacion`, parámetro nuevo `tacticas`).
+- **Validación:**
+  - táctica, gestión y condiciones, de las listas del motor;
+  - el plan B tiene que ser otra táctica;
+  - como mucho 3 cambios programados: sale un titular de la alineación guardada, entra uno de su banquillo, y ninguna carta sale ni entra dos veces;
+  - el umbral (entero de 1 a 99) solo existe en el cambio «energía menor que».
+  - Si después cambias la alineación y un cambio programado deja de cuadrar, el motor se lo salta (como ya hacía con las lesiones).
+- **Al motor, los cambios programados vacíos le llegan como `null`.** Con una lista vacía el motor entiende que hay cambios programados y no aplica la gestión (migración `…0200`).
+- **Lo que ve el motor del rival en un pronóstico o un amistoso:** su última táctica publicada (la del primer tramo; posesión si aún no jugó), gestión normal, sin plan B ni cambios. Así la simulación no filtra su táctica guardada. En el pronóstico de otro equipo, tampoco entran sus tácticas guardadas.
+- **La crónica de un amistoso solo la ve quien lo jugó:** lleva sus tácticas guardadas para el próximo partido. Los demás siguen viendo el resultado en la lista.
+- **Cartas para el motor (`carta_motor`):** las stats van con la tocada y después con la energía (redondeo al entero, mínimo 1). Además lleva `energia`, `estamina`, `tactica_favorita` y `coleccion_id`.
+- **Funciones envueltas:** `congelar_alineacion`, `cerrar_jornada`, `motor_guardar_jornada` y `publicar_jornada` se renombran (`…_cartas` / `…_base`), y la nueva añade lo de la v2 y llama a la anterior. Así no se copian funciones de cientos de líneas.
+- **Gasto con dos tramos:** quien juega entero gasta la base × la media de los factores de sus dos tramos (presión en uno = ×1,15). El titular sustituido gasta la mitad con la táctica del primer tramo, y el que entra, con la del segundo.
+- **Cartas sin dueño:** también recuperan tras cada jornada (40), para que no se queden cansadas para siempre.
+- **`partidos`:**
+  - `tacticas`: tácticas por tramo, cruce, plan B y cambios del descanso;
+  - `participacion`: quién jugó entero o una parte;
+  - `energia`: por equipo, energía antes del partido y gasto de cada carta que jugó, para la crónica.
+- **Alineación por defecto** (equipos nuevos, bots y quien no guardó): la de «Sugerir» con la energía. Ordena por la stat del hueco × factor, desempata por OVR × factor y por id. El gemelo de la web está en `js/slr/energia.js`, en enteros (factor × 100) para que coincida con el SQL.
+- **Rasgos:** `generar_rasgos` en SQL y `generarRasgos` en `js/slr/generador.js`, gemelos con el mismo Park-Miller (semilla de stats + 7919).
+  - Las cartas actuales se rellenaron con su semilla.
+  - Sin estamina, el trigger los genera. La táctica favorita, solo al crear la carta.
+- **Nueva temporada:** un trigger al crear la temporada pone la energía a 100, sea cual sea el camino (temporada nueva o reinicio de la beta).
+- **Motor actual: 2.0.0**, en `motores.js` y en la Edge Function (que guarda además tácticas y participación).
+- **Tests:** `api-paso11.mjs` (~54 comprobaciones). Entre otras cosas, recalcula la energía de todas las cartas de la liga tras dos jornadas y comprueba que la alineación de los bots es la de «Sugerir» de la web. `generador-sql.test.mjs` compara también los rasgos.

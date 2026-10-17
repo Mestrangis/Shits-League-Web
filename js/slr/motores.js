@@ -7,9 +7,10 @@
 import * as v1_1_0 from './motor-v1.1.0.js';
 import * as v1_2_0 from './motor-v1.2.0.js';
 import * as v1_3_0 from './motor-v1.3.0.js';
+import * as v2_0_0 from './motor-v2.0.0.js';
 
-export const MOTORES = Object.freeze({ '1.1.0': v1_1_0, '1.2.0': v1_2_0, '1.3.0': v1_3_0 });
-export const MOTOR_ACTUAL = v1_3_0;
+export const MOTORES = Object.freeze({ '1.1.0': v1_1_0, '1.2.0': v1_2_0, '1.3.0': v1_3_0, '2.0.0': v2_0_0 });
+export const MOTOR_ACTUAL = v2_0_0;
 
 // Motor de una versión ("1.1.0"); sin versión, el actual. Error si no existe.
 export function motorDe(version) {

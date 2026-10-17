@@ -104,6 +104,25 @@ export function generarStats(tier, perfil, tipo, semilla) {
   return out;
 }
 
+// Rasgos del motor v2 (gemelo de generar_rasgos en SQL, migración 20261017000000):
+// estamina (portero 50/35/15 % alta/media/baja; el resto 20/52/28 %, ~25/50/25 en total)
+// y táctica favorita según el perfil (equilibrado: al azar; portero: ninguna)
+export const ESTAMINAS = Object.freeze({ alta: 'Alta', media: 'Media', baja: 'Baja' });
+export const TACTICAS = Object.freeze({ posesion: 'Posesión', contraataque: 'Contraataque', presion: 'Presión' });
+export const TACTICA_DEL_PERFIL = Object.freeze({ atacante: 'contraataque', control: 'posesion', defensa: 'presion', portero: null });
+export function generarRasgos(perfil, semilla) {
+  if (!PERFILES[perfil]) throw new Error(`Perfil desconocido: ${perfil}`);
+  const r = enteros((Number(semilla) || 0) + 7919);
+  r(100);
+  const x = r(100);
+  const estamina = perfil === 'portero'
+    ? (x < 50 ? 'alta' : x < 85 ? 'media' : 'baja')
+    : (x < 20 ? 'alta' : x < 72 ? 'media' : 'baja');
+  const azar = r(3);
+  const tactica_favorita = perfil === 'equilibrado' ? Object.keys(TACTICAS)[azar] : TACTICA_DEL_PERFIL[perfil];
+  return { estamina, tactica_favorita };
+}
+
 // Poderes propuestos: S 2 fuertes · A 1 fuerte · B 1 simple · C 40 % 1 simple · D–F ninguno
 export function generarPoderes(tier, perfil, semilla) {
   if (!TIERS[tier]) throw new Error(`Tier desconocido: ${tier}`);

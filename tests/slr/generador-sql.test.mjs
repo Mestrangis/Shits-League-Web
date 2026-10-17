@@ -5,7 +5,7 @@
 // el rango de su tier con la forma de su perfil.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { TIERS, PERFILES, MAX_STAT_CARTA, generarStats, generarPoderes, ovr100, tierDeStats, perfilDeStats } from '../../js/slr/generador.js';
+import { TIERS, PERFILES, MAX_STAT_CARTA, generarStats, generarPoderes, generarRasgos, ovr100, tierDeStats, perfilDeStats } from '../../js/slr/generador.js';
 import { SUPABASE_URL, SUPABASE_KEY } from '../../js/slr/config.js';
 
 const TIPOS = ['individual', 'duo', 'trio', 'grupo', 'especial'];
@@ -18,8 +18,9 @@ for (const tier of Object.keys(TIERS)) for (const perfil of Object.keys(PERFILES
   }
 }
 
-const resumen = (stats, poderes) => JSON.stringify({
+const resumen = (stats, poderes, rasgos) => JSON.stringify({
   stats: [stats.ATA, stats.DEF, stats.CON],
+  rasgos: [rasgos.estamina, rasgos.tactica_favorita],
   poderes: poderes.map(p => [p.nombre, p.momento, p.nivel, p.efecto, p.probabilidades.map(Number)]),
 });
 
@@ -31,8 +32,9 @@ test(`SQL y JS generan lo mismo (${casos.length} casos: todos los tiers, perfile
   const sql = await r.json();
   assert.equal(sql.length, casos.length);
   const distintos = casos.filter((c, i) =>
-    resumen(generarStats(c.tier, c.perfil, c.tipo, c.semilla_stats), generarPoderes(c.tier, c.perfil, c.semilla_poderes))
-    !== resumen(sql[i].stats, sql[i].poderes));
+    resumen(generarStats(c.tier, c.perfil, c.tipo, c.semilla_stats), generarPoderes(c.tier, c.perfil, c.semilla_poderes),
+      generarRasgos(c.perfil, c.semilla_stats))
+    !== resumen(sql[i].stats, sql[i].poderes, sql[i].rasgos));
   assert.equal(distintos.length, 0, `distintos: ${JSON.stringify(distintos.slice(0, 3))}`);
 });
 
@@ -77,4 +79,23 @@ test('poderes por tier: S 2 fuertes, A 1 fuerte, B 1 simple, C ~40 % 1 simple, D
   let conPoder = 0;
   for (let s = 1; s <= 2000; s++) conPoder += n('C', 'control', s).length;
   assert.ok(Math.abs(conPoder / 2000 - 0.4) < 0.05, `C con poder: ${conPoder / 20} %`);
+});
+
+test('rasgos: estamina ~25/50/25 (porteros más alta) y táctica favorita según el perfil', () => {
+  const n = { alta: 0, media: 0, baja: 0 }, porteros = { alta: 0, media: 0, baja: 0 };
+  const azar = { posesion: 0, contraataque: 0, presion: 0 };
+  for (let s = 1; s <= 4000; s++) {
+    const perfil = Object.keys(PERFILES)[s % 5];
+    const r = generarRasgos(perfil, s * 7919);
+    (perfil === 'portero' ? porteros : n)[r.estamina]++;
+    if (perfil === 'atacante') assert.equal(r.tactica_favorita, 'contraataque');
+    if (perfil === 'control') assert.equal(r.tactica_favorita, 'posesion');
+    if (perfil === 'defensa') assert.equal(r.tactica_favorita, 'presion');
+    if (perfil === 'portero') assert.equal(r.tactica_favorita, null);
+    if (perfil === 'equilibrado') azar[r.tactica_favorita]++;
+  }
+  const total = 3200;
+  assert.ok(Math.abs(n.alta / total - 0.20) < 0.04 && Math.abs(n.media / total - 0.52) < 0.04, JSON.stringify(n));
+  assert.ok(porteros.alta / 800 > 0.4, `porteros con estamina alta: ${porteros.alta}/800`);
+  for (const t of Object.values(azar)) assert.ok(t > 200, `equilibrado al azar: ${JSON.stringify(azar)}`);
 });

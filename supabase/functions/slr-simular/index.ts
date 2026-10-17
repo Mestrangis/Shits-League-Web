@@ -21,9 +21,13 @@
 import * as motor_1_1_0 from '../_shared/motor-v1.1.0.js';
 import * as motor_1_2_0 from '../_shared/motor-v1.2.0.js';
 import * as motor_1_3_0 from '../_shared/motor-v1.3.0.js';
+import * as motor_2_0_0 from '../_shared/motor-v2.0.0.js';
 
-const MOTORES: Record<string, typeof motor_1_2_0> = { '1.1.0': motor_1_1_0, '1.2.0': motor_1_2_0, '1.3.0': motor_1_3_0 };
-const MOTOR_ACTUAL = '1.3.0';
+// deno-lint-ignore no-explicit-any
+const MOTORES: Record<string, any> = {
+  '1.1.0': motor_1_1_0, '1.2.0': motor_1_2_0, '1.3.0': motor_1_3_0, '2.0.0': motor_2_0_0,
+};
+const MOTOR_ACTUAL = '2.0.0';
 
 function motorDe(version?: string | null) {
   const m = MOTORES[version ?? MOTOR_ACTUAL];
@@ -87,6 +91,9 @@ function simularOficial(p: { partido_id: string; semilla: number; local: unknown
     pA: pron.pA, pEmpate: pron.pEmpate, pB: pron.pB,
     lesiones: real.eventos.filter((e: { tipo: string }) => e.tipo === 'lesion').map((e: { carta: string }) => e.carta),
     estadisticas: real.estadisticas,
+    // Desde la v2: tácticas por tramo, cruce, plan B, quién jugó (para la energía) y cambios del descanso
+    tacticas: real.tacticas ?? null, cruce: real.cruce ?? null, plan_b: real.plan_b ?? null,
+    participacion: real.participacion ?? null, cambios_descanso: real.cambios_descanso ?? null,
   };
 }
 
@@ -112,6 +119,8 @@ async function amistoso(cuerpo: { token?: string; rival_equipo_id?: string }) {
   const r = simularPartido(prep.local, prep.visitante, prep.semilla);
   const resultado = {
     goles: r.goles, pr: r.pr, estadisticas: r.estadisticas,
+    tacticas: r.tacticas ?? null, cruce: r.cruce ?? null, plan_b: r.plan_b ?? null,
+    participacion: r.participacion ?? null, cambios_descanso: r.cambios_descanso ?? null,
     lesiones: r.eventos.filter((e: { tipo: string }) => e.tipo === 'lesion').map((e: { carta: string }) => e.carta),
   };
   await rpc('motor_guardar_amistoso', { p_partido: prep.partido_id, p_resultado: resultado, p_version: VERSION });

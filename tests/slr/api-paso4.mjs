@@ -160,7 +160,9 @@ try {
       `pronóstico de ${A.nombre} contra su próximo rival: ${Math.round(100 * pr.datos.p_ganar)} / ${Math.round(100 * pr.datos.p_empate)} / ${Math.round(100 * pr.datos.p_perder)} %`);
     const s2 = await saldoDe(Bv);
     const am = await funcion({ accion: 'amistoso', token: Bv.token, rival_equipo_id: R.equipo });
-    const pa = am.status === 200 ? await rpcOk('slr_partido', { token: R.token, partido_id: am.datos.partido_id }) : null;
+    // La crónica de un amistoso lleva las tácticas guardadas de quien lo juega: solo él la ve
+    const pa = am.status === 200 ? await rpcOk('slr_partido', { token: Bv.token, partido_id: am.datos.partido_id }) : null;
+    if (am.status === 200) rechaza(await rpc('slr_partido', { token: R.token, partido_id: am.datos.partido_id }), 'solo la ve quien lo jugó', 'el rival no abre la crónica del amistoso');
     const repro = pa && motorDe(pa.version_motor).simularPartido(pa.alineaciones_congeladas.local, pa.alineaciones_congeladas.visitante, pa.semilla);
     check(pa && pa.tipo === 'amistoso' && pa.version_motor === MOTOR_ACTUAL.VERSION && repro.goles.join() === pa.goles.join(),
       `amistoso ${Bv.nombre}–${R.nombre} ${pa?.goles.join('-')} (motor ${pa?.version_motor}): se reproduce igual con el motor`);

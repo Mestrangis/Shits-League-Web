@@ -21,6 +21,6 @@ for (const motor of ARCHIVOS) {
   });
 }
 
-test('la Edge Function simula los partidos nuevos con el motor actual (1.3.0)', () => {
-  assert.match(funcion(), /const MOTOR_ACTUAL = '1\.3\.0'/);
+test('la Edge Function simula los partidos nuevos con el motor actual (2.0.0)', () => {
+  assert.match(funcion(), /const MOTOR_ACTUAL = '2\.0\.0'/);
 });

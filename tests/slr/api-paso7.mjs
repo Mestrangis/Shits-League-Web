@@ -98,7 +98,7 @@ try {
     for (const p of ps) {
       const r = motorDe(p.version_motor).simularPartido(p.alineaciones_congeladas.local, p.alineaciones_congeladas.visitante, p.semilla);
       const prog = r.eventos.filter(e => e.tipo === 'poder' && e.programada != null);
-      check(p.version_motor === '1.3.0' && r.goles.join() === `${p.goles_local},${p.goles_visitante}`,
+      check(p.version_motor === MOTOR_ACTUAL.VERSION && r.goles.join() === `${p.goles_local},${p.goles_visitante}`,
         `${p.goles_local}-${p.goles_visitante} con el motor ${p.version_motor}, reproducido igual (${prog.length} activaciones programadas)`);
     }
   }

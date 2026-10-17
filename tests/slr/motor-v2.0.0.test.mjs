@@ -36,9 +36,9 @@ const ATA_BASE = 70 + 70 * 0.7 + 0.3 * 70 * 0.5;           // dos DEL + MED al 3
 const ev = (r, tipo) => r.eventos.filter(e => e.tipo === tipo);
 
 /* ── Versión ─────────────────────────────────────────────────────────────── */
-test('versión 2.0.0 con sus números; el motor actual sigue siendo la 1.3.0 hasta la fase 2', () => {
+test('versión 2.0.0 con sus números; y es el motor actual', () => {
   assert.equal(VERSION, '2.0.0');
-  assert.equal(MOTOR_ACTUAL.VERSION, '1.3.0');
+  assert.equal(MOTOR_ACTUAL.VERSION, '2.0.0');
   assert.deepEqual([...CONFIG.TACTICAS], ['posesion', 'contraataque', 'presion']);
   assert.equal(CONFIG.TACTICA_POSESION, 1.06);
   assert.equal(CONFIG.CONTRAATAQUE_CONTRA, 1.25);

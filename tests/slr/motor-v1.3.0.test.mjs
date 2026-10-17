@@ -33,10 +33,11 @@ function secuencia(valores, resto = 0.5) {
 const programados = r => r.eventos.filter(e => e.tipo === 'poder' && e.programada != null);
 
 /* ── Versión ─────────────────────────────────────────────────────────────── */
-test('versión 1.3.0, motor actual; 1.1.0 y 1.2.0 siguen disponibles', () => {
+test('versión 1.3.0 (la actual ya es la 2.0.0); 1.1.0 y 1.2.0 siguen disponibles', () => {
   assert.equal(VERSION, '1.3.0');
-  assert.equal(MOTOR_ACTUAL.VERSION, '1.3.0');
-  assert.deepEqual(Object.keys(MOTORES).sort(), ['1.1.0', '1.2.0', '1.3.0']);
+  assert.equal(MOTOR_ACTUAL.VERSION, '2.0.0');
+  assert.deepEqual(Object.keys(MOTORES).sort(), ['1.1.0', '1.2.0', '1.3.0', '2.0.0']);
+  assert.equal(motorDe('1.3.0').VERSION, '1.3.0');
   assert.equal(motorDe('1.2.0').VERSION, '1.2.0');
   assert.equal(CONFIG.MAX_ACTIVACIONES, 3);
   assert.equal(CONFIG.MAX_PODERES_JUGADA, 2);
