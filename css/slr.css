@@ -2053,3 +2053,12 @@ html.slr-sin-seleccion input, html.slr-sin-seleccion textarea { -webkit-user-sel
 
 /* Al girarse, el abanico se abre para que las cartas se vean enteras */
 .slr-revela.revelada { --sep: 1.03; }
+
+/* Liga → Fichajes (historial público del mercado) */
+.slr-fichajes { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.slr-fichaje { display: grid; grid-template-columns: 28px 1fr auto; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 12px;
+  background: var(--slr-tarjeta); border: 1px solid var(--slr-borde); font-size: 13px; }
+.slr-fichaje__icono { font-size: 18px; text-align: center; }
+.slr-fichaje time { font-size: 11px; color: var(--slr-suave); white-space: nowrap; }
+.slr-fichaje.es-epica { border-color: #A55CFF; box-shadow: 0 0 12px rgba(165,92,255,.2); }
+.slr-fichaje.es-legendaria { border-color: var(--slr-oro); box-shadow: 0 0 14px rgba(255,201,74,.3); }

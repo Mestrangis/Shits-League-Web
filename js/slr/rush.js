@@ -247,6 +247,10 @@ async function irAlAviso(n) {
     const { abrirCronica } = await import('./pantallas/cronica.js');
     return abrirCronica(n.destino_id, ctx);
   }
+  if (n.destino_tipo === 'mercado') {
+    // Ofertas e intercambios por responder, subastas perdidas: su sub-pestaña del Mercado
+    return trasCerrarAvisos(async () => { mercado.irA(n.destino_id); await navegar('mercado'); });
+  }
   if (n.destino_tipo === 'movimientos' || n.destino_tipo === 'liga') {
     trasCerrarAvisos(async () => {
       if (n.destino_tipo === 'liga') await recargar('liga');

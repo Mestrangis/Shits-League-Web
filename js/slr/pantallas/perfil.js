@@ -85,6 +85,8 @@ export async function panelAdmin(cont, ctx) {
         <button class="slr-btn slr-btn--pruebas" type="button" data-pruebas="nueva-carta">➕ Nueva carta</button>
         <button class="slr-btn slr-btn--pruebas" type="button" data-pruebas="colecciones">🏷 Colecciones</button>
         <button class="slr-btn slr-btn--pruebas" type="button" data-pruebas="sobres">📦 Sobres</button>
+        <button class="slr-btn slr-btn--pruebas" type="button" data-pruebas="resolver-subastas">⏩ Resolver subastas ahora</button>
+        <button class="slr-btn slr-btn--pruebas" type="button" data-pruebas="tanda-nueva">🆕 Abrir tanda nueva ahora</button>
         <button class="slr-btn slr-btn--pruebas" type="button" data-pruebas="plantillas">🃏 Plantillas: dar o quitar cartas</button>
         <button class="slr-btn slr-btn--pruebas" type="button" data-pruebas="muestrario">✨ Muestrario de cartas</button>
         <button class="slr-btn slr-btn--peligro" type="button" data-pruebas="borrar-beta">Borrar cartas beta (sin foto)</button>
@@ -238,6 +240,12 @@ async function accionPruebas(boton, ctx) {
       const r = await rpc('slr_admin_anadir_bot', { liga_id: liga });
       if (r.aviso) toast(`🤖 ${r.nombre} se une con solo ${r.cartas} cartas: no quedan individuales libres para una plantilla completa`, 'error');
       else toast(`🤖 ${r.nombre} se une a la liga`, 'ok');
+    } else if (accion === 'resolver-subastas') {
+      const r = await rpc('slr_admin_resolver_subastas', { liga_id: liga });
+      toast(`${r.resueltas} subastas resueltas (${r.con_ganador} con ganador)`, 'ok');
+    } else if (accion === 'tanda-nueva') {
+      const r = await rpc('slr_admin_tanda_nueva', { liga_id: liga });
+      toast(r.cartas ? `Tanda nueva: ${r.cartas} cartas en subasta` : 'No quedan cartas que puedan salir a subasta', r.cartas ? 'ok' : 'error');
     } else if (accion === 'quitar') {
       const r = await rpc('slr_admin_quitar_bot', { liga_id: liga });
       toast(`${r.quitado} deja la liga`, 'ok');

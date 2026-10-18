@@ -1133,3 +1133,20 @@ Los goles dependen mucho de la formación (con un solo defensa la ocasión llega
 - **Vista previa (admin):** usa cartas reales de la liga (la mejor, de la rareza elegida si existe) sin llamar al servidor para comprar ni elegir.
 - **Capas:** la apertura es una capa más (el botón atrás la cierra). `[hidden]` se fuerza dentro de la apertura: el resumen, invisible pero con `display: flex`, tapaba los toques.
 - **Tests:** `banco/apertura.mjs` (31 comprobaciones, móvil y PC; con `VIDEO=1` guarda los fotogramas de una apertura completa).
+
+## Notificaciones, historial y pruebas del mercado (fase 5)
+
+### Decisiones de Marcos
+
+- Avisos con enlace de: subasta ganada o perdida, oferta recibida, aceptada o rechazada, intercambio, cláusula pagada por tu carta y carta vendida.
+- Historial público de la liga para el pique: fichajes, cláusulas, subastas resueltas y sobres con épica o legendaria.
+- Modo pruebas: «Resolver subastas ahora», «Abrir tanda nueva ahora» y simular una jornada concreta para la progresión.
+
+### Decisiones mías
+
+- **Los avisos ya existían:** se añade el destino `mercado` (con la sub-pestaña). Ofertas, contraofertas e intercambios llevan a Mercado → Ofertas; subastas perdidas, pujas anuladas y subastas canceladas, a Mercado → Subastas. Las ganadas y las ofertas aceptadas o rechazadas siguen yendo a la carta; las cláusulas y ventas cobradas, a los movimientos. Los avisos ya guardados se actualizaron.
+- **Historial público:** nueva vista **Liga → Fichajes** con compras, cláusulas, intercambios, subastas resueltas y sobres con épica (borde morado) o legendaria (borde dorado). Lee la tabla `historial`, que ya era pública.
+- **«Abrir tanda nueva ahora»** usa la siguiente fecha libre (una tanda por fecha) y no abre nada con el mercado cerrado. **«Resolver subastas ahora»** resuelve todas las abiertas como si hubieran cerrado.
+- **Simular una jornada:** en *Modo pruebas → Sobres → Progresión (pruebas)* (encendida, apagada o automática, y la jornada de referencia).
+- **Tests de navegador sin dependencias del catálogo:** `api-paso8` y `api-paso9` ya no dan por hecho que las individuales libres dejen un equipo a medias (con el catálogo del 17 de octubre salen 6 plantillas exactas). `api-paso4` tiene un margen de ±10 % en el reparto que de vez en cuando falla por azar, y `banco/listas` una comprobación de precarga que depende de la red.
+- **Tests:** `api-paso13.mjs` (avisos, historial y herramientas del Modo pruebas); `banco/mercado.mjs` (33) y `banco/apertura.mjs` (31), con capturas en móvil y PC.

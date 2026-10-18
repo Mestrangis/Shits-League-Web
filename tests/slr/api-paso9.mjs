@@ -39,7 +39,9 @@ try {
   check(u.cartas < 11 && u.aviso, `Bot Uno empieza con ${u.cartas} cartas y aviso (${n} bots; el último se llevó ${bot?.cartas})`);
   await rpcOk('slr_admin_quitar_bot', { token: U.token, liga_id: L });
   const b0 = await rpcOk('slr_admin_bombo', { token: U.token, liga_id: L });
-  check(b0.bombo > 0, `al quitar el último bot quedan libres ${b0.bombo} individuales del bombo y ${b0.caras} caras, fuera de todos los álbumes`);
+  // Con un catálogo que da plantillas exactas, el último bot se lleva solo caras: no quedan del bombo
+  const exacto = b0.bombo === 0;
+  check(b0.bombo > 0 || b0.caras > 0, `al quitar el último bot quedan libres ${b0.bombo} individuales del bombo y ${b0.caras} caras, fuera de todos los álbumes`);
   const albumU0 = await albumDe(U);
   const caras = (await bomboInicial()).caras;
 
@@ -60,7 +62,7 @@ try {
   const nuevas = mias.filter(c => !deAntes.has(c.diseno_id));
   const esperado = Math.min(11, albumU0.length + b0.bombo);
   check(mias.length === esperado, `Bot Uno: ${mias.length} cartas = ${albumU0.length} de su álbum + ${nuevas.length} del bombo (esperado ${esperado})`);
-  check(nuevas.length > 0 && nuevas.every(c => !caras.has(c.diseno_id)), 'las del bombo no son caras');
+  check(exacto || (nuevas.length > 0 && nuevas.every(c => !caras.has(c.diseno_id))), exacto ? 'las del bombo no son caras (no aplica: el catálogo da plantillas exactas)' : 'las del bombo no son caras');
   const albumU1 = await albumDe(U);
   check(nuevas.every(c => albumU1.some(a => a.diseno_id === c.diseno_id && a.via_adquisicion === 'inicial')),
     'y entran en su álbum (vía «inicial»)');

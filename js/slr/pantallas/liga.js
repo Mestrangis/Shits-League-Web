@@ -8,7 +8,7 @@
    equipo, la foto de perfil de su dueño en Shits League (👤 si no tiene).
 ═══════════════════════════════════════════════ */
 import { rpc, leer, funcion } from '../api.js';
-import { esc, diaHora, toast, conEspera } from '../ui.js';
+import { esc, diaHora, toast, conEspera, fechaHora } from '../ui.js';
 import { enJuego, proximaJornada } from '../rush.js';
 import { ESTADOS_LIGA } from './perfil.js';
 import { abrirCronica } from './cronica.js';
@@ -109,6 +109,22 @@ async function amistosos(liga, yo, dueno, usuario) {
     </section>`;
 }
 
+// Historial público del mercado, para el pique: fichajes (compras, cláusulas,
+// intercambios y subastas resueltas) y sobres con épica o legendaria
+const ICONO_FICHAJE = { compra: '🏷️', clausula: '💥', intercambio: '🔁', subasta: '🔨', sobre: '🎴' };
+async function fichajes(liga) {
+  const filas = await leer(`historial?select=id,tipo,texto,creado_en,datos&liga_id=eq.${liga}` +
+    `&tipo=in.(compra,clausula,intercambio,subasta,sobre)&order=id.desc&limit=60`);
+  if (!filas.length) return '<div class="slr-vacio" data-fichajes><b>Aún no hay fichajes</b><p>Aquí salen las compras, cláusulas, intercambios, subastas ganadas y los sobres con épica o legendaria.</p></div>';
+  return `<ul class="slr-fichajes" data-fichajes>${filas.map(h => {
+    const sobre = h.tipo === 'sobre', leg = sobre && (h.datos?.mejor === 'legendaria' || /legendaria/.test(h.texto));
+    return `<li class="slr-fichaje slr-fichaje--${esc(h.tipo)}${leg ? ' es-legendaria' : sobre ? ' es-epica' : ''}">
+      <span class="slr-fichaje__icono" aria-hidden="true">${ICONO_FICHAJE[h.tipo] ?? '•'}</span>
+      <span class="slr-fichaje__texto">${esc(h.texto)}</span>
+      <time>${esc(fechaHora(h.creado_en))}</time></li>`;
+  }).join('')}</ul>`;
+}
+
 // Estado de la liga (destino de los avisos de pausa, reanudación y temporada)
 function estadoLiga(datos) {
   const info = datos.ligaInfo ?? {}, j = proximaJornada();
@@ -140,10 +156,11 @@ export async function pintar(cont, ctx) {
       <div class="slr-segmentos" role="group" aria-label="Vista">
         <button type="button" data-vista="clasificacion" class="${vista === 'clasificacion' ? 'activo' : ''}">Clasificación</button>
         <button type="button" data-vista="calendario" class="${vista === 'calendario' ? 'activo' : ''}">Calendario</button>
+        <button type="button" data-vista="fichajes" class="${vista === 'fichajes' ? 'activo' : ''}">Fichajes</button>
       </div>
     </header>
     ${estadoLiga(datos)}
-    ${vista === 'clasificacion'
+    ${vista === 'fichajes' ? await fichajes(datos.liga.id) : vista === 'clasificacion'
       ? `${tabla(clas.clasificacion, yo)}<p class="slr-suave">Un amistoso se juega al momento con las alineaciones guardadas: no da puntos, dinero ni lesiones.</p>`
       : `${calendario(datos.jornadas, yo, dueno)}${await amistosos(datos.liga.id, yo, dueno, datos.yo?.usuario?.id)}`}`;
   pintarAvatares(cont);

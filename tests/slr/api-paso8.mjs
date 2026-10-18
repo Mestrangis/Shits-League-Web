@@ -123,20 +123,22 @@ try {
     bots.push(r.datos);
     if (r.datos.cartas === 0) break;
   }
+  // Si las individuales libres no son múltiplo de 11, uno se queda a medias (depende del catálogo)
+  const resto = (b0.bombo + b0.caras) % b0.por_equipo;
   const completos = bots.filter(b => !b.aviso), corto = bots.find(b => b.aviso && b.cartas > 0), vacio = bots.find(b => b.cartas === 0);
-  check(completos.every(b => b.cartas === 11) && corto && vacio,
-    `bots: ${bots.map(b => b.cartas).join(' · ')} cartas (completos, uno a medias con las caras y uno sin cartas)`);
-  check(/Plantilla inicial incompleta/.test(corto?.aviso ?? '') && /0 de 11/.test(vacio?.aviso ?? ''), `aviso claro: «${vacio?.aviso}»`);
+  check(completos.every(b => b.cartas === 11) && !!corto === resto > 0 && vacio,
+    `bots: ${bots.map(b => b.cartas).join(' · ')} cartas (completos, ${resto ? `uno a medias con ${resto}` : 'ninguno a medias: el catálogo da plantillas exactas'} y uno sin cartas)`);
+  check((resto === 0 || /Plantilla inicial incompleta/.test(corto?.aviso ?? '')) && /0 de 11/.test(vacio?.aviso ?? ''), `aviso claro: «${vacio?.aviso}»`);
   const caras = await rpcOk('slr_admin_bombo', { token: U.token, liga_id: L });
   check(caras.bombo === 0 && caras.caras === 0 && caras.equipos === 0, 'el contador queda a 0 (también las caras se han repartido)');
-  for (const b of [corto, vacio]) {
+  for (const b of [corto, vacio].filter(Boolean)) {
     const [a] = (await leer(`alineaciones?select=huecos,capitan_id&equipo_id=eq.${b.equipo_id}`)).datos;
     const puestos = a ? [a.huecos.por, ...a.huecos.def, ...a.huecos.med, ...a.huecos.del] : [];
     check(a && puestos.length === 7 && puestos.filter(Boolean).length === Math.min(7, b.cartas),
       `${b.nombre}: alineación con sus ${b.cartas} cartas colocadas y el resto de huecos vacíos`);
   }
   const hist2 = (await leer(`historial?select=tipo,datos&liga_id=eq.${L}&tipo=eq.plantilla_incompleta`)).datos;
-  check(hist2.length === 2, 'queda en el historial de la liga (2 equipos cortos)');
+  check(hist2.length === (corto ? 2 : 1), `queda en el historial de la liga (${corto ? 2 : 1} equipos cortos)`);
   // Una persona que se une sin cartas: sin error, aviso en la respuesta y en su campana
   const t = await rpcOk('slr_unirse_liga', { token: T.token, codigo_invitacion: liga.codigo_invitacion, nombre_equipo: 'Bot Tres FC' });
   check(t.cartas === 0 && /0 de 11/.test(t.aviso ?? ''), `persona sin cartas: se une igual, con aviso («${t.aviso?.slice(0, 60)}…»)`);

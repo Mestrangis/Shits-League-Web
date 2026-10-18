@@ -157,7 +157,7 @@ try {
   await dormir(1500);
   const ics = (await rpcOk('slr_mercado', { token: U.token, liga_id: L })).intercambios.filter(i => i.enviado);
   check(ics.length === 1 && ics[0].monedas_de === 300, 'intercambio propuesto con 1 carta y 300 monedas');
-  await ev(`document.querySelectorAll('.slr-hoja').forEach(h => h.querySelector('.slr-hoja__cerrar')?.click()); 0`);
+  for (let k = 0; k < 4 && await ev(`!!document.querySelector('.slr-hoja')`); k++) await cerrarHoja();   // de una en una, como una persona
   await dormir(600);
 
   console.log('\nTienda de sobres');
@@ -192,8 +192,38 @@ try {
   await enHoja('[data-vender-id]');
   await esperar(`!!document.querySelector('.slr-confirmar [data-si]')`, 5000);
   await enHoja('[data-si]');
-  check(await esperar(`!!document.querySelector('[data-resumen-sobre]')`, 15000), 'tras vender una, la operación sigue y el sobre se abre');
-  await cerrarHoja();
+  check(await esperar(`!!document.querySelector('[data-apertura]')`, 15000), 'tras vender una, la operación sigue y el sobre se abre');
+  await dormir(600);
+  await clic('[data-saltar]');
+  await esperar(`!!document.querySelector('[data-cerrar-apertura]')`, 5000);
+  await clic('[data-cerrar-apertura]');
+  await dormir(600);
+
+  console.log('\nAvisos, fichajes y Modo pruebas');
+  await clic('.slr-barra__avisos');
+  await esperar(`!!document.querySelector('[data-aviso]')`, 8000);
+  const avisoOferta = await ev(`(() => { const b = [...document.querySelectorAll('[data-aviso]')].find(x => /oferta|intercambio|contraoferta/i.test(x.textContent)); if (!b) return null; const t = b.textContent.trim(); b.click(); return t; })()`);
+  check(!!avisoOferta, `aviso de oferta o intercambio con enlace («${avisoOferta?.replace(/\s+/g, ' ').slice(0, 60)}»)`);
+  check(await esperar(`document.querySelector('[data-sub="ofertas"]')?.classList.contains('activo')`, 8000), 'tocándolo, lleva al Mercado → Ofertas');
+  await clic('.slr-nav__item[data-seccion="liga"]');
+  await esperar(`!!document.querySelector('[data-vista="fichajes"]')`, 8000);
+  await clic('[data-vista="fichajes"]');
+  await esperar(`!!document.querySelector('[data-fichajes]')`, 8000);
+  const fich = await ev(`[...document.querySelectorAll('.slr-fichaje')].map(f => f.textContent.replace(/\\s+/g, ' ').trim())`);
+  check(fich.some(t => /compra/i.test(t)), `Liga → Fichajes: historial público (${fich.length}: «${fich[0]?.slice(0, 70)}…»)`);
+  await foto('9-fichajes', '[data-fichajes]');
+  await clic('.slr-nav__item[data-seccion="perfil"]');
+  await esperar(`!!document.querySelector('[data-pruebas="tanda-nueva"]')`, 8000);
+  const antes = (await leer(`subastas?select=id&liga_id=eq.${L}&estado=eq.abierta`)).datos.length;
+  await clic('[data-pruebas="resolver-subastas"]');
+  await esperar(`[...document.querySelectorAll('.slr-toast')].some(t => /resueltas/.test(t.textContent))`, 8000);
+  check((await leer(`subastas?select=id&liga_id=eq.${L}&estado=eq.abierta`)).datos.length === 0 && antes > 0, `«Resolver subastas ahora»: ${antes} resueltas`);
+  await clic('[data-pruebas="tanda-nueva"]');
+  await esperar(`[...document.querySelectorAll('.slr-toast')].some(t => /Tanda nueva/.test(t.textContent))`, 8000);
+  check((await leer(`subastas?select=id&liga_id=eq.${L}&estado=eq.abierta`)).datos.length > 0, '«Abrir tanda nueva ahora»: nuevas subastas');
+  const contador = await ev(`document.querySelector('[data-catalogo-objetivo]')?.textContent.replace(/\\s+/g, ' ').trim()`);
+  check(/250/.test(contador ?? '') && /28/.test(contador ?? ''), `contador del Modo pruebas con el catálogo objetivo: «${contador?.slice(0, 90)}»`);
+  await foto('10-modo-pruebas', '[data-catalogo-objetivo]');
 
   console.log('\nMercado cerrado');
   await rpcOk('slr_prueba_pausar', { token: U.token, liga_id: L, ahora: new Date().toISOString() });
@@ -222,6 +252,34 @@ try {
   await foto('7-tienda-agotado');
   await sub('ofertas');
   await foto('4-ofertas');
+  const otraVenta = (await cartasDe(D.equipo))[0];
+  await rpcOk('slr_poner_en_venta', { token: D.token, carta_id: otraVenta.id, precio: otraVenta.disenos_carta.valor + 80 });
+  await sub('venta');
+  await foto('3-en-venta');
+  await ev(`import('/js/slr/pantallas/detalle.js').then(m => import('/js/slr/rush.js').then(r => m.abrirDetalle(${JSON.stringify(clausulable.id)}, { datos: r.datos, recargar: r.recargar, pintar: () => r.pintar() }))).then(() => 0)`);
+  await esperar(`!!document.querySelector('[data-intercambio]')`, 8000);
+  await clic('[data-intercambio]');
+  await esperar(`!!document.querySelector('[data-hoja-intercambio]')`, 8000);
+  await ev(`document.querySelector('[data-lado="mias"] [data-ic]').click(); 0`);
+  await foto('6-crear-intercambio');
+  for (let k = 0; k < 4 && await ev(`!!document.querySelector('.slr-hoja')`); k++) await cerrarHoja();   // de una en una, como una persona
+  await dormir(900);
+  await clic('.slr-nav__item[data-seccion="mercado"]');
+  await esperar(`!!document.querySelector('[data-sub="sobres"]')`, 8000);
+  await sub('sobres');
+  await esperar(`!!document.querySelector('[data-tienda-lista]')`, 10000);
+  const tengoPc = (await leer(`cartas?select=id&equipo_id=eq.${U.equipo}`)).datos.length;
+  const libresPc = (await leer(`cartas?select=id&liga_id=eq.${L}&equipo_id=is.null&reservada_por=is.null&limit=40`)).datos;
+  for (const c of libresPc.slice(0, Math.max(0, 15 - tengoPc))) await rpc('slr_admin_mover_carta', { token: U.token, liga_id: L, carta_id: c.id, equipo_id: U.equipo });
+  await ev(`import('/js/slr/rush.js').then(r => r.recargar('cartas')).then(() => 0)`);
+  await clic('[data-comprar-sobre="posicion"]');
+  await esperar(`!!document.querySelector('[data-perfil]')`, 5000);
+  await ev(`[...document.querySelectorAll('[data-perfil]')].find(b => !b.disabled).click(); 0`);
+  await esperar(`!!document.querySelector('.slr-confirmar [data-si]')`, 5000);
+  await enHoja('[data-si]');
+  check(await esperar(`!!document.querySelector('[data-haz-hueco]')`, 5000), 'en PC también sale «Haz hueco»');
+  await foto('8-haz-hueco');
+  await cerrarHoja();
 
   check(!errores.length, `sin errores en la consola${errores.length ? `: ${errores.join(' | ')}` : ''}`);
 } catch (e) {

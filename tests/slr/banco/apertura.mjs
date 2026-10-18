@@ -244,14 +244,38 @@ try {
   await escritorio();
   await aTienda();
   await rpcOk('slr_prueba_dar_dinero', { token: U.token, liga_id: L, equipo_id: U.equipo, importe: 10000 });
-  const mias2 = (await leer(`cartas?select=id&equipo_id=eq.${U.equipo}`)).datos;
-  for (const c of mias2.slice(0, Math.max(0, mias2.length - 11))) await rpcOk('slr_vender_banco', { token: U.token, carta_id: c.id });
+  // Las épicas que ya tiene Bot Uno vuelven al bombo, para ver otra vez la luz morada
+  const mias2 = (await leer(`cartas?select=id,disenos_carta(rareza)&equipo_id=eq.${U.equipo}`)).datos;
+  for (const c of mias2.filter(x => x.disenos_carta.rareza === 'epica')) await rpcOk('slr_admin_mover_carta', { token: U.token, liga_id: L, carta_id: c.id, equipo_id: null });
+  const mias3 = (await leer(`cartas?select=id&equipo_id=eq.${U.equipo}`)).datos;
+  for (const c of mias3.slice(0, Math.max(0, mias3.length - 10))) await rpcOk('slr_vender_banco', { token: U.token, carta_id: c.id });
   await ev(`import('/js/slr/rush.js').then(r => r.recargar('cartas')).then(() => 0)`);
   await comprar('basico');
   await apertura('apertura');
+  const ipc = await ev(`[...document.querySelectorAll('[data-revela]')].findIndex(c => c.classList.contains('slr-revela--epica'))`);
+  if (ipc >= 0) { await clic(`[data-revela="${ipc}"]`); await dormir(480); await foto('apertura-7-giro-epica'); await dormir(900); }
   await clic('[data-saltar]');
   await dormir(600);
   await foto('apertura-9-resumen');
+  await clic('[data-cerrar-apertura]');
+  await dormir(600);
+  await aTienda();
+  await comprar('eleccion');
+  await dormir(500);
+  await clic('[data-saltar]');
+  await esperar(`document.querySelectorAll('[data-elegir]:not([hidden])').length === 3`, 4000);
+  await dormir(700);
+  await foto('eleccion-1-candidatas');
+  await ev(`document.querySelectorAll('[data-elegir]')[0].click(); 0`);
+  await esperar(`!!document.querySelector('[data-cerrar-apertura]')`, 8000);
+  await clic('[data-cerrar-apertura]');
+  await dormir(600);
+  await clic('.slr-nav__item[data-seccion="perfil"]');
+  await esperar(`!!document.querySelector('[data-pruebas="sobres"]')`, 10000);
+  await clic('[data-pruebas="sobres"]');
+  await esperar(`document.querySelectorAll('[data-tipo-admin]').length === 5`, 10000);
+  await dormir(500);
+  await foto('admin-sobres');
 
   check(!errores.length, `sin errores en la consola${errores.length ? `: ${errores.join(' | ')}` : ''}`);
 } catch (e) {
