@@ -85,7 +85,7 @@ La rareza dice **lo buena que es** una carta y es lo que marca el **marco**. Sal
 | A | **épica** | morado |
 | S | **legendaria** | dorado, con un brillo que lo recorre |
 
-Los sobres y las subastas reparten **por rareza**: primero se sortea la rareza y luego una carta de esa rareza al azar. Solo entran las rarezas que pueden salir (progresión) y tienen alguna carta libre. Los pesos de los sobres están en la tabla `tipos_sobre` (se editan desde *Modo pruebas → Sobres*) y los de las subastas en `ligas.config.pesos_mercado`:
+Los sobres y las subastas reparten **por rareza**: primero se sortea la rareza con los pesos completos (entre las que la progresión deja salir) y luego una carta de esa rareza al azar. Si no queda ninguna carta libre de esa rareza (por ejemplo, en la colección o el perfil del sobre), se baja a la inferior, y así sucesivamente; si no hay nada por debajo, la siguiente que quede. Así una colección pequeña nunca da lo bueno más a menudo de lo que dicen los pesos. Los pesos de los sobres están en la tabla `tipos_sobre` (se editan desde *Modo pruebas → Sobres*) y los de las subastas en `ligas.config.pesos_mercado`:
 
 | | Común | Rara | Épica | Legendaria |
 |---|---|---|---|---|

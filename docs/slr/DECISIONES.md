@@ -1196,5 +1196,23 @@ Medido con `tests/slr/banco/rendimiento-apertura.mjs`: Chrome a 390×844 (DPR 2,
 - **Con los pesos actuales y la progresión apagada** (beta), una legendaria por carta sale un 1 % (sencillo y básico), un 4 % (elección: ~11 % de que haya una entre las 3 candidatas, y te la quedas), un 3 % (posición y colección). Con 3 legendarias en todo el catálogo, sacar varias seguidas sería muy improbable.
 - **Hay dos cosas raras que pueden explicarlo:**
   1. **La vista previa de apertura** del Modo pruebas (admin) fuerza la rareza que se elija, enseña cartas reales y las marca «¡NUEVA!», sin gastar nada. Si Marcos la usó, ahí es fácil ver varias legendarias.
-  2. **Los sobres de colección y de posición** renormalizan los pesos entre las rarezas que quedan en su filtro. Si a una colección solo le queda una legendaria (o una épica), el sobre la da siempre. Hoy, «Moon» solo tiene una épica libre: como colección de la semana, daría una épica el 100 % de las veces por 900. «Down» tiene una común y una legendaria: un 5 % de legendaria (3 de 58). **Pendiente de decidir:** que la rareza se sortee con los pesos completos y, si no queda de esa, baje a la siguiente inferior (así nunca sube la probabilidad de lo bueno), o no elegir como colección de la semana las que solo tienen cartas raras o mejores.
+  2. **Los sobres de colección y de posición** renormalizan los pesos entre las rarezas que quedan en su filtro. Si a una colección solo le queda una legendaria (o una épica), el sobre la da siempre. Hoy, «Moon» solo tiene una épica libre: como colección de la semana, daría una épica el 100 % de las veces por 900. «Down» tiene una común y una legendaria: un 5 % de legendaria (3 de 58). **Decidido después** (ver «Sorteo de rareza con los pesos completos»): que la rareza se sortee con los pesos completos y, si no queda de esa, baje a la siguiente inferior (así nunca sube la probabilidad de lo bueno), o no elegir como colección de la semana las que solo tienen cartas raras o mejores.
 - **Tests:** `api-paso14.mjs` (plantilla llena, bloqueos, venta por lotes y venta automática), `banco/apertura.mjs` (34, con el muestreo del giro), `banco/mercado.mjs` (41), `banco/rendimiento-apertura.mjs` (medidas); `api-paso3` y `api-paso12` ya no esperan el rechazo por falta de hueco en los sobres.
+
+## Sorteo de rareza con los pesos completos
+
+### Decisiones de Marcos
+
+- La rareza se sortea con los pesos completos del sobre. Si no queda ninguna carta libre de esa rareza en esa colección o posición, se baja a la inferior, y así sucesivamente. Si no queda ninguna carta de ninguna rareza, el sobre sale AGOTADO.
+- Lo mismo en cualquier otro sitio donde se renormalizaran los pesos de esa forma.
+
+### Decisiones mías
+
+- **Un solo sitio:** todo pasa por `sortear_carta` (los cinco sobres, la candidata forzada «rara o mejor» del de elección y las tandas de subastas), así que la regla vale para todos.
+- **Qué se sortea:** las rarezas con peso mayor que 0 que la progresión deja salir (y, en la candidata forzada, de rara para arriba), con sus pesos. La progresión sigue renormalizando entre las desbloqueadas, como se decidió en la fase 1: lo que no está desbloqueado no cuenta, pero lo que está desbloqueado y no queda, ya no reparte su peso hacia arriba.
+- **Si no queda nada por debajo:** se sube a la siguiente rareza que quede. Solo pasa en grupos sin nada inferior (por ejemplo, una colección a la que solo le queda una épica): el sobre no está agotado y da esa carta. Es la única forma de cumplir que «AGOTADO» sea solo cuando no queda ninguna carta.
+- **Probabilidades de la tienda:** se calculan con la misma regla (`probabilidades_sobre` con las rarezas desbloqueadas). Con «Down» (una común y una legendaria): común 97 % y legendaria 3 %, en vez de 94,8 % y 5,2 %.
+- **Más rápido:** `sortear_carta` calcula la progresión una vez por sorteo, en lugar de por cada carta libre.
+- **Modo pruebas:** `slr_prueba_sorteo` sortea n veces (de 1 a 20.000; mejor por lotes de 1.000) sin dar ninguna carta y cuenta las rarezas.
+- **Cartas creadas desde una liga de prueba:** nacen inactivas en el catálogo y el sorteo no las saca (ya era así). Por eso el test usa las colecciones reales.
+- **Tests:** `api-paso15.mjs` calcula la regla para cada composición real (colecciones y perfiles) y la compara con el sorteo, con las probabilidades de la tienda, con la candidata forzada y con la progresión.
