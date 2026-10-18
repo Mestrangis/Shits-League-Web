@@ -20,6 +20,7 @@ import * as liga from './pantallas/liga.js';
 import * as perfil from './pantallas/perfil.js';
 import * as alineacion from './pantallas/alineacion.js';
 import { abrirEleccionPendiente } from './pantallas/apertura.js';
+import { abrirHacerHueco } from './hueco.js';
 
 const ES_LOCAL = ['localhost', '127.0.0.1'].includes(location.hostname);
 
@@ -377,23 +378,40 @@ export async function abrir(op) {
   }
   await navegar(seccion);
   cargarAvisos();
-  comprobarPendiente();
+  comprobarPendiente({ abrirHueco: true });
 }
 
-/* ── Elección de sobre pendiente: reaparece en cualquier pantalla ──────── */
-export async function comprobarPendiente() {
+/* ── Pendientes que reaparecen en cualquier pantalla: elección de sobre y
+   «Haz hueco» tras un sobre (cartas de más). abrirHueco: abre ya la hoja ── */
+export async function comprobarPendiente({ abrirHueco = false } = {}) {
   if (!datos.liga || !datos.equipo) return;
-  datos.sobrePendiente = await rpc('slr_sobre_pendiente', { liga_id: datos.liga.id }, { silencioso: true }).catch(() => null);
+  const [p, h] = await Promise.all([
+    rpc('slr_sobre_pendiente', { liga_id: datos.liga.id }, { silencioso: true }).catch(() => null),
+    rpc('slr_hueco_pendiente', { liga_id: datos.liga.id }, { silencioso: true }).catch(() => null),
+  ]);
+  datos.sobrePendiente = p;
+  datos.huecoPendiente = h?.sobran > 0 ? h : null;
   pintarPendiente();
+  if (abrirHueco && datos.huecoPendiente && !datos.sobrePendiente) abrirHuecoPendiente();
+}
+function abrirHuecoPendiente() {
+  abrirHacerHueco({ navegar, recargar, pintar, datos }, datos.huecoPendiente, { alTerminar: () => { comprobarPendiente(); pintar(); } });
 }
 export function pintarPendiente() {
   if (!raiz) return;
   raiz.querySelector('.slr-pendiente-global')?.remove();
+  const h = datos.huecoPendiente;
+  if (h && !datos.sobrePendiente) {
+    const b = crear(`<button class="slr-pendiente-global slr-pendiente-global--hueco" type="button" data-hueco-global>📦 Te sobran ${h.sobran} ${h.sobran === 1 ? 'carta' : 'cartas'}: haz hueco <small>Elegir ›</small></button>`);
+    b.addEventListener('click', abrirHuecoPendiente);
+    raiz.appendChild(b);
+    return;
+  }
   const p = datos.sobrePendiente;
   if (!p || new Date(p.caduca_en) <= Date.now()) return;
   const b = crear(`<button class="slr-pendiente-global" type="button" data-pendiente-global>🎴 Tienes una elección de sobre pendiente <small>Elegir ›</small></button>`);
   b.addEventListener('click', () => abrirEleccionPendiente({ navegar, recargar, pintar, datos }, p,
-    { dorso: datos.dorsoUrl ?? null, alTerminar: () => { comprobarPendiente(); pintar(); } }));
+    { dorso: datos.dorsoUrl ?? null, alTerminar: () => { comprobarPendiente({ abrirHueco: true }); pintar(); } }));
   raiz.appendChild(b);
 }
 

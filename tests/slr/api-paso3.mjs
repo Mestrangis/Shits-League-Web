@@ -290,7 +290,10 @@ try {
     const alb = (await leer(`album?usuario_id=eq.${B1.usuario}&liga_id=eq.${L}&via_adquisicion=eq.sobre_basico`)).datos;
     check(sb.cartas.every(c => alb.some(a => a.diseno_id === c.diseno_id)), 'entradas de álbum con vía «sobre_basico»');
     await subirA(B1, 13);
-    rechaza(await rpc('slr_comprar_sobre', { token: B1.token, liga_id: L, tipo: 'basico' }), 'No tienes hueco', 'sobre con 13 cartas: rechazado (hacen falta 3 huecos)');
+    // Los sobres se abren aunque la plantilla pase de 15: luego hay que hacer hueco (api-paso14)
+    const s13 = await rpcOk('slr_comprar_sobre', { token: B1.token, liga_id: L, tipo: 'basico' });
+    check(s13.sobran === 1, 'sobre con 13 cartas: se abre y sobra 1 (después, «Haz hueco»)');
+    await bajarA(B1, 15);
     rechaza(await rpc('slr_comprar_sobre', { token: B1.token, liga_id: L, tipo: 'oro' }), 'Tipo de sobre no válido', 'tipo de sobre inexistente: rechazado');
 
     await bajarA(B3, 11);
@@ -341,7 +344,10 @@ try {
   {
     await subirA(B3, 15);
     check((await misCartas(B3)).length === 15, 'Bot Tres tiene 15 cartas');
-    rechaza(await rpc('slr_comprar_sobre', { token: B3.token, liga_id: L, tipo: 'eleccion' }), 'No tienes hueco', 'sobre de elección con 15: rechazado');
+    const e15 = await rpcOk('slr_comprar_sobre', { token: B3.token, liga_id: L, tipo: 'eleccion' });
+    check(e15.pendiente_eleccion, 'sobre de elección con 15: se abre (al elegir, sobrará una)');
+    await rpcOk('slr_elegir_carta_sobre', { token: B3.token, sobre_id: e15.sobre_id, carta_id: e15.cartas[0].id });
+    await bajarA(B3, 15);
     const venta = await rpcOk('slr_poner_en_venta', { token: B1.token, carta_id: (await misCartas(B1))[0].id, precio: 50 });
     rechaza(await rpc('slr_comprar_venta', { token: B3.token, venta_id: venta.venta_id }), 'llena', 'comprar una venta con 15: rechazado');
     const objetivo = (await misCartas(B1))[1];

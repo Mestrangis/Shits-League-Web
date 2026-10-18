@@ -5,7 +5,8 @@
      diseño provisional generado por código, distinto por tipo. El sobre de
      colección usa el emblema y el color de la colección de la semana.
      El brillo laminado (sigue al dedo, al ratón o a la inclinación) lo pone
-     la app encima: capa .slr-sobre__lamina con --x / --y.
+     la app encima: una capa con un degradado ya pintado que solo se desplaza
+     (transform): nada de repintar ni de mezclas en cada movimiento.
    · dorsoHTML(rareza, dorsoUrl): el dorso de una carta (5:7) con el color de
      su rareza; sin imagen, uno provisional.
 ═══════════════════════════════════════════════ */
@@ -53,7 +54,7 @@ export function sobreHTML(tipo, { nombre = '', imagen_url = null, coleccion = nu
       </div>`;
   return `<div class="slr-sobre slr-sobre--${esc(tipo)} slr-sobre--${tam}${imagen_url ? ' slr-sobre--imagen' : ''}" style="${estilo}" data-sobre-tipo="${esc(tipo)}">
     ${interior}
-    <div class="slr-sobre__lamina" aria-hidden="true"></div>
+    <div class="slr-sobre__lamina" aria-hidden="true"><i></i></div>
   </div>`;
 }
 
@@ -61,29 +62,12 @@ export function dorsoHTML(rareza, dorsoUrl = null) {
   return `<div class="slr-dorso slr-dorso--${esc(rareza ?? 'comun')}" style="--r:${COLOR_RAREZA[rareza] ?? COLOR_RAREZA.comun}">
     ${dorsoUrl ? `<img class="slr-dorso__img" src="${esc(dorsoUrl)}" alt="" draggable="false">`
       : `<div class="slr-dorso__dibujo"><span>SL</span><b>RUSH</b></div>`}
-    <div class="slr-dorso__brillo" aria-hidden="true"></div>
+    <div class="slr-dorso__brillo" aria-hidden="true"><i></i></div>
   </div>`;
 }
 
-// Brillo laminado que sigue al puntero (y a la inclinación del móvil si se permite)
-export function laminar(el) {
-  const capa = el.querySelector('.slr-sobre__lamina') ?? el;
-  let pend = null;
-  const poner = (x, y) => {
-    if (pend) return;
-    pend = requestAnimationFrame(() => { el.style.setProperty('--x', x.toFixed(3)); el.style.setProperty('--y', y.toFixed(3)); pend = null; });
-  };
-  const mover = e => {
-    const r = el.getBoundingClientRect();
-    poner(Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), Math.min(1, Math.max(0, (e.clientY - r.top) / r.height)));
-  };
-  const inclinar = e => { if (e.gamma != null) poner(0.5 + Math.max(-30, Math.min(30, e.gamma)) / 60, 0.5 + Math.max(-30, Math.min(30, (e.beta ?? 45) - 45)) / 60); };
-  window.addEventListener('pointermove', mover);
-  window.addEventListener('deviceorientation', inclinar);
-  capa.dataset.laminado = '1';
-  return () => {
-    window.removeEventListener('pointermove', mover);
-    window.removeEventListener('deviceorientation', inclinar);
-    if (pend) cancelAnimationFrame(pend);
-  };
+// Brillo laminado que sigue al puntero (y a la inclinación del móvil): x, y en [0, 1]
+export function moverLamina(capas, x, y) {
+  const t = `translate3d(${((0.5 - x) * 40).toFixed(1)}%, ${((0.5 - y) * 30).toFixed(1)}%, 0)`;
+  for (const c of capas) c.style.transform = t;
 }

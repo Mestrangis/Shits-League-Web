@@ -403,7 +403,7 @@ Hay cinco tipos (tabla `tipos_sobre`). Cada liga usa los de por defecto hasta qu
 - El precio va por tramo de la progresión (~70 % de valor esperado con el catálogo objetivo). Sin progresión (modo beta o preparación) se cobra el del último tramo.
 - **Colección de la semana:** cada lunes a las 00:00 (hora de la liga) se elige al azar una colección con cartas que puedan salir. El administrador la cambia a mano desde el Modo pruebas.
 - Solo salen cartas libres (sin dueño, fuera de subasta y no reservadas) y que la progresión deja salir. Si un sobre no se puede llenar, sale **AGOTADO** y no se puede comprar; la tienda dice cuántas quedan cuando importa («Quedan 3 cartas de Dormidito»).
-- Hace falta hueco para todas las cartas del sobre (el de elección, para una: la pendiente ocupa su hueco).
+- El sobre se abre aunque la plantilla pase de 15. Al terminar, si sobran cartas, «Haz hueco» enseña todas (las nuevas marcadas) para elegir cuáles vender al banco; mientras sobren no se puede hacer nada más en el mercado ni tocar la alineación, y si llega el cierre de la jornada el banco se queda con las de menos valor.
 - Al historial público solo van los sobres en los que sale una épica o una legendaria.
 
 ### Imágenes de los sobres y del dorso

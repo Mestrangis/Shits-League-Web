@@ -80,6 +80,19 @@ export function precargar(urls) {
   }
 }
 
+// Descarga y decodifica ya (prioridad alta) y espera, como mucho msMax: para
+// animaciones que no deben dar tirones al pintar una foto a medias (apertura)
+export function asegurarFotos(urls, msMax = 2500) {
+  const pendientes = [...new Set(urls.filter(u => u && !listas.has(u)))].map(url => new Promise(res => {
+    const im = new Image();
+    im.decoding = 'async';
+    im.fetchPriority = 'high';
+    im.src = url;
+    im.decode().then(() => { recordar(url, im); res(); }, res);
+  }));
+  return Promise.race([Promise.all(pendientes), new Promise(res => setTimeout(res, msMax))]);
+}
+
 /* ── Una carta ───────────────────────────────────────────────────────────── */
 // Ancho de reserva si la carta aún no tiene tamaño (p. ej. en una hoja que se abre)
 const ANCHO_TAM = { xs: 90, s: 170, l: 380 };

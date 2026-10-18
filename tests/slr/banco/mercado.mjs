@@ -175,7 +175,7 @@ try {
   check(t.precio === '1.500', `básico al precio del tramo J1–3 (${t.precio})`);
   await foto('7-tienda-agotado', '[data-tienda-lista]');
 
-  console.log('\nHaz hueco');
+  console.log('\nSobre con la plantilla llena: se abre y después «Haz hueco»');
   const tengo = (await leer(`cartas?select=id&equipo_id=eq.${U.equipo}`)).datos.length;
   const libres = (await leer(`cartas?select=id&liga_id=eq.${L}&equipo_id=is.null&reservada_por=is.null&limit=40`)).datos;
   for (const c of libres.slice(0, 15 - tengo)) await rpc('slr_admin_mover_carta', { token: U.token, liga_id: L, carta_id: c.id, equipo_id: U.equipo });
@@ -185,19 +185,63 @@ try {
   await ev(`[...document.querySelectorAll('[data-perfil]')].find(b => !b.disabled).click(); 0`);
   await esperar(`!!document.querySelector('.slr-confirmar [data-si]')`, 5000);
   await enHoja('[data-si]');
-  check(await esperar(`!!document.querySelector('[data-haz-hueco]')`, 5000), 'con 15 cartas, antes de abrir el sobre sale «Haz hueco»');
-  const hh = await ev(`({ filas: document.querySelectorAll('[data-vender-id]').length, banco: document.querySelector('[data-vender-id] .slr-lista-cartas__stat')?.textContent.trim() })`);
-  check(hh.filas === 15 && /banco/.test(hh.banco ?? ''), `tus 15 cartas con lo que da el banco (${hh.banco})`);
+  const abre = await esperar(`!!document.querySelector('[data-apertura]')`, 15000);
+  check(abre && !(await ev(`!!document.querySelector('[data-haz-hueco]')`)),
+    'con 15 cartas, el sobre se compra y se abre sin pedir hueco antes');
+  await dormir(800);
+  await clic('[data-saltar]');
+  await esperar(`!!document.querySelector('[data-cerrar-apertura]')`, 5000);
+  await clic('[data-cerrar-apertura]');
+  check(await esperar(`!!document.querySelector('[data-hacer-hueco]')`, 8000), 'al terminar la apertura, «Haz hueco» con todas tus cartas');
+  const hh = await ev(`({ filas: document.querySelectorAll('[data-elegir-venta]').length, nuevas: [...document.querySelectorAll('[data-elegir-venta]')].filter(b => b.querySelector('.slr-nueva')).length,
+    boton: document.querySelector('[data-vender-elegidas]').disabled, texto: document.querySelector('[data-resumen-hueco]').textContent })`);
+  check(hh.filas === 16 && hh.nuevas === 1 && hh.boton, `16 cartas (la del sobre marcada «¡NUEVA!»); hasta elegir una, no se puede vender («${hh.texto}»)`);
+  await foto('8-haz-hueco-sobre');
+  // Mientras sobren cartas, el servidor no deja otras operaciones ni la alineación
+  const sub0 = (await rpcOk('slr_mercado', { token: U.token, liga_id: L })).subastas[0];
+  const bloqueo = sub0 ? await rpc('slr_pujar', { token: U.token, subasta_id: sub0.id, importe: sub0.puja_minima }) : { ok: false, mensaje: 'Primero haz hueco' };
+  const tact = await rpc('slr_guardar_tacticas', { token: U.token, equipo_id: U.equipo, tacticas: { tactica: 'presion' } });
+  check(!bloqueo.ok && /haz hueco/i.test(bloqueo.mensaje) && !tact.ok && /haz hueco/i.test(tact.mensaje), `con cartas de más: ni pujar ni tocar la alineación («${bloqueo.mensaje}»)`);
+  // Al recargar la página, la hoja vuelve
+  await cdp('Page.reload', {});
+  await esperar(`!!document.getElementById('rushJugar')`, 30000);
+  await dormir(800);
+  await clic('#rushJugar');
+  check(await esperar(`!!document.querySelector('[data-hacer-hueco]')`, 20000), 'si cierras la app, al volver la hoja reaparece sola');
+  // Se descarta la nueva: se vende la recién obtenida
+  await ev(`[...document.querySelectorAll('[data-elegir-venta]')].find(b => b.querySelector('.slr-nueva')).click(); 0`);
+  const listo = await ev(`({ boton: document.querySelector('[data-vender-elegidas]').disabled, texto: document.querySelector('[data-vender-elegidas]').textContent })`);
+  check(!listo.boton && /Vender 1 por/.test(listo.texto), `elegida la nueva: «${listo.texto}»`);
+  await clic('[data-vender-elegidas]');
+  await esperar(`!!document.querySelector('.slr-confirmar [data-si]')`, 5000);
+  await enHoja('[data-si]');
+  check(await esperar(`!document.querySelector('[data-hacer-hueco]')`, 10000), 'vendida: la hoja se cierra');
+  check((await leer(`cartas?select=id&equipo_id=eq.${U.equipo}`)).datos.length === 15 && !(await ev(`!!document.querySelector('[data-hueco-global]')`)),
+    'te quedas en 15 y desaparece el aviso');
+  await clic('.slr-nav__item[data-seccion="mercado"]');
+  await esperar(`!!document.querySelector('[data-sub]')`, 8000);
+  await dormir(600);
+
+  console.log('\nEl resto de adquisiciones sigue pidiendo hueco antes');
+  const ventaHueco = (await cartasDe(D.equipo))[0];
+  await rpcOk('slr_poner_en_venta', { token: D.token, carta_id: ventaHueco.id, precio: ventaHueco.disenos_carta.valor + 20 });
+  await clic('.slr-nav__item[data-seccion="perfil"]');
+  await dormir(700);
+  await clic('.slr-nav__item[data-seccion="mercado"]');   // vuelve a pedir el mercado (con la venta nueva)
+  await esperar(`!!document.querySelector('[data-sub]')`, 8000);
+  await sub('venta');
+  await esperar(`!!document.querySelector('[data-comprar]')`, 8000);
+  await clic('[data-comprar]');
+  await esperar(`!!document.querySelector('.slr-confirmar [data-si]')`, 5000);
+  await enHoja('[data-si]');
+  check(await esperar(`!!document.querySelector('[data-haz-hueco]')`, 5000), 'comprar una carta con 15: «Haz hueco» antes');
+  const hh2 = await ev(`({ filas: document.querySelectorAll('[data-vender-id]').length, banco: document.querySelector('[data-vender-id] .slr-lista-cartas__stat')?.textContent.trim() })`);
+  check(hh2.filas === 15 && /banco/.test(hh2.banco ?? ''), `tus 15 cartas con lo que da el banco (${hh2.banco})`);
   await foto('8-haz-hueco');
   await enHoja('[data-vender-id]');
   await esperar(`!!document.querySelector('.slr-confirmar [data-si]')`, 5000);
   await enHoja('[data-si]');
-  check(await esperar(`!!document.querySelector('[data-apertura]')`, 15000), 'tras vender una, la operación sigue y el sobre se abre');
-  await dormir(600);
-  await clic('[data-saltar]');
-  await esperar(`!!document.querySelector('[data-cerrar-apertura]')`, 5000);
-  await clic('[data-cerrar-apertura]');
-  await dormir(600);
+  check(await esperar(`!document.querySelector('[data-venta]')`, 10000), 'tras vender una, la compra sigue sola');
 
   console.log('\nAvisos, fichajes y Modo pruebas');
   await clic('.slr-barra__avisos');
@@ -272,12 +316,12 @@ try {
   const libresPc = (await leer(`cartas?select=id&liga_id=eq.${L}&equipo_id=is.null&reservada_por=is.null&limit=40`)).datos;
   for (const c of libresPc.slice(0, Math.max(0, 15 - tengoPc))) await rpc('slr_admin_mover_carta', { token: U.token, liga_id: L, carta_id: c.id, equipo_id: U.equipo });
   await ev(`import('/js/slr/rush.js').then(r => r.recargar('cartas')).then(() => 0)`);
-  await clic('[data-comprar-sobre="posicion"]');
-  await esperar(`!!document.querySelector('[data-perfil]')`, 5000);
-  await ev(`[...document.querySelectorAll('[data-perfil]')].find(b => !b.disabled).click(); 0`);
+  await sub('venta');
+  await esperar(`!!document.querySelector('[data-comprar]')`, 8000);
+  await clic('[data-comprar]');
   await esperar(`!!document.querySelector('.slr-confirmar [data-si]')`, 5000);
   await enHoja('[data-si]');
-  check(await esperar(`!!document.querySelector('[data-haz-hueco]')`, 5000), 'en PC también sale «Haz hueco»');
+  check(await esperar(`!!document.querySelector('[data-haz-hueco]')`, 5000), 'en PC también sale «Haz hueco» antes de comprar');
   await foto('8-haz-hueco');
   await cerrarHoja();
 

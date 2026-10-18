@@ -9,10 +9,10 @@
       rareza (blanco, azul, morado o dorado); en las legendarias el último toque
       es especialmente intenso.
    3. Rasgar: una línea brillante arriba; se desliza el dedo (o el ratón) a lo
-      largo de ella. El corte sigue al dedo en zigzag. Si se suelta antes de
-      terminar, se queda a medias y se puede seguir.
-   4. Explosión: fogonazo, rayos, partículas (canvas) y temblor fuerte, del color
-      de la mejor rareza; las dos piezas del sobre salen despedidas.
+      largo de ella. Si se suelta antes de terminar, se queda a medias y se
+      puede seguir.
+   4. Explosión: fogonazo, rayos, partículas y temblor fuerte, del color de la
+      mejor rareza; las dos piezas del sobre salen despedidas.
    5. Revelado: las cartas boca abajo en abanico, el dorso con el color de su
       rareza; al tocar cada una se gira (épicas y legendarias: más lento, más
       luz y más partículas). «¡NUEVA!» si es nueva en tu álbum.
@@ -21,8 +21,26 @@
      atrás). Si se cierra, la elección pendiente reaparece en Rush.
    · «Saltar» siempre a la vista: directo al resumen (o a elegir).
    · prefers-reduced-motion: sin temblores ni partículas, revelado directo.
-   · Rendimiento: un solo bucle (requestAnimationFrame) para balanceo, temblor y
-     partículas; todo se limpia al cerrar.
+
+   RENDIMIENTO (móvil medio, CPU ×6 en DevTools; ver DECISIONES.md):
+   · Solo se anima transform y opacity. Halos, brillos, grietas, línea de corte
+     y fondo de color son capas ya pintadas (degradados o SVG estáticos) que
+     solo cambian de opacidad o escala. Nada de filter, box-shadow, clip-path,
+     máscaras, mezclas ni background-position animados.
+   · Temblor: un único contenedor (la escena) con transform.
+   · Rasgado: el corte en zigzag se calcula una vez al empezar; las dos piezas
+     del sobre se recortan entonces (clip-path fijo, un solo pintado) y durante
+     el arrastre solo se mueven, con transform, una ventana que descubre la
+     línea de luz y la chispa de la punta. La separación es una transición de
+     transform.
+   · Un solo canvas (DPR ≤ 1,5) para partículas y rayos, con sprites ya
+     dibujados (sin shadowBlur), y un solo requestAnimationFrame para todo.
+   · Calidad adaptativa: si los frames se alargan, menos partículas y sin rayos.
+   · Antes de empezar se precargan y decodifican el sobre, el dorso y las fotos.
+   · El giro de cada carta: las dos caras montadas desde el principio (el
+     frente pre-girado 180°, preserve-3d y backface-visibility: hidden); al
+     tocar solo se anima rotateY. Nada de filter ni opacity en el elemento que
+     gira (aplanarían el 3D y la carta se vería dos veces).
    · Sonidos: aún no hay; SONIDOS.alSonar(nombre, datos) es el punto de enganche
      (aparece, toque, grieta, rasgar_inicio, rasgando, rasgado, explosion,
      reparto, carta_gira, carta_revelada, elegida, resumen, cerrar).
@@ -30,7 +48,8 @@
 import { rpc } from '../api.js';
 import { esc, miles, abrirCapa, cerrarHasta, toast, faltan } from '../ui.js';
 import { cartaHTML, normalizarCarta, RAREZAS } from '../carta.js';
-import { sobreHTML, dorsoHTML, laminar } from '../sobre-arte.js';
+import { sobreHTML, dorsoHTML, moverLamina } from '../sobre-arte.js';
+import { asegurarFotos, urlFoto } from '../imagenes.js';
 
 export const SONIDOS = { alSonar: null };
 const sonar = (nombre, datos = {}) => { try { SONIDOS.alSonar?.(nombre, datos); } catch { /* sin sonido */ } };
@@ -48,6 +67,53 @@ const GRIETAS = [
   ['M35 66 L27 70 L30 79 L22 86', 'M69 33 L76 28 L74 20 L82 14', 'M43 60 L52 67 L49 76 L56 84', 'M47 33 L56 28 L54 19 L60 12', 'M38 15 L30 10', 'M73 80 L80 88'],
 ];
 const CORTE_Y = 15;      // altura de la línea de rasgado (% del sobre)
+// Tope de partículas por nivel de calidad (el 0 es el mejor)
+const MAX_PARTICULAS = [80, 45, 20];
+
+// Zigzag del corte, calculado una vez: dientes de ±1,8 % con algo de azar
+function zigzag() {
+  const p = [[0, CORTE_Y]];
+  for (let x = 3, k = 0; x < 100; x += 3.2 + Math.random() * 1.6, k++) p.push([x, CORTE_Y + (k % 2 ? 1.8 : -1.8) + (Math.random() - 0.5)]);
+  p.push([100, CORTE_Y]);
+  return p;
+}
+
+// Sprites de las partículas: un punto con halo por color, dibujado una vez
+const sprites = new Map();
+function sprite(color) {
+  if (sprites.has(color)) return sprites.get(color);
+  const c = document.createElement('canvas');
+  c.width = c.height = 32;
+  const g = c.getContext('2d');
+  const gr = g.createRadialGradient(16, 16, 0, 16, 16, 16);
+  gr.addColorStop(0, '#ffffff');
+  gr.addColorStop(0.25, color);
+  gr.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = gr;
+  g.fillRect(0, 0, 32, 32);
+  sprites.set(color, c);
+  return c;
+}
+// Rayos de la explosión, dibujados una vez por color (se giran y escalan al pintar)
+const rayos = new Map();
+function rayosDe(color) {
+  if (rayos.has(color)) return rayos.get(color);
+  const c = document.createElement('canvas');
+  c.width = c.height = 512;
+  const g = c.getContext('2d');
+  g.translate(256, 256);
+  const gr = g.createRadialGradient(0, 0, 0, 0, 0, 256);
+  gr.addColorStop(0, color);
+  gr.addColorStop(0.55, color + '66');
+  gr.addColorStop(1, color + '00');
+  g.fillStyle = gr;
+  for (let k = 0; k < 16; k++) {
+    g.rotate((Math.PI * 2) / 16);
+    g.beginPath(); g.moveTo(0, 0); g.lineTo(256, -22); g.lineTo(256, 22); g.closePath(); g.fill();
+  }
+  rayos.set(color, c);
+  return c;
+}
 
 /* ── Pantalla ───────────────────────────────────────────────────────────── */
 // r: respuesta de slr_comprar_sobre (o una vista previa con las mismas claves)
@@ -69,97 +135,176 @@ export function abrirEleccionPendiente(ctx, pend, opts = {}) {
   });
 }
 
-function crearApertura(ctx, o) {
+// Ancho en pantalla de cada carta del abanico (el mismo que pone el CSS)
+function anchoCarta(n) {
+  const pc = innerWidth >= 900;
+  if (n === 1) return pc ? Math.min(innerHeight * 0.46, 380) : Math.min(innerWidth * 0.62, 300);
+  return pc ? Math.min(innerHeight * 0.30, 260) : Math.min(innerWidth * 0.30, 210);
+}
+
+async function crearApertura(ctx, o) {
   const mejor = mejorDe(o.cartas);
   const luz = LUZ[mejor];
+  const quieto = reducido();
   const el = document.createElement('div');
-  el.className = `slr-apertura slr-apertura--${mejor}`;
+  el.className = `slr-apertura slr-apertura--${mejor} es-cargando`;
   el.style.setProperty('--luz', luz);
   el.dataset.apertura = '';
+  const sobreArte = () => sobreHTML(o.tipo, { nombre: o.nombre, imagen_url: o.imagen, coleccion: o.coleccion, cartas: o.cartas.length, tam: 'l' });
   el.innerHTML = `
-    <canvas class="slr-apertura__particulas" aria-hidden="true"></canvas>
-    <div class="slr-apertura__rayos" aria-hidden="true"></div>
+    <div class="slr-apertura__fondo" aria-hidden="true"></div>
+    <canvas class="slr-apertura__lienzo" aria-hidden="true"></canvas>
     <div class="slr-apertura__destello" aria-hidden="true"></div>
     <div class="slr-apertura__escena" data-escena>
+      <div class="slr-apertura__halo" aria-hidden="true"></div>
       <div class="slr-apertura__sobre" data-sobre>
-        <div class="slr-apertura__pieza slr-apertura__pieza--abajo" data-pieza="abajo">${sobreHTML(o.tipo, { nombre: o.nombre, imagen_url: o.imagen, coleccion: o.coleccion, cartas: o.cartas.length, tam: 'l' })}</div>
-        <div class="slr-apertura__pieza slr-apertura__pieza--arriba" data-pieza="arriba" hidden>${sobreHTML(o.tipo, { nombre: o.nombre, imagen_url: o.imagen, coleccion: o.coleccion, cartas: o.cartas.length, tam: 'l' })}</div>
-        <svg class="slr-apertura__grietas" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-          ${GRIETAS.map((g, i) => `<g data-grietas="${i + 1}">${g.map(d => `<path d="${d}"/>`).join('')}</g>`).join('')}
-        </svg>
-        <svg class="slr-apertura__corte" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-          <line class="slr-apertura__guia" x1="2" y1="${CORTE_Y}" x2="98" y2="${CORTE_Y}"/>
-          <polyline class="slr-apertura__rasgado" data-rasgado points=""/>
-        </svg>
+        <div class="slr-apertura__pieza slr-apertura__pieza--abajo" data-pieza="abajo">${sobreArte()}</div>
+        <div class="slr-apertura__pieza slr-apertura__pieza--arriba" data-pieza="arriba" hidden>${sobreArte()}</div>
+        <div class="slr-apertura__luz-sobre" aria-hidden="true"></div>
+        ${GRIETAS.map((g, i) => `<svg class="slr-apertura__grietas" data-grietas="${i + 1}" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+          ${g.map(d => `<path class="ancha" d="${d}"/><path d="${d}"/>`).join('')}</svg>`).join('')}
+        <div class="slr-apertura__guia" aria-hidden="true"></div>
+        <div class="slr-apertura__ventana" data-ventana aria-hidden="true"><div class="slr-apertura__contenido" data-contenido>
+          <svg class="slr-apertura__corte" viewBox="0 0 100 44" preserveAspectRatio="none"><polyline class="ancha" data-rasgado points=""/><polyline data-rasgado-fino points=""/></svg>
+        </div></div>
+        <i class="slr-apertura__punta" data-punta aria-hidden="true"></i>
         <span class="slr-apertura__mano" aria-hidden="true">👆</span>
       </div>
       <div class="slr-apertura__cartas" data-cartas></div>
       <div class="slr-apertura__final" data-final hidden></div>
     </div>
-    <p class="slr-apertura__pista" data-pista>Toca el sobre para cargarlo</p>
+    <p class="slr-apertura__pista" data-pista>Preparando el sobre…</p>
     <button class="slr-apertura__saltar" type="button" data-saltar>Saltar ⏭</button>`;
 
   const $ = s => el.querySelector(s);
   const escena = $('[data-escena]'), sobre = $('[data-sobre]'), pista = $('[data-pista]');
   const canvas = $('canvas'), g2 = canvas.getContext('2d');
-  let fase = 'flotando', toques = 0, temblor = 0, t0 = performance.now(), frame = 0, vivo = true;
-  let particulas = [];
+  const laminas = [...el.querySelectorAll('.slr-sobre__lamina i')];
+  let fase = 'flotando', toques = 0, temblor = 0, t0 = 0, frame = 0, vivo = true, nivel = 0;
+  let particulas = [], explosion = null, preparadas = false;
+  // Lo que limpiar() necesita, declarado ya: se puede cerrar mientras se prepara el sobre
+  let relojEleccion = null, medir = null, alMover = null, alInclinar = null;   // explosion: { t, x, y } para los rayos
   const temporizadores = [];
   const despues = (ms, f) => temporizadores.push(setTimeout(() => vivo && f(), ms));
-  const quitarLamina = laminar(sobre.querySelector('[data-pieza="abajo"] .slr-sobre'));
   const fijarFase = f => { fase = f; el.dataset.fase = f; };
+  el.dataset.fase = 'cargando';
+
+  // «Saltar» funciona desde el principio (también mientras se prepara el sobre)
+  let listo = false, saltarAlEmpezar = false;
+  $('[data-saltar]').addEventListener('click', () => { if (listo) saltar(); else saltarAlEmpezar = true; });
+
+  // ── Precarga: sobre, dorso y fotos de las cartas, decodificadas antes de animar ──
+  abrirCapa(el, limpiar);
+  const w = anchoCarta(o.cartas.length);
+  await asegurarFotos([o.imagen, o.dorso, ...o.cartas.map(c => c.imagen_url && urlFoto(c.imagen_url, w))]);
+  if (!vivo) return el;
+  // Lo caro, todavía con «Preparando el sobre…»: sprites, rayos y las cartas (ocultas)
+  if (!quieto) { sprite(luz); sprite('#ffffff'); rayosDe(luz); }
+  prepararCartas();
+  el.classList.remove('es-cargando');
+  pista.textContent = 'Toca el sobre para cargarlo';
   fijarFase('flotando');
 
-  // ── Bucle único: balanceo, temblor y partículas ──
-  const dpr = Math.min(2, devicePixelRatio || 1);
-  const medir = () => { canvas.width = innerWidth * dpr; canvas.height = innerHeight * dpr; };
+  // ── Canvas: DPR limitado (1,5) ──
+  let dpr = Math.min(1.5, devicePixelRatio || 1);
+  medir = () => { canvas.width = Math.round(innerWidth * dpr); canvas.height = Math.round(innerHeight * dpr); };
   medir();
   addEventListener('resize', medir);
+
+  // ── Brillo laminado: el destino lo marcan el puntero o la inclinación; lo aplica el bucle ──
+  let lx = 0.5, ly = 0.3, objX = 0.5, objY = 0.3;
+  alMover = e => { objX = e.clientX / innerWidth; objY = e.clientY / innerHeight; };
+  alInclinar = e => { if (e.gamma != null) { objX = 0.5 + Math.max(-30, Math.min(30, e.gamma)) / 60; objY = 0.5 + Math.max(-30, Math.min(30, (e.beta ?? 45) - 45)) / 60; } };
+  addEventListener('pointermove', alMover, { passive: true });
+  addEventListener('deviceorientation', alInclinar);
+
+  // ── Bucle único ──
+  let ultimo = 0;
+  const lentos = [];
+  t0 = performance.now();
   function bucle(ahora) {
     if (!vivo) return;
+    const dt = ultimo ? ahora - ultimo : 16;
+    ultimo = ahora;
+    // Calidad adaptativa: media de los últimos 30 frames
+    lentos.push(dt); if (lentos.length > 30) lentos.shift();
+    if (lentos.length === 30 && nivel < 2 && lentos.reduce((a, b) => a + b, 0) / 30 > 26) {
+      nivel++; lentos.length = 0;
+      if (nivel === 2 && dpr > 1) { dpr = 1; medir(); }
+      el.dataset.calidad = nivel;
+    }
     const t = (ahora - t0) / 1000;
     if (fase === 'flotando' || fase === 'cargando') {
-      sobre.style.transform = `translateY(${Math.sin(t * 1.6) * 7}px) rotate(${Math.sin(t * 1.1) * 2.2}deg)`;
+      sobre.style.transform = `translate3d(0, ${(Math.sin(t * 1.6) * 7).toFixed(1)}px, 0) rotate(${(Math.sin(t * 1.1) * 2.2).toFixed(2)}deg)`;
     }
+    if (fase !== 'revelado' && fase !== 'resumen') {
+      lx += (objX - lx) * 0.12; ly += (objY - ly) * 0.12;
+      moverLamina(laminas, lx, ly);
+    }
+    if (rasgo) pintarRasgo();
     if (temblor > 0.3) {
       const a = temblor;
-      escena.style.transform = `translate(${(Math.random() - 0.5) * 2 * a}px, ${(Math.random() - 0.5) * 2 * a}px) rotate(${(Math.random() - 0.5) * a * 0.08}deg)`;
+      escena.style.transform = `translate3d(${((Math.random() - 0.5) * 2 * a).toFixed(1)}px, ${((Math.random() - 0.5) * 2 * a).toFixed(1)}px, 0) rotate(${((Math.random() - 0.5) * a * 0.08).toFixed(2)}deg)`;
       temblor *= 0.88;
     } else if (temblor) { temblor = 0; escena.style.transform = ''; }
+    pintarLienzo(ahora);
+    frame = requestAnimationFrame(bucle);
+  }
+  let lienzoSucio = false;
+  function pintarLienzo(ahora) {
+    if (!particulas.length && !explosion) {
+      if (lienzoSucio) { g2.setTransform(1, 0, 0, 1, 0, 0); g2.clearRect(0, 0, canvas.width, canvas.height); lienzoSucio = false; }
+      return;
+    }
+    lienzoSucio = true;
     g2.setTransform(dpr, 0, 0, dpr, 0, 0);
     g2.clearRect(0, 0, innerWidth, innerHeight);
+    g2.globalCompositeOperation = 'lighter';
+    if (explosion) {
+      const e = (ahora - explosion.t) / 1400;
+      if (e >= 1 || nivel >= 1) explosion = null;
+      else {
+        const im = rayosDe(luz), tam = Math.max(innerWidth, innerHeight) * (0.6 + e * 1.1);
+        g2.globalAlpha = e < 0.15 ? e / 0.15 * 0.9 : 0.9 * (1 - (e - 0.15) / 0.85);
+        g2.save(); g2.translate(explosion.x, explosion.y); g2.rotate(e * 0.7);
+        g2.drawImage(im, -tam / 2, -tam / 2, tam, tam);
+        g2.restore();
+      }
+    }
     if (particulas.length) {
-      g2.globalCompositeOperation = 'lighter';
       particulas = particulas.filter(p => {
         p.vida++;
         if (p.vida > p.max) return false;
         p.vx *= 0.985; p.vy = p.vy * 0.985 + p.g; p.x += p.vx; p.y += p.vy;
-        const a = 1 - p.vida / p.max;
+        const a = 1 - p.vida / p.max, s = p.tam * (0.6 + a * 0.6);
         g2.globalAlpha = a;
-        g2.fillStyle = p.color;
-        g2.beginPath(); g2.arc(p.x, p.y, p.tam * (0.5 + a * 0.5), 0, Math.PI * 2); g2.fill();
+        g2.drawImage(p.im, p.x - s, p.y - s, s * 2, s * 2);
         return true;
       });
-      g2.globalAlpha = 1;
     }
-    frame = requestAnimationFrame(bucle);
+    g2.globalAlpha = 1;
+    g2.globalCompositeOperation = 'source-over';
   }
+  // El lienzo se «calienta» ya (textura creada y subida) para que el primer toque no la estrene
+  if (!quieto) { g2.globalAlpha = 0.02; g2.drawImage(sprite(luz), 0, 0, 2, 2); g2.globalAlpha = 1; lienzoSucio = true; }
   frame = requestAnimationFrame(bucle);
 
-  function chispas(x, y, n, { color = luz, fuerza = 9, g = 0.12, tam = 3, vida = 60 } = {}) {
-    if (reducido()) return;
-    n = Math.min(n, 420 - particulas.length);
+  function chispas(x, y, n, { color = luz, fuerza = 9, g = 0.12, tam = 6, vida = 55 } = {}) {
+    if (quieto) return;
+    n = Math.min(Math.round(n * [1, 0.55, 0.25][nivel]), MAX_PARTICULAS[nivel] - particulas.length);
+    const im = sprite(color), blanco = sprite('#ffffff');
     for (let i = 0; i < n; i++) {
       const ang = Math.random() * Math.PI * 2, v = fuerza * (0.25 + Math.random() * 0.75);
       particulas.push({ x, y, vx: Math.cos(ang) * v, vy: Math.sin(ang) * v - fuerza * 0.15, g, vida: 0,
-        max: vida * (0.6 + Math.random() * 0.6), tam: tam * (0.5 + Math.random()), color: Math.random() < 0.25 ? '#ffffff' : color });
+        max: vida * (0.6 + Math.random() * 0.6), tam: tam * (0.6 + Math.random() * 0.8), im: Math.random() < 0.2 ? blanco : im });
     }
   }
   const centroDe = n => { const r = n.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; };
-  const sacudir = a => { if (!reducido()) temblor = Math.max(temblor, a); };
+  const sacudir = a => { if (!quieto) temblor = Math.max(temblor, a); };
+  // Animaciones puntuales con la Web Animations API: sin forzar recálculos (nada de offsetWidth)
   const destello = (fuerte = false) => {
-    const d = $('.slr-apertura__destello');
-    d.classList.remove('ya', 'fuerte'); void d.offsetWidth; d.classList.add('ya'); if (fuerte) d.classList.add('fuerte');
+    if (quieto) return;
+    $('.slr-apertura__destello').animate([{ opacity: 0 }, { opacity: 1, offset: 0.12 }, { opacity: 0 }], { duration: fuerte ? 900 : 550, easing: 'ease-out' });
   };
 
   // ── 2. Cargar ──
@@ -168,14 +313,14 @@ function crearApertura(ctx, o) {
     fijarFase('cargando');
     toques++;
     sonar('toque', { n: toques, rareza: mejor });
-    el.style.setProperty('--carga', toques);
-    el.querySelectorAll(`[data-grietas="${toques}"]`).forEach(gr => gr.classList.add('visible'));
+    el.dataset.carga = toques;
+    el.querySelector(`[data-grietas="${toques}"]`)?.classList.add('visible');
     sonar('grieta', { n: toques });
     const final = toques === 3, legendaria = mejor === 'legendaria';
     sacudir(final ? (legendaria ? 30 : 20) : 6 + toques * 4);
     const [cx, cy] = centroDe(sobre);
-    chispas(cx, cy, final ? (legendaria ? 90 : 40) : 12 * toques, { fuerza: final ? 10 : 5, vida: 45 });
-    sobre.classList.remove('golpe'); void sobre.offsetWidth; sobre.classList.add('golpe');
+    chispas(cx, cy, final ? (legendaria ? 40 : 24) : 8 * toques, { fuerza: final ? 10 : 5, vida: 45 });
+    sobre.animate([{ scale: 1 }, { scale: 1.07, offset: 0.3 }, { scale: 1 }], { duration: 320, easing: 'cubic-bezier(.3,1.6,.5,1)' });
     if (final && legendaria) destello(true);
     if (final) {
       pista.textContent = 'Desliza el dedo por la línea para abrirlo';
@@ -185,56 +330,74 @@ function crearApertura(ctx, o) {
   sobre.addEventListener('click', tocar);
 
   // ── 3. Rasgar ──
-  let rasgo = null;   // { puntos: [[x,y]…], progreso, activo, r }
+  let rasgo = null;   // { puntos, progreso, objetivo, activo, pintado }
   function empezarRasgado() {
-    fijarFase('rasgar');
+    const puntos = zigzag();
+    const pts = puntos.map(([x, y]) => `${x.toFixed(1)}% ${y.toFixed(1)}%`);
+    // Las dos piezas se recortan YA (un solo pintado): juntas parecen un sobre entero
+    const arriba = $('[data-pieza="arriba"]'), abajo = $('[data-pieza="abajo"]');
+    arriba.style.clipPath = `polygon(0 0, 100% 0, ${[...pts].reverse().join(', ')})`;
+    abajo.style.clipPath = `polygon(${pts.join(', ')}, 100% 100%, 0 100%)`;
+    arriba.hidden = false;
+    // La línea vive en una franja de 44 px centrada en el corte: x en %, y en px
+    const alto = sobre.getBoundingClientRect().height;
+    const linea = puntos.map(([x, y]) => `${x.toFixed(1)},${((y - CORTE_Y) * alto / 100 + 22).toFixed(1)}`).join(' ');
+    $('[data-rasgado]').setAttribute('points', linea);
+    $('[data-rasgado-fino]').setAttribute('points', linea);
+    rasgo = { puntos, progreso: 0, objetivo: 0, activo: false, pintado: -1, rect: sobre.getBoundingClientRect(),
+              ventana: $('[data-ventana]'), contenido: $('[data-contenido]'), punta: $('[data-punta]') };
     sobre.style.transform = '';
-    rasgo = { puntos: [[0, CORTE_Y]], progreso: 0, activo: false, ultimoSonido: 0 };
+    fijarFase('rasgar');
     sonar('rasgar_inicio');
   }
   const local = e => {
-    const r = sobre.getBoundingClientRect();
-    return [((e.clientX - r.left) / r.width) * 100, ((e.clientY - r.top) / r.height) * 100, r];
+    const r = rasgo?.rect ?? sobre.getBoundingClientRect();
+    return [((e.clientX - r.left) / r.width) * 100, ((e.clientY - r.top) / r.height) * 100];
   };
   sobre.addEventListener('pointerdown', e => {
     if (fase !== 'rasgar') return;
     const [x, y] = local(e);
     // Hay que empezar cerca de la línea y de donde se quedó el corte
-    if (Math.abs(y - CORTE_Y) > 14 || x > rasgo.progreso + 18) return;
+    if (Math.abs(y - CORTE_Y) > 14 || x > rasgo.objetivo + 18) return;
     rasgo.activo = true;
     try { sobre.setPointerCapture(e.pointerId); } catch { /* sin captura */ }
     e.preventDefault();
   });
   sobre.addEventListener('pointermove', e => {
     if (fase !== 'rasgar' || !rasgo?.activo) return;
-    const [x, y, r] = local(e);
-    if (x <= rasgo.progreso + 1.2) return;
-    // El corte sigue al dedo (dentro de una franja) con dientes de zigzag
-    const yy = Math.max(CORTE_Y - 6, Math.min(CORTE_Y + 6, y));
-    const n = rasgo.puntos.length;
-    const diente = n % 2 ? 1.6 : -1.6;
-    rasgo.puntos.push([Math.min(100, x), yy + diente]);
-    rasgo.progreso = Math.min(100, x);
-    $('[data-rasgado]').setAttribute('points', rasgo.puntos.map(([a, b]) => `${a.toFixed(1)},${b.toFixed(1)}`).join(' '));
-    el.style.setProperty('--rasgado', (rasgo.progreso / 100).toFixed(3));
-    el.classList.add('rasgando-ya');
-    chispas(r.left + (x / 100) * r.width, r.top + (yy / 100) * r.height, 3, { fuerza: 4, vida: 30, tam: 2 });
-    if (rasgo.progreso - rasgo.ultimoSonido > 8) { rasgo.ultimoSonido = rasgo.progreso; sonar('rasgando', { progreso: rasgo.progreso / 100 }); }
-    if (rasgo.progreso >= 96) completarRasgado();
+    const [x] = local(e);
+    if (x > rasgo.objetivo) rasgo.objetivo = Math.min(100, x);   // solo avanza: lo pinta el bucle
   });
-  const soltar = () => { if (rasgo) rasgo.activo = false; if (fase === 'rasgar' && rasgo?.progreso > 0) pista.textContent = 'Sigue deslizando desde donde lo dejaste'; };
+  const soltar = () => {
+    if (!rasgo) return;
+    rasgo.activo = false;
+    if (fase === 'rasgar' && rasgo.objetivo > 0) pista.textContent = 'Sigue deslizando desde donde lo dejaste';
+  };
   sobre.addEventListener('pointerup', soltar);
   sobre.addEventListener('pointercancel', soltar);
-
+  // En el bucle: la ventana descubre la línea (dos transform opuestos) y la chispa sigue la punta
+  let ultimoSonido = 0;
+  function pintarRasgo() {
+    if (fase !== 'rasgar') return;
+    rasgo.progreso += (rasgo.objetivo - rasgo.progreso) * 0.5;
+    if (rasgo.objetivo - rasgo.progreso < 0.2) rasgo.progreso = rasgo.objetivo;
+    const p = rasgo.progreso;
+    if (Math.abs(p - rasgo.pintado) < 0.05) return;
+    rasgo.pintado = p;
+    // Solo transform: ni variables en la raíz ni medidas en cada frame
+    rasgo.ventana.style.transform = `translate3d(${(p - 100).toFixed(2)}%, 0, 0)`;
+    rasgo.contenido.style.transform = `translate3d(${(100 - p).toFixed(2)}%, 0, 0)`;
+    const i = rasgo.puntos.findIndex(([x]) => x >= p);
+    const yy = rasgo.puntos[Math.max(0, i)][1];
+    const r = rasgo.rect;
+    rasgo.punta.style.transform = `translate3d(${(r.width * p / 100).toFixed(1)}px, ${(r.height * yy / 100).toFixed(1)}px, 0)`;
+    if (p > 0 && !rasgo.empezado) { rasgo.empezado = true; el.classList.add('rasgando-ya'); }
+    if (p - ultimoSonido > 8) { ultimoSonido = p; sonar('rasgando', { progreso: p / 100 }); }
+    if (Math.random() < 0.5) chispas(r.left + (r.width * p) / 100, r.top + (r.height * yy) / 100, 2, { fuerza: 4, vida: 26, tam: 4 });
+    if (p >= 96) completarRasgado();
+  }
   function completarRasgado() {
     fijarFase('explosion');
-    const ult = rasgo.puntos[rasgo.puntos.length - 1];
-    rasgo.puntos.push([100, ult[1]]);
-    const pts = rasgo.puntos.map(([x, y]) => `${x.toFixed(1)}% ${y.toFixed(1)}%`);
-    const arriba = $('[data-pieza="arriba"]'), abajo = $('[data-pieza="abajo"]');
-    arriba.hidden = false;
-    arriba.style.clipPath = `polygon(0 0, 100% 0, ${[...pts].reverse().join(', ')})`;
-    abajo.style.clipPath = `polygon(${pts.join(', ')}, 100% 100%, 0 100%)`;
     sonar('rasgado');
     explotar();
   }
@@ -247,7 +410,8 @@ function crearApertura(ctx, o) {
     destello(mejor === 'legendaria' || mejor === 'epica');
     el.classList.add('explota');
     sacudir({ comun: 16, rara: 22, epica: 30, legendaria: 40 }[mejor]);
-    chispas(cx, cy, { comun: 90, rara: 130, epica: 190, legendaria: 280 }[mejor], { fuerza: 14, vida: 80, tam: 3.5 });
+    if (!quieto) explosion = { t: performance.now(), x: cx, y: cy };
+    chispas(cx, cy, { comun: 40, rara: 55, epica: 70, legendaria: 80 }[mejor], { fuerza: 14, vida: 70, tam: 8 });
     sobre.classList.add('vuela');
     despues(750, repartir);
   }
@@ -255,18 +419,21 @@ function crearApertura(ctx, o) {
   // ── 5. Revelado ──
   const reveladas = new Set();
   let elegida = null;
-  function repartir() {
-    fijarFase('revelado');
-    sobre.hidden = true;
-    el.classList.remove('explota');
+  // Las cartas se montan (ocultas) antes de empezar: al repartir solo se muestran
+  function prepararCartas() {
+    if (preparadas) return;
+    preparadas = true;
     const cont = $('[data-cartas]');
     const n = o.cartas.length;
+    cont.classList.add('en-espera');
     cont.style.setProperty('--n', n);
     cont.classList.toggle('una', n === 1);
+    // Cada carta con sus dos caras montadas desde el principio; al tocar solo gira
     cont.innerHTML = o.cartas.map((j, i) => {
       const c = normalizarCarta(j);
       const ang = n === 1 ? 0 : (i - (n - 1) / 2) * 9, dx = n === 1 ? 0 : (i - (n - 1) / 2);
       return `<div class="slr-revela slr-revela--${esc(c.rareza)}" data-revela="${i}" style="--i:${i};--ang:${ang}deg;--dx:${dx};--luz-r:${LUZ[c.rareza]};--giro:${GIRO_MS[c.rareza]}ms">
+        <div class="slr-revela__halo" aria-hidden="true"></div>
         <div class="slr-revela__giro">
           <div class="slr-revela__cara slr-revela__cara--dorso">${dorsoHTML(c.rareza, o.dorso)}</div>
           <div class="slr-revela__cara slr-revela__cara--frente">${cartaHTML(c, { tam: 'l', energia: false })}</div>
@@ -275,15 +442,23 @@ function crearApertura(ctx, o) {
         ${o.eleccion ? `<button class="slr-btn slr-revela__elegir" type="button" data-elegir="${esc(j.id)}" hidden>Elegir</button>` : ''}
       </div>`;
     }).join('');
-    sonar('reparto', { n });
-    pista.textContent = o.eleccion ? 'Toca las cartas para girarlas y elige una' : 'Toca cada carta para girarla';
-    if (o.eleccion) ponerCuenta();
     cont.querySelectorAll('[data-revela]').forEach(c => c.addEventListener('click', e => {
       if (e.target.closest('[data-elegir]')) return;
       girar(Number(c.dataset.revela));
     }));
     cont.querySelectorAll('[data-elegir]').forEach(b => b.addEventListener('click', () => elegir(b.dataset.elegir, b)));
-    if (reducido() || o.directo) o.cartas.forEach((_, i) => girar(i, true));
+  }
+  function repartir() {
+    prepararCartas();
+    fijarFase('revelado');
+    sobre.hidden = true;
+    el.classList.remove('explota');
+    $('[data-cartas]').classList.remove('en-espera');
+    const n = o.cartas.length;
+    sonar('reparto', { n });
+    pista.textContent = o.eleccion ? 'Toca las cartas para girarlas y elige una' : 'Toca cada carta para girarla';
+    if (o.eleccion) ponerCuenta();
+    if (quieto || o.directo) o.cartas.forEach((_, i) => girar(i, true));
   }
   function girar(i, ya = false) {
     if (reveladas.has(i)) return;
@@ -292,29 +467,33 @@ function crearApertura(ctx, o) {
     const grande = rz === 'epica' || rz === 'legendaria';
     sonar('carta_gira', { rareza: rz, i });
     if (ya) c.classList.add('sin-transicion');
-    if (grande && !ya) c.classList.add('carga');
-    c.classList.add('girada');
-    despues(ya ? 0 : GIRO_MS[rz] / 2, () => {
-      if (!ya) {
+    // Épica o legendaria: primero se carga (halo y pulso), después gira
+    const retraso = grande && !ya ? 320 : 0;
+    if (retraso) c.classList.add('carga');
+    despues(retraso, () => {
+      c.classList.add('girada');
+      despues(ya ? 0 : GIRO_MS[rz] / 2, () => {
+        if (ya) return;
         const [x, y] = centroDe(c);
-        chispas(x, y, grande ? (rz === 'legendaria' ? 160 : 100) : 24, { color: LUZ[rz], fuerza: grande ? 11 : 6, vida: grande ? 70 : 40 });
+        chispas(x, y, grande ? (rz === 'legendaria' ? 60 : 40) : 12, { color: LUZ[rz], fuerza: grande ? 11 : 6, vida: grande ? 60 : 36 });
         if (grande) { sacudir(rz === 'legendaria' ? 18 : 10); destello(rz === 'legendaria'); }
-      }
-    });
-    despues(ya ? 0 : GIRO_MS[rz], () => {
-      c.classList.add('revelada');
-      sonar('carta_revelada', { rareza: rz, nueva: !!o.cartas[i].nueva });
-      c.querySelector('[data-elegir]')?.removeAttribute('hidden');
-      if (reveladas.size === o.cartas.length && !o.eleccion) mostrarContinuar();
-      if (reveladas.size === o.cartas.length && o.eleccion) pista.textContent = 'Elige tu carta';
+      });
+      despues(ya ? 0 : GIRO_MS[rz], () => {
+        c.classList.add('revelada');
+        sonar('carta_revelada', { rareza: rz, nueva: !!o.cartas[i].nueva });
+        c.querySelector('[data-elegir]')?.removeAttribute('hidden');
+        if (reveladas.size === o.cartas.length && !o.eleccion && [...el.querySelectorAll('[data-revela]')].every(x => x.classList.contains('revelada'))) mostrarContinuar();
+        if (reveladas.size === o.cartas.length && o.eleccion) pista.textContent = 'Elige tu carta';
+      });
     });
   }
   function mostrarContinuar() {
+    if (pista.querySelector('[data-continuar]')) return;
     pista.innerHTML = '<button class="slr-btn slr-btn--grande" type="button" data-continuar>Ver resumen</button>';
     pista.querySelector('[data-continuar]').addEventListener('click', resumen);
   }
-  let relojEleccion = null;
   function ponerCuenta() {
+    if ($('.slr-apertura__cuenta')) return;
     const pinta = () => { const p = $('[data-cuenta-eleccion]'); if (p) p.textContent = faltan(o.eleccion.caduca_en); };
     $('[data-cartas]').insertAdjacentHTML('beforebegin', `<p class="slr-apertura__cuenta">⏱ Te quedan <b data-cuenta-eleccion>${faltan(o.eleccion.caduca_en)}</b> para elegir</p>`);
     relojEleccion = setInterval(pinta, 15000);
@@ -342,7 +521,7 @@ function crearApertura(ctx, o) {
     if (fase === 'resumen') return;
     fijarFase('resumen');
     sonar('resumen');
-    particulas = [];
+    particulas = []; explosion = null;
     sobre.hidden = true;
     $('[data-cartas]').hidden = true;
     $('.slr-apertura__cuenta')?.remove();
@@ -370,15 +549,15 @@ function crearApertura(ctx, o) {
   }
 
   // «Saltar»: al resumen (o, en la elección, a las candidatas giradas)
-  $('[data-saltar]').addEventListener('click', () => {
-    particulas = [];
+  function saltar() {
+    particulas = []; explosion = null;
     temblor = 0; escena.style.transform = '';
     if (o.eleccion) {
       if (fase !== 'revelado') { sobre.hidden = true; repartir(); }
       o.cartas.forEach((_, i) => girar(i, true));
       $('[data-saltar]').hidden = true;
     } else resumen();
-  });
+  }
 
   // Limpieza al cerrar (botón atrás, «Genial» o la ✕ del sistema)
   function limpiar() {
@@ -386,19 +565,21 @@ function crearApertura(ctx, o) {
     cancelAnimationFrame(frame);
     temporizadores.forEach(clearTimeout);
     clearInterval(relojEleccion);
-    removeEventListener('resize', medir);
-    quitarLamina();
-    particulas = [];
+    if (medir) removeEventListener('resize', medir);
+    if (alMover) removeEventListener('pointermove', alMover);
+    if (alInclinar) removeEventListener('deviceorientation', alInclinar);
+    particulas = []; explosion = null;
     sonar('cerrar');
     o.alTerminar?.();
   }
-  abrirCapa(el, limpiar);
   sonar('aparece', { tipo: o.tipo, rareza: mejor });
-  if (reducido() || o.directo) {
+  listo = true;
+  if (quieto || o.directo) {
     // Revelado directo
     sobre.hidden = true;
     repartir();
   }
+  if (saltarAlEmpezar) saltar();
   return el;
 }
 

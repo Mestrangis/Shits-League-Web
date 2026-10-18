@@ -177,7 +177,7 @@ try {
   t = await rpcOk('slr_tienda', { token: U.token, liga_id: L });
   const tengo = (await leer(`cartas?select=id&equipo_id=eq.${U.equipo}`)).datos.length;
   check(t.plantilla.ocupada === tengo && t.plantilla.maxima === 15, `plantilla ${t.plantilla.ocupada}/${t.plantilla.maxima}`);
-  if (tengo > 12) rechaza(await rpc('slr_comprar_sobre', { token: U.token, liga_id: L, tipo: 'basico' }), 'No tienes hueco', 'sin 3 huecos, el básico no se compra');
+  if (tengo > 12) { const x = await rpcOk('slr_comprar_sobre', { token: U.token, liga_id: L, tipo: 'basico' }); check(x.sobran === tengo + 3 - 15, `sin 3 huecos, el básico se abre igual y sobran ${x.sobran} (después, «Haz hueco»)`); }
 
   seccion('Apagada: sale todo');
   await rpcOk('slr_admin_progresion', { token: U.token, liga_id: L, activa: 'false' });

@@ -4,13 +4,14 @@
    probabilidad de cada rareza (entre lo que puede salir), cuántas quedan
    cuando importa y AGOTADO en gris si no se pueden llenar. El de posición
    pide el perfil; el de colección enseña la colección de la semana.
-   Comprar: confirmación → «Haz hueco» si hace falta → apertura (apertura.js).
+   Comprar: confirmación → apertura (apertura.js). El sobre se abre aunque la
+   plantilla pase del máximo; al terminar, si sobran cartas, «Haz hueco» con
+   todas (las nuevas marcadas) para elegir cuáles vender (hueco.js).
 ═══════════════════════════════════════════════ */
 import { rpc } from '../api.js';
 import { esc, miles, monedas, hoja, cerrarHasta, confirmar, toast } from '../ui.js';
 import { RAREZAS } from '../carta.js';
 import { sobreHTML } from '../sobre-arte.js';
-import { asegurarHueco } from '../hueco.js';
 import { abrirApertura, abrirEleccionPendiente } from './apertura.js';
 import { bannerProgresion } from './mercado.js';
 import { pintarPendiente, comprobarPendiente } from '../rush.js';
@@ -96,11 +97,10 @@ async function comprar(t, tienda, ctx, alCambiar) {
     perfil = await elegirPerfil(t);
     if (!perfil) return;
   }
-  const n = t.tipo === 'eleccion' ? 1 : t.cartas;
   const ok = await confirmar({ titulo: `Sobre ${t.nombre}`,
     texto: `Compras un sobre <b>${esc(t.nombre)}</b>${perfil ? ` (${PERFIL[perfil][1].toLowerCase()})` : ''} por <b>${miles(t.precio)}</b>.
       Te quedarán ${miles(tienda.saldo - t.precio)}.`, ok: `Comprar por ${miles(t.precio)}` });
-  if (!ok || !(await asegurarHueco(ctx, n, { que: 'abrir el sobre' }))) return;
+  if (!ok) return;
   let r;
   try {
     r = await rpc('slr_comprar_sobre', { liga_id: ctx.datos.liga.id, tipo: t.tipo, perfil });
@@ -108,5 +108,5 @@ async function comprar(t, tienda, ctx, alCambiar) {
   await ctx.recargar('yo', 'cartas');
   if (r.pendiente_eleccion) { ctx.datos.sobrePendiente = { sobre_id: r.sobre_id, caduca_en: r.caduca_en, candidatas: r.cartas }; pintarPendiente(); }
   await abrirApertura(ctx, r, { tipo: t, coleccion: tienda.coleccion_semana, dorso: tienda.dorso_url,
-    alTerminar: () => { comprobarPendiente(); alCambiar?.(); } });
+    alTerminar: () => { comprobarPendiente({ abrirHueco: true }); alCambiar?.(); } });
 }

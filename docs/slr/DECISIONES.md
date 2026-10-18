@@ -1150,3 +1150,51 @@ Los goles dependen mucho de la formación (con un solo defensa la ocasión llega
 - **Simular una jornada:** en *Modo pruebas → Sobres → Progresión (pruebas)* (encendida, apagada o automática, y la jornada de referencia).
 - **Tests sin dependencias del catálogo:** `api-paso8` y `api-paso9` ya no dan por hecho que las individuales libres dejen un equipo a medias (con el catálogo del 17 de octubre salen 6 plantillas exactas). `api-paso4` tiene un margen de ±10 % en el reparto que de vez en cuando falla por azar, y `banco/listas` una comprobación de precarga que depende de la red.
 - **Tests:** `api-paso13.mjs` (avisos, historial y herramientas del Modo pruebas); `banco/mercado.mjs` (33) y `banco/apertura.mjs` (31), con capturas en móvil y PC.
+
+## Arreglos de los sobres: rendimiento, giro y plantilla llena
+
+### Decisiones de Marcos
+
+- La apertura tiene que ir fluida en un móvil medio (60 fps o 30 estables): solo transform y opacity, temblor en un único contenedor, rasgado sin recalcular recortes, un solo canvas con DPR ≤ 1,5 y 60–80 partículas, calidad adaptativa y precarga antes de animar.
+- El giro de las cartas: dos caras montadas desde el principio; al tocar solo se anima el giro.
+- Los sobres se compran y se abren aunque la plantilla pase de 15; después, «Haz hueco» con todas las cartas. Mientras sobren, nada más en el mercado ni en la alineación; al cierre de la jornada, venta automática de las de menos valor. El resto de adquisiciones mantiene el «Haz hueco» previo.
+
+### Rendimiento de la apertura
+
+Medido con `tests/slr/banco/rendimiento-apertura.mjs`: Chrome a 390×844 (DPR 2,75, táctil) con la CPU ×6, vista previa de un básico con una legendaria, recorrida con toques y arrastres reales. «Paint» es el tiempo de pintado del hilo principal en la fase.
+
+| Fase | Antes: fps · p95 · máx · tareas largas · Paint | Después |
+|---|---|---|
+| Aparición (preparación) | 43 · 33 ms · 350 ms · 1 (107 ms) · 187 ms | 49–55 · 17 ms · 133–167 ms · 2 · 31–36 ms (con el sobre aún oculto: precarga y montaje) |
+| Toques | 54 · 33 ms · 67 ms · 0 · 258 ms | 55–58 · 17–33 ms · 83–100 ms (un frame, GPU emulada) · 0 · 19–28 ms |
+| Rasgado | **33** · 33 ms · 67 ms · 0 · 259 ms | **60** · 17 ms · 17–33 ms · 0 · 8–11 ms |
+| Explosión | 52 · 17 ms · 117 ms · 1 (99 ms) · 109 ms | 55–59 · 17–33 ms · 33–50 ms · 0–1 · 37–50 ms |
+| Abanico | 60 · 17 ms · 17 ms · 0 · 227 ms | 60 · 17 ms · 17 ms · 0 · 7–11 ms |
+| Giro | 57 · 17 ms · 117 ms · 0 · 381 ms | 59–60 · 17 ms · 17–33 ms · 0 · 12–18 ms |
+
+- El pintado baja entre 6 y 30 veces: en un móvil real (donde rasterizar filtros y mezclas es lo caro) es lo que se notaba como tirones.
+- El frame suelto de ~80–100 ms del primer toque es trabajo de GPU (`GPUTask`) en el Chrome sin pantalla, que emula la GPU por software; no hay tareas largas en el hilo principal.
+- Con la CPU ×20, la calidad adaptativa baja sola al nivel 2 (mínimas partículas, sin rayos, lienzo a DPR 1).
+
+### Decisiones mías
+
+- **Qué se animaba mal:** `filter`/`drop-shadow` y `brightness` del sobre, el brillo laminado con `mix-blend-mode` y `background-position` (repintado en cada movimiento), el fondo con un degradado que cambiaba de color, grietas con `stroke-dashoffset` y filtro, la línea de corte repintada (SVG con `drop-shadow`) en cada movimiento, rayos con máscara en una capa de 170vmax, el dorso con `box-shadow` y `background-position`, y los avisos dorados con `box-shadow`.
+- **Ahora:** halo, luz del sobre, fondo de color, grietas (un SVG por tanda, con su halo como trazo ancho) y destello son capas ya pintadas que cambian de opacidad o escala; empiezan en opacidad 0,01 para estar rasterizadas antes del primer toque. El laminado es un degradado que solo se desplaza. Los rayos se dibujan en el canvas desde una imagen hecha una vez. Las animaciones puntuales (golpe del sobre, destello) van con la Web Animations API, sin `offsetWidth` para reiniciarlas.
+- **Rasgado:** el zigzag se calcula al empezar y las dos piezas se recortan entonces (un solo `clip-path` fijo); durante el arrastre solo se mueven, con transform, una ventana que descubre la línea de luz ya pintada y la chispa de la punta. El arrastre solo actualiza el objetivo y lo pinta el bucle; el rectángulo del sobre se mide una vez.
+- **Partículas:** sprites de 32 px dibujados una vez por color, mezcla aditiva, topes de 80 / 45 / 20 según la calidad y lienzo a DPR ≤ 1,5 (1 en el nivel más bajo). El lienzo se «calienta» antes del primer toque.
+- **Calidad adaptativa:** media de los últimos 30 frames; por encima de 26 ms baja un nivel (menos partículas y sin rayos; después, mínimas y DPR 1).
+- **Precarga:** antes de enseñar el sobre se descargan y decodifican su imagen, el dorso y las fotos de las cartas (`asegurarFotos`, con tope de 2,5 s), y se montan las cartas ocultas; «Saltar» funciona también durante esa preparación.
+- **Giro (bug de la carta que se veía dos veces):** al «cargar» una épica o legendaria se ponía un `filter` en el elemento que gira; un `filter` aplana el 3D (`preserve-3d`) y `backface-visibility` deja de funcionar, así que el frente se veía al instante. Ahora el elemento que gira no lleva ni filter ni opacity (el brillo es un halo detrás), las dos caras están montadas desde el principio y solo se anima `rotateY`. Épicas y legendarias se cargan 0,32 s y giran con una curva pausada: el frente asoma a ~0,8 s del toque (la común, a ~0,3 s). Un test muestrea el ángulo en cada frame y comprueba que nada aplana el 3D.
+- **Plantilla llena tras un sobre:** el «exceso» no se guarda: son las cartas por encima del máximo (sin contar la elección pendiente). `preparar_operacion` lo comprueba (salvo al vender al banco), y también guardar o confirmar la alineación y las tácticas. `slr_hacer_hueco` vende varias de una vez (al menos las que sobran) y `slr_hueco_pendiente` dice cuántas sobran y cuáles son las del último sobre. El trigger del máximo de plantilla deja pasar las cartas que entran por un sobre. Al cierre de la jornada se venden las de menos valor, con el aviso `hueco_automatico`.
+- **Envoltorios:** primero se envolvieron las funciones de alineación renombrándolas a `_base`, pero sus cuerpos cualifican los parámetros con el nombre de la función y fallaban; se deshizo y la comprobación va dentro (migración `…0700`).
+- **Interfaz:** tras la apertura, si sobran cartas se abre «Haz hueco» con todas, las nuevas primero y marcadas; se pueden descartar las nuevas. Si se cierra, un aviso rojo flotante la reabre, y al volver a entrar en Rush se abre sola.
+
+### Rarezas de los sobres de la liga principal
+
+- En `sobres_abiertos` de la liga principal solo hay 3 sobres (de Nicolás, a partir de las 18:15 del 18 de octubre): elección (común, común, **rara** elegida), básico (3 comunes) y colección (común). Cuadran con los pesos.
+- **Los de Marcos no se pueden comprobar:** la liga se reinició en modo pruebas a las 18:07 del 18 de octubre, y el reinicio borra sobres, movimientos, álbum e historial. No queda ningún registro de esos sobres.
+- **Con los pesos actuales y la progresión apagada** (beta), una legendaria por carta sale un 1 % (sencillo y básico), un 4 % (elección: ~11 % de que haya una entre las 3 candidatas, y te la quedas), un 3 % (posición y colección). Con 3 legendarias en todo el catálogo, sacar varias seguidas sería muy improbable.
+- **Hay dos cosas raras que pueden explicarlo:**
+  1. **La vista previa de apertura** del Modo pruebas (admin) fuerza la rareza que se elija, enseña cartas reales y las marca «¡NUEVA!», sin gastar nada. Si Marcos la usó, ahí es fácil ver varias legendarias.
+  2. **Los sobres de colección y de posición** renormalizan los pesos entre las rarezas que quedan en su filtro. Si a una colección solo le queda una legendaria (o una épica), el sobre la da siempre. Hoy, «Moon» solo tiene una épica libre: como colección de la semana, daría una épica el 100 % de las veces por 900. «Down» tiene una común y una legendaria: un 5 % de legendaria (3 de 58). **Pendiente de decidir:** que la rareza se sortee con los pesos completos y, si no queda de esa, baje a la siguiente inferior (así nunca sube la probabilidad de lo bueno), o no elegir como colección de la semana las que solo tienen cartas raras o mejores.
+- **Tests:** `api-paso14.mjs` (plantilla llena, bloqueos, venta por lotes y venta automática), `banco/apertura.mjs` (34, con el muestreo del giro), `banco/mercado.mjs` (41), `banco/rendimiento-apertura.mjs` (medidas); `api-paso3` y `api-paso12` ya no esperan el rechazo por falta de hueco en los sobres.

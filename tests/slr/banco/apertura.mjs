@@ -114,7 +114,7 @@ try {
     if (fotos) await foto(`${prefijo}-1-flotando`);
     await clic('[data-sobre]'); await dormir(350);
     await clic('[data-sobre]'); await dormir(120);
-    const luz = await ev(`({ luz: getComputedStyle(document.querySelector('[data-apertura]')).getPropertyValue('--luz').trim(), carga: document.querySelector('[data-apertura]').style.getPropertyValue('--carga'),
+    const luz = await ev(`({ luz: getComputedStyle(document.querySelector('[data-apertura]')).getPropertyValue('--luz').trim(), carga: document.querySelector('[data-apertura]').dataset.carga,
       grietas: document.querySelectorAll('[data-grietas].visible').length })`);
     check(luz.carga === '2' && luz.grietas === 2, `${prefijo}: 2 toques: carga 2 y grietas de luz (${luz.luz})`);
     if (fotos) await foto(`${prefijo}-2-cargando`);
@@ -152,13 +152,37 @@ try {
   check(dorsos === 3, `3 cartas boca abajo en abanico (${dorsos})`);
   const i = await ev(`[...document.querySelectorAll('[data-revela]')].findIndex(c => c.classList.contains('slr-revela--epica'))`);
   check(i >= 0, 'hay una épica');
-  await clic(`[data-revela="${i}"]`);
-  await dormir(480);
-  await foto('apertura-7-giro-epica');
+  // Giro: se muestrea en cada frame el ángulo real (rotateY de la matriz) y que nada aplane el 3D
+  const muestreo = idx => `(async () => {
+    const c = document.querySelector('[data-revela="${idx}"]'), g = c.querySelector('.slr-revela__giro');
+    const angulo = () => { const m = new DOMMatrix(getComputedStyle(g).transform); return Math.round(Math.atan2(-m.m13, m.m11) * 180 / Math.PI); };
+    const plano = () => { const cg = getComputedStyle(g); return cg.filter !== 'none' || cg.opacity !== '1' || cg.transformStyle !== 'preserve-3d'
+      || [...c.querySelectorAll('.slr-revela__cara')].some(f => getComputedStyle(f).backfaceVisibility !== 'hidden'); };
+    const t0 = performance.now(), m = [];
+    c.click();
+    while (performance.now() - t0 < 2300) { await new Promise(r => requestAnimationFrame(r)); m.push([Math.round(performance.now() - t0), angulo(), plano()]); }
+    return m; })()`;
+  const mE = await ev(muestreo(i));
+  const primeroE = mE.find(([, a]) => Math.abs(a) > 5), medioE = mE.find(([, a]) => Math.abs(a) >= 90);
+  check(mE.slice(0, 3).every(([, a]) => Math.abs(a) < 20), `al tocar la épica sigue de dorso (ángulos de los primeros frames: ${mE.slice(0, 3).map(x => x[1]).join(', ')}°): no se revela de golpe`);
+  check(!mE.some(([, , pl]) => pl), 'durante todo el giro: sin filter ni opacity en lo que gira, preserve-3d y caras con backface-visibility: hidden');
+  check(primeroE && medioE && medioE[0] >= 600, `la épica se carga y gira despacio (empieza a moverse a los ${primeroE?.[0]} ms y el frente asoma a los ${medioE?.[0]} ms del toque)`);
+  check(Math.abs(Math.abs(mE[mE.length - 1][1]) - 180) <= 1 && await ev(`document.querySelector('[data-revela="${i}"]').classList.contains('revelada')`),
+    'termina de frente (180°) y revelada, una sola vez');
+  const comun = await ev(`[...document.querySelectorAll('[data-revela]')].findIndex(c => c.classList.contains('slr-revela--comun') && !c.classList.contains('girada'))`);
+  if (comun >= 0) {
+    const mC = await ev(muestreo(comun));
+    const medioC = mC.find(([, a]) => Math.abs(a) >= 90);
+    check(medioC && medioC[0] < (medioE?.[0] ?? 0), `la común gira más rápido (mitad a los ${medioC?.[0]} ms)`);
+  }
+  // Capturas a mitad de giro de la otra carta que quede boca abajo
+  const otra = await ev(`[...document.querySelectorAll('[data-revela]')].findIndex(c => !c.classList.contains('girada'))`);
+  if (otra >= 0 && SALIDA) {
+    await clic(`[data-revela="${otra}"]`);
+    for (const [ms, n] of [[120, 'a'], [260, 'b'], [420, 'c'], [700, 'd']]) { await dormir(ms - (n === 'a' ? 0 : [0, 120, 260, 420][['a', 'b', 'c', 'd'].indexOf(n)])); await foto(`apertura-7-giro-${n}`); }
+  }
   await dormir(900);
-  const giro = await ev(`({ revelada: document.querySelector('[data-revela="${i}"]').classList.contains('revelada'),
-    nueva: getComputedStyle(document.querySelector('[data-revela="${i}"] .slr-revela__nueva') ?? document.body).transform })`);
-  check(giro.revelada, 'la épica se gira (más despacio) y queda revelada');
+  await foto('apertura-7-giro-epica');
   for (let k = 0; k < 3; k++) { await clic(`[data-revela="${k}"]`); await dormir(400); }
   await esperar(`!!document.querySelector('[data-continuar]')`, 4000);
   await dormir(1200);

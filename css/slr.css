@@ -1867,7 +1867,7 @@ html.slr-sin-seleccion input, html.slr-sin-seleccion textarea { -webkit-user-sel
 .slr-tienda__precio { font-family: 'Anton', sans-serif; font-size: 22px; }
 .slr-tienda__nota { font-size: 12px; }
 .slr-pendiente { text-align: left; width: 100%; border-style: solid !important; border-color: var(--slr-oro) !important; animation: slr-latido 1.6s ease-in-out infinite; }
-@keyframes slr-latido { 50% { box-shadow: 0 0 18px rgba(255,201,74,.4); } }
+@keyframes slr-latido { 50% { opacity: .78; } }   /* solo opacidad: sin repintar sombras */
 .slr-perfiles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
 .slr-perfil-btn { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 16px 8px; border-radius: 16px;
   background: rgba(3,12,7,.55) !important; border: 1px solid var(--slr-borde) !important; }
@@ -1899,10 +1899,10 @@ html.slr-sin-seleccion input, html.slr-sin-seleccion textarea { -webkit-user-sel
 .slr-sobre__emblema { display: block; width: 58%; aspect-ratio: 1; background: var(--emblema) center / contain no-repeat; filter: drop-shadow(0 4px 12px rgba(0,0,0,.5)); }
 .slr-sobre__nombre { font-family: 'Anton', sans-serif; font-weight: 400; font-size: 14cqw; text-transform: uppercase; letter-spacing: .04em; text-shadow: 0 3px 12px rgba(0,0,0,.45); }
 .slr-sobre__cartas { font-size: 7cqw; font-weight: 700; opacity: .9; }
-.slr-sobre__lamina { position: absolute; inset: 0; pointer-events: none; mix-blend-mode: color-dodge; opacity: .55;
-  background: radial-gradient(60% 40% at calc(var(--x) * 100%) calc(var(--y) * 100%), rgba(255,255,255,.75), transparent 60%),
-    linear-gradient(115deg, transparent 20%, rgba(255,0,170,.35) 35%, rgba(0,230,255,.35) 45%, rgba(255,255,0,.3) 55%, transparent 70%)
-      calc(var(--x) * 100%) 0 / 260% 100%; }
+.slr-sobre__lamina { position: absolute; inset: 0; overflow: hidden; pointer-events: none; opacity: .5; }
+.slr-sobre__lamina i { position: absolute; inset: -60%; will-change: transform;
+  background: radial-gradient(22% 16% at 50% 45%, rgba(255,255,255,.55), transparent 70%),
+    linear-gradient(115deg, transparent 32%, rgba(255,120,220,.22) 42%, rgba(120,240,255,.24) 50%, rgba(255,250,150,.2) 58%, transparent 68%); }
 .slr-sobre--s .slr-sobre__lamina { opacity: .35; }
 
 /* Dorso de las cartas */
@@ -1914,9 +1914,10 @@ html.slr-sin-seleccion input, html.slr-sin-seleccion textarea { -webkit-user-sel
     repeating-linear-gradient(45deg, rgba(255,255,255,.05) 0 8px, transparent 8px 16px), #0b1d12; }
 .slr-dorso__dibujo span { font-weight: 800; letter-spacing: .25em; color: var(--r); font-size: 13px; }
 .slr-dorso__dibujo b { font-family: 'Anton', sans-serif; font-weight: 400; font-size: 34px; color: #fff; text-shadow: 0 0 14px var(--r); transform: skewX(-8deg); }
-.slr-dorso__brillo { position: absolute; inset: 0; background: linear-gradient(120deg, transparent 30%, rgba(255,255,255,.25) 50%, transparent 70%) 0 0 / 250% 100%;
-  animation: slr-dorso-brillo 2.6s linear infinite; mix-blend-mode: screen; }
-@keyframes slr-dorso-brillo { from { background-position: 120% 0; } to { background-position: -120% 0; } }
+.slr-dorso__brillo { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.slr-dorso__brillo i { position: absolute; inset: 0 -100%; background: linear-gradient(110deg, transparent 40%, rgba(255,255,255,.22) 50%, transparent 60%);
+  animation: slr-dorso-brillo 2.6s linear infinite; will-change: transform; }
+@keyframes slr-dorso-brillo { from { transform: translateX(-35%); } to { transform: translateX(35%); } }
 
 /* Resumen de apertura (básico) y elección */
 .slr-apertura-resumen__cartas, .slr-eleccion { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
@@ -1932,82 +1933,120 @@ html.slr-sin-seleccion input, html.slr-sin-seleccion textarea { -webkit-user-sel
 .slr-mfiltros-plegable[open] .slr-mfiltros { margin-top: 8px; }
 .slr-sobre__marca { white-space: nowrap; }
 
-/* ══ Apertura de sobres ══════════════════════════════════════════════════ */
-.slr-apertura { --luz: #fff; --carga: 0; --rasgado: 0; position: absolute; inset: 0; z-index: 30; overflow: hidden;
+/* ══ Apertura de sobres ══════════════════════════════════════════════════
+   Solo se anima transform y opacity: los brillos, halos, grietas, la línea de
+   corte y el color de fondo son capas ya pintadas que cambian de opacidad o
+   escala (ver la cabecera de js/slr/pantallas/apertura.js). */
+.slr-apertura { --luz: #fff; position: absolute; inset: 0; z-index: 30; overflow: hidden;
   display: grid; place-items: center; touch-action: none; user-select: none; -webkit-user-select: none;
-  background: radial-gradient(70% 55% at 50% 45%, color-mix(in srgb, var(--luz) calc(var(--carga) * 9%), #06140c) 0%, #020805 70%);
-  transition: background .4s; animation: slr-ap-entrar .35s ease-out; }
+  background: radial-gradient(70% 55% at 50% 45%, #0a1f13 0%, #020805 70%); animation: slr-ap-entrar .35s ease-out; }
 @keyframes slr-ap-entrar { from { opacity: 0; } }
-.slr-apertura__particulas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 6; }
-.slr-apertura__rayos { position: absolute; left: 50%; top: 45%; width: 170vmax; height: 170vmax; margin: -85vmax 0 0 -85vmax; pointer-events: none; z-index: 1;
-  background: repeating-conic-gradient(from 0deg, color-mix(in srgb, var(--luz) 55%, transparent) 0 6deg, transparent 6deg 18deg);
-  -webkit-mask: radial-gradient(circle, #000 0, transparent 60%); mask: radial-gradient(circle, #000 0, transparent 60%);
-  opacity: 0; transform: scale(.2); }
-.slr-apertura.explota .slr-apertura__rayos { animation: slr-ap-rayos 1.7s ease-out forwards; }
-@keyframes slr-ap-rayos { 15% { opacity: .95; } 100% { opacity: 0; transform: scale(1.25) rotate(40deg); } }
+.slr-apertura.es-cargando .slr-apertura__escena { opacity: 0; }
+.slr-apertura__escena { transition: opacity .25s; }
+/* Fondo del color de la rareza: una capa fija que solo sube de opacidad con la carga.
+   Las capas que aparecen al tocar empiezan en .01 (no 0): así ya están rasterizadas */
+.slr-apertura__fondo { position: absolute; inset: 0; pointer-events: none; opacity: .01; transition: opacity .45s; will-change: opacity;
+  background: radial-gradient(60% 45% at 50% 45%, var(--luz), transparent 75%); }
+.slr-apertura[data-carga="1"] .slr-apertura__fondo { opacity: .10; }
+.slr-apertura[data-carga="2"] .slr-apertura__fondo { opacity: .20; }
+.slr-apertura[data-carga="3"] .slr-apertura__fondo, .slr-apertura[data-fase="rasgar"] .slr-apertura__fondo { opacity: .32; }
+.slr-apertura.explota .slr-apertura__fondo { opacity: .5; }
+.slr-apertura__lienzo { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 6; }
 .slr-apertura__destello { position: absolute; inset: 0; pointer-events: none; z-index: 7; opacity: 0;
   background: radial-gradient(circle at 50% 45%, #fff 0, var(--luz) 35%, transparent 75%); }
-.slr-apertura__destello.ya { animation: slr-ap-destello .55s ease-out; }
-.slr-apertura__destello.ya.fuerte { animation-duration: .9s; }
-@keyframes slr-ap-destello { 0% { opacity: 0; } 12% { opacity: 1; } 100% { opacity: 0; } }
 .slr-apertura__escena { position: relative; z-index: 3; width: 100%; height: 100%; display: grid; place-items: center; will-change: transform; }
 
 /* Sobre */
-.slr-apertura__sobre { position: relative; width: min(64vw, 330px); aspect-ratio: 3 / 5; cursor: pointer; will-change: transform;
-  filter: drop-shadow(0 0 calc(var(--carga) * 18px) var(--luz)) drop-shadow(0 20px 30px rgba(0,0,0,.55)) brightness(calc(1 + var(--carga) * .09));
-  transition: filter .3s; }
+.slr-apertura__sobre { position: relative; grid-area: 1 / 1; width: min(64vw, 330px); aspect-ratio: 3 / 5; cursor: pointer; will-change: transform; }
 @media (min-width: 900px) { .slr-apertura__sobre { width: auto; height: min(64vh, 620px); } }
-.slr-apertura__sobre.golpe { animation: slr-ap-golpe .32s cubic-bezier(.3,1.6,.5,1); }
-@keyframes slr-ap-golpe { 30% { scale: 1.07; } }
+/* Halo detrás del sobre: degradado pintado una vez; sube de opacidad y escala con cada toque */
+.slr-apertura__halo { grid-area: 1 / 1; width: min(120vw, 620px); aspect-ratio: 1; pointer-events: none; opacity: .01; transform: scale(.7);
+  background: radial-gradient(circle, var(--luz) 0, color-mix(in srgb, var(--luz) 45%, transparent) 30%, transparent 62%);
+  transition: opacity .3s, transform .3s; will-change: transform, opacity; }
+@media (min-width: 900px) { .slr-apertura__halo { width: min(110vh, 1000px); } }
+.slr-apertura[data-carga="1"] .slr-apertura__halo { opacity: .35; transform: scale(.8); }
+.slr-apertura[data-carga="2"] .slr-apertura__halo { opacity: .6; transform: scale(.9); }
+.slr-apertura[data-carga="3"] .slr-apertura__halo, .slr-apertura[data-fase="rasgar"] .slr-apertura__halo { opacity: .85; transform: scale(1); }
+.slr-apertura.explota .slr-apertura__halo, .slr-apertura[data-fase="revelado"] .slr-apertura__halo,
+.slr-apertura[data-fase="resumen"] .slr-apertura__halo { opacity: 0; transform: scale(1.4); transition-duration: .7s; }
 .slr-apertura__pieza { position: absolute; inset: 0; transition: transform .9s cubic-bezier(.2,.7,.25,1), opacity .9s; }
 .slr-apertura__pieza .slr-sobre { width: 100%; height: 100%; }
-.slr-apertura__sobre.vuela .slr-apertura__pieza--arriba { transform: translate(-12%, -95vh) rotate(-32deg); opacity: 0; }
-.slr-apertura__sobre.vuela .slr-apertura__pieza--abajo { transform: translate(9%, 95vh) rotate(16deg); opacity: 0; }
-.slr-apertura__sobre.vuela .slr-apertura__grietas, .slr-apertura__sobre.vuela .slr-apertura__corte { opacity: 0; }
-.slr-apertura__grietas, .slr-apertura__corte { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
-.slr-apertura__grietas path { fill: none; stroke: var(--luz); stroke-width: 2.2; vector-effect: non-scaling-stroke; stroke-linecap: round; stroke-linejoin: round;
-  stroke-dasharray: 60; stroke-dashoffset: 60; opacity: 0; filter: drop-shadow(0 0 4px var(--luz)) drop-shadow(0 0 10px var(--luz)); }
-.slr-apertura__grietas g.visible path { opacity: 1; animation: slr-ap-grieta .35s ease-out forwards; }
-@keyframes slr-ap-grieta { to { stroke-dashoffset: 0; } }
-.slr-apertura__corte { opacity: 0; transition: opacity .3s; }
-.slr-apertura[data-fase="rasgar"] .slr-apertura__corte { opacity: 1; }
-.slr-apertura__guia { stroke: #fff; stroke-width: 3; vector-effect: non-scaling-stroke; stroke-dasharray: 2 2.5; stroke-linecap: round;
-  filter: drop-shadow(0 0 5px var(--luz)) drop-shadow(0 0 12px var(--luz)); animation: slr-ap-guia 1s linear infinite; }
-@keyframes slr-ap-guia { to { stroke-dashoffset: -9; } }
-.slr-apertura__rasgado { fill: none; stroke: #fff; stroke-width: 4; vector-effect: non-scaling-stroke; stroke-linejoin: miter;
-  filter: drop-shadow(0 0 6px var(--luz)) drop-shadow(0 0 16px var(--luz)); }
-.slr-apertura__mano { position: absolute; top: calc(15% - 6px); left: 0; font-size: 34px; opacity: 0; pointer-events: none; z-index: 4;
-  filter: drop-shadow(0 4px 8px rgba(0,0,0,.6)); }
+.slr-apertura__sobre.vuela .slr-apertura__pieza--arriba { transform: translate3d(-12%, -95vh, 0) rotate(-32deg); opacity: 0; }
+.slr-apertura__sobre.vuela .slr-apertura__pieza--abajo { transform: translate3d(9%, 95vh, 0) rotate(16deg); opacity: 0; }
+.slr-apertura__sobre.vuela > :not(.slr-apertura__pieza) { opacity: 0; transition: opacity .2s; }
+/* Luz dentro del sobre (degradado fijo): más intensa con cada toque */
+.slr-apertura__luz-sobre { position: absolute; inset: 0; pointer-events: none; opacity: .01; transition: opacity .3s; will-change: opacity;
+  background: radial-gradient(55% 45% at 50% 48%, rgba(255,255,255,.9), color-mix(in srgb, var(--luz) 55%, transparent) 45%, transparent 75%); }
+.slr-apertura[data-carga="1"] .slr-apertura__luz-sobre { opacity: .15; }
+.slr-apertura[data-carga="2"] .slr-apertura__luz-sobre { opacity: .3; }
+.slr-apertura[data-carga="3"] .slr-apertura__luz-sobre, .slr-apertura[data-fase="rasgar"] .slr-apertura__luz-sobre { opacity: .45; }
+/* Grietas: cada tanda es un SVG fijo (con su halo como trazo ancho) que aparece con opacidad y escala */
+.slr-apertura__grietas { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; opacity: .01; transform: scale(.94); will-change: opacity, transform;
+  transition: opacity .18s, transform .25s cubic-bezier(.3,1.6,.5,1); }
+.slr-apertura__grietas.visible { opacity: 1; transform: scale(1); }
+.slr-apertura__grietas path { fill: none; stroke: #fff; stroke-width: 2; vector-effect: non-scaling-stroke; stroke-linecap: round; stroke-linejoin: round; }
+.slr-apertura__grietas path.ancha { stroke: var(--luz); stroke-width: 9; stroke-opacity: .35; }
+/* Línea guía del rasgado: fija, solo parpadea con opacidad */
+.slr-apertura__guia { position: absolute; left: 2%; right: 2%; top: calc(15% - 2px); height: 4px; border-radius: 4px; pointer-events: none; opacity: 0;
+  background: repeating-linear-gradient(90deg, #fff 0 8px, transparent 8px 14px);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--luz) 35%, transparent); }
+.slr-apertura[data-fase="rasgar"] .slr-apertura__guia { animation: slr-ap-guia 1s ease-in-out infinite; }
+.slr-apertura.rasgando-ya .slr-apertura__guia { animation: none; opacity: .35; }
+@keyframes slr-ap-guia { 0%, 100% { opacity: .45; } 50% { opacity: 1; } }
+/* Línea de corte: una ventana que se desliza (transform) descubre la línea ya pintada */
+.slr-apertura__ventana { position: absolute; left: 0; right: 0; top: calc(15% - 22px); height: 44px; overflow: hidden; pointer-events: none;
+  transform: translate3d(-100%, 0, 0); opacity: 0; will-change: transform; }
+.slr-apertura[data-fase="rasgar"] .slr-apertura__ventana { opacity: 1; }
+.slr-apertura__contenido { position: absolute; inset: 0; transform: translate3d(100%, 0, 0); will-change: transform; }
+.slr-apertura__corte { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.slr-apertura__corte polyline { fill: none; stroke: #fff; stroke-width: 3; vector-effect: non-scaling-stroke; stroke-linejoin: miter; }
+.slr-apertura__corte polyline.ancha { stroke: var(--luz); stroke-width: 12; stroke-opacity: .45; }
+.slr-apertura__punta { position: absolute; left: -14px; top: -14px; width: 28px; height: 28px; border-radius: 50%; pointer-events: none; opacity: 0;
+  background: radial-gradient(circle, #fff 0, var(--luz) 30%, transparent 70%); will-change: transform; }
+.slr-apertura.rasgando-ya[data-fase="rasgar"] .slr-apertura__punta { opacity: 1; }
+.slr-apertura__mano { position: absolute; top: calc(15% - 6px); left: 0; font-size: 34px; opacity: 0; pointer-events: none; z-index: 4; }
 .slr-apertura[data-fase="rasgar"] .slr-apertura__mano { animation: slr-ap-mano 1.8s ease-in-out infinite; }
 .slr-apertura.rasgando-ya .slr-apertura__mano { display: none; }
-@keyframes slr-ap-mano { 0% { opacity: 0; left: 0; } 15% { opacity: 1; } 80% { opacity: 1; left: 85%; } 100% { opacity: 0; left: 90%; } }
+@keyframes slr-ap-mano { 0% { opacity: 0; transform: translateX(0); } 15% { opacity: 1; } 80% { opacity: 1; transform: translateX(min(54vw, 280px)); } 100% { opacity: 0; transform: translateX(min(58vw, 300px)); } }
 
-/* Cartas: abanico y giro */
+/* Cartas: abanico y giro (las dos caras montadas desde el principio) */
 .slr-apertura__cartas { --n: 3; --w: min(30vw, 210px); position: absolute; inset: 0; pointer-events: none; }
 .slr-apertura__cartas.una { --w: min(62vw, 300px); }
+/* Montadas mientras el sobre flota: invisibles y sin animar hasta el reparto */
+.slr-apertura__cartas.en-espera { visibility: hidden; }
+.slr-apertura__cartas.en-espera .slr-revela, .slr-apertura__cartas.en-espera .slr-revela__halo { animation: none; }
 @media (min-width: 900px) { .slr-apertura__cartas { --w: min(30vh, 260px); } .slr-apertura__cartas.una { --w: min(46vh, 380px); } }
-.slr-revela { position: absolute; left: 50%; top: 46%; width: var(--w); pointer-events: auto; cursor: pointer; perspective: 1400px;
-  --sep: .82; transform: translate(-50%, -50%) translateX(calc(var(--dx) * var(--w) * var(--sep))) rotate(var(--ang));
-  transition: transform .45s cubic-bezier(.3,.8,.3,1);
+.slr-revela { --sep: .82; position: absolute; left: 50%; top: 46%; width: var(--w); pointer-events: auto; cursor: pointer; perspective: 1400px;
+  transform: translate(-50%, -50%) translateX(calc(var(--dx) * var(--w) * var(--sep))) rotate(var(--ang));
+  transition: transform .45s cubic-bezier(.3,.8,.3,1), opacity .5s, scale .5s;
   animation: slr-ap-reparto .65s cubic-bezier(.2,.8,.25,1.1) backwards; animation-delay: calc(var(--i) * 150ms); }
 @keyframes slr-ap-reparto { from { transform: translate(-50%, -10%) scale(.25) rotate(0); opacity: 0; } }
-.slr-revela__giro { position: relative; aspect-ratio: 5 / 7; transform-style: preserve-3d; transition: transform var(--giro) cubic-bezier(.35,.1,.15,1); }
+.slr-revela.revelada { --sep: 1.03; }
+.slr-revela.revelada:not(.descartada) { rotate: calc(var(--ang) * -1); transition: transform .45s cubic-bezier(.3,.8,.3,1), rotate .4s, opacity .5s, scale .5s; }
+/* Halo detrás de la carta: degradado fijo que solo cambia de opacidad y escala */
+.slr-revela__halo { position: absolute; inset: -22%; pointer-events: none; opacity: 0; transform: scale(.8);
+  background: radial-gradient(closest-side, var(--luz-r), color-mix(in srgb, var(--luz-r) 35%, transparent) 55%, transparent);
+  transition: opacity .35s, transform .35s; }
+.slr-revela--epica .slr-revela__halo, .slr-revela--legendaria .slr-revela__halo { opacity: .35; animation: slr-ap-halo 2s ease-in-out infinite; }
+.slr-revela.carga .slr-revela__halo { opacity: 1; transform: scale(1.1); animation: none; }
+.slr-revela--epica.revelada .slr-revela__halo, .slr-revela--legendaria.revelada .slr-revela__halo { opacity: .9; transform: scale(1); animation: none; }
+@keyframes slr-ap-halo { 50% { opacity: .65; } }
+.slr-revela.carga { animation: slr-ap-carga .32s ease-out; }
+@keyframes slr-ap-carga { 50% { scale: 1.08; } }
+/* El elemento que gira: sin filter ni opacity (aplanarían el 3D) */
+.slr-revela__giro { position: relative; aspect-ratio: 5 / 7; transform-style: preserve-3d; -webkit-transform-style: preserve-3d;
+  transition: transform var(--giro) cubic-bezier(.35,.1,.15,1); }
 .slr-revela.girada .slr-revela__giro { transform: rotateY(180deg); }
+/* Épicas y legendarias: curva pausada, el frente aparece hacia la mitad del giro largo */
+.slr-revela--epica .slr-revela__giro, .slr-revela--legendaria .slr-revela__giro { transition-timing-function: cubic-bezier(.5,0,.25,1); }
 .slr-revela.sin-transicion .slr-revela__giro { transition: none; }
-.slr-revela__cara { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+.slr-revela__cara { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; transform: rotateY(0deg); }
 .slr-revela__cara--frente { transform: rotateY(180deg); }
 .slr-revela__cara--frente .slr-carta, .slr-revela__cara--dorso .slr-dorso { width: 100%; }
-.slr-revela__cara--dorso .slr-dorso { animation: slr-ap-dorso 2s ease-in-out infinite; }
-@keyframes slr-ap-dorso { 50% { box-shadow: 0 0 0 2px var(--r), 0 0 30px var(--r); } }
-.slr-revela.carga { animation: slr-ap-carga .4s ease-out; }
-.slr-revela.carga .slr-revela__giro { filter: drop-shadow(0 0 22px var(--luz-r)); }
-@keyframes slr-ap-carga { 50% { scale: 1.08; } }
-.slr-revela--epica.revelada .slr-revela__giro, .slr-revela--legendaria.revelada .slr-revela__giro { filter: drop-shadow(0 0 18px var(--luz-r)) drop-shadow(0 0 40px var(--luz-r)); }
 .slr-revela__nueva { position: absolute; left: 50%; top: -14px; transform: translateX(-50%) scale(0); z-index: 3; transition: transform .35s cubic-bezier(.3,1.7,.5,1) .1s; }
 .slr-revela.revelada .slr-revela__nueva { transform: translateX(-50%) scale(1); }
 .slr-revela__elegir { position: absolute; left: 50%; bottom: -54px; transform: translateX(-50%); }
-.slr-revela.descartada { opacity: 0; transition: opacity .5s, scale .5s; scale: .85; pointer-events: none; }
-.slr-revela.revelada:not(.descartada) { rotate: calc(var(--ang) * -1); transition: rotate .4s; }
+.slr-revela.descartada { opacity: 0; scale: .85; pointer-events: none; }
 .slr-apertura__cuenta { position: absolute; top: calc(70px + var(--slr-top)); left: 0; right: 0; text-align: center; margin: 0; z-index: 4; font-size: 14px; }
 
 /* Textos y botones */
@@ -2028,10 +2067,11 @@ html.slr-sin-seleccion input, html.slr-sin-seleccion textarea { -webkit-user-sel
 .slr-apertura__col { color: var(--col, var(--slr-texto)); font-weight: 700; }
 
 @media (prefers-reduced-motion: reduce) {
-  .slr-apertura, .slr-revela, .slr-apertura__final { animation: none !important; }
+  .slr-apertura, .slr-revela, .slr-apertura__final, .slr-revela__halo { animation: none !important; }
   .slr-revela__giro, .slr-apertura__pieza { transition: none !important; }
-  .slr-apertura__rayos, .slr-apertura__destello { display: none; }
+  .slr-apertura__destello { display: none; }
 }
+
 .slr-pendiente-global { position: absolute; left: 50%; bottom: calc(var(--slr-nav-h) + 14px + var(--slr-bottom)); transform: translateX(-50%); z-index: 15;
   display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 99px; white-space: nowrap; font-weight: 800; font-size: 13px;
   background: linear-gradient(135deg, #3a2a00, #1a1200) !important; border: 1.5px solid var(--slr-oro) !important; color: #FFE6A3 !important;
@@ -2051,8 +2091,6 @@ html.slr-sin-seleccion input, html.slr-sin-seleccion textarea { -webkit-user-sel
 .slr-sobres-admin__dorsos { display: grid; grid-template-columns: repeat(4, minmax(0, 90px)); gap: 10px; }
 .slr-apertura [hidden] { display: none !important; }
 
-/* Al girarse, el abanico se abre para que las cartas se vean enteras */
-.slr-revela.revelada { --sep: 1.03; }
 
 /* Liga → Fichajes (historial público del mercado) */
 .slr-fichajes { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
@@ -2062,3 +2100,15 @@ html.slr-sin-seleccion input, html.slr-sin-seleccion textarea { -webkit-user-sel
 .slr-fichaje time { font-size: 11px; color: var(--slr-suave); white-space: nowrap; }
 .slr-fichaje.es-epica { border-color: #A55CFF; box-shadow: 0 0 12px rgba(165,92,255,.2); }
 .slr-fichaje.es-legendaria { border-color: var(--slr-oro); box-shadow: 0 0 14px rgba(255,201,74,.3); }
+
+/* «Haz hueco» tras un sobre: selección múltiple */
+.slr-hueco-hoja__fila { position: relative; }
+.slr-hueco-hoja__marca { flex: none; width: 22px; height: 22px; border-radius: 7px; border: 2px solid var(--slr-suave); display: grid; place-items: center; }
+.slr-hueco-hoja__fila.es-elegida { border-color: var(--slr-peligro) !important; background: rgba(255,90,90,.08) !important; }
+.slr-hueco-hoja__fila.es-elegida .slr-hueco-hoja__marca { border-color: var(--slr-peligro); background: var(--slr-peligro); }
+.slr-hueco-hoja__fila.es-elegida .slr-hueco-hoja__marca::after { content: '✓'; color: #fff; font-weight: 900; font-size: 13px; }
+.slr-hueco-hoja__pie { position: sticky; bottom: 0; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 0 4px;
+  background: linear-gradient(transparent, var(--slr-fondo) 30%); }
+.slr-hueco-hoja__pie span { font-size: 13px; }
+.slr-pendiente-global--hueco { background: linear-gradient(135deg, #3a0d0d, #1a0606) !important; border-color: var(--slr-peligro) !important; color: #FFC9C9 !important; }
+.slr-pendiente-global--hueco small { color: var(--slr-peligro); }
