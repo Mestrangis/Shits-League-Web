@@ -58,6 +58,13 @@ export const ventanaCierre = () => enJuego(proximaJornada());
 export const pausada = () => datos.ligaInfo?.estado === 'pausada';
 // Alineación bloqueada: entre cierre y publicación, o con la liga en pausa
 export const alineacionBloqueada = () => ventanaCierre() || pausada();
+// Por qué está cerrado el mercado (null: abierto). El servidor manda; esto solo pinta
+export function motivoCierre() {
+  const e = datos.ligaInfo?.estado;
+  if (e === 'pausada') return 'pausa';
+  if (e === 'entre_temporadas' || e === 'terminada') return 'entre_temporadas';
+  return ventanaCierre() ? 'jornada' : null;
+}
 export const miPartido = j => j?.partidos.find(p => [p.local.equipo_id, p.visitante.equipo_id].includes(datos.equipo?.id)) ?? null;
 export const configLiga = () => datos.ligaInfo?.config ?? {};
 

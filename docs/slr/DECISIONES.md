@@ -1096,3 +1096,21 @@ Los goles dependen mucho de la formación (con un solo defensa la ocasión llega
 - **Historial:** solo los sobres (y las elecciones) en los que sale una épica o una legendaria.
 - `equipos.contador_garantia_premium` queda sin uso (no se borra: lo toca el reinicio de temporada).
 - **Tests:** `api-paso12.mjs` amplía la progresión con los cinco sobres; `api-paso3` y `api-paso10` dejan el premium y la garantía.
+
+## Pestaña Mercado (fase 3)
+
+### Decisiones de Marcos
+
+- Sub-pestañas Subastas · En venta · Ofertas · Sobres; pujar, comprar, ofertar, intercambiar y clausular desde el detalle; cada carta con lo que importa para decidir; filtros y orden por precio; mercado cerrado con banner y todo deshabilitado; «Haz hueco» antes de cualquier adquisición.
+
+### Decisiones mías
+
+- **`slr_mercado`** añade la plantilla ocupada, el motivo de cierre (`pausa`, `jornada`, `entre_temporadas`), el estado de la progresión, el impuesto y el porcentaje del banco: una sola llamada para pintar la pestaña.
+- **Hoja de puja:** puja mínima (el valor), saldo, cierre, botones rápidos (mínima, +10, +25 y +50 %) y los dos avisos (ciega y hueco al resolverse). Se marcan solo tus subastas (el servidor no da pujas ajenas).
+- **«Haz hueco»** (`hueco.js`) cuenta tus cartas más la elección de sobre pendiente. Se pide al pujar por primera vez en una subasta, comprar, ofertar, clausular, proponer o aceptar un intercambio que te deje con más cartas, y abrir un sobre. Tras vender, la operación sigue sola.
+- **Hojas encadenadas:** las que devuelven un valor (perfil, importe, haz hueco) lo resuelven al cerrarse (cuando el historial ya ha vuelto), no al tocar el botón; si no, la hoja siguiente se cerraba con el `popstate` de la anterior.
+- **Intercambio:** dos listas (tus cartas y las suyas, con la que miras ya marcada) y monedas por cada lado; el resumen dice cuánto le llega a cada uno tras el impuesto del 5 %.
+- **Sinergia en las listas:** «te daría sinergia ×N» si ya tienes N−1 cartas de esa colección.
+- **Filtros** plegados en el móvil (con cuántos hay activos) y abiertos en PC.
+- **Tienda:** el arte provisional de cada sobre se genera con CSS (colores y dibujo por tipo; el de colección con su emblema y su color). Los perfiles sin cartas del de posición salen deshabilitados.
+- **Tests:** `banco/mercado.mjs` (26 comprobaciones en móvil y PC, con capturas).
