@@ -69,8 +69,10 @@ export async function rpc(fn, args = {}, { silencioso = false } = {}) {
       body: JSON.stringify({ token: token(), ...args }),
     }));
   } catch (e) {
-    if (e instanceof ErrorSesion || e.message === 'Sin conexión') throw e;
+    if (e instanceof ErrorSesion) throw e;
+    if (e.message === 'Sin conexión') { e.red = true; throw e; }
     const err = new Error('Sin conexión con el servidor');
+    err.red = true;   // de red: no se sabe si llegó (las compras lo preguntan con su intento)
     if (!silencioso) toast(err.message, 'error');
     throw err;
   }
@@ -82,6 +84,15 @@ export async function rpc(fn, args = {}, { silencioso = false } = {}) {
     throw e;
   }
   return datos;
+}
+
+// Identificador de un intento de compra (o de elección): si la petición llega dos veces, el servidor no cobra otra vez
+export function nuevoIntento() {
+  if (crypto.randomUUID) return crypto.randomUUID();
+  const b = crypto.getRandomValues(new Uint8Array(16));
+  b[6] = (b[6] & 0x0f) | 0x40; b[8] = (b[8] & 0x3f) | 0x80;
+  const h = [...b].map(x => x.toString(16).padStart(2, '0')).join('');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
 }
 
 export async function leer(ruta) {

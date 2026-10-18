@@ -85,7 +85,8 @@ try {
     await clic(`[data-comprar-sobre="${tipo}"]`);
     await esperar(`!!document.querySelector('.slr-confirmar [data-si]')`, 5000);
     await ev(`[...document.querySelectorAll('.slr-hoja')].pop().querySelector('[data-si]').click(); 0`);
-    return esperar(`!!document.querySelector('[data-apertura]')`, 15000);
+    // La pantalla negra («Preparando sobre…») sale al momento: se espera a la apertura de verdad
+    return esperar(`(() => { const a = document.querySelector('[data-apertura]'); return !!a && a.dataset.fase !== 'preparando' && !a.classList.contains('es-cargando'); })()`, 15000);
   }
   async function aTienda() {
     await clic('.slr-nav__item[data-seccion="mercado"]');

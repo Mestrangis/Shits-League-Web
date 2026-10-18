@@ -21,6 +21,9 @@
      atrás). Si se cierra, la elección pendiente reaparece en Rush.
    · «Saltar» siempre a la vista: directo al resumen (o a elegir).
    · prefers-reduced-motion: sin temblores ni partículas, revelado directo.
+   · Al comprar, la pantalla negra sale al momento («Preparando sobre…», con
+     abrirEspera) y la apertura la aprovecha cuando llega la respuesta: no se
+     puede volver a tocar «Comprar» mientras tanto.
 
    RENDIMIENTO (móvil medio, CPU ×6 en DevTools; ver DECISIONES.md):
    · Solo se anima transform y opacity. Halos, brillos, grietas, línea de corte
@@ -45,7 +48,7 @@
      (aparece, toque, grieta, rasgar_inicio, rasgando, rasgado, explosion,
      reparto, carta_gira, carta_revelada, elegida, resumen, cerrar).
 ═══════════════════════════════════════════════ */
-import { rpc } from '../api.js';
+import { rpc, nuevoIntento } from '../api.js';
 import { esc, miles, abrirCapa, cerrarHasta, toast, faltan } from '../ui.js';
 import { cartaHTML, normalizarCarta, RAREZAS } from '../carta.js';
 import { sobreHTML, dorsoHTML, moverLamina } from '../sobre-arte.js';
@@ -116,6 +119,25 @@ function rayosDe(color) {
 }
 
 /* ── Pantalla ───────────────────────────────────────────────────────────── */
+// La pantalla negra al momento de confirmar la compra, antes de que responda el
+// servidor: tapa la tienda (no se puede volver a tocar «Comprar») y la apertura
+// la aprovecha (opts.espera) cuando llega el sobre.
+export function abrirEspera() {
+  const el = document.createElement('div');
+  el.className = 'slr-apertura slr-apertura--espera';
+  el.dataset.apertura = '';
+  el.dataset.fase = 'preparando';
+  el.innerHTML = '<p class="slr-apertura__espera" data-pista>Preparando sobre…</p>';
+  let cierre = null, cerrada = false;
+  abrirCapa(el, () => { cerrada = true; cierre?.(); });
+  return {
+    el,
+    get cerrada() { return cerrada; },
+    fijarCierre: f => { cierre = f; },
+    cerrar: () => { if (!cerrada) cerrarHasta(el); },
+  };
+}
+
 // r: respuesta de slr_comprar_sobre (o una vista previa con las mismas claves)
 export async function abrirApertura(ctx, r, opts = {}) {
   const cartas = r.cartas ?? r.candidatas ?? [];
@@ -123,7 +145,7 @@ export async function abrirApertura(ctx, r, opts = {}) {
     cartas, tipo: opts.tipo?.tipo ?? r.tipo, nombre: opts.tipo?.nombre ?? r.nombre ?? '',
     imagen: opts.tipo?.imagen_url ?? null, coleccion: opts.coleccion ?? null, dorso: opts.dorso ?? null,
     eleccion: r.pendiente_eleccion ? { sobre_id: r.sobre_id, caduca_en: r.caduca_en } : null,
-    vistaPrevia: !!opts.vistaPrevia, alTerminar: opts.alTerminar,
+    vistaPrevia: !!opts.vistaPrevia, alTerminar: opts.alTerminar, espera: opts.espera,
   });
 }
 
@@ -146,8 +168,10 @@ async function crearApertura(ctx, o) {
   const mejor = mejorDe(o.cartas);
   const luz = LUZ[mejor];
   const quieto = reducido();
-  const el = document.createElement('div');
-  el.className = `slr-apertura slr-apertura--${mejor} es-cargando`;
+  // Si la pantalla de espera sigue abierta, se aprovecha (misma capa y misma entrada del historial)
+  const espera = o.espera && !o.espera.cerrada ? o.espera : null;
+  const el = espera ? espera.el : document.createElement('div');
+  el.className = `slr-apertura slr-apertura--${mejor} es-cargando${espera ? ' abierta' : ''}`;
   el.style.setProperty('--luz', luz);
   el.dataset.apertura = '';
   const sobreArte = () => sobreHTML(o.tipo, { nombre: o.nombre, imagen_url: o.imagen, coleccion: o.coleccion, cartas: o.cartas.length, tam: 'l' });
@@ -173,7 +197,7 @@ async function crearApertura(ctx, o) {
       <div class="slr-apertura__cartas" data-cartas></div>
       <div class="slr-apertura__final" data-final hidden></div>
     </div>
-    <p class="slr-apertura__pista" data-pista>Preparando el sobre…</p>
+    <p class="slr-apertura__pista" data-pista>Preparando sobre…</p>
     <button class="slr-apertura__saltar" type="button" data-saltar>Saltar ⏭</button>`;
 
   const $ = s => el.querySelector(s);
@@ -194,7 +218,8 @@ async function crearApertura(ctx, o) {
   $('[data-saltar]').addEventListener('click', () => { if (listo) saltar(); else saltarAlEmpezar = true; });
 
   // ── Precarga: sobre, dorso y fotos de las cartas, decodificadas antes de animar ──
-  abrirCapa(el, limpiar);
+  if (espera) espera.fijarCierre(limpiar);
+  else abrirCapa(el, limpiar);
   const w = anchoCarta(o.cartas.length);
   await asegurarFotos([o.imagen, o.dorso, ...o.cartas.map(c => c.imagen_url && urlFoto(c.imagen_url, w))]);
   if (!vivo) return el;
@@ -418,7 +443,9 @@ async function crearApertura(ctx, o) {
 
   // ── 5. Revelado ──
   const reveladas = new Set();
-  let elegida = null;
+  let elegida = null, eligiendo = false;
+  // Un intento por sobre: si «Elegir» llega dos veces (mala conexión), el servidor da la misma carta
+  const intentoEleccion = nuevoIntento();
   // Las cartas se montan (ocultas) antes de empezar: al repartir solo se muestran
   function prepararCartas() {
     if (preparadas) return;
@@ -446,7 +473,7 @@ async function crearApertura(ctx, o) {
       if (e.target.closest('[data-elegir]')) return;
       girar(Number(c.dataset.revela));
     }));
-    cont.querySelectorAll('[data-elegir]').forEach(b => b.addEventListener('click', () => elegir(b.dataset.elegir, b)));
+    cont.querySelectorAll('[data-elegir]').forEach(b => b.addEventListener('click', () => elegir(b.dataset.elegir)));
   }
   function repartir() {
     prepararCartas();
@@ -498,17 +525,20 @@ async function crearApertura(ctx, o) {
     $('[data-cartas]').insertAdjacentHTML('beforebegin', `<p class="slr-apertura__cuenta">⏱ Te quedan <b data-cuenta-eleccion>${faltan(o.eleccion.caduca_en)}</b> para elegir</p>`);
     relojEleccion = setInterval(pinta, 15000);
   }
-  async function elegir(id, boton) {
-    if (elegida) return;
+  async function elegir(id) {
+    if (elegida || eligiendo) return;
     if (!o.vistaPrevia) {
-      boton.disabled = true;
+      // Mientras va la petición, ningún «Elegir» responde
+      eligiendo = true;
+      const botones = [...el.querySelectorAll('[data-elegir]')];
+      botones.forEach(b => { b.disabled = true; });
       try {
-        const r = await rpc('slr_elegir_carta_sobre', { sobre_id: o.eleccion.sobre_id, carta_id: id });
+        const r = await rpc('slr_elegir_carta_sobre', { sobre_id: o.eleccion.sobre_id, carta_id: id, intento: intentoEleccion });
         if (r.automatica) toast('Se había acabado el tiempo: te llevas la primera candidata', 'info');
         id = r.carta.id;
         ctx.datos.sobrePendiente = null;
         await ctx.recargar?.('yo', 'cartas');
-      } catch { boton.disabled = false; return; }
+      } catch { botones.forEach(b => { b.disabled = false; }); return; } finally { eligiendo = false; }
     }
     elegida = id;
     sonar('elegida', { id });

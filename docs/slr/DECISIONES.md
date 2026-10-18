@@ -1234,3 +1234,31 @@ Medido con `tests/slr/banco/rendimiento-apertura.mjs`: Chrome a 390×844 (DPR 2,
 - **Aviso al admin:** `slr_admin_coleccion_semana` devuelve `aviso` («Esta colección tiene cartas legendarias, que aún no están desbloqueadas (jornada 2; llegan en la jornada 6)…»), que la pantalla «Sobres» enseña. Queda apuntado en el historial.
 - **Sortear otra:** con `coleccion_id` vacío, borra la de esta semana y sortea otra con la regla. Botón «🎲 Sortear otra (con la regla)» en la pantalla «Sobres».
 - **Tests:** `api-paso16.mjs` sortea 30 veces en las jornadas 2, 4 y 6 y sin progresión, comprueba el tope de rareza de lo que sale y los avisos al elegir a mano.
+
+## Apertura en Android y compras con mala conexión
+
+### Decisiones de Marcos
+
+- En un Android real (unos 412 px) la apertura salía desplazada a la derecha y el botón «Genial» se salía de la pantalla. Todo tiene que quedar centrado y nada debe salirse en ninguna fase.
+- Con mala conexión, tocar «Comprar» varias veces abría y cobraba varios sobres. Ahora:
+  - al confirmar sale **al momento** la pantalla negra de la apertura con un «Preparando sobre…» discreto, y cuando llega la respuesta sigue la animación normal;
+  - si falla o tarda más de unos 15 s, se sale con «No se ha podido comprar el sobre, no se te ha cobrado nada», salvo que la compra sí se hubiera hecho: entonces se abre ese sobre;
+  - cada intento de compra lleva un identificador del cliente; si llega dos veces, no se cobra otra vez y se devuelve el resultado del primero. Lo mismo al elegir la carta del sobre de Elección;
+  - mientras hay una compra en curso, todos los botones de comprar quedan desactivados.
+
+### Decisiones mías
+
+- **Causa del descentrado:** el halo de detrás del sobre mide `min(120vw, 620px)`. En el móvil son 120vw, más que la pantalla, y la escena era una rejilla con una columna `auto`: la columna se ensanchaba hasta el halo y todo lo que va en ella (sobre, abanico y resumen) se centraba en esa columna, un 10 % del ancho más a la derecha. En PC el tope de 620 px lo escondía. Ahora la escena y la capa tienen una sola celda del tamaño de la pantalla (`grid-template: minmax(0, 1fr) / minmax(0, 1fr)`): el halo la desborda por los dos lados por igual y se recorta.
+- **Prueba en el navegador:** `banco/apertura-android.mjs` emula Android a 360 y 412 px con la barra de direcciones (agente de usuario de Android, alto sin la barra) y en cada fase (sobre, abanico, carta girada, todas reveladas y resumen arriba y abajo) comprueba que la capa mide lo que la pantalla, que nada se sale y que todo está centrado (±2 px).
+- **Servidor:** tabla privada `intentos_sobre` (intento, equipo, compra o elección, respuesta, anulada). `slr_comprar_sobre(…, intento)` y `slr_elegir_carta_sobre(…, intento)` guardan su respuesta; si el intento ya está, la devuelven (con `repetida: true`). Un candado por intento (`pg_advisory_xact_lock`) ordena las peticiones que llegan a la vez. El repetido se responde antes de las comprobaciones de la compra (si el primer sobre dejó la plantilla con cartas de más, el repetido no falla por eso). Sin intento, las funciones se comportan como antes. Los intentos se borran a los 7 días.
+- **Anular:** `slr_anular_intento(token, liga, intento)`. Si la compra ya se hizo, devuelve su sobre; si no, deja el intento anulado y la petición que llegue tarde se rechaza («se anuló… no se te ha cobrado nada»). Así el aviso de «no se te ha cobrado nada» es siempre verdad.
+- **Cliente:**
+  - sin conexión (`navigator.onLine` falso), el aviso sale al momento y no se envía nada;
+  - si el servidor dice que no (agotado, saldo…), no se ha cobrado: aviso con el motivo;
+  - si falla la red o pasan 15 s, se pregunta por el intento (y vale también la respuesta de la compra si llega mientras tanto);
+  - si ni eso se puede saber, se avisa («Si llegó a hacerse, se abrirá cuando vuelvas a la tienda con conexión»), el intento se guarda en el navegador y, al volver a la tienda, se resuelve: si se hizo, «Tu compra sí llegó a hacerse» y se abre ese sobre.
+- **La pantalla de espera** es la misma capa (y la misma entrada del historial) que luego usa la apertura. Si el jugador la cierra con el botón atrás antes de que llegue el sobre, el sobre se abre en una capa nueva al llegar.
+- **Elección:** un intento por sobre; mientras va la petición, ningún «Elegir» responde, y si falla por la red se puede volver a tocar con el mismo intento.
+- **Tests:**
+  - `api-paso17.mjs`: dos veces y cuatro a la vez con el mismo intento (un cobro, el mismo sobre), anular antes y después de comprar, intentos de otro jugador y la elección repetida;
+  - `banco/apertura-android.mjs`: red lenta con toques repetidos (un sobre, un cobro), compra que tarda más de la espera pero se hizo, sin conexión, y compra que queda sin saber y se abre al volver a la tienda.

@@ -1937,8 +1937,8 @@ html.slr-sin-seleccion input, html.slr-sin-seleccion textarea { -webkit-user-sel
    Solo se anima transform y opacity: los brillos, halos, grietas, la línea de
    corte y el color de fondo son capas ya pintadas que cambian de opacidad o
    escala (ver la cabecera de js/slr/pantallas/apertura.js). */
-.slr-apertura { --luz: #fff; position: absolute; inset: 0; z-index: 30; overflow: hidden;
-  display: grid; place-items: center; touch-action: none; user-select: none; -webkit-user-select: none;
+.slr-apertura { --luz: #fff; position: absolute; inset: 0; z-index: 30; overflow: hidden; box-sizing: border-box;
+  display: grid; place-items: center; grid-template: minmax(0, 1fr) / minmax(0, 1fr); touch-action: none; user-select: none; -webkit-user-select: none;
   background: radial-gradient(70% 55% at 50% 45%, #0a1f13 0%, #020805 70%); animation: slr-ap-entrar .35s ease-out; }
 @keyframes slr-ap-entrar { from { opacity: 0; } }
 .slr-apertura.es-cargando .slr-apertura__escena { opacity: 0; }
@@ -1954,7 +1954,10 @@ html.slr-sin-seleccion input, html.slr-sin-seleccion textarea { -webkit-user-sel
 .slr-apertura__lienzo { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 6; }
 .slr-apertura__destello { position: absolute; inset: 0; pointer-events: none; z-index: 7; opacity: 0;
   background: radial-gradient(circle at 50% 45%, #fff 0, var(--luz) 35%, transparent 75%); }
-.slr-apertura__escena { position: relative; z-index: 3; width: 100%; height: 100%; display: grid; place-items: center; will-change: transform; }
+/* Una sola celda del tamaño de la pantalla: el halo (120vw) la desborda centrado y se recorta,
+   en vez de ensanchar la columna (con una columna «auto», todo quedaba desplazado un 10 % a la derecha) */
+.slr-apertura__escena { position: relative; z-index: 3; width: 100%; height: 100%; display: grid; place-items: center; will-change: transform;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr); }
 
 /* Sobre */
 .slr-apertura__sobre { position: relative; grid-area: 1 / 1; width: min(64vw, 330px); aspect-ratio: 3 / 5; cursor: pointer; will-change: transform; }
@@ -2054,6 +2057,12 @@ html.slr-sin-seleccion input, html.slr-sin-seleccion textarea { -webkit-user-sel
   font-family: 'Anton', sans-serif; font-size: 20px; letter-spacing: .05em; text-transform: uppercase; color: #fff; text-shadow: 0 0 14px var(--luz); }
 .slr-apertura__saltar { position: absolute; top: calc(14px + var(--slr-top)); right: calc(14px + var(--slr-der)); z-index: 9; padding: 8px 14px; border-radius: 99px;
   background: rgba(0,0,0,.45) !important; border: 1px solid rgba(255,255,255,.25) !important; font-weight: 800; font-size: 13px; }
+
+/* Pantalla negra al comprar, mientras responde el servidor: un aviso discreto en el centro */
+.slr-apertura--espera { animation-duration: .1s; }
+.slr-apertura__espera { margin: 0; padding: 0 16px; text-align: center; font-size: 14px; font-weight: 700; letter-spacing: .04em; color: rgba(255,255,255,.55);
+  animation: slr-ap-espera 1.4s ease-in-out infinite; }
+@keyframes slr-ap-espera { 50% { opacity: .45; } }
 
 /* Resumen */
 .slr-apertura__final { position: absolute; inset: 0; z-index: 8; overflow-y: auto; display: flex; flex-direction: column; align-items: center; gap: 12px;
