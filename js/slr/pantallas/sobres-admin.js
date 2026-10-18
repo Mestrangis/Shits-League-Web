@@ -62,6 +62,9 @@ export async function abrirSobresAdmin(ctx) {
           <select class="slr-input" data-col-semana>${listaColecciones().map(k => `<option value="${k.id}" ${k.id === col?.id ? 'selected' : ''}>${esc(k.nombre)}</option>`).join('')}</select>
           <button class="slr-btn" type="button" data-col-guardar>Cambiar</button>
         </div>
+        <p class="slr-suave">Con la progresión activa, al azar solo salen colecciones cuya mejor carta ya esté desbloqueada
+          (con épicas, desde la J4; con legendarias, desde la J6). A mano puedes poner cualquiera.</p>
+        <button class="slr-btn slr-btn--fantasma" type="button" data-col-sortear>🎲 Sortear otra (con la regla)</button>
       </section>
 
       <section class="slr-tarjeta">
@@ -117,8 +120,16 @@ export async function abrirSobresAdmin(ctx) {
 
   // Colección de la semana
   el.querySelector('[data-col-guardar]').addEventListener('click', e => conEspera(e.currentTarget, async () => {
-    await rpc('slr_admin_coleccion_semana', { liga_id: liga, coleccion_id: el.querySelector('[data-col-semana]').value });
-    toast('Colección de la semana cambiada', 'ok');
+    const r = await rpc('slr_admin_coleccion_semana', { liga_id: liga, coleccion_id: el.querySelector('[data-col-semana]').value });
+    if (r.aviso) toast(`Aviso: ${r.aviso}`, 'error');
+    else toast('Colección de la semana cambiada', 'ok');
+  }).catch(() => {}));
+
+  el.querySelector('[data-col-sortear]').addEventListener('click', e => conEspera(e.currentTarget, async () => {
+    const r = await rpc('slr_admin_coleccion_semana', { liga_id: liga, coleccion_id: null });
+    const k = listaColecciones().find(x => x.id === r.coleccion_id);
+    if (k) el.querySelector('[data-col-semana]').value = k.id;
+    toast(k ? `Colección de la semana: ${k.nombre}` : 'Ninguna colección cumple la regla ahora mismo', k ? 'ok' : 'error');
   }).catch(() => {}));
 
   // Dorso

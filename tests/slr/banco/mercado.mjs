@@ -269,6 +269,22 @@ try {
   check(/250/.test(contador ?? '') && /28/.test(contador ?? ''), `contador del Modo pruebas con el catálogo objetivo: «${contador?.slice(0, 90)}»`);
   await foto('10-modo-pruebas', '[data-catalogo-objetivo]');
 
+  // Sobres (admin): colección de la semana con la progresión en la J2
+  await clic('[data-pruebas="sobres"]');
+  await esperar(`!!document.querySelector('[data-col-sortear]')`, 8000);
+  const conLeg = (await leer(`disenos_carta?select=coleccion_id&rareza=eq.legendaria&activo=eq.true&liga_prueba_id=is.null&coleccion_id=not.is.null&limit=1`)).datos[0]?.coleccion_id;
+  await ev(`(() => { const s = document.querySelector('[data-col-semana]'); s.value = ${JSON.stringify(conLeg)}; return s.value; })()`);
+  await clic('[data-col-guardar]');
+  check(await esperar(`[...document.querySelectorAll('.slr-toast')].some(t => /legendarias.*jornada 6/.test(t.textContent))`, 8000),
+    'Sobres: elegir a mano una colección con legendarias en la J2 avisa');
+  await foto('11-sobres-aviso', '[data-col-sortear]');
+  await clic('[data-col-sortear]');
+  check(await esperar(`[...document.querySelectorAll('.slr-toast')].some(t => /^Colección de la semana: /.test(t.textContent.trim()))`, 8000),
+    'Sobres: «Sortear otra» elige una con la regla');
+  const elegida = (await leer(`colecciones_semana?select=coleccion_id&liga_id=eq.${L}&order=elegida_en.desc&limit=1`)).datos[0]?.coleccion_id;
+  check(elegida && elegida !== conLeg, 'la sorteada no es la de las legendarias');
+  await cerrarHoja();
+
   console.log('\nMercado cerrado');
   await rpcOk('slr_prueba_pausar', { token: U.token, liga_id: L, ahora: new Date().toISOString() });
   await ev(`import('/js/slr/rush.js').then(r => r.recargar('liga')).then(() => 0)`);

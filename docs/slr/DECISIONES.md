@@ -1216,3 +1216,21 @@ Medido con `tests/slr/banco/rendimiento-apertura.mjs`: Chrome a 390×844 (DPR 2,
 - **Modo pruebas:** `slr_prueba_sorteo` sortea n veces (de 1 a 20.000; mejor por lotes de 1.000) sin dar ninguna carta y cuenta las rarezas.
 - **Cartas creadas desde una liga de prueba:** nacen inactivas en el catálogo y el sorteo no las saca (ya era así). Por eso el test usa las colecciones reales.
 - **Tests:** `api-paso15.mjs` calcula la regla para cada composición real (colecciones y perfiles) y la compara con el sorteo, con las probabilidades de la tienda, con la candidata forzada y con la progresión.
+
+## Colección de la semana y progresión
+
+### Decisiones de Marcos
+
+- Se mantiene la regla del sorteo de rareza: si no queda nada de la rareza sorteada ni de las inferiores, se sube a la siguiente que quede.
+- Una colección solo puede salir como colección de la semana si la rareza más alta de **todas** sus cartas (libres o no) está desbloqueada por la progresión en ese momento. Con la progresión activa: una colección con alguna legendaria no sale antes de la jornada 6 y una con épicas, antes de la 4. Las que no tienen cartas altas pueden salir desde el principio.
+- Si el admin la elige a mano desde el Modo pruebas, se le avisa si no cumple la regla, pero se aplica.
+- Con la progresión apagada (beta), cualquier colección vale.
+
+### Decisiones mías
+
+- **Qué cartas cuentan:** los diseños activos de la colección (del catálogo, o de esa liga de prueba). Da igual que estén libres, en un equipo o en subasta. `rareza_maxima_coleccion(liga, colección)` y `coleccion_desbloqueada(liga, colección)`.
+- **Cuándo se mira:** al elegirla (la primera vez que hace falta en la semana o en las tareas del lunes), con la jornada de progresión de ese momento. Una vez elegida, no se cambia aunque avance la jornada.
+- **Además** tiene que tener alguna carta que pueda salir, como antes. Si ninguna colección cumple las dos cosas, esa semana no hay colección (el sobre de colección sale agotado).
+- **Aviso al admin:** `slr_admin_coleccion_semana` devuelve `aviso` («Esta colección tiene cartas legendarias, que aún no están desbloqueadas (jornada 2; llegan en la jornada 6)…»), que la pantalla «Sobres» enseña. Queda apuntado en el historial.
+- **Sortear otra:** con `coleccion_id` vacío, borra la de esta semana y sortea otra con la regla. Botón «🎲 Sortear otra (con la regla)» en la pantalla «Sobres».
+- **Tests:** `api-paso16.mjs` sortea 30 veces en las jornadas 2, 4 y 6 y sin progresión, comprueba el tope de rareza de lo que sale y los avisos al elegir a mano.
