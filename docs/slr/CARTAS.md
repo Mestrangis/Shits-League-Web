@@ -98,6 +98,30 @@ Los sobres y las subastas reparten **por rareza**: primero se sortea la rareza y
 - **Sobre de elección:** si las dos primeras candidatas son comunes, la tercera es rara o superior.
 - Con pocas raras y épicas en el catálogo, esas cartas forzadas acaban siendo legendarias: conviene que haya raras y épicas.
 
+### Progresión por jornadas
+
+Durante una temporada real, lo que puede salir en sobres y subastas mejora con las jornadas (la referencia es la próxima jornada pendiente):
+
+| Jornadas | Pueden salir |
+|---|---|
+| 1–3 | comunes y raras |
+| 4–5 | también épicas |
+| 6 en adelante | también legendarias |
+
+Además, las épicas y las legendarias **entran poco a poco**: desde la jornada 4 entran 6 épicas por jornada y desde la 6, 2 legendarias. Al empezar la temporada cada épica y legendaria libre recibe al azar su jornada de entrada (columna `cartas.libera_jornada`); hasta entonces no sale. Los pesos de cada sobre y de las subastas se aplican solo entre lo que puede salir.
+
+Todo está en `ligas.config.progresion` (tramos, cupos y el interruptor `activa`: `auto` la enciende solo en temporada real, en curso y sin modo beta). Las cláusulas, las ventas y los intercambios no se ven afectados.
+
+### Catálogo objetivo
+
+Para una liga de 18 equipos, el catálogo final debería tener:
+
+| Común | Rara | Épica | Legendaria |
+|---|---|---|---|
+| ~250 | ~80 | ~40 | 28 |
+
+Con esto y la economía de la liga (saldo 5.000, salario 1.000), la simulación de temporada da 3–4 legendarias a los mejores equipos en la jornada 15 y varias épicas a los medianos (ver DECISIONES.md). El **contador del Modo pruebas** (Perfil) enseña el progreso del catálogo hacia estos números por rareza.
+
 ## Estamina y táctica favorita
 
 Desde el motor v2.0.0 cada carta tiene dos rasgos más:
@@ -123,20 +147,20 @@ El tier fija el OVR de la carta y los poderes que propone el generador:
 
 | Tier | OVR | Poderes propuestos | Cuántas tener (liga de 18 equipos) |
 |---|---|---|---|
-| **S** | 85–95 | 2 fuertes | 4–6 |
-| **A** | 78–85 | 1 fuerte | 12–15 |
-| **B** | 72–78 | 1 simple | 25–30 |
-| **C** | 66–72 | 1 simple el 40 % de las veces | 40–50 |
-| **D** | 60–66 | ninguno | 80 |
-| **E** | 54–60 | ninguno | 80 |
-| **F** | 46–54 | ninguno | 70 |
+| **S** | 85–95 | 2 fuertes | 28 (legendarias) |
+| **A** | 78–85 | 1 fuerte | 40 (épicas) |
+| **B** | 72–78 | 1 simple | 30 |
+| **C** | 66–72 | 1 simple el 40 % de las veces | 50 |
+| **D** | 60–66 | ninguno | 85 |
+| **E** | 54–60 | ninguno | 85 |
+| **F** | 46–54 | ninguno | 80 |
 
 Por qué tantas D, E y F:
 
 - Cada equipo empieza con **11 individuales** sacadas del "bombo": las individuales **sin el 20 % más caro**.
 - Con 18 equipos son **198 cartas** solo para las plantillas iniciales, y conviene que sobren para que el reparto tenga donde elegir (±10 % de valor entre equipos) y para los sobres y las subastas.
 - Las S, A y B (y parte de las C) caen en ese 20 % caro: no entran en las plantillas iniciales, se consiguen en el mercado.
-- Resumen: unas **300 individuales**, casi todas D, E y F (comunes), y el resto repartido entre raras (C, B), épicas (A) y unas pocas legendarias (S), de cualquier tipo. El tipo ya no marca lo buena que es una carta: lo marca el tier, que da la rareza.
+- Resumen: el catálogo objetivo (~400 cartas: ~250 comunes D, E y F, ~80 raras C y B, ~40 épicas A y 28 legendarias S), de cualquier tipo. El tipo ya no marca lo buena que es una carta: lo marca el tier, que da la rareza.
 
 El catálogo beta inicial (283 cartas sin foto) se borró el 15 de octubre de 2026. El 16 de octubre hay 84 cartas, todas con foto: 82 comunes (D, E y F) y 2 legendarias (S); 48 individuales. Con 48 individuales el bombo da para 3 plantillas iniciales; para 18 equipos hacen falta unas 250. El contador de **Modo pruebas → Plantillas iniciales disponibles** dice cuántas salen ahora mismo.
 

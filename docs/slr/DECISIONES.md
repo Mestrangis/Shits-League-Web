@@ -544,7 +544,7 @@ Los goles dependen mucho de la formación (con un solo defensa la ocasión llega
   - Las hojas pequeñas, como diálogos centrados.
   - La carta arrastrada va en una capa encima de todo.
 - **Arrastre en móvil:**
-  - Mantener pulsada una carta (~300 ms) la levanta y se arrastra con inclinación; al soltar vuelve con un rebote, con vibración corta al levantarla.
+  - Mantener pulsada una carta (~300 ms) la levanta y se arrastra con inclinación; al soltar vuelve con un rebote.
   - Un toque corto abre la ficha.
   - En la alineación, la pulsación larga sigue colocando jugadores.
   - Nunca sale el menú de guardar o copiar imagen.
@@ -1045,3 +1045,33 @@ Los goles dependen mucho de la formación (con un solo defensa la ocasión llega
 - **Plantilla:** se puede ordenar por energía.
 - **Formulario de carta:** estamina y táctica favorita, propuestas por el generador mientras no se toquen a mano (siguen al perfil y a la semilla de stats). La edición múltiple las cambia también.
 - **Tests:** `tests/slr/banco/tacticas.mjs` (30 comprobaciones, con las capturas de la entrega). `banco/alineacion.mjs` ahora coloca el scroll en el campo, porque la táctica va encima; `banco/equipo.mjs` no cuenta el bloque del descanso como jugada.
+
+## Mercado, sobres y progresión: economía (fase 0)
+
+### Decisiones de Marcos
+
+- **Calibrar con el catálogo final objetivo**, no con el provisional: ~250 comunes, ~80 raras, ~40 épicas y 28 legendarias, con los valores medios medidos (común 189, rara 614, épica 1.906, legendaria 3.749).
+- **Objetivo de diseño:** el mercado mejora con la temporada; en la jornada ~15 los mejores equipos tienen 3–4 legendarias y los medios varias épicas, sin que el dinero sobre tanto como para que todos lo tengan todo.
+- **Economía: se queda la actual** (saldo 5.000, salario 1.000, participación 100, sorpresa 600/300, ojo clínico 300).
+- **Progresión con dosificación 6/2** (6 épicas por jornada desde la J4 y 2 legendarias por jornada desde la J6).
+- **Precios de los sobres por tramo** (J1–3 / J4–5 / J6+), editables desde el admin, y los pesos propuestos.
+- **Sin vibraciones** del dispositivo en ningún sitio: todo el impacto es visual.
+
+### Informe (simulación de 40 temporadas, 18 equipos, bots buenos, medios y flojos)
+
+- **El límite lo pone la oferta, no el dinero.** Sin dosificar, las épicas libres se acaban hacia la J7 y las legendarias hacia la J10–11, con cualquier salario. Subir el salario solo concentra más en los de arriba y vacía antes el bombo; limitar los sobres por jornada casi no cambia nada.
+- **Con la economía actual y la dosificación 6/2**, en la jornada 15: 1.º 4,3 legendarias, 3.º 3,1, 5.º 1,8, 6.º 1,3, 9.º 0,8 (y ~1–2 épicas los del medio). Los buenos acaban con ~2.900 de saldo: gastan casi todo.
+- Con 20 legendarias, que 4–6 equipos tengan 3–4 era imposible sin dejar al resto sin ninguna: por eso el objetivo sube a **28 legendarias**.
+- Precios por tramo calculados para ~70 % de valor esperado con el catálogo objetivo (ver CARTAS.md).
+
+## Progresión por jornadas (fase 1)
+
+### Decisiones mías
+
+- **Dosificación por turnos:** cada épica y legendaria libre recibe, al azar, su jornada de entrada (`cartas.libera_jornada`, `libera_temporada`). Se asigna la primera vez que se sortea algo en la temporada (`asignar_cupos`, llamado desde el sorteo), y también a las que vuelven libres sin turno a mitad de temporada (van a la cola). Así es determinista y la tienda puede decir cuántas entran esta jornada.
+- **Interruptor:** `progresion.activa` = `auto` (encendida solo con la liga `en_curso` y sin `modo_beta`), `true` o `false`. `progresion.jornada_prueba` fuerza la jornada de referencia; las dos se cambian con `slr_admin_progresion` (Modo pruebas).
+- **Jornada de referencia:** la de prueba, o la próxima pendiente (programada, cerrada o simulada) de la temporada actual; si no queda ninguna, la siguiente a la última.
+- **Sorteo único** `sortear_carta` (con progresión y filtros de perfil y colección para los sobres nuevos). `sortear_carta_libre` lo llama, así que las tandas de subastas y los sobres ya respetan la progresión. Los pesos se aplican entre las rarezas que pueden salir y tienen cartas (renormalizados).
+- **Contador del Modo pruebas:** además de las plantillas iniciales, el progreso del catálogo hacia el objetivo por rareza (`bombo_plantillas.catalogo_rarezas`).
+- **Vibraciones quitadas** (levantar una carta, arrastrar en la alineación y entrar en modo selección).
+- **Tests:** `api-paso12.mjs` (tramos, turnos de entrada, tandas que solo sacan lo que puede salir e interruptor).

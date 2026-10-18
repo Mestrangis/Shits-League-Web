@@ -455,7 +455,6 @@ function levantar() {
   capaArrastre().appendChild(copia);
   l.copia = copia;
   l.carta.classList.add('is-origen');
-  if (l.tipo !== 'mouse') navigator.vibrate?.(15);
   pintarLevantada();
 }
 

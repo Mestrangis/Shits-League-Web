@@ -1754,3 +1754,11 @@ html.slr-sin-seleccion input, html.slr-sin-seleccion textarea { -webkit-user-sel
 .slr-ficha__energia { display: flex; justify-content: center; min-height: 16px; }
 .slr-ficha__energia .slr-energia { flex-wrap: wrap; justify-content: center; row-gap: 2px; }
 .slr-cronica__tacticas > .slr-cronica__cruce { align-items: center; }
+
+/* Modo pruebas: progreso del catálogo hacia el objetivo */
+.slr-catalogo-objetivo { display: flex; flex-direction: column; gap: 5px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--slr-borde); }
+.slr-catalogo-objetivo > span { font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--slr-suave); }
+.slr-catalogo-objetivo__fila { display: grid; grid-template-columns: 90px 1fr auto; align-items: center; gap: 8px; font-size: 12px; border: none !important; }
+.slr-catalogo-objetivo__fila i { height: 6px; border-radius: 99px; background: rgba(255,255,255,.08); overflow: hidden; }
+.slr-catalogo-objetivo__fila b { display: block; height: 100%; background: currentColor; border-radius: inherit; }
+.slr-catalogo-objetivo__fila em { font-style: normal; font-weight: 700; color: var(--slr-texto); }

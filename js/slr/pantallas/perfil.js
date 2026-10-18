@@ -152,8 +152,22 @@ async function jugarJornada(boton, liga) {
 }
 
 // Plantillas iniciales completas que salen de las individuales libres del bombo
-// (sin el 20 % más caro); si no llegan, el reparto tira de las caras
+// (sin el 20 % más caro); si no llegan, el reparto tira de las caras.
+// Debajo, el progreso del catálogo hacia el objetivo para 18 equipos (CARTAS.md)
 const EQUIPOS_OBJETIVO = 18;
+const CATALOGO_OBJETIVO = { comun: 250, rara: 80, epica: 40, legendaria: 28 };
+const NOMBRE_RAREZA = { comun: 'Comunes', rara: 'Raras', epica: 'Épicas', legendaria: 'Legendarias' };
+function progresoCatalogo(cat = {}) {
+  return `<div class="slr-catalogo-objetivo" data-catalogo-objetivo>
+    <span>Catálogo objetivo (${EQUIPOS_OBJETIVO} equipos)</span>
+    ${Object.entries(CATALOGO_OBJETIVO).map(([r, obj]) => {
+      const n = cat[r] ?? 0;
+      return `<div class="slr-catalogo-objetivo__fila slr-chip-rareza--${r}">
+        <small>${NOMBRE_RAREZA[r]}</small><i><b style="width:${Math.min(100, (100 * n) / obj).toFixed(1)}%"></b></i>
+        <em>${miles(n)}/${miles(obj)}</em></div>`;
+    }).join('')}
+  </div>`;
+}
 function contadorBombo(b) {
   const faltan = Math.max(0, EQUIPOS_OBJETIVO * b.por_equipo - b.bombo);
   return `<div class="slr-bombo ${b.equipos < 2 ? 'es-corto' : ''}" data-bombo>
@@ -161,6 +175,7 @@ function contadorBombo(b) {
     <small>${miles(b.bombo)} individuales libres en el bombo (${b.por_equipo} por equipo)` +
       `${b.caras ? ` · con las ${miles(b.caras)} caras de reserva, ${b.equipos_con_caras}` : ''}` +
       `${faltan ? ` · para ${EQUIPOS_OBJETIVO} equipos faltan ${miles(faltan)}` : ''}</small>
+    ${progresoCatalogo(b.catalogo_rarezas)}
   </div>`;
 }
 

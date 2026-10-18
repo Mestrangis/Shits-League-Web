@@ -124,7 +124,6 @@ export function seleccionMultiple({ contenedor, barra, visibles, alAccion }) {
     if (!bloqueado) { bloquearSeleccion(); bloqueado = true; }   // sin selección de texto mientras se mantiene pulsado
     pulsacion = { id: el.dataset.selId, x: e.clientX, y: e.clientY, t: setTimeout(() => {
       entrar(); alternar(pulsacion.id); cambiar();
-      navigator.vibrate?.(15);
       anularClic = Date.now() + 500;
       pulsacion = null;
     }, PULSACION_MS) };

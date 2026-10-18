@@ -611,7 +611,6 @@ function activarArrastre(cont, ctx, porId) {
     a.el.classList.add('es-origen');
     raiz.classList.add('slr-arrastrando');
     try { a.el.setPointerCapture(a.pointerId); } catch { /* el puntero ya no existe */ }
-    navigator.vibrate?.(12);
     colocar();
   }
 
