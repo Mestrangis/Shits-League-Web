@@ -85,17 +85,17 @@ La rareza dice **lo buena que es** una carta y es lo que marca el **marco**. Sal
 | A | **épica** | morado |
 | S | **legendaria** | dorado, con un brillo que lo recorre |
 
-Los sobres y las subastas reparten **por rareza**: primero se sortea la rareza y luego una carta de esa rareza al azar. Solo entran las rarezas que tengan alguna carta libre. Los pesos están en la configuración de la liga (`ligas.config`):
+Los sobres y las subastas reparten **por rareza**: primero se sortea la rareza y luego una carta de esa rareza al azar. Solo entran las rarezas que pueden salir (progresión) y tienen alguna carta libre. Los pesos de los sobres están en la tabla `tipos_sobre` (se editan desde *Modo pruebas → Sobres*) y los de las subastas en `ligas.config.pesos_mercado`:
 
 | | Común | Rara | Épica | Legendaria |
 |---|---|---|---|---|
-| Sobre básico | 85 | 13 | 2 | 0 |
-| Sobre premium | 60 | 30 | 8 | 2 |
-| Sobre de elección | 45 | 35 | 15 | 5 |
+| Sobres sencillo y básico | 72 | 22 | 5 | 1 |
+| Sobre de elección | 50 | 34 | 12 | 4 |
+| Sobres de posición y de colección | 55 | 30 | 12 | 3 |
 | Subastas (cada carta de la tanda) | 70 | 22 | 7 | 1 |
 
-- **Garantía premium:** tras 2 sobres premium seguidos sin ninguna rara o superior, la primera carta del siguiente es rara o superior.
 - **Sobre de elección:** si las dos primeras candidatas son comunes, la tercera es rara o superior.
+- El sobre premium y su garantía ya no existen.
 - Con pocas raras y épicas en el catálogo, esas cartas forzadas acaban siendo legendarias: conviene que haya raras y épicas.
 
 ### Progresión por jornadas
@@ -387,3 +387,27 @@ No toques las tablas `cartas` ni `equipos` a mano. Para eso está **Rush → Per
 - la quita de la alineación del dueño anterior;
 - cancela sus ventas, ofertas y subastas;
 - lo deja en el historial.
+
+## Sobres
+
+Hay cinco tipos (tabla `tipos_sobre`). Cada liga usa los de por defecto hasta que su administrador edita alguno desde *Modo pruebas → Sobres*: entonces esa liga tiene su propia fila para ese tipo y los demás no cambian.
+
+| Sobre | Cartas | Precio J1–3 / J4–5 / J6+ |
+|---|---|---|
+| Sencillo | 1 al azar | 500 / 600 / 650 |
+| Básico | 3 al azar | 1.500 / 1.800 / 2.000 |
+| Elección | 3 candidatas (al menos una rara o mejor); te quedas con una en 10 minutos | 950 / 1.600 / 2.100 |
+| De posición | 1 del perfil que elijas (portero, defensa, control o atacante; las equilibradas valen para cualquiera) | 550 / 850 / 950 |
+| De colección | 1 de la colección de la semana | 600 / 850 / 900 |
+
+- El precio va por tramo de la progresión (~70 % de valor esperado con el catálogo objetivo). Sin progresión (modo beta o preparación) se cobra el del último tramo.
+- **Colección de la semana:** cada lunes a las 00:00 (hora de la liga) se elige al azar una colección con cartas que puedan salir. El administrador la cambia a mano desde el Modo pruebas.
+- Solo salen cartas libres (sin dueño, fuera de subasta y no reservadas) y que la progresión deja salir. Si un sobre no se puede llenar, sale **AGOTADO** y no se puede comprar; la tienda dice cuántas quedan cuando importa («Quedan 3 cartas de Dormidito»).
+- Hace falta hueco para todas las cartas del sobre (el de elección, para una: la pendiente ocupa su hueco).
+- Al historial público solo van los sobres en los que sale una épica o una legendaria.
+
+### Imágenes de los sobres y del dorso
+
+- **Sobre:** PNG vertical de unos **600 × 1000 px** (proporción 3:5), en `tipos_sobre.imagen_url`. Si el sobre tiene forma propia (bordes rasgados, esquinas recortadas…), con **fondo transparente**. La app pone encima el brillo laminado y el rasgado, así que la imagen va sin efectos. Sin imagen, la app dibuja un diseño provisional distinto por tipo. El de colección usa una plantilla con el emblema y el color de la colección de la semana.
+- **Dorso de las cartas:** PNG o JPG de proporción **5:7** (p. ej. 500 × 700 px), en `ajustes.dorso_carta_url` (o el de la liga, `ligas.config.dorso_url`). El color de la rareza lo añade la app. Sin imagen, un dorso provisional generado por código.
+- Se suben desde *Modo pruebas → Sobres* a Cloudinary con el preset `slr_cartas`, como las fotos de las cartas.

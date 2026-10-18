@@ -1075,3 +1075,24 @@ Los goles dependen mucho de la formación (con un solo defensa la ocasión llega
 - **Contador del Modo pruebas:** además de las plantillas iniciales, el progreso del catálogo hacia el objetivo por rareza (`bombo_plantillas.catalogo_rarezas`).
 - **Vibraciones quitadas** (levantar una carta, arrastrar en la alineación y entrar en modo selección).
 - **Tests:** `api-paso12.mjs` (tramos, turnos de entrada, tandas que solo sacan lo que puede salir e interruptor).
+
+## Sobres nuevos (fase 2)
+
+### Decisiones de Marcos
+
+- Fuera el sobre premium y su garantía. Cinco tipos (sencillo, básico, elección, de posición y de colección) en una tabla editable por el admin, con precios por tramo y los pesos propuestos.
+- Solo cartas libres y con progresión; si un sobre no se puede llenar, AGOTADO.
+
+### Decisiones mías
+
+- **`tipos_sobre` por liga:** filas por defecto (`liga_id` nulo) y, al editar desde el Modo pruebas, una fila propia de la liga para ese tipo (`tipos_sobre_liga` da la propia o la de por defecto). Así un administrador de una liga de prueba no cambia los sobres de la liga principal.
+- **Precio por tramo:** `precios` son tres enteros (J1–3, J4–5, J6+); `tramo_precio` cuenta cuántos tramos de la progresión ha alcanzado la jornada de referencia. Sin progresión, el último.
+- **De posición:** la carta tiene que ser del perfil elegido o equilibrada. **De colección:** de la colección de la semana (`colecciones_semana`, una fila por liga y lunes; la elige `coleccion_semana()` la primera vez que hace falta y las tareas del mercado cada lunes).
+- **Probabilidades en la tienda:** las de la primera carta, con los pesos renormalizados entre las rarezas que pueden salir y tienen cartas para ese sobre.
+- **Agotado:** con menos cartas disponibles que las del sobre; el de posición, solo si no queda ninguna de ningún perfil (cada perfil sin cartas sale deshabilitado al elegir).
+- **Respuesta de la compra:** cada carta con `nueva` (si no estaba en tu álbum) y el progreso de su colección (`tengo`/`total`), y `mejor_rareza` para la animación.
+- **Elección pendiente:** `slr_sobre_pendiente` y la tienda la devuelven con las candidatas, para que reaparezca en cualquier pantalla al recargar. El plazo queda fijo en 10 minutos.
+- **Dorso de las cartas:** `ajustes.dorso_carta_url` (global) o `ligas.config.dorso_url` (la liga, desde el Modo pruebas).
+- **Historial:** solo los sobres (y las elecciones) en los que sale una épica o una legendaria.
+- `equipos.contador_garantia_premium` queda sin uso (no se borra: lo toca el reinicio de temporada).
+- **Tests:** `api-paso12.mjs` amplía la progresión con los cinco sobres; `api-paso3` y `api-paso10` dejan el premium y la garantía.

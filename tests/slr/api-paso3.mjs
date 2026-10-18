@@ -280,7 +280,7 @@ try {
     const antes = await cartasLiga(L);
     const enSubasta = new Set((await subastasAbiertas(L)).map(s => s.carta_id));
     const sb = await rpcOk('slr_comprar_sobre', { token: B1.token, liga_id: L, tipo: 'basico' });
-    check(sb.precio === 1500 && sb.cartas.length === 3, 'sobre básico: 1.500 y 3 cartas');
+    check(sb.precio === 2000 && sb.cartas.length === 3, 'sobre básico: 2.000 (sin progresión, el precio del último tramo) y 3 cartas');
     check(sb.cartas.every(c => ['normal', 'foil', 'brillante', 'plateada'].includes(c.acabado) && !('variante' in c)),
       `las cartas traen su acabado (${sb.cartas.map(c => c.acabado).join(', ')}) y ya no «variante»`);
     check(sb.cartas.every(c => { const a = antes.find(x => x.id === c.id); return !a || (!a.equipo_id && !enSubasta.has(c.id)); }),
@@ -290,7 +290,7 @@ try {
     const alb = (await leer(`album?usuario_id=eq.${B1.usuario}&liga_id=eq.${L}&via_adquisicion=eq.sobre_basico`)).datos;
     check(sb.cartas.every(c => alb.some(a => a.diseno_id === c.diseno_id)), 'entradas de álbum con vía «sobre_basico»');
     await subirA(B1, 13);
-    rechaza(await rpc('slr_comprar_sobre', { token: B1.token, liga_id: L, tipo: 'basico' }), 'como mucho 12', 'sobre con 13 cartas: rechazado (hace falta tener 12 o menos)');
+    rechaza(await rpc('slr_comprar_sobre', { token: B1.token, liga_id: L, tipo: 'basico' }), 'No tienes hueco', 'sobre con 13 cartas: rechazado (hacen falta 3 huecos)');
     rechaza(await rpc('slr_comprar_sobre', { token: B1.token, liga_id: L, tipo: 'oro' }), 'Tipo de sobre no válido', 'tipo de sobre inexistente: rechazado');
 
     await bajarA(B3, 11);
@@ -299,29 +299,8 @@ try {
     rechaza(await rpc('slr_comprar_sobre', { token: B3.token, liga_id: L, tipo: 'basico' }), 'Saldo insuficiente', 'sobre sin saldo: rechazado');
     await darDinero(B3, s3 - 100);
 
-    // Garantía premium: se fuerza la primera carta a rara o superior tras 2 sin ninguna (si queda alguna libre)
-    await darDinero(B2, 200000);
-    let vista = false, n = 0, contadorOk = true;
-    while (!vista && n < 120) {   // con el catálogo corto salen más especiales: hacen falta más sobres
-      await bajarA(B2, 12);
-      const enSub = new Set((await subastasAbiertas(L)).map(s => s.carta_id));
-      const cont = (await leer(`equipos?select=contador_garantia_premium&id=eq.${B2.equipo}`)).datos[0].contador_garantia_premium;
-      const hayRara = (await cartasLiga(L)).some(c => !c.equipo_id && !c.reservada_por && !enSub.has(c.id) && c.disenos_carta.rareza !== 'comun');
-      const p = await rpcOk('slr_comprar_sobre', { token: B2.token, liga_id: L, tipo: 'premium' });
-      n++;
-      if (p.cartas.some(c => enSub.has(c.id))) contadorOk = false;
-      const especial = p.cartas.some(c => c.rareza !== 'comun');
-      const contDespues = (await leer(`equipos?select=contador_garantia_premium&id=eq.${B2.equipo}`)).datos[0].contador_garantia_premium;
-      if (contDespues !== (especial ? 0 : cont + 1)) contadorOk = false;
-      if (cont >= 2) {
-        vista = true;
-        if (hayRara) check(p.garantia_aplicada && p.cartas[0].rareza !== 'comun',
-          `garantía premium: con el contador en ${cont}, la primera carta es ${p.cartas[0].rareza} (sobre nº ${n})`);
-        else check(!p.garantia_aplicada, `con el contador en ${cont} pero sin raras o superiores libres, no se aplica (sobre nº ${n})`);
-      } else if (p.garantia_aplicada) contadorOk = false;
-    }
-    check(vista, 'se llegó a aplicar la garantía premium');
-    check(contadorOk, `el contador vuelve a 0 con una rara o mejor y si no suma 1; ninguna carta en subasta (${n} sobres premium)`);
+    // El premium y su garantía ya no existen (sobres nuevos: api-paso12)
+    rechaza(await rpc('slr_comprar_sobre', { token: B2.token, liga_id: L, tipo: 'premium' }), 'no válido', 'el sobre premium ya no existe');
 
     // Sobre de elección: manual
     await bajarA(B3, 13);
@@ -362,7 +341,7 @@ try {
   {
     await subirA(B3, 15);
     check((await misCartas(B3)).length === 15, 'Bot Tres tiene 15 cartas');
-    rechaza(await rpc('slr_comprar_sobre', { token: B3.token, liga_id: L, tipo: 'eleccion' }), 'llena', 'sobre de elección con 15: rechazado');
+    rechaza(await rpc('slr_comprar_sobre', { token: B3.token, liga_id: L, tipo: 'eleccion' }), 'No tienes hueco', 'sobre de elección con 15: rechazado');
     const venta = await rpcOk('slr_poner_en_venta', { token: B1.token, carta_id: (await misCartas(B1))[0].id, precio: 50 });
     rechaza(await rpc('slr_comprar_venta', { token: B3.token, venta_id: venta.venta_id }), 'llena', 'comprar una venta con 15: rechazado');
     const objetivo = (await misCartas(B1))[1];

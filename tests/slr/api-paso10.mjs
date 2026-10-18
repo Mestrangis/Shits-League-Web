@@ -7,8 +7,8 @@
 // · Tipos grupo y especial.
 // · Edición múltiple: recuento sin aplicar, una transacción, triggers (valor,
 //   rareza, regenerar), alcance y nombres repetidos.
-// · Sobres por rareza: el básico nunca da legendarias (peso 0); la garantía
-//   premium da al menos una rara o superior; las subastas de la tanda solo
+// · Sobres por rareza: los pesos están en tipos_sobre; el sobre
+//   de elección trae al menos una rara o superior; las subastas de la tanda solo
 //   sacan rarezas con peso; la configuración tiene los pesos por rareza.
 import { env, exigirEnv, rpc, rpcOk, leer, check, rechaza, seccion, resultado } from './api-util.mjs';
 
@@ -32,10 +32,11 @@ try {
   U.equipo = (await rpcOk('slr_unirse_liga', { token: U.token, codigo_invitacion: liga.codigo_invitacion, nombre_equipo: 'Bot Uno FC' })).equipo.id;
   D.equipo = (await rpcOk('slr_unirse_liga', { token: D.token, codigo_invitacion: liga.codigo_invitacion, nombre_equipo: 'Bot Dos FC' })).equipo.id;
   const cfg = (await leer(`ligas?select=config&id=eq.${L}`)).datos[0].config;
-  check(JSON.stringify(Object.keys(cfg.pesos_mercado).sort()) === JSON.stringify([...ORDEN].sort()) &&
-        cfg.sobres.basico.pesos.legendaria === 0 && cfg.sobres.premium.pesos.rara === 30 && cfg.sobres.eleccion.pesos.legendaria === 5,
-    `pesos por rareza en la configuración: básico ${Object.values(cfg.sobres.basico.pesos).join('/')}, premium ${Object.values(cfg.sobres.premium.pesos).join('/')}, ` +
-    `elección ${Object.values(cfg.sobres.eleccion.pesos).join('/')}, subastas ${Object.values(cfg.pesos_mercado).join('/')}`);
+  const def = Object.fromEntries((await leer('tipos_sobre?select=tipo,pesos&liga_id=is.null')).datos.map(t => [t.tipo, t.pesos]));
+  check(JSON.stringify(Object.keys(cfg.pesos_mercado).sort()) === JSON.stringify([...ORDEN].sort()) && !cfg.sobres &&
+        def.basico.legendaria === 1 && def.eleccion.rara === 34 && def.posicion.epica === 12,
+    `pesos por rareza: sobres en tipos_sobre (básico ${Object.values(def.basico).join('/')}, elección ${Object.values(def.eleccion).join('/')}), ` +
+    `subastas ${Object.values(cfg.pesos_mercado).join('/')}`);
 
   seccion('Colecciones');
   const EMBLEMA = 'https://res.cloudinary.com/dnd3g3zgm/image/upload/v1/emblema-de-prueba.png';
@@ -158,20 +159,18 @@ try {
     basicas.push(...s.cartas.map(c => c.rareza));
     await vender(D.equipo, D.token);
   }
-  check(basicas.length === 24 && !basicas.includes('legendaria'), `24 cartas de sobres básicos, ninguna legendaria (peso 0): ${[...new Set(basicas)].join(', ')}`);
-  // Garantía premium: con el contador en 2, la primera carta es rara o superior (si queda alguna libre)
-  let vista = false;
-  for (let i = 0; i < 60 && !vista; i++) {
-    const cont = (await leer(`equipos?select=contador_garantia_premium&id=eq.${D.equipo}`)).datos[0].contador_garantia_premium;
-    const hayRara = (await libres()).some(c => c.disenos_carta.rareza !== 'comun');
-    const s = await rpcOk('slr_comprar_sobre', { token: D.token, liga_id: L, tipo: 'premium' });
-    if (cont >= 2 && hayRara) {
-      vista = true;
-      check(s.garantia_aplicada && s.cartas[0].rareza !== 'comun', `garantía premium: con el contador en ${cont}, la primera carta es ${s.cartas[0].rareza}`);
+  check(basicas.length === 24 && basicas.every(r => ORDEN.includes(r)), `24 cartas de sobres básicos: ${[...new Set(basicas)].join(', ')}`);
+  // Elección: si las dos primeras candidatas son comunes, la tercera es rara o mejor (si queda alguna)
+  if ([...rarezasLibres].some(r => r !== 'comun')) {
+    let ok = true;
+    for (let i = 0; i < 6; i++) {
+      await vender(D.equipo, D.token);
+      const s = await rpcOk('slr_comprar_sobre', { token: D.token, liga_id: L, tipo: 'eleccion' });
+      if (!s.cartas.some(c => c.rareza !== 'comun')) ok = false;
+      await rpcOk('slr_elegir_carta_sobre', { token: D.token, sobre_id: s.sobre_id, carta_id: s.cartas[0].id });
     }
-    await vender(D.equipo, D.token);
+    check(ok, 'sobre de elección: siempre al menos una candidata rara o mejor');
   }
-  if (!vista) check(rarezasLibres.size === 1, 'no hubo ocasión de ver la garantía (no quedan raras o superiores libres)');
 } catch (e) {
   resultado.fallos++;
   console.log(`\n  ✖ Error inesperado: ${e.message}`);
