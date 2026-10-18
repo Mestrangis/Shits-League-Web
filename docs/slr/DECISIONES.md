@@ -1114,3 +1114,22 @@ Los goles dependen mucho de la formación (con un solo defensa la ocasión llega
 - **Filtros** plegados en el móvil (con cuántos hay activos) y abiertos en PC.
 - **Tienda:** el arte provisional de cada sobre se genera con CSS (colores y dibujo por tipo; el de colección con su emblema y su color). Los perfiles sin cartas del de posición salen deshabilitados.
 - **Tests:** `banco/mercado.mjs` (26 comprobaciones en móvil y PC, con capturas).
+
+## Apertura de sobres (fase 4)
+
+### Decisiones de Marcos
+
+- Pantalla completa también en PC: flotar con brillo laminado, cargar con 3 toques (temblor creciente, grietas de luz y color de la mejor rareza), rasgar deslizando el dedo por la línea, explosión, cartas boca abajo en abanico con giro 3D (épicas y legendarias más lentas y con más luz), «¡NUEVA!», resumen con colección y valor; elección con cuenta atrás que reaparece al recargar; «Saltar» siempre; movimiento reducido; sin sonidos todavía pero con puntos de enganche; sin vibraciones.
+- Admin: pantalla «Sobres» (editar tipos, subir imagen y dorso, colección de la semana y vista previa de apertura).
+
+### Decisiones mías
+
+- **Un solo bucle** (`requestAnimationFrame`) mueve el balanceo, el temblor (en la escena entera) y las partículas (un `canvas` a pantalla completa, con mezcla aditiva y un tope de 420 partículas). Al cerrar se cancela el bucle y se quitan los temporizadores y los escuchadores.
+- **Color de la luz:** blanco (común), azul (rara), morado (épica) y dorado (legendaria), según la mejor carta del sobre (en la elección, la mejor candidata).
+- **Rasgado:** se empieza cerca de la línea (15 % de la altura) y de donde se quedó el corte. Cada movimiento a la derecha añade un punto que sigue la altura del dedo (dentro de una franja) con dientes alternos (zigzag). Al llegar al 96 %, las dos piezas del sobre se recortan con `clip-path` siguiendo ese mismo corte y salen despedidas.
+- **Revelado:** al girarse, el abanico se abre un poco (las cartas se ven enteras) y se enderezan. El giro dura 0,65 s (común), 0,75 s (rara), 1,15 s (épica) y 1,6 s (legendaria). Las épicas y legendarias se «cargan» antes de girar y sueltan partículas, temblor y destello a mitad del giro.
+- **Elección pendiente:** botón flotante dorado en cualquier pantalla de Rush (`rush.js` lo comprueba al entrar y tras cada apertura); tocándolo se abre directa en las candidatas.
+- **Sonidos:** `SONIDOS.alSonar(nombre, datos)` en `apertura.js` recibe `aparece`, `toque`, `grieta`, `rasgar_inicio`, `rasgando`, `rasgado`, `explosion`, `reparto`, `carta_gira`, `carta_revelada`, `elegida`, `resumen` y `cerrar`.
+- **Vista previa (admin):** usa cartas reales de la liga (la mejor, de la rareza elegida si existe) sin llamar al servidor para comprar ni elegir.
+- **Capas:** la apertura es una capa más (el botón atrás la cierra). `[hidden]` se fuerza dentro de la apertura: el resumen, invisible pero con `display: flex`, tapaba los toques.
+- **Tests:** `banco/apertura.mjs` (31 comprobaciones, móvil y PC; con `VIDEO=1` guarda los fotogramas de una apertura completa).

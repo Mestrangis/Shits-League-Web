@@ -12,7 +12,8 @@ import { RAREZAS } from '../carta.js';
 import { sobreHTML } from '../sobre-arte.js';
 import { asegurarHueco } from '../hueco.js';
 import { abrirApertura, abrirEleccionPendiente } from './apertura.js';
-import { bannerProgresion, bannerCierre } from './mercado.js';
+import { bannerProgresion } from './mercado.js';
+import { pintarPendiente, comprobarPendiente } from '../rush.js';
 
 const PERFIL = { portero: ['🧤', 'Portero'], defensa: ['🛡️', 'Defensa'], control: ['🎯', 'Control'], atacante: ['⚡', 'Atacante'] };
 const pct = p => `${p >= 0.1 ? Math.round(p * 100) : (Math.round(p * 1000) / 10).toString().replace('.', ',')} %`;
@@ -37,6 +38,8 @@ export async function pintarTienda(cont, ctx, { mercado, alCambiar }) {
   cont.innerHTML = '<div class="slr-cargando-bloque"></div>';
   const tienda = await rpc('slr_tienda', { liga_id: ctx.datos.liga.id });
   ctx.datos.sobrePendiente = tienda.pendiente;
+  ctx.datos.dorsoUrl = tienda.dorso_url;
+  pintarPendiente();
   const cerrado = !!mercado?.cerrado;
   cont.innerHTML = `
     ${bannerProgresion(tienda.progresion)}
@@ -103,5 +106,7 @@ async function comprar(t, tienda, ctx, alCambiar) {
     r = await rpc('slr_comprar_sobre', { liga_id: ctx.datos.liga.id, tipo: t.tipo, perfil });
   } catch { return; }
   await ctx.recargar('yo', 'cartas');
-  await abrirApertura(ctx, r, { tipo: t, coleccion: tienda.coleccion_semana, dorso: tienda.dorso_url, alTerminar: alCambiar });
+  if (r.pendiente_eleccion) { ctx.datos.sobrePendiente = { sobre_id: r.sobre_id, caduca_en: r.caduca_en, candidatas: r.cartas }; pintarPendiente(); }
+  await abrirApertura(ctx, r, { tipo: t, coleccion: tienda.coleccion_semana, dorso: tienda.dorso_url,
+    alTerminar: () => { comprobarPendiente(); alCambiar?.(); } });
 }

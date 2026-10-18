@@ -19,6 +19,7 @@ import * as mercado from './pantallas/mercado.js';
 import * as liga from './pantallas/liga.js';
 import * as perfil from './pantallas/perfil.js';
 import * as alineacion from './pantallas/alineacion.js';
+import { abrirEleccionPendiente } from './pantallas/apertura.js';
 
 const ES_LOCAL = ['localhost', '127.0.0.1'].includes(location.hostname);
 
@@ -372,6 +373,24 @@ export async function abrir(op) {
   }
   await navegar(seccion);
   cargarAvisos();
+  comprobarPendiente();
+}
+
+/* ── Elección de sobre pendiente: reaparece en cualquier pantalla ──────── */
+export async function comprobarPendiente() {
+  if (!datos.liga || !datos.equipo) return;
+  datos.sobrePendiente = await rpc('slr_sobre_pendiente', { liga_id: datos.liga.id }, { silencioso: true }).catch(() => null);
+  pintarPendiente();
+}
+export function pintarPendiente() {
+  if (!raiz) return;
+  raiz.querySelector('.slr-pendiente-global')?.remove();
+  const p = datos.sobrePendiente;
+  if (!p || new Date(p.caduca_en) <= Date.now()) return;
+  const b = crear(`<button class="slr-pendiente-global" type="button" data-pendiente-global>🎴 Tienes una elección de sobre pendiente <small>Elegir ›</small></button>`);
+  b.addEventListener('click', () => abrirEleccionPendiente({ navegar, recargar, pintar, datos }, p,
+    { dorso: datos.dorsoUrl ?? null, alTerminar: () => { comprobarPendiente(); pintar(); } }));
+  raiz.appendChild(b);
 }
 
 export const recargarAvisos = cargarAvisos;

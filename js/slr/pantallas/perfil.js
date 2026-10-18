@@ -15,6 +15,7 @@ import { abrirPlantillas } from './plantillas-admin.js';
 import { abrirMuestrario } from './muestrario.js';
 import { abrirEditorCarta } from './editor-carta.js';
 import { abrirColecciones } from './colecciones-admin.js';
+import { abrirSobresAdmin } from './sobres-admin.js';
 import { TIPOS } from '../carta.js';
 
 const TIPOS_MOV = {
@@ -83,6 +84,7 @@ export async function panelAdmin(cont, ctx) {
         ${sinTemporada && bots.length ? `<button class="slr-btn slr-btn--pruebas" type="button" data-pruebas="quitar">− Quitar bot (${esc(bots[bots.length - 1].nombre)})</button>` : ''}
         <button class="slr-btn slr-btn--pruebas" type="button" data-pruebas="nueva-carta">➕ Nueva carta</button>
         <button class="slr-btn slr-btn--pruebas" type="button" data-pruebas="colecciones">🏷 Colecciones</button>
+        <button class="slr-btn slr-btn--pruebas" type="button" data-pruebas="sobres">📦 Sobres</button>
         <button class="slr-btn slr-btn--pruebas" type="button" data-pruebas="plantillas">🃏 Plantillas: dar o quitar cartas</button>
         <button class="slr-btn slr-btn--pruebas" type="button" data-pruebas="muestrario">✨ Muestrario de cartas</button>
         <button class="slr-btn slr-btn--peligro" type="button" data-pruebas="borrar-beta">Borrar cartas beta (sin foto)</button>
@@ -96,6 +98,7 @@ export async function panelAdmin(cont, ctx) {
     else if (b.dataset.pruebas === 'nueva-carta') abrirEditorCarta(ctx).catch(e => toast(e.message, 'error'));
     else if (b.dataset.pruebas === 'muestrario') abrirMuestrario(ctx);
     else if (b.dataset.pruebas === 'colecciones') abrirColecciones(ctx).catch(e => toast(e.message, 'error'));
+    else if (b.dataset.pruebas === 'sobres') abrirSobresAdmin(ctx).catch(e => toast(e.message, 'error'));
     else if (b.dataset.pruebas === 'borrar-beta') borrarBeta(b, ctx);
     else accionPruebas(b, ctx);
   }));
