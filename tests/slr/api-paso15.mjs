@@ -51,7 +51,7 @@ try {
   rechaza(await rpc('slr_prueba_sorteo', { token: U.token, liga_id: L, pesos: PESOS_BAS, n: 0 }), 'entre 1 y', 'slr_prueba_sorteo: n fuera de rango');
 
   // Composición de las cartas libres por colección y por perfil
-  const libres = (await leer(`cartas?select=id,disenos_carta(rareza,perfil,coleccion_id,activo)&liga_id=eq.${L}&equipo_id=is.null&limit=5000`)).datos
+  const libres = (await leer(`cartas?select=id,disenos_carta(rareza,perfil,coleccion_id,activo,ata,def,con)&liga_id=eq.${L}&equipo_id=is.null&limit=5000`)).datos
     .filter(c => c.disenos_carta.activo);
   const grupos = new Map();
   for (const c of libres) {
@@ -78,7 +78,8 @@ try {
 
   seccion('Perfiles (sobre de posición)');
   for (const perfil of ['portero', 'atacante']) {
-    const hay = new Set(libres.filter(c => [perfil, 'equilibrado'].includes(c.disenos_carta.perfil)).map(c => c.disenos_carta.rareza));
+    const st = { portero: 'def', atacante: 'ata' }[perfil];   // la posición es la stat más alta
+    const hay = new Set(libres.filter(({ disenos_carta: d }) => d[st] >= Math.max(d.ata, d.def, d.con)).map(c => c.disenos_carta.rareza));
     const s = await sorteo({ token: U.token, liga_id: L, pesos: PESOS_COL, filtro: { perfil }, n });
     const e = esperada(PESOS_COL, hay);
     check(cerca(s, e, 0.03), `${perfil}: ${R.map(r => `${r} ${pct(s[r])}`).join(', ')} (esperado ${R.map(r => pct(e[r])).join(' / ')})`);

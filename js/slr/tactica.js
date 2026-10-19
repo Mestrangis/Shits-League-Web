@@ -10,18 +10,20 @@ import { coleccion } from './colecciones.js';
 import { GASTO_ESTAMINA, GESTIONES, RECUPERA, RECUPERA_SIN_JUGAR, tramoEnergia } from './energia.js';
 
 const pct = x => `${Math.round((x - 1) * 100)} %`;
+// Icono de una táctica: el SVG de img/slr/tacticas como máscara, del color del texto (.slr-ico-tac en el CSS)
+const ico = t => `<i class="slr-ico-tac slr-ico-tac--${t}" aria-hidden="true"></i>`;
 
 export const TACTICA = Object.freeze({
   posesion: {
-    nombre: 'Posesión', icono: '🔄',
+    nombre: 'Posesión', icono: ico('posesion'),
     frase: `Tener el balón: +${pct(CONFIG.TACTICA_POSESION)} al disputarlo. Sus contras no llevan bonus.`,
   },
   contraataque: {
-    nombre: 'Contraataque', icono: '🏹',
+    nombre: 'Contraataque', icono: ico('contraataque'),
     frase: `Atrás y a la contra: contras +${pct(CONFIG.CONTRAATAQUE_CONTRA)} y defensa +${pct(CONFIG.DEFENSA_CONTRA)}.`,
   },
   presion: {
-    nombre: 'Presión', icono: '🔥',
+    nombre: 'Presión', icono: ico('presion'),
     frase: `Robar arriba: +${pct(CONFIG.PRESION_ROBO)} cuando saca el rival. Cansa más (×1,3 de energía).`,
   },
 });
@@ -102,7 +104,7 @@ export function abrirAyuda() {
       <p>Cada partido de liga gasta energía según la <b>estamina</b> de la carta: alta ${GASTO_ESTAMINA.alta}, media ${GASTO_ESTAMINA.media},
         baja ${GASTO_ESTAMINA.baja}. Con presión, ×1,3; si juega solo una parte, la mitad.
         Tras cada jornada todas recuperan ${RECUPERA}, y las que no jugaron, ${RECUPERA_SIN_JUGAR} más. Los amistosos no cansan.
-        Cada temporada empieza con todas a 100. Rotar compensa: <b>Sugerir alineación</b> ya tiene en cuenta la energía.</p>
+        Cada temporada empieza con todas a 100. Rotar compensa.</p>
       <p><b>Gestión</b> (los cambios del descanso):</p>
       <ul class="slr-ayuda__lista">${Object.values(GESTIONES).map(g => `<li><b>${g.nombre}</b>: ${esc(g.frase)}</li>`).join('')}</ul>
       <p>En «Avanzado» puedes programar hasta 3 cambios (quién sale, quién entra y cuándo). Si los programas, la gestión no se aplica.</p>

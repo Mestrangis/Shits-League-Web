@@ -985,7 +985,7 @@ Los goles dependen mucho de la formación (con un solo defensa la ocasión llega
   - quien descansa recupera como si no jugase nadie;
   - los amistosos la usan, pero no la gastan ni la recuperan;
   - al cambiar de dueño se conserva, y en cada temporada nueva vuelve a 100.
-- **Bots:** táctica al azar, gestión normal, y rotan con la regla de «Sugerir alineación».
+- **Bots:** táctica al azar, gestión normal, y rotan con la alineación por defecto (2-2-2 por stats y energía; el botón «Sugerir alineación» se quitó después).
 - **Privacidad:** la táctica de un partido solo se ve cuando está publicado; la guardada para el próximo, nunca.
 
 ### Decisiones mías
@@ -1038,7 +1038,7 @@ Los goles dependen mucho de la formación (con un solo defensa la ocasión llega
 - **«Avanzado»:** la fila plegada resume lo que hay dentro (p. ej. «plan B · 1 cambio») y sigue abierta al repintar.
   - Con cambios programados, la gestión avisa de que no se aplica, porque el motor los usa en su lugar.
   - Al guardar se quitan, avisando, los cambios que ya no cuadran con la alineación; si falta quién sale o quién entra, no se guarda.
-- **«Sugerir alineación»** usa la misma función que el servidor para los bots (`sugerirAlineacion`, en `js/slr/energia.js`). No guarda: queda como «Cambios sin guardar».
+- **«Sugerir alineación»** (quitado después, ver «Cambios pequeños: mercado, alineación, posición e iconos») usaba la misma función que el servidor para los bots (`sugerirAlineacion`, en `js/slr/energia.js`). No guarda: queda como «Cambios sin guardar».
 - **Stats en la alineación:** el valor de cada hueco y las fuerzas de línea ya incluyen la tocada, la energía, la táctica favorita y la sinergia. Los bonus de táctica no, porque dependen del momento del partido.
 - **Crónica:** el descanso es un bloque propio entre las jugadas 5 y 6, con el plan B, los cambios (con la energía de quien sale y el motivo: reservón, cansado o programado con su condición) y las tácticas y el cruce de la segunda parte. Al final, por equipo: energía antes → después del partido (sin la recuperación) y el gasto.
 - **Amistosos de otros:** en la lista de la pestaña Liga se ve el resultado, pero no se abre la crónica: el servidor no la da, porque lleva las tácticas guardadas de quien lo jugó.
@@ -1262,3 +1262,24 @@ Medido con `tests/slr/banco/rendimiento-apertura.mjs`: Chrome a 390×844 (DPR 2,
 - **Tests:**
   - `api-paso17.mjs`: dos veces y cuatro a la vez con el mismo intento (un cobro, el mismo sobre), anular antes y después de comprar, intentos de otro jugador y la elección repetida;
   - `banco/apertura-android.mjs`: red lenta con toques repetidos (un sobre, un cobro), compra que tarda más de la espera pero se hizo, sin conexión, y compra que queda sin saber y se abre al volver a la tienda.
+
+## Cambios pequeños: mercado, alineación, posición e iconos
+
+### Decisiones de Marcos
+
+- **Mercado:** las pestañas van en este orden: Subastas, Sobres, En venta, Ofertas.
+- **Fuera «Sugerir alineación»**, con su código.
+- **Sobre de posición:** la posición de una carta es solo su stat más alta: Ataque si es ATA, Control si es CON, y Portero y Defensa si es DEF. Portero y Defensa usan exactamente las mismas cartas, pero siguen siendo dos opciones. Si empatan las stats más altas, la carta vale para las dos posiciones. El número de cartas de cada opción se calcula igual. (Antes salía en un sobre de ataque una carta con más CON que ATA: iba por el perfil y las «equilibradas» valían para cualquiera.)
+- **Test del sorteo** en los sobres de posición y de colección: primero la rareza con sus pesos, luego la carta dentro de esa rareza, con los fallbacks de siempre (inferior; si no hay, superior). Unas 10.000 veces.
+- **Iconos de tácticas:** `img/slr/tacticas/tactica-posesion.svg`, `tactica-contraataque.svg` y `tactica-presion.svg` (de un color) sustituyen a todos los emojis de las tácticas y toman el color del texto.
+
+### Decisiones mías
+
+- **Posición en el servidor:** `encaja_posicion(posición, ata, def, con)`, usada en `sortear_carta` y en `disponibles_sobre` (de ahí salen el recuento de la tienda y el «agotado»). El `perfil` de la carta ya no interviene en el sobre (sigue usándose para la táctica favorita y el generador). La descripción por defecto del sobre de posición se actualiza (si nadie la había cambiado) y la hoja de elegir posición lo explica; «Atacante» pasa a llamarse «Ataque».
+- **«Sugerir alineación»:** fuera el botón, su función (`sugerirAlineacion` de `energia.js`), sus estilos y la mención en la ayuda. Los bots siguen alineándose con `crear_alineacion_por_defecto` en el servidor; el gemelo en JS vive ahora solo en `api-paso11.mjs`, que comprueba que el servidor lo hace bien.
+- **Iconos:** una máscara CSS (como los emblemas) pintada con `currentColor`: `<i class="slr-ico-tac slr-ico-tac--presion">`, a 1,25 em del texto (unos 16 px en textos de 13 px), a 28 px en los botones de táctica y al tamaño de la cabeza en la carta (en blanco, con sombra). Están en la alineación, la táctica favorita de las cartas (carta, ficha, listas y mercado), la crónica, la ficha del rival, la ayuda y el editor del admin (vista previa). En los desplegables (`<option>`, que no admiten iconos) queda solo el nombre. El de Posesión es el más fino de los tres: a 16 px se distingue, pero por debajo pierde detalle.
+- **Tests:**
+  - `api-paso18.mjs`: el recuento de la tienda por stats, 10.000 sorteos por posición y por colección comparados con la regla (y con lo que saldría «carta a carta»), y 20 sobres de posición comprados de verdad (todas de su stat más alta). Ejemplo: «Down» (7 cartas, 1 legendaria) da la legendaria un 3,2 %, su peso (3 %), no 1 de cada 7 (14,3 %).
+  - `banco/tacticas.mjs`: sin «Sugerir», iconos en SVG y ningún emoji de táctica (alineación, crónica, ayuda).
+  - `banco/mercado.mjs`: el orden de las pestañas.
+  - `api-paso12` y `api-paso15` siguen la regla nueva de posición.

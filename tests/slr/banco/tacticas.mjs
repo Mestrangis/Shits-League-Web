@@ -1,5 +1,5 @@
 // Prueba en Chrome headless (móvil 390×844) del motor v2 en la interfaz:
-// táctica, gestión, «Avanzado» (plan B y cambios programados), «Sugerir
+// táctica, gestión, «Avanzado» (plan B y cambios programados), sin «Sugerir
 // alineación», energía en las cartas (alineación, listas, plantilla y ficha),
 // táctica favorita resaltada, sinergias, crónica (tácticas, cruce, descanso y
 // energía gastada), ficha del rival con sus tácticas y la ayuda.
@@ -10,7 +10,6 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { env, rpcOk, rpc, leer } from '../api-util.mjs';
-import { sugerirAlineacion } from '../../../js/slr/energia.js';
 
 const SALIDA = process.env.SALIDA;
 const dormir = ms => new Promise(r => setTimeout(r, ms));
@@ -138,6 +137,14 @@ try {
   check(cambio.n === 1 && cambio.umbral === '50' && cambio.sale && cambio.entra, `cambio programado: sale un titular, entra un suplente, «si su energía baja de» ${cambio.umbral}`);
   check(/la gestión no se aplica/.test(cambio.aviso), 'con cambios programados, avisa de que la gestión no se aplica');
   await foto('1-equipo-tactica-avanzado', '.slr-tactica', 1500);
+  check(!(await ev(`!!document.querySelector('[data-sugerir]')`)), 'sin el botón «Sugerir alineación»');
+  // Iconos de táctica: SVG (máscara del color del texto), ningún emoji
+  const sinEmojis = () => ev(`!/[\\u{1F504}\\u{1F3F9}\\u{1F525}]/u.test(document.body.innerText + [...document.querySelectorAll('option')].map(o => o.textContent).join(''))`);
+  const iconos = await ev(`(() => { const l = [...document.querySelectorAll('.slr-ico-tac')]; const r = l[0]?.getBoundingClientRect();
+    return { n: l.length, mask: l[0] ? getComputedStyle(l[0]).maskImage || getComputedStyle(l[0]).webkitMaskImage : '', w: Math.round(r?.width ?? 0) }; })()`);
+  check(iconos.n > 0 && /tactica-(posesion|contraataque|presion)\.svg/.test(iconos.mask) && await sinEmojis(),
+    `alineación: ${iconos.n} iconos de táctica en SVG (${iconos.w} px) y ningún emoji`);
+  await foto('1b-iconos-tactica', '.slr-tacticas');
 
   await clic('[data-guardar]');
   await esperar(`!document.querySelector('.slr-estado--sucio')`, 10000);
@@ -148,19 +155,6 @@ try {
     `guardadas con la alineación: ${guardadas.tactica}, ${guardadas.gestion}, plan B ${guardadas.plan_b?.condicion} → ${guardadas.plan_b?.tactica}, 1 cambio`);
   const recarga = await ev(`({ activa: document.querySelector('.slr-tactica-btn.activo')?.dataset.tactica, cambios: document.querySelectorAll('.slr-cambio').length })`);
   check(recarga.activa === 'contraataque' && recarga.cambios === 1, 'tras guardar, la pantalla muestra lo guardado');
-
-  console.log('\nSugerir alineación');
-  await clic('[data-sugerir]');
-  await dormir(400);
-  const sugerida = await ev(`(() => { const id = (l, i) => document.querySelector('.slr-campo-juego .slr-hueco[data-l="' + l + '"][data-i="' + i + '"]')?.dataset.id ?? null;
-    return { formacion: document.querySelector('[data-formacion].activo')?.dataset.formacion,
-      ids: [id('por', 0), id('def', 0), id('def', 1), id('med', 0), id('med', 1), id('del', 0), id('del', 1)] }; })()`);
-  const s = sugerirAlineacion(cartasU.map(c => ({ id: c.id, ATA: c.disenos_carta.ata, DEF: c.disenos_carta.def, CON: c.disenos_carta.con, energia: c.energia })));
-  check(sugerida.formacion === '2-2-2' && JSON.stringify(sugerida.ids) === JSON.stringify([s.huecos.por, ...s.huecos.def, ...s.huecos.med, ...s.huecos.del]),
-    'propone el 2-2-2 por stats y energía (el mismo que calcula el servidor para los bots)');
-  check(await ev(`!!document.querySelector('.slr-estado--sucio')`), 'la sugerencia no se guarda sola: queda como «Cambios sin guardar»');
-  await clic('[data-deshacer]');
-  await dormir(300);
 
   console.log('\nEnergía en las listas, la plantilla y la ficha');
   await clic('.slr-campo-juego .slr-hueco[data-l="med"][data-i="0"]');
@@ -206,6 +200,7 @@ try {
   check(cr.energia >= 14, `energía gastada al final (${cr.energia} cartas)`);
   check(!cr.aviso, 'el partido se reproduce igual en el navegador');
   await foto('5-cronica-tacticas', '.slr-cronica');
+  check(await sinEmojis() && await ev(`document.querySelectorAll('.slr-cronica .slr-ico-tac').length > 0`), 'crónica: iconos en SVG, ningún emoji');
   await foto('6-cronica-descanso', '.slr-jugada--descanso');
   await foto('7-cronica-energia', '.slr-cronica__energia');
   await cerrarHoja();
@@ -231,6 +226,7 @@ try {
   const ayuda = await ev(`document.querySelector('.slr-ayuda').textContent`);
   check(/Tácticas/.test(ayuda) && /Energía/.test(ayuda) && /Sinergias/.test(ayuda) && /Táctica favorita/.test(ayuda), '«¿Cómo funciona?»: tácticas, táctica favorita, energía y sinergias');
   await foto('9-ayuda', '.slr-ayuda', 1700);
+  check(await sinEmojis(), 'ayuda: ningún emoji de táctica');
   await cerrarHoja();
 
   console.log('\nPC');

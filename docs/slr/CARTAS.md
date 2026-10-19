@@ -397,7 +397,7 @@ Hay cinco tipos (tabla `tipos_sobre`). Cada liga usa los de por defecto hasta qu
 | Sencillo | 1 al azar | 500 / 600 / 650 |
 | Básico | 3 al azar | 1.500 / 1.800 / 2.000 |
 | Elección | 3 candidatas (al menos una rara o mejor); te quedas con una en 10 minutos | 950 / 1.600 / 2.100 |
-| De posición | 1 del perfil que elijas (portero, defensa, control o atacante; las equilibradas valen para cualquiera) | 550 / 850 / 950 |
+| De posición | 1 de la posición que elijas (portero, defensa, control o ataque): la de su stat más alta (portero y defensa: DEF; con empate, vale para las dos) | 550 / 850 / 950 |
 | De colección | 1 de la colección de la semana | 600 / 850 / 900 |
 
 - El precio va por tramo de la progresión (~70 % de valor esperado con el catálogo objetivo). Sin progresión (modo beta o preparación) se cobra el del último tramo.

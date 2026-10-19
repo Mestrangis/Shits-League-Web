@@ -116,8 +116,9 @@ try {
   rechaza(await rpc('slr_comprar_sobre', { token: U.token, liga_id: L, tipo: 'posicion' }), 'Elige el perfil', 'de posición sin perfil: rechazado');
   await hueco(1);
   const pos = await rpcOk('slr_comprar_sobre', { token: U.token, liga_id: L, tipo: 'posicion', perfil: 'defensa' });
-  check(pos.cartas.length === 1 && ['defensa', 'equilibrado'].includes(pos.cartas[0].perfil) && pos.precio === 550,
-    `de posición (defensa): ${pos.cartas[0].nombre}, perfil ${pos.cartas[0].perfil}, 550`);
+  const dPos = (await leer(`cartas?select=disenos_carta(ata,def,con)&id=eq.${pos.cartas[0].id}`)).datos[0].disenos_carta;
+  check(pos.cartas.length === 1 && dPos.def >= Math.max(dPos.ata, dPos.con) && pos.precio === 550,
+    `de posición (defensa): ${pos.cartas[0].nombre}, DEF es su stat más alta (${dPos.ata}/${dPos.def}/${dPos.con}), 550`);
   await hueco(1);
   const col = await rpcOk('slr_comprar_sobre', { token: U.token, liga_id: L, tipo: 'coleccion' });
   check(col.cartas[0].coleccion?.id === t.coleccion_semana.id && col.cartas[0].coleccion.tengo >= 1,

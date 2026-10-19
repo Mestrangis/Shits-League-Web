@@ -23,7 +23,7 @@ import { asegurarHueco, plantillaOcupada, plantillaMaxima } from '../hueco.js';
 import { abrirDetalle } from './detalle.js';
 import { pintarTienda } from './tienda.js';
 
-const SUBS = { subastas: 'Subastas', venta: 'En venta', ofertas: 'Ofertas', sobres: 'Sobres' };
+const SUBS = { subastas: 'Subastas', sobres: 'Sobres', venta: 'En venta', ofertas: 'Ofertas' };
 const ORDEN_RAREZA = ['comun', 'rara', 'epica', 'legendaria'];
 const CIERRE = {
   pausa: ['Liga en pausa', 'El mercado vuelve cuando se reanude la liga.'],
@@ -95,7 +95,7 @@ function filtrosHTML() {
     <label><span>Rareza</span><select class="slr-input" data-f="rareza">${op(RAREZAS, filtros.rareza, 'Todas')}</select></label>
     <label><span>Colección</span><select class="slr-input" data-f="coleccion">${op(Object.fromEntries(listaColecciones().map(k => [k.id, k.nombre])), filtros.coleccion, 'Todas')}</select></label>
     <label><span>Perfil</span><select class="slr-input" data-f="perfil">${op(PERFILES, filtros.perfil, 'Todos')}</select></label>
-    <label><span>Táctica favorita</span><select class="slr-input" data-f="tactica">${op(Object.fromEntries(Object.entries(TACTICA).map(([k, t]) => [k, `${t.icono} ${t.nombre}`])), filtros.tactica, 'Todas')}</select></label>
+    <label><span>Táctica favorita</span><select class="slr-input" data-f="tactica">${op(Object.fromEntries(Object.entries(TACTICA).map(([k, t]) => [k, t.nombre])), filtros.tactica, 'Todas')}</select></label>
     <label><span>Orden</span><select class="slr-input" data-f="orden">
       ${[['tiempo', sub === 'subastas' ? 'Cierre' : 'Recientes'], ['precio_asc', 'Precio ↑'], ['precio_desc', 'Precio ↓'], ['ovr', 'OVR']]
         .map(([k, v]) => `<option value="${k}" ${k === filtros.orden ? 'selected' : ''}>${v}</option>`).join('')}</select></label>

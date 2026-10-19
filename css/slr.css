@@ -1648,7 +1648,14 @@ html.slr-sin-seleccion input, html.slr-sin-seleccion textarea { -webkit-user-sel
 }
 .slr-carta--xs .slr-carta__energia { height: 4cqw; bottom: 2%; }
 .slr-carta__energia i { display: block; height: 100%; border-radius: inherit; background: var(--e); box-shadow: 0 0 1.5cqw var(--e); }
-.slr-carta__favorita { display: block; font-size: 8.5cqw; line-height: 1; filter: drop-shadow(0 .5cqw 1cqw rgba(0,0,0,.75)); }
+/* Iconos de táctica (img/slr/tacticas, de un color): máscara pintada con el color del texto */
+.slr-ico-tac { display: inline-block; flex: none; width: 1.25em; height: 1.25em; vertical-align: -.25em; background: currentColor;
+  -webkit-mask: var(--ico) center / contain no-repeat; mask: var(--ico) center / contain no-repeat; }
+.slr-ico-tac--posesion { --ico: url("../img/slr/tacticas/tactica-posesion.svg"); }
+.slr-ico-tac--contraataque { --ico: url("../img/slr/tacticas/tactica-contraataque.svg"); }
+.slr-ico-tac--presion { --ico: url("../img/slr/tacticas/tactica-presion.svg"); }
+.slr-carta__favorita { display: block; font-size: 8.5cqw; line-height: 1; color: #fff; filter: drop-shadow(0 .5cqw 1cqw rgba(0,0,0,.75)); }
+.slr-carta__favorita .slr-ico-tac { width: 1em; height: 1em; vertical-align: top; }
 .slr-carta--xs .slr-carta__favorita { font-size: 13cqw; }
 .slr-carta--encaja .slr-carta__marco { box-shadow: 0 0 0 2px var(--slr-oro), 0 0 12px rgba(255,201,74,.55); }
 /* Barra con número (fichas y listas) */
@@ -1670,6 +1677,7 @@ html.slr-sin-seleccion input, html.slr-sin-seleccion textarea { -webkit-user-sel
   background: rgba(3,12,7,.55) !important; border: 1px solid var(--slr-borde) !important; transition: transform .12s, box-shadow .12s;
 }
 .slr-tactica-btn__icono { font-size: 28px; line-height: 1; }
+.slr-tactica-btn__icono .slr-ico-tac { width: 1em; height: 1em; vertical-align: top; }
 .slr-tactica-btn b { font-family: 'Anton', sans-serif; font-weight: 400; font-size: 17px; letter-spacing: .04em; text-transform: uppercase; }
 .slr-tactica-btn small { font-size: 11px; line-height: 1.35; color: var(--slr-suave); }
 .slr-tactica-btn__cruce { color: var(--slr-texto) !important; opacity: .8; }
@@ -1709,8 +1717,6 @@ html.slr-sin-seleccion input, html.slr-sin-seleccion textarea { -webkit-user-sel
 .slr-cambio .slr-input { width: 100%; min-width: 0; }
 @media (max-width: 520px) { .slr-cambio label:nth-of-type(3) { grid-column: 1 / -1; } }
 .slr-cambio__quitar { position: absolute; top: 6px; right: 6px; width: 26px; height: 26px; border-radius: 50%; color: var(--slr-suave); }
-.slr-sugerir { display: flex; flex-direction: column; align-items: center; gap: 2px; }
-.slr-sugerir small { font-size: 11px; font-weight: 500; color: var(--slr-suave); }
 
 /* Chips: táctica y sinergia */
 .slr-chips-once { display: flex; flex-wrap: wrap; gap: 6px; }

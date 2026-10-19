@@ -89,6 +89,8 @@ try {
   await esperar(`!!document.querySelector('.slr-nav:not([hidden])')`, 15000);
   await clic('.slr-nav__item[data-seccion="mercado"]');
   await esperar(`!!document.querySelector('[data-sub]')`, 15000);
+  const pestanas = await ev(`[...document.querySelectorAll("[data-sub]")].map(b => b.dataset.sub).join(",")`);
+  check(pestanas === "subastas,sobres,venta,ofertas", `pestañas en orden: Subastas, Sobres, En venta, Ofertas (${pestanas})`);
   await dormir(800);
 
   console.log('\nSubastas');

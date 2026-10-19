@@ -41,7 +41,7 @@ function bloquearCompras(si) {
   });
 }
 
-const PERFIL = { portero: ['🧤', 'Portero'], defensa: ['🛡️', 'Defensa'], control: ['🎯', 'Control'], atacante: ['⚡', 'Atacante'] };
+const PERFIL = { portero: ['🧤', 'Portero'], defensa: ['🛡️', 'Defensa'], control: ['🎯', 'Control'], atacante: ['⚡', 'Ataque'] };
 const pct = p => `${p >= 0.1 ? Math.round(p * 100) : (Math.round(p * 1000) / 10).toString().replace('.', ',')} %`;
 
 function probabilidades(t) {
@@ -109,7 +109,7 @@ function elegirPerfil(t) {
   return new Promise(resolve => {
     let elegido = null;   // se resuelve al cerrar la hoja (tras el historial): así la siguiente no se cierra con ella
     const el = hoja(`
-      <p class="slr-confirmar__texto">¿Qué puesto quieres? Las cartas equilibradas valen para cualquiera.</p>
+      <p class="slr-confirmar__texto">¿Qué posición quieres? Cada carta es de la posición de su stat más alta (portero y defensa: DEF); si empata, vale para las dos.</p>
       <div class="slr-perfiles">${Object.entries(PERFIL).map(([k, [ic, nombre]]) => {
         const n = t.por_perfil?.[k] ?? 0;
         return `<button class="slr-perfil-btn" type="button" data-perfil="${k}" ${n ? '' : 'disabled'}>

@@ -15,15 +15,14 @@
    (ambos dan el bonus de participación de la próxima jornada).
    Motor v2: táctica (3 botones grandes), gestión y, plegado en «Avanzado», el
    plan B y los cambios programados; se guardan con la alineación (las tácticas
-   son privadas). «Sugerir alineación» propone un 2-2-2 con stats, energía y
-   puesto (la misma regla que los bots). La energía se ve en cada carta, las que
+   son privadas). La energía se ve en cada carta, las que
    encajan con la táctica se resaltan y la sinergia de colección sale en un chip.
 ═══════════════════════════════════════════════ */
 import { rpc, funcion, leer as leerTabla } from '../api.js';
 import { esc, hoja, cerrarCapa, conEspera, toast, hora, faltan as quedan, diaHora, bloquearSeleccion, desbloquearSeleccion } from '../ui.js';
 import { cartaHTML, describirPoder } from '../carta.js';
 import { fuerzaPosesion, fuerzaAtaque, fuerzaDefensa, probabilidadesTirador, sinergia, CONFIG } from '../motor-v2.0.0.js';
-import { factorEnergia, tramoEnergia, sugerirAlineacion, GESTIONES } from '../energia.js';
+import { factorEnergia, tramoEnergia, GESTIONES } from '../energia.js';
 import { TACTICA, ESTAMINA, CONDICION_PLAN_B, CONDICION_CAMBIO, ganaA, pierdeCon, barraEnergia, textoSinergia, abrirAyuda } from '../tactica.js';
 import { estaTocada, alineacionBloqueada, alineacionConfirmada, proximaJornada, pausada, configLiga, ventanaCierre, miPartido, enJuego } from '../rush.js';
 import { abrirDetalle } from './detalle.js';
@@ -223,7 +222,7 @@ function bloqueTactica(porId, bloqueada) {
               ${Object.entries(CONDICION_PLAN_B).map(([v, txt]) => opcion(v, txt[0].toUpperCase() + txt.slice(1), t.plan_b?.condicion)).join('')}
             </select>
             ${t.plan_b ? `<span>→</span><select class="slr-input" data-planb="tactica" ${dis}>
-              ${CONFIG.TACTICAS.filter(k => k !== t.tactica).map(k => opcion(k, `${TACTICA[k].icono} ${TACTICA[k].nombre}`, t.plan_b.tactica)).join('')}
+              ${CONFIG.TACTICAS.filter(k => k !== t.tactica).map(k => opcion(k, TACTICA[k].nombre, t.plan_b.tactica)).join('')}
             </select>` : ''}
           </div>
         </div>
@@ -272,8 +271,6 @@ function pintarTodo(cont, ctx) {
     <div class="slr-segmentos slr-formaciones" role="group" aria-label="Formación">
       ${CONFIG.FORMACIONES.map(x => `<button type="button" data-formacion="${x}" class="${x === borrador.formacion ? 'activo' : ''}" ${bloqueada ? 'disabled' : ''}>${x}</button>`).join('')}
     </div>
-    ${bloqueada ? '' : `<button class="slr-btn slr-btn--fantasma slr-sugerir" type="button" data-sugerir>✨ Sugerir alineación
-      <small>según stats, energía y puesto (no mira al rival ni la táctica)</small></button>`}
 
     <div class="slr-campo-juego">
       <div class="slr-campo-juego__lineas" aria-hidden="true"></div>
@@ -772,21 +769,6 @@ function enlazar(cont, ctx, porId, bloqueada) {
     if (campo === 'condicion') { if (c.condicion === 'energia_menor') c.umbral = c.umbral ?? 50; else delete c.umbral; }
     repintar();
   }));
-
-  // Sugerir alineación: 2-2-2 por stats, energía y puesto (como los bots)
-  cont.querySelector('[data-sugerir]')?.addEventListener('click', () => {
-    const s = sugerirAlineacion(datos.cartas.map(c => ({ id: c.id, ATA: c.ata, DEF: c.def, CON: c.con, energia: c.energia ?? 100 })));
-    borrador.formacion = s.formacion;
-    borrador.por = s.huecos.por;
-    borrador.def = s.huecos.def;
-    borrador.med = s.huecos.med;
-    borrador.del = s.huecos.del;
-    borrador.banco = [...s.banquillo, null, null, null].slice(0, 3);
-    borrador.capitan = s.capitan_id;
-    const quitados = podarCambios();
-    repintar();
-    toast(`Alineación sugerida: revísala y guárdala${quitados ? ` (se quitan ${quitados} cambios programados que ya no cuadran)` : ''}`, 'info');
-  });
 
   cont.querySelector('[data-guardar]')?.addEventListener('click', e => {
     if (titulares(borrador).some(x => !x)) { toast('Rellena todos los huecos del once antes de guardar', 'error'); return; }

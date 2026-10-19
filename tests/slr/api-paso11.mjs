@@ -8,12 +8,42 @@
 //   crónica; no gasta energía.
 // · Jornadas de liga: tácticas, cruce y participación guardadas; la energía se
 //   gasta y se recupera según la regla (también quien descansa); los bots eligen
-//   táctica al azar y rotan con «Sugerir alineación».
+//   táctica al azar y rotan con la alineación por defecto (2-2-2 por stats y energía).
 // · Una carta que cambia de dueño conserva su energía; nueva temporada: todas a 100.
 // Liga de prueba con Bot Uno (admin), Bot Dos y 3 bots: se borra al terminar.
 import { env, exigirEnv, rpc, rpcOk, leer, check, rechaza, seccion, resultado } from './api-util.mjs';
 import { SUPABASE_URL, SUPABASE_KEY } from '../../js/slr/config.js';
-import { energiaTras, sugerirAlineacion } from '../../js/slr/energia.js';
+import { energiaTras, factor100 } from '../../js/slr/energia.js';
+
+// OVR × 100 (60·s1 + 25·s2 + 15·s3)
+function ovr100(c) {
+  const [s1, s2, s3] = [c.ATA, c.DEF, c.CON].sort((a, b) => b - a);
+  return 60 * s1 + 25 * s2 + 15 * s3;
+}
+
+// Gemelo de crear_alineacion_por_defecto (la de los bots): 2-2-2 con la mejor stat de cada hueco × factor de energía
+// (POR y DEF por DEF, MED por CON, DEL por ATA), banquillo los 3 siguientes por
+// OVR × factor y capitán el titular de mayor OVR × factor. Desempates: OVR × factor
+// e id. No mira al rival ni la táctica. cartas: [{ id, ATA, DEF, CON, energia }]
+function sugerirAlineacion(cartas) {
+  const libres = cartas.map(c => ({ c, f: factor100(c.energia), o: ovr100(c) }));
+  const cmp = stat => (a, b) => b.c[stat] * b.f - a.c[stat] * a.f || b.o * b.f - a.o * a.f || (a.c.id < b.c.id ? -1 : a.c.id > b.c.id ? 1 : 0);
+  const usadas = new Set();
+  const elegir = (stat, n) => libres.filter(x => !usadas.has(x)).sort(cmp(stat)).slice(0, n).map(x => { usadas.add(x); return x; });
+  const por = elegir('DEF', 1), def = elegir('DEF', 2), med = elegir('CON', 2), del = elegir('ATA', 2);
+  const titulares = [...por, ...def, ...med, ...del];
+  const porOvr = (a, b) => b.o * b.f - a.o * a.f || (a.c.id < b.c.id ? -1 : a.c.id > b.c.id ? 1 : 0);
+  const banquillo = libres.filter(x => !usadas.has(x)).sort(porOvr).slice(0, 3);
+  const capitan = [...titulares].sort(porOvr)[0];
+  const ids = l => l.map(x => x.c.id);
+  const relleno = (l, n) => [...ids(l), ...Array(Math.max(0, n - l.length)).fill(null)];
+  return {
+    formacion: '2-2-2',
+    huecos: { por: por[0]?.c.id ?? null, def: relleno(def, 2), med: relleno(med, 2), del: relleno(del, 2) },
+    banquillo: ids(banquillo),
+    capitan_id: capitan?.c.id ?? null,
+  };
+}
 
 exigirEnv('SLR_BOT_UNO_CODIGO', 'SLR_BOT_DOS_CODIGO');
 const dormir = ms => new Promise(r => setTimeout(r, ms));
@@ -205,7 +235,7 @@ try {
     }
   }
 
-  seccion('Jornada 2: los bots rotan con «Sugerir alineación»');
+  seccion('Jornada 2: los bots rotan (alineación por defecto con la energía)');
   antes = await energias();
   const listaAntes = await cartas();
   r = await jugarJornada();
@@ -231,7 +261,7 @@ try {
         difs.push(`sugerida [${sug.map(n).join(', ')}] · real [${real.map(n).join(', ')}]`);
       }
     }
-    check(total > 0 && iguales === total, `la alineación de los bots es la de «Sugerir» con la energía (web y servidor coinciden: ${iguales}/${total})`, difs.join(' || '));
+    check(total > 0 && iguales === total, `la alineación de los bots es la regla por defecto con la energía (gemelo del test y servidor coinciden: ${iguales}/${total})`, difs.join(' || '));
   }
 
   seccion('Nueva temporada: energía a 100');
