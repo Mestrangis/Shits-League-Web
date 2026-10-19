@@ -13,6 +13,7 @@ import { campoHTML, enlazarCampo } from '../campo.js';
 import { abrirDetalle } from './detalle.js';
 import { abrirCronica } from './cronica.js';
 import { TACTICA, chipTactica } from '../tactica.js';
+import { sinVer } from '../rush.js';
 
 export async function abrirEquipo(equipoId, ctx) {
   const { datos } = ctx;
@@ -32,6 +33,9 @@ export async function abrirEquipo(equipoId, ctx) {
   const cartas = filas.map(f => ({ ...normalizarCarta(f), clausula: Math.round(f.disenos_carta.valor * Number(f.multiplicador_clausula)),
     blindada: f.blindada_hasta && new Date(f.blindada_hasta) > Date.now() })).sort((a, b) => b.ovr - a.ovr);
   const valorTotal = cartas.reduce((s, c) => s + c.valor, 0);
+  // Tu último partido sin ver no sale (ni su resultado ni sus tácticas)
+  const oculto = partidos.find(p => sinVer(p.id));
+  if (oculto) partidos.splice(partidos.indexOf(oculto), 1);
   const ultimo = partidos[0];
   const mio = equipoId === yo;
 
@@ -94,7 +98,7 @@ export async function abrirEquipo(equipoId, ctx) {
   el.querySelectorAll('[data-cronica]').forEach(b => b.addEventListener('click', () => abrirCronica(b.dataset.cronica, ctx).catch(() => {})));
   el.querySelector('[data-amistoso]')?.addEventListener('click', e => conEspera(e.currentTarget, async () => {
     const r = await funcion({ accion: 'amistoso', rival_equipo_id: equipoId });
-    toast(`Amistoso: ${r.goles.join(' – ')}`, 'ok');
+    // Sin el resultado: se reproduce solo la primera vez
     await abrirCronica(r.partido_id, ctx);
   }).catch(() => {}));
 }

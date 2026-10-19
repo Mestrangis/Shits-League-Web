@@ -1,9 +1,10 @@
 // Prueba en Chrome headless de la reproducción de partidos (Android emulado a 360 y 412 px):
 //  · Muestrario (Modo pruebas): cada escena y cada variante se reproduce y, en varios
 //    momentos, nada importante se sale de la pantalla. Capturas de cada una.
-//  · Un partido de verdad desde la crónica: «▶ Ver partido» empieza por el inicio, el tap
-//    salta al final de la escena y pasa a la siguiente, ×2, «Saltar» va al final con el
-//    resultado del partido, y al terminar se vuelve a la crónica.
+//  · Tu partido sin ver: la clasificación no cuenta esa jornada, el calendario, la pestaña
+//    Equipo y el aviso no enseñan el resultado. La primera vez se reproduce solo (desde el
+//    aviso): tap, ×2, «Saltar» al final con el resultado; al terminar, la crónica, y ya
+//    cuenta como visto (también tras recargar: otra vez, la crónica con «▶ Ver partido»).
 //   node tests/slr/banco/partido.mjs   (servidor local en :3000 y .env.local; SALIDA=carpeta guarda capturas)
 //   SOLO=gol,parada  limita el muestrario a esos tipos.
 // Crea una liga de prueba con Bot Uno y 3 bots (1 jornada jugada) y la borra al terminar.
@@ -158,16 +159,36 @@ try {
     await dormir(500);
   }
 
-  console.log('\nUn partido de verdad desde la crónica');
+  console.log('\nTu partido sin ver: nada destripa el resultado');
   await android(412);
-  await clic('.slr-nav__item[data-seccion="liga"]');
-  await esperar(`!!document.querySelector('[data-vista="calendario"]')`, 10000);
+  await entrar();
+  const pjMio = async () => {
+    await clic('.slr-nav__item[data-seccion="liga"]');
+    await esperar(`!!document.querySelector('[data-vista="clasificacion"]')`, 10000);
+    await clic('[data-vista="clasificacion"]');
+    await esperar(`!!document.querySelector('.slr-tabla tr.es-mio')`, 10000);
+    return ev(`({ pj: Number(document.querySelector('.slr-tabla tr.es-mio td:nth-child(3)')?.textContent), aviso: !!document.querySelector('.slr-sin-ver') })`);
+  };
+  const c0 = await pjMio();
+  check(c0.pj === 0 && c0.aviso, `clasificación: la J1 aún no cuenta para ti (PJ ${c0.pj}) y avisa de que tu partido ya se ha jugado`);
+  await foto('real-0-clasificacion');
   await clic('[data-vista="calendario"]');
-  await esperar(`!!document.querySelector('[data-partido="${mio.id}"]')`, 10000);
-  await clic(`[data-partido="${mio.id}"]`);
-  check(await esperar(`!!document.querySelector('[data-ver-partido]')`, 10000), 'la crónica tiene «▶ Ver partido»');
-  await clic('[data-ver-partido]');
-  check(await esperar(`document.querySelector('[data-partido-reproductor]')?.dataset.escena === 'inicio'`, 10000), 'empieza por el inicio (VS)');
+  await esperar(`!!document.querySelector('.slr-cruce [data-partido="${mio.id}"]')`, 10000);
+  const cal = await ev(`document.querySelector('.slr-cruce [data-partido="${mio.id}"]').textContent.trim()`);
+  check(cal === '▶ Ver', `calendario: tu partido sin resultado («${cal}»)`);
+  await foto('real-0-calendario');
+  await clic('.slr-nav__item[data-seccion="equipo"]');
+  await esperar(`!!document.querySelector('.slr-franja__ultimo')`, 10000);
+  const franja = await ev(`document.querySelector('.slr-franja__ultimo').textContent.replace(/\\s+/g, ' ').trim()`);
+  check(/ya se ha jugado/.test(franja) && !/\d+-\d+/.test(franja), `pestaña Equipo: «${franja}»`);
+  await clic('.slr-barra__avisos');
+  await esperar(`!!document.querySelector('.slr-avisos')`, 5000);
+  const aviso = await ev(`[...document.querySelectorAll('.slr-aviso__texto')].map(x => x.textContent).find(x => /Jornada 1/.test(x)) ?? ''`);
+  check(/ya se ha jugado/.test(aviso) && !/cobrado/.test(aviso), `aviso de la jornada sin resultado ni cobros: «${aviso.replace(/\\s+/g, ' ').trim().slice(0, 70)}»`);
+  // Desde el aviso: se reproduce solo
+  await ev(`[...document.querySelectorAll('[data-aviso]')].find(b => /ya se ha jugado/.test(b.textContent))?.click(); 0`);
+  check(await esperar(`document.querySelector('[data-partido-reproductor]')?.dataset.escena === 'inicio'`, 10000), 'la primera vez, el partido se reproduce solo (desde el aviso)');
+  check(!(await ev(`!!document.querySelector('.slr-cronica')`)), 'sin la crónica debajo (no se ve el resultado)');
   await dormir(900);
   await foto('real-1-inicio');
   const nombres = await ev(`[...document.querySelectorAll('.slr-pt-marcador__nombre')].map(n => n.textContent)`);
@@ -179,7 +200,6 @@ try {
   await dormir(250);
   const despues = await ev(`document.querySelector('[data-partido-reproductor]').dataset.escena`);
   check(antes === 'inicio' && despues === 'saque', `el tap pasa a la siguiente escena (${antes} → ${despues})`);
-  // Unas cuantas escenas con taps
   const vistas = [despues];
   for (let k = 0; k < 8; k++) {
     await dormir(350);
@@ -190,7 +210,6 @@ try {
   check(new Set(vistas).size >= 3 && vistas.includes('control'), `con taps se recorren las escenas: ${vistas.join(' → ')}`);
   await clic('[data-velocidad]');
   check(await ev(`document.querySelector('[data-velocidad]').textContent`) === '×2', 'botón ×1 / ×2');
-  // Saltar: directo al final con el resultado del partido
   await clic('[data-saltar]');
   check(await esperar(`document.querySelector('[data-partido-reproductor]')?.dataset.escena === 'final'`, 3000), '«Saltar» va directamente al final');
   await dormir(1200);
@@ -201,7 +220,28 @@ try {
   const f = await fuera();
   check(typeof f === 'object' && !f.malos.length, 'el final cabe en la pantalla', JSON.stringify(f));
   check(await esperar(`!document.querySelector('[data-partido-reproductor]')`, 12000), 'al terminar se cierra');
-  check(await ev(`!!document.querySelector('.slr-cronica')`), 'y queda la crónica como resumen');
+  check(await esperar(`!!document.querySelector('.slr-cronica [data-ver-partido]')`, 8000), 'y queda la crónica como resumen, con «▶ Ver partido»');
+  await ev(`history.back(); 0`); await dormir(400);
+  await ev(`history.back(); 0`); await dormir(400);
+  const visto = (await leer(`partidos?select=id&id=eq.${mio.id}`)).datos.length === 1;
+  const c1 = await pjMio();
+  check(visto && c1.pj === 1 && !c1.aviso, `visto: la clasificación ya cuenta la J1 (PJ ${c1.pj})`);
+
+  console.log('\nEn otro dispositivo (recarga): ya visto');
+  await entrar();
+  await clic('.slr-nav__item[data-seccion="liga"]');
+  await esperar(`!!document.querySelector('[data-vista="calendario"]')`, 10000);
+  await clic('[data-vista="calendario"]');
+  await esperar(`!!document.querySelector('.slr-cruce [data-partido="${mio.id}"]')`, 10000);
+  const cal2 = await ev(`document.querySelector('.slr-cruce [data-partido="${mio.id}"]').textContent.replace(/\\s+/g, '')`);
+  check(/^\d+–\d+$/.test(cal2), `el calendario ya enseña el resultado (${cal2})`);
+  await clic(`.slr-cruce [data-partido="${mio.id}"]`);
+  check(await esperar(`!!document.querySelector('.slr-cronica [data-ver-partido]')`, 10000), 'abrirlo otra vez: la crónica con «▶ Ver partido» (no se reproduce solo)');
+  check(!(await ev(`!!document.querySelector('[data-partido-reproductor]')`)), 'sin reproducción automática');
+  await ev(`history.back(); 0`); await dormir(400);
+  // El partido de otro: con su resultado directamente
+  const ajeno = await ev(`[...document.querySelectorAll('.slr-cruce.es-ajeno [data-partido][data-jugado]')].map(b => b.textContent.replace(/\\s+/g, ''))[0] ?? ''`);
+  check(/^\d+–\d+$/.test(ajeno), `el partido de otros, con su resultado (${ajeno})`);
 
   check(!errores.length, 'sin errores en la consola', errores.slice(0, 3).join(' | '));
 } catch (e) {

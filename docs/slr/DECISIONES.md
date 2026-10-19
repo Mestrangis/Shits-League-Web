@@ -1338,7 +1338,7 @@ Medido con `tests/slr/banco/rendimiento-apertura.mjs`: Chrome a 390×844 (DPR 2,
   - deslizador de probabilidad, resultado, versión (automática, completa o rápida) y un poder;
   - usa tus cartas; el rival, con copias;
   - tiene un botón de pausa para revisar el diseño.
-- **Pendiente** (próxima entrega): partidos vistos en Supabase, reproducción automática la primera vez y no destripar el resultado.
+- **Partidos vistos y spoilers:** en la 2.ª entrega (abajo).
 - **Tests:**
   - `partido-guion.test.mjs`:
     - las 4 versiones del motor con 300 semillas cada una: nunca falla y el marcador coincide;
@@ -1351,3 +1351,40 @@ Medido con `tests/slr/banco/rendimiento-apertura.mjs`: Chrome a 390×844 (DPR 2,
     - cada escena y variante en el 30, 60 y 95 % de su duración, sin nada fuera de la pantalla, con capturas;
     - con CPU ×6, una jugada entera a 60 fps;
     - un partido real desde la crónica: tap, ×2, «Saltar», el marcador final y la vuelta a la crónica.
+
+## Reproducción animada de los partidos (2.ª entrega: partidos vistos y sin destripar)
+
+### Decisiones de Marcos
+
+- **Partidos vistos en Supabase**, con una tabla con RLS: cuenta igual en todos los dispositivos.
+- **Primera vez:** un partido TUYO (de liga o amistoso) ya jugado se reproduce solo. Las siguientes veces, el resumen y «▶ Ver partido». Cuenta como visto al llegar al final o al pulsar «Saltar».
+- **Hasta que veas tu último partido de liga:**
+  - la clasificación sigue como antes de esa jornada;
+  - tu resultado no aparece en Inicio, en la jornada ni en los avisos: sale «Tu partido ya se ha jugado · ▶ Ver»;
+  - tu dinero ganado y tus stats de la jornada tampoco deberían delatarlo (si es muy complicado, avisar).
+- **Los partidos de los demás** se ven con su resultado directamente, sin animación; se puede ver con el botón.
+
+### Decisiones mías
+
+- **Servidor:**
+  - `partidos_vistos (usuario_id, partido_id, visto_en)` es privada (RLS sin políticas).
+  - `slr_marcar_visto(token, partido_id)` es idempotente.
+  - `slr_sin_ver(token, liga_id)` devuelve tu último partido de liga publicado si no lo has visto (solo el último cuenta).
+  - `slr_partido` añade `mio` y `visto`.
+  - `slr_clasificacion`: si tienes un partido sin ver en esa temporada, la calcula sin esa jornada (`clasificacion_temporada_sin`) y lo dice (`sin_ver`). Solo para ti: cada usuario, con lo suyo.
+- **«Inicio»:** en Rush no hay una pantalla con ese nombre. El resultado salía en la franja de arriba de la pestaña Equipo («último partido»), así que se oculta ahí.
+- **Dónde se oculta el resultado mientras no lo veas:**
+  - el aviso de la jornada: sin el resultado ni lo cobrado;
+  - el calendario: «▶ Ver» en vez del marcador;
+  - la franja de la pestaña Equipo;
+  - la clasificación (con un aviso para ir a verlo) y la ficha de cualquier equipo: posición, goles y lista de resultados sin ese partido;
+  - el aviso al jugar un amistoso, que ya no dice el resultado.
+- **Reproducción automática:** la crónica, al abrir un partido tuyo no visto, lanza la reproducción sin pintar la crónica debajo (no se ve el resultado). Si la cierras antes de tiempo, no cuenta como visto. Al llegar al final se abre la crónica.
+- **Pendiente de decidir (dinero y stats):** el saldo de arriba y los movimientos de Perfil incluyen el bonus de sorpresa (600 por ganar, 300 por empatar, si eras el menos favorito) y el ojo clínico. Ocultarlo en la web no es fiable: el saldo es uno y se usa para comprar. Opciones:
+  - (a) que el servidor deje esos dos cobros pendientes y los pague al marcar el partido como visto (o, como mucho, al cerrar la siguiente jornada; los bots, al momento);
+  - (b) dejarlo como está.
+  - Las demás stats de la jornada (energía, lesiones, PR) no dicen el resultado directamente; la crónica ya solo se abre después de verlo.
+- **Tests:**
+  - `api-paso19.mjs`: sin ver, `mio`/`visto`, clasificación oculta solo para quien no lo ha visto, idempotencia y solo el último partido;
+  - `banco/partido.mjs`: clasificación, calendario, pestaña Equipo y aviso sin resultado; la primera vez se reproduce solo desde el aviso; al terminar, la crónica; tras recargar, ya visto.
+  - `api-paso4`, `api-paso5`, `banco/tacticas` y `banco/equipo` marcan el partido como visto antes de mirar la clasificación o la crónica.

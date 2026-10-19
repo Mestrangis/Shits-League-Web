@@ -25,6 +25,7 @@ import { motorDe } from '../motores.js';
 import { TACTICA, CONDICION_PLAN_B, CONDICION_CAMBIO, MOTIVO_CAMBIO, chipTactica, textoSinergia } from '../tactica.js';
 import { tramoEnergia } from '../energia.js';
 import { abrirPartido } from '../partido/abrir.js';
+import { marcarVisto } from '../rush.js';
 
 const pct = p => `${Math.round(p * 100)} %`;
 const LETRAS = ['A', 'B'];
@@ -196,8 +197,19 @@ function tablaPR(p, al, eq, nombre) {
   return `<ul class="slr-cronica__pr">${fila('local', 'A')}${fila('visitante', 'B')}</ul>`;
 }
 
-export async function abrirCronica(partidoId, ctx) {
+// La primera vez que abres un partido TUYO ya jugado se reproduce solo; cuenta como visto
+// al llegar al final o al pulsar «Saltar» y entonces queda la crónica. Las siguientes, la
+// crónica con «▶ Ver partido». Los de los demás, la crónica directamente.
+export async function abrirCronica(partidoId, ctx, { soloCronica = false } = {}) {
   const p = await rpc('slr_partido', { partido_id: partidoId });
+  if (p.mio && !p.visto && !soloCronica) {
+    const r = await abrirPartido(partidoId, ctx, {
+      p,
+      alVisto: () => marcarVisto(partidoId),
+      alTerminar: ({ visto }) => { if (visto) abrirCronica(partidoId, ctx, { soloCronica: true }).catch(() => {}); },
+    });
+    if (r) return;
+  }
   const eqs = await leer(`equipos?select=id,nombre&id=in.(${p.local_id},${p.visitante_id})`);
   const nombreEq = id => eqs.find(e => e.id === id)?.nombre ?? 'Equipo';
   const al = p.alineaciones_congeladas;
@@ -262,7 +274,7 @@ export async function abrirCronica(partidoId, ctx) {
     </div>`, { titulo: 'Crónica', completa: true });
 
   enlazarCampo(el, ctx);
-  el.querySelector('[data-ver-partido]')?.addEventListener('click', () => abrirPartido(partidoId, ctx, { p }));
+  el.querySelector('[data-ver-partido]')?.addEventListener('click', () => abrirPartido(partidoId, ctx, { p, alVisto: () => { if (p.mio) marcarVisto(partidoId); } }));
   // Tocar el nombre de un poder: su descripción
   el.querySelectorAll('[data-poder]').forEach(b => b.addEventListener('click', () => {
     const [cartaId, poder] = b.dataset.poder.split('|');

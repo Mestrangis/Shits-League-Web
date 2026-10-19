@@ -24,7 +24,7 @@ import { cartaHTML, describirPoder } from '../carta.js';
 import { fuerzaPosesion, fuerzaAtaque, fuerzaDefensa, probabilidadesTirador, sinergia, CONFIG } from '../motor-v2.0.0.js';
 import { factorEnergia, tramoEnergia, GESTIONES } from '../energia.js';
 import { TACTICA, ESTAMINA, CONDICION_PLAN_B, CONDICION_CAMBIO, ganaA, pierdeCon, barraEnergia, textoSinergia, abrirAyuda } from '../tactica.js';
-import { estaTocada, alineacionBloqueada, alineacionConfirmada, proximaJornada, pausada, configLiga, ventanaCierre, miPartido, enJuego } from '../rush.js';
+import { estaTocada, alineacionBloqueada, alineacionConfirmada, proximaJornada, pausada, configLiga, ventanaCierre, miPartido, enJuego, sinVer } from '../rush.js';
 import { abrirDetalle } from './detalle.js';
 import { abrirEquipo } from './ficha-equipo.js';
 import { abrirCronica } from './cronica.js';
@@ -342,7 +342,11 @@ function franja(datos, j, estadoTexto) {
   const jugadas = datos.jornadas.filter(x => x.estado === 'publicada' && miPartido(x));
   const ult = jugadas[jugadas.length - 1];
   let ultimo = '<span class="slr-suave">Aún no has jugado</span>';
-  if (ult) {
+  if (ult && sinVer(miPartido(ult).id)) {
+    // Sin destripar: todavía no lo has visto
+    ultimo = `<button class="slr-franja__ultimo slr-franja__ultimo--sin-ver" type="button" data-cronica="${esc(miPartido(ult).id)}">
+      ▶ <b>Tu partido de la J${ult.numero} ya se ha jugado</b> <small>Ver</small></button>`;
+  } else if (ult) {
     const q = miPartido(ult), local = q.local.equipo_id === yo;
     const [m, s] = local ? q.goles : [q.goles[1], q.goles[0]];
     const res = m > s ? 'V' : m < s ? 'D' : 'E';

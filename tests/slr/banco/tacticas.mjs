@@ -33,6 +33,8 @@ try {
   // El partido de Bot Uno para la crónica: el último con cruce ganado por alguien (si lo hay)
   const mios = (await leer(`partidos?select=id,local_id,visitante_id,tacticas,jornadas(numero)&liga_id=eq.${L}&tipo=eq.liga&or=(local_id.eq.${U},visitante_id.eq.${U})&order=simulado_en.desc`)).datos;
   const elegido = mios.find(p => p.tacticas?.cruce?.[0]) ?? mios[0];
+  // Visto ya: así abre la crónica (la primera vez se reproduciría solo; eso se prueba en banco/partido.mjs)
+  await rpcOk('slr_marcar_visto', { token: t, partido_id: elegido.id });
   const cartasU = (await leer(`cartas?select=id,energia,disenos_carta(ata,def,con,tactica_favorita,nombre)&equipo_id=eq.${U}`)).datos;
 
   // ── Navegador ──

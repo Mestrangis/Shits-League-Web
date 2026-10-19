@@ -26,6 +26,9 @@ try {
     let r;
     do { r = await rpcOk('slr_admin_jugar_jornada', { token: t, liga_id: L }); if (r.estado === 'simulando') await dormir(1500); } while (r.estado === 'simulando');
   }
+  // Los partidos de Bot Uno, ya vistos: así el aviso abre la crónica (la primera vez se
+  // reproduciría solo; eso se prueba en banco/partido.mjs)
+  for (const p of (await leer(`partidos?select=id&liga_id=eq.${L}&tipo=eq.liga`)).datos) await rpc('slr_marcar_visto', { token: t, partido_id: p.id });
 
   // ── Navegador ──
   const ch = spawn('C:/Program Files/Google/Chrome/Application/chrome.exe', ['--remote-debugging-port=9360',

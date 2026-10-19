@@ -9,7 +9,7 @@
 ═══════════════════════════════════════════════ */
 import { rpc, leer, funcion } from '../api.js';
 import { esc, diaHora, toast, conEspera, fechaHora } from '../ui.js';
-import { enJuego, proximaJornada } from '../rush.js';
+import { enJuego, proximaJornada, sinVer } from '../rush.js';
 import { ESTADOS_LIGA } from './perfil.js';
 import { abrirCronica } from './cronica.js';
 import { abrirEquipo } from './ficha-equipo.js';
@@ -66,11 +66,13 @@ function calendario(jornadas, yo, dueno) {
         ${j.partidos.map(p => {
           const mio = [p.local.equipo_id, p.visitante.equipo_id].includes(yo);
           const lado = id => (id === yo ? 'slr-propio' : mio ? 'slr-rival' : '');
+          // Tu último partido sin ver: sin resultado, con «▶ Ver»
+          const oculto = p.goles && sinVer(p.id);
           return `
-          <div class="slr-cruce ${claseResultado(p.local.equipo_id, p.visitante.equipo_id, p.goles, yo)}">
+          <div class="slr-cruce ${oculto ? 'es-mio es-sin-ver' : claseResultado(p.local.equipo_id, p.visitante.equipo_id, p.goles, yo)}">
             <span class="slr-cruce__equipo slr-cruce__equipo--local">
               <button type="button" class="slr-enlace-equipo ${lado(p.local.equipo_id)}" data-equipo="${esc(p.local.equipo_id)}">${esc(p.local.equipo)}</button>${avatar(dueno[p.local.equipo_id])}</span>
-            <button type="button" class="slr-cruce__marcador" data-partido="${esc(p.id)}" ${p.goles ? 'data-jugado="1"' : ''}>${p.goles ? `${p.goles[0]}<i>–</i>${p.goles[1]}` : 'vs'}</button>
+            <button type="button" class="slr-cruce__marcador" data-partido="${esc(p.id)}" ${p.goles ? 'data-jugado="1"' : ''}>${oculto ? '▶ Ver' : p.goles ? `${p.goles[0]}<i>–</i>${p.goles[1]}` : 'vs'}</button>
             <span class="slr-cruce__equipo">${avatar(dueno[p.visitante.equipo_id])}
               <button type="button" class="slr-enlace-equipo ${lado(p.visitante.equipo_id)}" data-equipo="${esc(p.visitante.equipo_id)}">${esc(p.visitante.equipo)}</button></span>
           </div>`;
@@ -161,7 +163,9 @@ export async function pintar(cont, ctx) {
     </header>
     ${estadoLiga(datos)}
     ${vista === 'fichajes' ? await fichajes(datos.liga.id) : vista === 'clasificacion'
-      ? `${tabla(clas.clasificacion, yo)}<p class="slr-suave">Un amistoso se juega al momento con las alineaciones guardadas: no da puntos, dinero ni lesiones.</p>`
+      ? `${clas.sin_ver ? `<button class="slr-banner slr-sin-ver" type="button" data-partido="${esc(clas.sin_ver.partido_id)}" data-jugado="1">
+          <b>▶ Tu partido de la jornada ${clas.sin_ver.numero} ya se ha jugado</b><span>La clasificación no cuenta esa jornada hasta que lo veas.</span></button>` : ''}
+        ${tabla(clas.clasificacion, yo)}<p class="slr-suave">Un amistoso se juega al momento con las alineaciones guardadas: no da puntos, dinero ni lesiones.</p>`
       : `${calendario(datos.jornadas, yo, dueno)}${await amistosos(datos.liga.id, yo, dueno, datos.yo?.usuario?.id)}`}`;
   pintarAvatares(cont);
 
@@ -174,7 +178,7 @@ export async function pintar(cont, ctx) {
   }));
   cont.querySelectorAll('[data-amistoso]').forEach(b => b.addEventListener('click', () => conEspera(b, async () => {
     const r = await funcion({ accion: 'amistoso', rival_equipo_id: b.dataset.amistoso });
-    toast(`Amistoso: ${r.goles.join(' – ')}`, 'ok');
+    // Sin el resultado: se reproduce solo la primera vez
     await abrirCronica(r.partido_id, ctx);
   }).catch(() => {})));
 }

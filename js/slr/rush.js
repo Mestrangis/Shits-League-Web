@@ -142,7 +142,8 @@ async function cargarLiga() {
     datos.equipo ? rpc('slr_calendario', { liga_id: id }) : null,
     datos.equipo ? leer(`jornadas?select=id,publicada_en&liga_id=eq.${id}&limit=500`) : [],
     cargarColecciones(id),            // para el fondo, el emblema y el nombre de la colección de cada carta
-  ]);
+    datos.equipo ? rpc('slr_sin_ver', { liga_id: id }, { silencioso: true }).catch(() => null) : null,
+  ]).then(r => { datos.sinVer = r[5]?.sin_ver ?? null; return r; });
   datos.ligaInfo = info;
   datos.temporada = temporada ?? null;
   if (!datos.equipo) { datos.jornadas = []; return; }
@@ -159,6 +160,20 @@ async function cargarAlineacion() {
   ]);
   datos.alineacion = al ?? null;
   datos.tacticas = tac ?? { tactica: 'posesion', plan_b: null, gestion: 'normal', cambios_avanzados: [] };
+}
+
+/* ── Partidos vistos (sin destripar) ────────────────────────────────────────
+   datos.sinVer: tu último partido de liga publicado que aún no has visto
+   ({ partido_id, jornada_id, numero }) o null. Hasta verlo, la web no enseña su
+   resultado (avisos, calendario, Equipo, fichas) y la clasificación llega sin
+   esa jornada (lo hace el servidor). */
+export const sinVer = partidoId => !!datos.sinVer && (partidoId == null || datos.sinVer.partido_id === partidoId);
+export async function marcarVisto(partidoId) {
+  const r = await rpc('slr_marcar_visto', { partido_id: partidoId }, { silencioso: true }).catch(() => null);
+  if (!r) return;
+  const antes = datos.sinVer?.partido_id;
+  datos.sinVer = r.sin_ver ?? null;
+  if (antes && antes !== datos.sinVer?.partido_id) pintar().catch(() => {});
 }
 
 // partes: 'yo', 'liga', 'cartas', 'alineacion' (sin partes, todo)
@@ -207,9 +222,12 @@ function pintarCampana() {
   b.setAttribute('aria-label', n ? `Avisos: ${n} sin leer` : 'Avisos');
 }
 function tarjetaAviso(n) {
+  // El aviso de la jornada lleva el resultado y lo cobrado: mientras no veas el partido, no
+  const oculto = n.tipo === 'jornada_publicada' && datos.sinVer && n.datos?.jornada_id === datos.sinVer.jornada_id;
+  const texto = oculto ? `Jornada ${datos.sinVer.numero}: tu partido ya se ha jugado · ▶ Ver` : (n.datos?.texto ?? n.tipo);
   const dentro = `
     <span class="slr-aviso__icono" aria-hidden="true">${ICONOS_AVISO[n.tipo] ?? '🔔'}</span>
-    <span class="slr-aviso__texto"><span>${esc(n.datos?.texto ?? n.tipo)}</span><time>${esc(fechaHora(n.creada_en))}</time></span>`;
+    <span class="slr-aviso__texto"><span>${esc(texto)}</span><time>${esc(fechaHora(n.creada_en))}</time></span>`;
   const clase = `slr-aviso ${n.leida ? '' : 'es-nuevo'}`;
   return n.destino_tipo
     ? `<li><button type="button" class="${clase}" data-aviso="${n.id}">${dentro}<span class="slr-aviso__flecha" aria-hidden="true">›</span></button></li>`

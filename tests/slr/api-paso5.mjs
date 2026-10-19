@@ -136,6 +136,7 @@ try {
   check(lg.estado === 'entre_temporadas', 'la liga queda entre temporadas');
   const fin = (await equiposLiga());
   check(fin.every(e => e.saldo >= saldo0[e.id] + 4000), 'cobros reales: cada equipo cobra al menos 4 salarios (uno descansa cada jornada)');
+  await (async () => { const sv = (await rpcOk('slr_sin_ver', { token: U.token, liga_id: L })).sin_ver; if (sv) await rpcOk('slr_marcar_visto', { token: U.token, partido_id: sv.partido_id }); })();   // la clasificación no cuenta tu último partido hasta que lo ves (api-paso19)
   const clas = (await rpcOk('slr_clasificacion', { token: U.token, liga_id: L })).clasificacion;
   check(clas.length === 5 && clas.reduce((s, f) => s + f.pj, 0) === 20, `clasificación final con 10 partidos: ${clas.map(f => `${f.posicion}. ${f.equipo} ${f.puntos}`).join(' · ')}`);
   const alBot = (await leer(`alineaciones?select=automatica,guardada_en&equipo_id=eq.${bot0.id}`)).datos[0];

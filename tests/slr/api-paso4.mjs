@@ -255,6 +255,7 @@ try {
         `esperado ${JSON.stringify(exp)}`);
       check(await saldoDe(b) === saldos0[b.equipo] + Object.values(porTipo).reduce((s, x) => s + x, 0), `${b.nombre}: el saldo sube lo cobrado`);
     }
+    await (async () => { const sv = (await rpcOk('slr_sin_ver', { token: R.token, liga_id: L })).sin_ver; if (sv) await rpcOk('slr_marcar_visto', { token: R.token, partido_id: sv.partido_id }); })();   // la clasificación no cuenta tu último partido hasta que lo ves (api-paso19)
     const clas = (await rpcOk('slr_clasificacion', { token: R.token, liga_id: L })).clasificacion;
     const ptsA = gl > gv ? 3 : gl === gv ? 1 : 0, ptsB = gv > gl ? 3 : gl === gv ? 1 : 0;
     const fila = eq => clas.find(f => f.equipo_id === eq);
@@ -431,6 +432,8 @@ try {
     check((await leer(`subastas?select=id&liga_id=eq.${L}&estado=eq.abierta`)).datos.length === 0, 'sin subastas abiertas al empezar');
     const clas = (await rpcOk('slr_clasificacion', { token: B1.token, liga_id: L })).clasificacion;
     check(clas.length === 3 && clas.every(f => f.pj === 0 && f.puntos === 0), 'clasificación de la temporada 2 a cero');
+    // La clasificación no cuenta tu último partido hasta que lo ves (api-paso19)
+    await (async () => { const sv = (await rpcOk('slr_sin_ver', { token: B1.token, liga_id: L })).sin_ver; if (sv) await rpcOk('slr_marcar_visto', { token: B1.token, partido_id: sv.partido_id }); })();
     const t1final = (await rpcOk('slr_clasificacion', { token: B1.token, liga_id: L, temporada: 1 })).clasificacion;
     check(t1final.reduce((s, f) => s + f.pj, 0) === 6, 'la clasificación final de la temporada 1 sigue guardada');
   }
