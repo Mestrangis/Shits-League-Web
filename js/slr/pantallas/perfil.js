@@ -13,6 +13,7 @@ import { abrirAlbum } from './album.js';
 import { abrirCatalogo } from './catalogo.js';
 import { abrirPlantillas } from './plantillas-admin.js';
 import { abrirMuestrario } from './muestrario.js';
+import { abrirMuestrarioPartido } from './muestrario-partido.js';
 import { abrirEditorCarta } from './editor-carta.js';
 import { abrirColecciones } from './colecciones-admin.js';
 import { abrirSobresAdmin } from './sobres-admin.js';
@@ -89,6 +90,7 @@ export async function panelAdmin(cont, ctx) {
         <button class="slr-btn slr-btn--pruebas" type="button" data-pruebas="tanda-nueva">🆕 Abrir tanda nueva ahora</button>
         <button class="slr-btn slr-btn--pruebas" type="button" data-pruebas="plantillas">🃏 Plantillas: dar o quitar cartas</button>
         <button class="slr-btn slr-btn--pruebas" type="button" data-pruebas="muestrario">✨ Muestrario de cartas</button>
+        <button class="slr-btn slr-btn--pruebas" type="button" data-pruebas="escenas-partido">🎬 Escenas de partido</button>
         <button class="slr-btn slr-btn--peligro" type="button" data-pruebas="borrar-beta">Borrar cartas beta (sin foto)</button>
         <button class="slr-btn slr-btn--peligro" type="button" data-pruebas="reiniciar">Reiniciar beta</button>
       </div>
@@ -99,6 +101,7 @@ export async function panelAdmin(cont, ctx) {
     if (b.dataset.pruebas === 'plantillas') abrirPlantillas(ctx).catch(() => {});
     else if (b.dataset.pruebas === 'nueva-carta') abrirEditorCarta(ctx).catch(e => toast(e.message, 'error'));
     else if (b.dataset.pruebas === 'muestrario') abrirMuestrario(ctx);
+    else if (b.dataset.pruebas === 'escenas-partido') abrirMuestrarioPartido(ctx);
     else if (b.dataset.pruebas === 'colecciones') abrirColecciones(ctx).catch(e => toast(e.message, 'error'));
     else if (b.dataset.pruebas === 'sobres') abrirSobresAdmin(ctx).catch(e => toast(e.message, 'error'));
     else if (b.dataset.pruebas === 'borrar-beta') borrarBeta(b, ctx);

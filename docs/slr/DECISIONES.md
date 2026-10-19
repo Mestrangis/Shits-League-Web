@@ -1283,3 +1283,71 @@ Medido con `tests/slr/banco/rendimiento-apertura.mjs`: Chrome a 390×844 (DPR 2,
   - `banco/tacticas.mjs`: sin «Sugerir», iconos en SVG y ningún emoji de táctica (alineación, crónica, ayuda).
   - `banco/mercado.mjs`: el orden de las pestañas.
   - `api-paso12` y `api-paso15` siguen la regla nueva de posición.
+
+## Reproducción animada de los partidos (1.ª entrega: reproductor, escenas y muestrario)
+
+### Decisiones de Marcos
+
+- **Arquitectura en tres capas**, para aguantar cambios del motor sin tocar las animaciones:
+  - el adaptador (`js/slr/partido/guion.js`) es lo único que conoce los eventos del motor;
+  - las escenas tienen variantes registradas (`js/slr/partido/escenas/`);
+  - el reproductor (`js/slr/partido/reproductor.js`) no sabe nada del motor.
+- Las variantes y los detalles al azar salen de un PRNG con semilla «id del partido + jugada»: la repetición es siempre idéntica. El motor y sus números no se tocan.
+- **Estilo** de la app. Partículas de la apertura (un canvas). Solo transform y opacity. Fluido en Android a 360 y 412 px. Sin vibración.
+- **Escenas:**
+  - inicio (VS) y saque;
+  - duelo de control (botas, bote y una tercera), con la barra de la probabilidad real, «¡ROBO!» + «CONTRAATAQUE» y «¡SORPRESA!»;
+  - ataque contra defensa, con «¡CORTADO!» (entrada, despeje, choque);
+  - quién chuta (ruleta) y chut con barra; parada (estirada, puños, atrapada) o gol (red, chilena, ardiendo);
+  - poderes, lesión, descanso y final con la mejor carta.
+- **Ritmo:**
+  - duelos igualados (p entre 0,40 y 0,60), completos (~3 s); los muy claros, rápidos (~1 s);
+  - los últimos minutos con el marcador igualado, completos;
+  - sin repetir variante seguida;
+  - de 6 a 14 s por jugada; todos los tiempos en un archivo.
+- **Controles:** tap (salta al final de la escena y pasa a la siguiente), «Saltar» (al final), ×1 / ×2.
+- **Sonido preparado** (`sonido.js`, mapa vacío) y botón de silenciar.
+- **Muestrario** en el Modo pruebas.
+
+### Decisiones mías
+
+- **Los eventos no se guardan**: se sacan reproduciendo el partido con el motor de su versión, la semilla y las alineaciones congeladas, exactamente como ya hacía la crónica. El adaptador solo lee esos eventos (y las stats de las alineaciones, para la DEF de quién corta). No recalcula nada.
+- **Guion:** escenas `inicio · saque · poder* · control · robo? · poder* · ataque · pase|corte · tirador · poder* · chut · gol|parada · lesion* … descanso … final`. Cada una con jugada, minuto, marcador de antes, equipo(s), cartas y la `p` del evento.
+  - El cansancio no se anima. Un evento desconocido o mal formado se ignora.
+  - **v1.x** no tiene evento de descanso: el adaptador pone uno al empezar la segunda mitad, solo con el marcador y la posesión.
+  - La alineación se sigue con los eventos de lesión y cambio, para saber qué defensas hay en cada momento.
+- **Azar de la animación** (`azar.js`): FNV-1a + mulberry32 con «id + jugada». Elige:
+  - la variante, sin repetir la anterior del mismo tipo;
+  - qué defensa corta, con peso DEF² (con 90 y 45 de DEF, la de 90 sale 4 veces más);
+  - si la escena va completa o rápida;
+  - y una semilla para las chispas.
+  - Se hace aparte del guion, que se queda en hechos puros.
+- **Variantes:** cada tipo tiene un `{ id: función(ctx) }` en `escenas/registro.js`. Añadir una es escribir la función y añadir una línea al registro.
+  - Cada variante monta su escena y la anima en una línea de tiempo (`linea.js`): Web Animations con retraso, más avisos.
+  - La línea se puede iniciar, adelantar (tap), terminar, pausar y cancelar. Al saltar al final se ejecutan los avisos de estado (el marcador) y no los de efectos.
+  - La tercera variante del control es **«escudos»**: las fotos de los dos equipos chocan en el centro y saltan rayos.
+- **Pantalla:**
+  - **Reloj:** avanza solo desde el minuto de cada jugada hasta el de la siguiente.
+  - **Colores:** el equipo de la izquierda en verde neón y el de la derecha en naranja, como en la crónica.
+  - **Portería arriba en el chut:** el balón sale desde abajo; da igual qué equipo ataca.
+  - **Fotos de los equipos:** la foto del dueño (la de su perfil de Shits League).
+- **Partículas:** el sistema de la apertura pasa a `js/slr/particulas.js` (chispas, fuego que sube y rayos) y lo usan los dos. La apertura sigue igual de fluida.
+- **Entrada:** de momento, el botón «▶ Ver partido» de la crónica. Al terminar se vuelve a la crónica, que hace de resumen.
+- **Muestrario** (Modo pruebas → 🎬 Escenas de partido):
+  - un botón por escena y variante, más «una jugada entera» y «partido de ejemplo»;
+  - deslizador de probabilidad, resultado, versión (automática, completa o rápida) y un poder;
+  - usa tus cartas; el rival, con copias;
+  - tiene un botón de pausa para revisar el diseño.
+- **Pendiente** (próxima entrega): partidos vistos en Supabase, reproducción automática la primera vez y no destripar el resultado.
+- **Tests:**
+  - `partido-guion.test.mjs`:
+    - las 4 versiones del motor con 300 semillas cada una: nunca falla y el marcador coincide;
+    - eventos desconocidos y mal formados;
+    - copa con penaltis;
+    - lados;
+    - misma semilla, mismo guion y mismas variantes, sin repetir;
+    - ritmo y peso de quién corta.
+  - `banco/partido.mjs`, a 360 y 412 px:
+    - cada escena y variante en el 30, 60 y 95 % de su duración, sin nada fuera de la pantalla, con capturas;
+    - con CPU ×6, una jugada entera a 60 fps;
+    - un partido real desde la crónica: tap, ×2, «Saltar», el marcador final y la vuelta a la crónica.

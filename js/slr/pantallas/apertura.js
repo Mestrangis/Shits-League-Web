@@ -53,6 +53,7 @@ import { esc, miles, abrirCapa, cerrarHasta, toast, faltan } from '../ui.js';
 import { cartaHTML, normalizarCarta, RAREZAS } from '../carta.js';
 import { sobreHTML, dorsoHTML, moverLamina } from '../sobre-arte.js';
 import { asegurarFotos, urlFoto } from '../imagenes.js';
+import { Particulas, sprite, rayosDe } from '../particulas.js';
 
 export const SONIDOS = { alSonar: null };
 const sonar = (nombre, datos = {}) => { try { SONIDOS.alSonar?.(nombre, datos); } catch { /* sin sonido */ } };
@@ -70,8 +71,6 @@ const GRIETAS = [
   ['M35 66 L27 70 L30 79 L22 86', 'M69 33 L76 28 L74 20 L82 14', 'M43 60 L52 67 L49 76 L56 84', 'M47 33 L56 28 L54 19 L60 12', 'M38 15 L30 10', 'M73 80 L80 88'],
 ];
 const CORTE_Y = 15;      // altura de la línea de rasgado (% del sobre)
-// Tope de partículas por nivel de calidad (el 0 es el mejor)
-const MAX_PARTICULAS = [80, 45, 20];
 
 // Zigzag del corte, calculado una vez: dientes de ±1,8 % con algo de azar
 function zigzag() {
@@ -79,43 +78,6 @@ function zigzag() {
   for (let x = 3, k = 0; x < 100; x += 3.2 + Math.random() * 1.6, k++) p.push([x, CORTE_Y + (k % 2 ? 1.8 : -1.8) + (Math.random() - 0.5)]);
   p.push([100, CORTE_Y]);
   return p;
-}
-
-// Sprites de las partículas: un punto con halo por color, dibujado una vez
-const sprites = new Map();
-function sprite(color) {
-  if (sprites.has(color)) return sprites.get(color);
-  const c = document.createElement('canvas');
-  c.width = c.height = 32;
-  const g = c.getContext('2d');
-  const gr = g.createRadialGradient(16, 16, 0, 16, 16, 16);
-  gr.addColorStop(0, '#ffffff');
-  gr.addColorStop(0.25, color);
-  gr.addColorStop(1, 'rgba(0,0,0,0)');
-  g.fillStyle = gr;
-  g.fillRect(0, 0, 32, 32);
-  sprites.set(color, c);
-  return c;
-}
-// Rayos de la explosión, dibujados una vez por color (se giran y escalan al pintar)
-const rayos = new Map();
-function rayosDe(color) {
-  if (rayos.has(color)) return rayos.get(color);
-  const c = document.createElement('canvas');
-  c.width = c.height = 512;
-  const g = c.getContext('2d');
-  g.translate(256, 256);
-  const gr = g.createRadialGradient(0, 0, 0, 0, 0, 256);
-  gr.addColorStop(0, color);
-  gr.addColorStop(0.55, color + '66');
-  gr.addColorStop(1, color + '00');
-  g.fillStyle = gr;
-  for (let k = 0; k < 16; k++) {
-    g.rotate((Math.PI * 2) / 16);
-    g.beginPath(); g.moveTo(0, 0); g.lineTo(256, -22); g.lineTo(256, 22); g.closePath(); g.fill();
-  }
-  rayos.set(color, c);
-  return c;
 }
 
 /* ── Pantalla ───────────────────────────────────────────────────────────── */
@@ -205,9 +167,10 @@ async function crearApertura(ctx, o) {
   const canvas = $('canvas'), g2 = canvas.getContext('2d');
   const laminas = [...el.querySelectorAll('.slr-sobre__lamina i')];
   let fase = 'flotando', toques = 0, temblor = 0, t0 = 0, frame = 0, vivo = true, nivel = 0;
-  let particulas = [], explosion = null, preparadas = false;
+  const fx = new Particulas();   // chispas y rayos (js/slr/particulas.js)
+  let preparadas = false;
   // Lo que limpiar() necesita, declarado ya: se puede cerrar mientras se prepara el sobre
-  let relojEleccion = null, medir = null, alMover = null, alInclinar = null;   // explosion: { t, x, y } para los rayos
+  let relojEleccion = null, medir = null, alMover = null, alInclinar = null;
   const temporizadores = [];
   const despues = (ms, f) => temporizadores.push(setTimeout(() => vivo && f(), ms));
   const fijarFase = f => { fase = f; el.dataset.fase = f; };
@@ -275,54 +238,15 @@ async function crearApertura(ctx, o) {
     pintarLienzo(ahora);
     frame = requestAnimationFrame(bucle);
   }
-  let lienzoSucio = false;
-  function pintarLienzo(ahora) {
-    if (!particulas.length && !explosion) {
-      if (lienzoSucio) { g2.setTransform(1, 0, 0, 1, 0, 0); g2.clearRect(0, 0, canvas.width, canvas.height); lienzoSucio = false; }
-      return;
-    }
-    lienzoSucio = true;
-    g2.setTransform(dpr, 0, 0, dpr, 0, 0);
-    g2.clearRect(0, 0, innerWidth, innerHeight);
-    g2.globalCompositeOperation = 'lighter';
-    if (explosion) {
-      const e = (ahora - explosion.t) / 1400;
-      if (e >= 1 || nivel >= 1) explosion = null;
-      else {
-        const im = rayosDe(luz), tam = Math.max(innerWidth, innerHeight) * (0.6 + e * 1.1);
-        g2.globalAlpha = e < 0.15 ? e / 0.15 * 0.9 : 0.9 * (1 - (e - 0.15) / 0.85);
-        g2.save(); g2.translate(explosion.x, explosion.y); g2.rotate(e * 0.7);
-        g2.drawImage(im, -tam / 2, -tam / 2, tam, tam);
-        g2.restore();
-      }
-    }
-    if (particulas.length) {
-      particulas = particulas.filter(p => {
-        p.vida++;
-        if (p.vida > p.max) return false;
-        p.vx *= 0.985; p.vy = p.vy * 0.985 + p.g; p.x += p.vx; p.y += p.vy;
-        const a = 1 - p.vida / p.max, s = p.tam * (0.6 + a * 0.6);
-        g2.globalAlpha = a;
-        g2.drawImage(p.im, p.x - s, p.y - s, s * 2, s * 2);
-        return true;
-      });
-    }
-    g2.globalAlpha = 1;
-    g2.globalCompositeOperation = 'source-over';
-  }
+  const pintarLienzo = ahora => { fx.nivel = nivel; fx.pintar(g2, ahora, innerWidth, innerHeight, dpr); };
   // El lienzo se «calienta» ya (textura creada y subida) para que el primer toque no la estrene
-  if (!quieto) { g2.globalAlpha = 0.02; g2.drawImage(sprite(luz), 0, 0, 2, 2); g2.globalAlpha = 1; lienzoSucio = true; }
+  if (!quieto) { g2.globalAlpha = 0.02; g2.drawImage(sprite(luz), 0, 0, 2, 2); g2.globalAlpha = 1; fx.sucio = true; }
   frame = requestAnimationFrame(bucle);
 
   function chispas(x, y, n, { color = luz, fuerza = 9, g = 0.12, tam = 6, vida = 55 } = {}) {
     if (quieto) return;
-    n = Math.min(Math.round(n * [1, 0.55, 0.25][nivel]), MAX_PARTICULAS[nivel] - particulas.length);
-    const im = sprite(color), blanco = sprite('#ffffff');
-    for (let i = 0; i < n; i++) {
-      const ang = Math.random() * Math.PI * 2, v = fuerza * (0.25 + Math.random() * 0.75);
-      particulas.push({ x, y, vx: Math.cos(ang) * v, vy: Math.sin(ang) * v - fuerza * 0.15, g, vida: 0,
-        max: vida * (0.6 + Math.random() * 0.6), tam: tam * (0.6 + Math.random() * 0.8), im: Math.random() < 0.2 ? blanco : im });
-    }
+    fx.nivel = nivel;
+    fx.chispas(x, y, n, { color, fuerza, g, tam, vida });
   }
   const centroDe = n => { const r = n.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; };
   const sacudir = a => { if (!quieto) temblor = Math.max(temblor, a); };
@@ -435,7 +359,7 @@ async function crearApertura(ctx, o) {
     destello(mejor === 'legendaria' || mejor === 'epica');
     el.classList.add('explota');
     sacudir({ comun: 16, rara: 22, epica: 30, legendaria: 40 }[mejor]);
-    if (!quieto) explosion = { t: performance.now(), x: cx, y: cy };
+    if (!quieto) fx.explotar(cx, cy, luz);
     chispas(cx, cy, { comun: 40, rara: 55, epica: 70, legendaria: 80 }[mejor], { fuerza: 14, vida: 70, tam: 8 });
     sobre.classList.add('vuela');
     despues(750, repartir);
@@ -551,7 +475,7 @@ async function crearApertura(ctx, o) {
     if (fase === 'resumen') return;
     fijarFase('resumen');
     sonar('resumen');
-    particulas = []; explosion = null;
+    fx.vaciar();
     sobre.hidden = true;
     $('[data-cartas]').hidden = true;
     $('.slr-apertura__cuenta')?.remove();
@@ -580,7 +504,7 @@ async function crearApertura(ctx, o) {
 
   // «Saltar»: al resumen (o, en la elección, a las candidatas giradas)
   function saltar() {
-    particulas = []; explosion = null;
+    fx.vaciar();
     temblor = 0; escena.style.transform = '';
     if (o.eleccion) {
       if (fase !== 'revelado') { sobre.hidden = true; repartir(); }
@@ -598,7 +522,7 @@ async function crearApertura(ctx, o) {
     if (medir) removeEventListener('resize', medir);
     if (alMover) removeEventListener('pointermove', alMover);
     if (alInclinar) removeEventListener('deviceorientation', alInclinar);
-    particulas = []; explosion = null;
+    fx.vaciar();
     sonar('cerrar');
     o.alTerminar?.();
   }

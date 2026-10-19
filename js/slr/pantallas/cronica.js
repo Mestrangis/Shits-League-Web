@@ -24,6 +24,7 @@ import { campoHTML, enlazarCampo } from '../campo.js';
 import { motorDe } from '../motores.js';
 import { TACTICA, CONDICION_PLAN_B, CONDICION_CAMBIO, MOTIVO_CAMBIO, chipTactica, textoSinergia } from '../tactica.js';
 import { tramoEnergia } from '../energia.js';
+import { abrirPartido } from '../partido/abrir.js';
 
 const pct = p => `${Math.round(p * 100)} %`;
 const LETRAS = ['A', 'B'];
@@ -228,6 +229,7 @@ export async function abrirCronica(partidoId, ctx) {
   const el = hoja(`
     <div class="slr-cronica">
       <p class="slr-cronica__tipo">${p.tipo === 'amistoso' ? 'Amistoso' : `Jornada ${p.jornada}`}</p>
+      ${sim ? '<button class="slr-btn slr-btn--grande slr-cronica__ver" type="button" data-ver-partido>▶ Ver partido</button>' : ''}
       <div class="slr-marcador slr-cronica__marcador">
         <span class="${eq.A.clase}">${esc(eq.A.nombre)}</span>
         <b><i class="${eq.A.clase}">${p.goles[0]}</i>–<i class="${eq.B.clase}">${p.goles[1]}</i></b>
@@ -260,6 +262,7 @@ export async function abrirCronica(partidoId, ctx) {
     </div>`, { titulo: 'Crónica', completa: true });
 
   enlazarCampo(el, ctx);
+  el.querySelector('[data-ver-partido]')?.addEventListener('click', () => abrirPartido(partidoId, ctx, { p }));
   // Tocar el nombre de un poder: su descripción
   el.querySelectorAll('[data-poder]').forEach(b => b.addEventListener('click', () => {
     const [cartaId, poder] = b.dataset.poder.split('|');
