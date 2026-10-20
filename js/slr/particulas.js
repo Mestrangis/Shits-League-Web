@@ -55,13 +55,14 @@ export class Particulas {
     this.nivel = 0;
     this.rng = rng;
     this.sucio = false;
+    this.factor = 1;   // veces el número de partículas (ajustes del partido: efectos.particulas)
   }
 
   get activas() { return this.lista.length > 0 || !!this.explosion; }
 
   // n chispas desde (x, y). g > 0 caen; g < 0 suben (fuego). dir: ángulo en radianes y abertura (cono)
   chispas(x, y, n, { color = '#ffffff', fuerza = 9, g = 0.12, tam = 6, vida = 55, blancas = 0.2, dir = null, abertura = Math.PI * 2 } = {}) {
-    n = Math.min(Math.round(n * [1, 0.55, 0.25][this.nivel]), MAX_PARTICULAS[this.nivel] - this.lista.length);
+    n = Math.min(Math.round(n * this.factor * [1, 0.55, 0.25][this.nivel]), MAX_PARTICULAS[this.nivel] - this.lista.length);
     const im = sprite(color), blanco = sprite('#ffffff'), r = this.rng;
     for (let i = 0; i < n; i++) {
       const ang = dir == null ? r() * Math.PI * 2 : dir + (r() - 0.5) * abertura;

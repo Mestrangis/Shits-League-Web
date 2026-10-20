@@ -8,9 +8,9 @@ const entra = (ctx, el, en = 0, dur = 320) =>
   ctx.linea.anim(el, [{ opacity: 0, transform: 'translate3d(0, 14px, 0) scale(.94)' }, { opacity: 1, transform: 'translate3d(0, 0, 0) scale(1)' }], { en, dur, easing: 'cubic-bezier(.2,.9,.3,1.1)' });
 
 export function aviso(ctx) {
-  const d = ctx.d, T = ctx.T.lesion;
+  const d = ctx.d, T = { total: ctx.T.lesion };
   const caja = poner(ctx, `<div class="slr-pt-lesion" style="--c:${ctx.color(d.equipo)}">
-    <b class="slr-pt-lesion__titulo">🚑 LESIÓN</b><div class="slr-pt-lesion__cartas"></div>
+    <b class="slr-pt-lesion__titulo">${esc(ctx.texto('lesion'))}</b><div class="slr-pt-lesion__cartas"></div>
     <small>${d.suplente ? `Entra <b>${esc(ctx.carta(d.suplente)?.nombre ?? '')}</b>` : 'Sigue jugando al 70 %'}</small></div>`);
   const c = cartaPartido(ctx, d.carta, 'slr-pt-carta--mini es-lesionada');
   caja.querySelector('.slr-pt-lesion__cartas').appendChild(c);
@@ -21,11 +21,11 @@ export function aviso(ctx) {
 }
 
 export function resumen(ctx) {
-  const d = ctx.d, T = ctx.T.descanso, iz = ctx.lados.abajo, de = ctx.lados.arriba;
+  const d = ctx.d, T = { total: ctx.T.descanso }, iz = ctx.lados.abajo, de = ctx.lados.arriba;
   const g = l => d.marcador[l === 'A' ? 0 : 1];
   const pos = Math.round((d.posesion?.[iz] ?? 0.5) * 100);
   const caja = poner(ctx, `<div class="slr-pt-panel">
-    <b class="slr-pt-panel__titulo">DESCANSO</b>
+    <b class="slr-pt-panel__titulo">${esc(ctx.texto('descanso'))}</b>
     <div class="slr-pt-panel__marcador"><span class="slr-pt-panel__foto" data-l="${iz}"></span><b style="color:${ctx.color(iz)}">${g(iz)}</b><i>–</i><b style="color:${ctx.color(de)}">${g(de)}</b><span class="slr-pt-panel__foto" data-l="${de}"></span></div>
     <p class="slr-pt-panel__sub">Posesión</p>
     <div class="slr-pt-posesion" style="--izq:${ctx.color(iz)};--der:${ctx.color(de)}"><i style="transform:scaleX(${pos / 100})"></i><b>${pos} %</b><b>${100 - pos} %</b></div>
@@ -52,15 +52,15 @@ export function resumen(ctx) {
 }
 
 export function resultado(ctx) {
-  const d = ctx.d, T = ctx.T.final, iz = ctx.lados.abajo, de = ctx.lados.arriba;
+  const d = ctx.d, T = { total: ctx.T.final }, iz = ctx.lados.abajo, de = ctx.lados.arriba;
   const g = l => d.goles[l === 'A' ? 0 : 1];
   const pen = d.penaltis ? `<p class="slr-pt-panel__sub">Penaltis ${d.penaltis[iz === 'A' ? 0 : 1]}–${d.penaltis[de === 'A' ? 0 : 1]}</p>` : '';
   const caja = poner(ctx, `<div class="slr-pt-panel slr-pt-panel--final">
-    <b class="slr-pt-panel__titulo">FINAL</b>
+    <b class="slr-pt-panel__titulo">${esc(ctx.texto('final'))}</b>
     <div class="slr-pt-panel__marcador"><span class="slr-pt-panel__foto" data-l="${iz}"></span><b style="color:${ctx.color(iz)}">${g(iz)}</b><i>–</i><b style="color:${ctx.color(de)}">${g(de)}</b><span class="slr-pt-panel__foto" data-l="${de}"></span></div>
     <p class="slr-pt-panel__equipos"><span>${esc(ctx.equipo(iz).nombre ?? '')}</span><span>${esc(ctx.equipo(de).nombre ?? '')}</span></p>
     ${pen}
-    ${d.mejor ? `<p class="slr-pt-panel__sub">Mejor carta del partido</p><div class="slr-pt-mejor" style="--c:${ctx.color(d.mejor.equipo ?? iz)}"></div>
+    ${d.mejor ? `<p class="slr-pt-panel__sub">${esc(ctx.texto('mejor_carta'))}</p><div class="slr-pt-mejor" style="--c:${ctx.color(d.mejor.equipo ?? iz)}"></div>
       <p class="slr-pt-panel__pr">${String(Math.round(d.mejor.pr * 10) / 10).replace('.', ',')} puntos de rendimiento</p>` : ''}
   </div>`);
   caja.querySelectorAll('[data-l]').forEach(el => el.appendChild(foto(ctx, el.dataset.l)));

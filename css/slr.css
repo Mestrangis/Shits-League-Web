@@ -2135,13 +2135,13 @@ html.slr-sin-seleccion input, html.slr-sin-seleccion textarea { -webkit-user-sel
    (balón, botas, guantes…) van en left:0/top:0 y se colocan con transform en px;
    las demás, con left/top y la animación encima. Tamaños con vw y vh a la vez
    para aprovechar la pantalla también en PC. */
-.slr-partido { --pt-carta: min(26vw, 17vh, 150px); --pt-porteria: min(80vw, 62vh, 520px);
+.slr-partido { --pt-carta: min(26vw, 17vh, 150px); --pt-porteria: min(80vw, 62vh, 520px); --pt-franja: 64px; --pt-balon-max: 64px;
   position: absolute; inset: 0; z-index: 30; overflow: hidden; display: grid; grid-template-rows: auto minmax(0, 1fr) auto;
   grid-template-columns: minmax(0, 1fr); user-select: none; -webkit-user-select: none; touch-action: manipulation; color: #fff;
   background: #06180d; animation: slr-ap-entrar .25s ease-out; }
 .slr-partido__lienzo { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 6; }
 .slr-pt-marcador { position: relative; z-index: 7; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 6px;
-  padding: calc(10px + var(--slr-top)) 10px 8px; background: linear-gradient(rgba(2,8,5,.92), rgba(2,8,5,.7)); border-bottom: 1px solid var(--slr-borde); }
+  padding: calc(10px + var(--slr-top)) 10px 8px; background: linear-gradient(rgba(2,8,5,.88), rgba(2,8,5,.55)); border-bottom: 1px solid var(--slr-borde); }
 .slr-pt-marcador__eq { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .slr-pt-marcador__eq--der { justify-content: flex-end; }
 .slr-pt-marcador__nombre { font-family: 'Anton', sans-serif; font-size: 14px; letter-spacing: .03em; text-transform: uppercase; color: var(--c);
@@ -2151,22 +2151,44 @@ html.slr-sin-seleccion input, html.slr-sin-seleccion textarea { -webkit-user-sel
 .slr-pt-marcador__goles { display: inline-block; font-family: 'Anton', sans-serif; font-weight: 400; font-size: 30px; line-height: 1; min-width: 20px; text-align: center; }
 .slr-pt-reloj { font-family: 'Anton', sans-serif; font-size: 13px; padding: 3px 8px; border-radius: 99px; background: rgba(57,255,136,.14); color: var(--slr-propio); min-width: 38px; text-align: center; }
 .slr-pt-temblor { position: relative; z-index: 3; min-height: 0; align-self: stretch; justify-self: stretch; overflow: hidden; }
-/* Césped: franjas de 64 px que corren (una animación infinita del reproductor) */
-.slr-pt-cesped { position: absolute; left: 0; right: 0; top: -128px; bottom: 0; z-index: 0; pointer-events: none; will-change: transform;
+/* Césped: franjas que corren (una animación infinita del reproductor). Detrás de todo y en
+   toda la capa (también bajo el marcador y los controles); sobresale dos franjas por arriba
+   y por abajo para que, al moverse una vuelta, las franjas se reciclen fuera de la vista */
+.slr-pt-cesped { position: absolute; left: 0; right: 0; top: calc(-2 * var(--pt-franja)); bottom: calc(-2 * var(--pt-franja)); z-index: 0; pointer-events: none; will-change: transform;
   background:
-    repeating-linear-gradient(180deg, rgba(57,255,136,.075) 0 64px, rgba(0,0,0,.08) 64px 128px),
-    linear-gradient(180deg, #0c3a1f, #0a2f19 50%, #0c3a1f); }
+    repeating-linear-gradient(180deg, rgba(57,255,136,.075) 0 var(--pt-franja), rgba(0,0,0,.08) var(--pt-franja) calc(2 * var(--pt-franja))),
+    #0b351c; }
 .slr-pt-temblor::after { content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
   background: radial-gradient(120% 70% at 50% 50%, transparent 40%, rgba(2,8,5,.65) 100%); }
 /* Rejilla de una celda: los paneles (descanso, final, lesión) quedan centrados; lo demás va en absoluto */
 .slr-pt-escenario { position: absolute; inset: 0; z-index: 2; display: grid; place-items: center; }
 .slr-pt-controles { position: relative; z-index: 8; display: flex; align-items: center; gap: 8px; padding: 8px 12px calc(10px + var(--slr-bottom));
-  background: linear-gradient(rgba(2,8,5,.6), rgba(2,8,5,.9)); }
+  background: linear-gradient(rgba(2,8,5,.35), rgba(2,8,5,.75)); }
 .slr-pt-boton { padding: 8px 12px; border-radius: 99px; background: rgba(0,0,0,.45) !important; border: 1px solid rgba(255,255,255,.22) !important;
   font-weight: 800; font-size: 13px; color: #fff !important; min-width: 44px; }
 .slr-pt-boton--saltar { margin-left: auto; }
 .slr-pt-pista { flex: 1; min-width: 0; text-align: center; font-size: 11.5px; color: var(--slr-suave); transition: opacity .3s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .slr-pt-pista.es-oculta { opacity: 0; }
+
+/* Iconos de img/slr/partido (trazo de un color): máscara pintada con el color del texto */
+.slr-pt-ico { display: block; width: 100%; height: 100%; background: currentColor;
+  -webkit-mask: var(--ico) center / contain no-repeat; mask: var(--ico) center / contain no-repeat; }
+.slr-pt-ico--balon { --ico: url("../img/slr/partido/balon.svg"); }
+.slr-pt-ico--bota { --ico: url("../img/slr/partido/bota.svg"); }
+.slr-pt-ico--puno { --ico: url("../img/slr/partido/puno.svg"); }
+.slr-pt-ico--guante { --ico: url("../img/slr/partido/guante.svg"); }
+.slr-pt-ico--brazo { --ico: url("../img/slr/partido/brazo.svg"); }
+.slr-pt-ico--porteria { --ico: url("../img/slr/partido/porteria.svg"); }
+.slr-pt-ico--porteria-red { --ico: url("../img/slr/partido/porteria-red.svg"); }
+.slr-pt-ico--gol-red-porteria { --ico: url("../img/slr/partido/gol-red-porteria.svg"); }
+.slr-pt-ico--gol-red-red { --ico: url("../img/slr/partido/gol-red-red.svg"); }
+.slr-pt-ico--gol-red-red-abombada { --ico: url("../img/slr/partido/gol-red-red-abombada.svg"); }
+/* Piezas sueltas (botas, guantes, brazo): se colocan con transform por su centro */
+.slr-pt-pieza { position: absolute; left: 0; top: 0; z-index: 8; aspect-ratio: 1; will-change: transform; filter: drop-shadow(0 4px 8px rgba(0,0,0,.6)); }
+.slr-pt-pieza--bota { width: min(30vw, 19vh, 170px); z-index: 5; }
+.slr-pt-pieza--puno { width: min(18vw, 11vh, 100px); }
+.slr-pt-pieza--guante { width: min(22vw, 13vh, 120px); }
+.slr-pt-pieza--brazo { width: min(78vw, 52vh, 460px); aspect-ratio: 160 / 48; }
 
 /* Piezas */
 .slr-pt-foto { --t: 44px; display: inline-flex; flex: none; width: var(--t); height: var(--t); border-radius: 50%; overflow: hidden; border: 2.5px solid var(--c, #fff);
@@ -2177,26 +2199,18 @@ html.slr-sin-seleccion input, html.slr-sin-seleccion textarea { -webkit-user-sel
 .slr-pt-tactica { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 99px; border: 1px solid var(--c, rgba(255,255,255,.3));
   background: rgba(0,0,0,.35); font-weight: 800; font-size: 12px; color: var(--c, #fff); }
 .slr-pt-tactica .slr-ico-tac { font-size: 15px; }
-.slr-pt-balon { --b: min(13vw, 8vh, 72px); position: absolute; left: 50%; top: 42%; width: var(--b); height: var(--b); margin: calc(var(--b) / -2) 0 0 calc(var(--b) / -2);
-  z-index: 4; will-change: transform; }
+.slr-pt-balon { --b: min(13vw, 8vh, var(--pt-balon-max)); position: absolute; left: 50%; top: 42%; width: var(--b); height: var(--b); margin: calc(var(--b) / -2) 0 0 calc(var(--b) / -2);
+  z-index: 4; color: #fff; will-change: transform; }
+.slr-pt-balon::before { content: ""; position: absolute; inset: 8%; border-radius: 50%; background: rgba(4,16,9,.72); box-shadow: 0 4px 10px rgba(0,0,0,.55); }
+.slr-pt-balon .slr-pt-ico { position: relative; }
 .slr-pt-balon--libre { left: 0; top: 0; }
-.slr-pt-balon--grande { --b: min(19vw, 12vh, 104px); }
-.slr-pt-balon__svg { display: block; width: 100%; height: 100%; filter: drop-shadow(0 4px 6px rgba(0,0,0,.6)); }
-.slr-pt-balon--fantasma .slr-pt-balon__svg { opacity: var(--o); filter: none; }
+.slr-pt-balon--grande { --b: min(19vw, 12vh, calc(var(--pt-balon-max) * 1.6)); }
+.slr-pt-balon--golred { --b: calc(min(84vw, 62vh, 560px) * .1625); z-index: 4; }
+.slr-pt-balon--fantasma .slr-pt-ico { opacity: var(--o); }
+.slr-pt-balon--fantasma::before { display: none; }
 .slr-pt-balon.es-ardiendo::after { content: ""; position: absolute; inset: -45%; border-radius: 50%; z-index: -1;
   background: radial-gradient(circle, rgba(255,210,58,.95) 0%, rgba(255,122,26,.7) 40%, transparent 70%); }
-.slr-pt-bota { position: absolute; left: 0; top: 0; width: min(28vw, 18vh, 170px); z-index: 5; will-change: transform; }
-.slr-pt-bota svg { display: block; width: 100%; filter: drop-shadow(0 4px 8px rgba(0,0,0,.6)); }
 .slr-pt-escudo { position: absolute; left: 0; top: 0; z-index: 5; will-change: transform; }
-.slr-pt-pierna { position: absolute; left: 0; top: 0; width: min(13vw, 8.5vh, 90px); z-index: 5; will-change: transform; }
-.slr-pt-pierna svg { display: block; width: 100%; filter: drop-shadow(0 6px 10px rgba(0,0,0,.6)); }
-.slr-pt-pierna--sube { transform-origin: 50% 100%; }
-.slr-pt-pierna--sube svg { transform: scaleY(-1); }
-.slr-pt-pierna--baja { transform-origin: 50% 0; }
-.slr-pt-guante { position: absolute; left: 0; top: 0; width: min(17vw, 11vh, 100px); z-index: 8; will-change: transform; }
-.slr-pt-guante--abierto { width: min(21vw, 13vh, 120px); }
-.slr-pt-guante svg, .slr-pt-brazo svg { display: block; width: 100%; filter: drop-shadow(0 6px 12px rgba(0,0,0,.7)); }
-.slr-pt-brazo { position: absolute; left: 0; top: 0; width: min(78vw, 52vh, 460px); z-index: 8; will-change: transform; }
 .slr-pt-rotulo { position: absolute; left: 50%; top: 40%; z-index: 7; display: flex; flex-direction: column; align-items: center; pointer-events: none; will-change: transform, opacity; }
 .slr-pt-rotulo b { font-family: 'Anton', sans-serif; font-weight: 400; font-size: clamp(44px, min(14vw, 9vh), 120px); line-height: 1; letter-spacing: .02em; white-space: nowrap;
   color: var(--c, #fff); text-shadow: 0 0 22px var(--c, #fff), 0 4px 0 rgba(0,0,0,.55); }
@@ -2206,6 +2220,7 @@ html.slr-sin-seleccion input, html.slr-sin-seleccion textarea { -webkit-user-sel
 .slr-pt-rotulo--vs b { font-size: clamp(54px, min(17vw, 11vh), 140px); color: #fff; text-shadow: 0 0 26px var(--slr-propio), 0 0 10px #fff; }
 .slr-pt-rotulo--gol { top: 50%; z-index: 9; }
 .slr-pt-rotulo--gol b { font-size: clamp(90px, min(34vw, 22vh), 260px); }
+.slr-pt-rotulo--gol.slr-pt-rotulo--bajo { top: 76%; }
 .slr-pt-rotulo--sorpresa { top: 27%; }
 .slr-pt-rotulo--sorpresa.slr-pt-rotulo--abajo { top: 73%; }
 .slr-pt-rotulo--sorpresa b { font-size: clamp(38px, min(12vw, 7.5vh), 100px); }
@@ -2254,13 +2269,13 @@ html.slr-sin-seleccion input, html.slr-sin-seleccion textarea { -webkit-user-sel
 .slr-pt-ruleta__luz { position: absolute; inset: -5px; border-radius: 12px; border: 3px solid var(--c); opacity: 0; pointer-events: none;
   box-shadow: 0 0 16px var(--c), inset 0 0 16px var(--c); }
 /* Portería: arriba (atacas tú) o abajo (ataca el rival, la portería dada la vuelta) */
-.slr-pt-porteria { position: absolute; left: 50%; width: var(--pt-porteria); transform: translateX(-50%); z-index: 2; }
+.slr-pt-porteria { position: absolute; left: 50%; width: var(--pt-porteria); aspect-ratio: 160 / 70; transform: translateX(-50%); z-index: 2; color: #fff; }
+.slr-pt-porteria .slr-pt-ico { position: absolute; inset: 0; }
+.slr-pt-porteria__red { transform-origin: 50% 0; will-change: transform; }
+.slr-pt-porteria--abajo .slr-pt-ico--porteria { transform: scaleY(-1); }
 .slr-pt-porteria--arriba { top: 1.5%; }
 .slr-pt-porteria--abajo { bottom: 1.5%; }
-.slr-pt-porteria--abajo .slr-pt-porteria__svg { transform: scaleY(-1); }
 .slr-pt-porteria.es-delante { z-index: 5; }
-.slr-pt-porteria__svg { display: block; width: 100%; height: auto; aspect-ratio: 160 / 70; overflow: visible; }
-.slr-pt-porteria__red { transform-box: fill-box; transform-origin: 50% 0; }
 .slr-pt-carta--portero { left: 50%; width: min(24vw, 17vh, 150px); transform: translate3d(-50%, 0, 0); z-index: 3; }
 .slr-pt-carta--portero-arriba { top: calc(1.5% + var(--pt-porteria) * .12); }
 .slr-pt-carta--portero-abajo { bottom: calc(1.5% + var(--pt-porteria) * .12); }
@@ -2271,12 +2286,10 @@ html.slr-sin-seleccion input, html.slr-sin-seleccion textarea { -webkit-user-sel
   background: radial-gradient(circle, color-mix(in srgb, var(--c) 70%, transparent) 0%, color-mix(in srgb, var(--c) 25%, transparent) 35%, transparent 65%); }
 .slr-pt-brillo--arriba { top: calc(1.5% + var(--pt-porteria) * .12 + min(24vw, 17vh, 150px) * .7); }
 .slr-pt-brillo--abajo { top: calc(100% - 1.5% - var(--pt-porteria) * .12 - min(24vw, 17vh, 150px) * .7); }
-/* La red vista desde detrás de la portería: la malla llena la pantalla y los palos en los bordes */
-.slr-pt-red { position: absolute; inset: 0; z-index: 5; pointer-events: none; }
-.slr-pt-red__svg { position: absolute; inset: 0; width: 100%; height: 100%; transform-origin: 50% 45%; will-change: transform; }
-.slr-pt-red__palos { position: absolute; left: 5%; right: 5%; top: 6%; bottom: 0; border: min(3vw, 2vh, 16px) solid #fff; border-bottom: none;
-  box-shadow: 0 0 22px rgba(255,255,255,.35); }
-.slr-pt-balon--detras { z-index: 4; }
+/* Gol «red»: la portería vista de lado, en el centro (como img/slr/partido/gol-red.svg) */
+.slr-pt-golred { position: absolute; left: 50%; top: 38%; width: min(84vw, 62vh, 560px); aspect-ratio: 160 / 120; transform: translate(-50%, -50%); z-index: 5; color: #fff; }
+.slr-pt-golred .slr-pt-ico { position: absolute; inset: 0; }
+.slr-pt-golred__abombada { opacity: 0; transform-origin: 60% 50%; }
 .slr-pt-carta--mini { position: relative; width: min(64px, 8.5vh); }
 .slr-pt-carta--mejor { position: relative; width: min(40vw, 170px, 26vh); margin: 0 auto; }
 .slr-pt-carta.es-lesionada::after { content: "✚"; position: absolute; right: -8px; top: -8px; width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%;

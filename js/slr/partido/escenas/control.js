@@ -1,113 +1,131 @@
-/* Duelo de control (en cada jugada): una entrada de la variante y después la barra con la
-   probabilidad real (p del evento). Composición vertical: el rival arriba y tú abajo.
-   · botas: una bota baja desde arriba y otra sube desde abajo; golpean el balón a la vez y salta fuego
+/* Duelo de control (en cada jugada): la barra con la probabilidad real (p del evento)
+   y, A LA VEZ, la animación de la variante; su desenlace cae justo cuando el ganador
+   aplasta la barra. Composición vertical: el rival arriba y tú abajo.
+   · botas: entran por los lados (la tuya por la izquierda), pisan el balón y forcejean;
+     al final la del ganador se lo lleva hacia su campo y salta fuego
    · bote: el balón bota de arriba abajo, cada vez más rápido, y se queda en el lado del que gana
-   · escudos: las fotos de los dos equipos chocan en el centro y saltan rayos */
-import { poner, BOTA, foto, barra, inclinacion, balonEn, en, medidas } from './comun.js';
+   · escudos: las fotos de los dos equipos se empujan en el centro; al final el ganador
+     echa al otro y saltan rayos */
+import { pieza, foto, barra, inclinacion, balonEn, en, centrada, medidas, poner } from './comun.js';
 
-function datos(ctx) {
-  const d = ctx.d, T = ctx.T.control[d.completo ? 'completo' : 'rapido'];
+function empezar(ctx) {
+  const d = ctx.d, dur = ctx.T.control[d.completo ? 'completo' : 'rapido'];
   const pAbajo = ctx.lado(d.saca) === 'abajo' ? d.p : 1 - d.p;
-  return { T, pAbajo, ganaAbajo: ctx.lado(d.ganador) === 'abajo' };
+  const ganaAbajo = ctx.lado(d.ganador) === 'abajo';
+  const tb = barra(ctx, { pAbajo, ganaAbajo, en: 0, dur, sorpresa: d.sorpresa, inclina: inclinacion(ctx, d.poderes), titulo: ctx.texto('control') });
+  ctx.linea.en(tb.fin, () => {});
+  return { tb, ganaAbajo };
 }
-function conBarra(ctx, intro) {
-  const d = ctx.d, { T, pAbajo, ganaAbajo } = datos(ctx);
-  barra(ctx, { pAbajo, ganaAbajo, en: intro, dur: T.barra, sorpresa: d.sorpresa, inclina: inclinacion(ctx, d.poderes), titulo: 'Control del balón' });
-}
+// Reparte n momentos entre a y b (forcejeo)
+const pasos = (a, b, n) => Array.from({ length: n + 1 }, (_, k) => a + (b - a) * k / n);
 
 export function botas(ctx) {
-  const { T } = datos(ctx);
+  const { tb, ganaAbajo } = empezar(ctx);
   const { W, H } = medidas(ctx);
-  const cx = W / 2, cy = H * 0.4;
+  const cx = W / 2, cy = H * 0.42, A = tb.aplasta;
   const b = balonEn(ctx, cx, cy);
-  const golpe = T.intro * 0.5;
+  const bb = b.getBoundingClientRect().width;
+  const llegan = tb.pelea[0] + 250;
+  const golpes = pasos(llegan, A - 120, 7);
   const bota = lado => {
-    const el = poner(ctx, `<div class="slr-pt-bota" style="color:${ctx.color(ctx.lados[lado])}">${BOTA}</div>`);
-    const w = el.getBoundingClientRect().width, bb = b.getBoundingClientRect().width;
-    // La bota girada: la puntera mira al balón (arriba: hacia abajo; abajo: hacia arriba)
-    const s = lado === 'arriba' ? -1 : 1, giro = lado === 'arriba' ? 90 : -90;
-    const pegada = cy + s * (w / 2 + bb * 0.35), lejos = cy + s * H * 0.75;
-    const t = y => `translate3d(${cx}px, ${y.toFixed(1)}px, 0) translate(-50%, -50%) rotate(${giro}deg)`;
-    ctx.linea.anim(el, [
-      { transform: t(lejos), offset: 0 },
-      { transform: `${t(pegada)} rotate(${-s * 6}deg)`, offset: golpe / T.intro },
-      { transform: t(pegada + s * H * 0.06), offset: Math.min(0.85, golpe / T.intro + 0.18) },
-      { transform: t(lejos), opacity: 0, offset: 1 },
-    ], { dur: T.intro, easing: 'cubic-bezier(.5,0,.3,1)' });
+    const izq = lado === 'izq';
+    const l = izq ? ctx.lados.abajo : ctx.lados.arriba;      // la tuya (abajo) por la izquierda, como en el marcador
+    const gana = izq === ganaAbajo;
+    const el = pieza(ctx, 'bota', { color: ctx.color(l) });
+    const w = el.getBoundingClientRect().width;
+    const espejo = izq ? '' : ' scaleX(-1)';
+    const pegada = cx + (izq ? -1 : 1) * (w * 0.42 + bb * 0.35);
+    const fuera = cx + (izq ? -1 : 1) * (W * 0.5 + w);
+    const t = (x, y = cy + bb * 0.1, extra = '') => ({ transform: centrada(x, y, `${espejo}${extra}`) });
+    const f = [{ ...t(fuera), offset: 0 }, { ...t(pegada, undefined, ' rotate(-6deg)'), offset: llegan / A }];
+    // Forcejeo: empujan y ceden, cada vez con más fuerza
+    golpes.slice(1).forEach((g, k) => f.push({ ...t(pegada + (izq ? 1 : -1) * (k % 2 ? -1 : 1) * (3 + k), undefined, ` rotate(${k % 2 ? -4 : -9}deg)`), offset: g / A }));
+    f.push({ ...t(pegada, undefined, ' rotate(-6deg)'), offset: 1 });
+    ctx.linea.anim(el, f, { dur: A, easing: 'ease-in-out' });
+    // El desenlace: la del ganador chuta (gira) y se queda; la otra sale despedida
+    ctx.linea.anim(el, gana
+      ? [t(pegada, undefined, ' rotate(-6deg)'), t(pegada + (izq ? 1 : -1) * bb * 0.3, undefined, ' rotate(-28deg)'), t(pegada, undefined, ' rotate(-10deg)')]
+      : [t(pegada, undefined, ' rotate(-6deg)'), { ...t(fuera, cy - H * 0.05, ' rotate(30deg)'), opacity: 0 }],
+    { en: A, dur: 600, easing: 'cubic-bezier(.2,.8,.3,1)', fill: 'forwards' });
   };
-  bota('arriba'); bota('abajo');
-  ctx.linea.anim(b, [{ transform: en(cx, cy, ' scale(1)') }, { transform: en(cx, cy, ' scale(1.25) rotate(40deg)'), offset: 0.5 }, { transform: en(cx, cy, ' scale(1)') }],
-    { en: golpe, dur: 420, easing: 'ease-out' });
-  ctx.linea.anim(b, [{ opacity: 1 }, { opacity: 0 }], { en: T.intro - 150, dur: 200, fill: 'forwards' });
-  ctx.linea.en(golpe, () => {
+  bota('izq'); bota('der');
+  // El balón tiembla entre las dos botas y, al final, se va hacia el campo del ganador
+  ctx.linea.anim(b, golpes.map((g, k) => ({ transform: en(cx + (k % 2 ? 1 : -1) * (2 + k * 0.6), cy, ` rotate(${k * 25}deg)`), offset: g / A })), { dur: A, easing: 'linear' });
+  ctx.linea.anim(b, [{ transform: en(cx, cy) }, { transform: en(cx, cy + (ganaAbajo ? 1 : -1) * H * 0.2, ' rotate(540deg)'), opacity: 0.2 }],
+    { en: A, dur: 650, easing: 'cubic-bezier(.2,.8,.3,1)', fill: 'forwards' });
+  ctx.linea.en(llegan, () => { ctx.sonar('patada'); const [x, y] = ctx.centro(b); ctx.fx.chispas(x, y, 14, { color: '#ffffff', fuerza: 7 }); ctx.temblor(3, 0, 200); });
+  ctx.linea.en(A, () => {
     ctx.sonar('patada');
     const [x, y] = ctx.centro(b);
     ctx.fx.fuego(x, y, 34, { ancho: 60 });
     ctx.fx.chispas(x, y, 26, { color: '#ffd23a', fuerza: 11 });
     ctx.temblor(7, 0, 380);
   });
-  conBarra(ctx, T.intro);
 }
 
 export function bote(ctx) {
-  const { T, ganaAbajo } = datos(ctx);
+  const { tb, ganaAbajo } = empezar(ctx);
   const { W, H } = medidas(ctx);
-  const cx = W / 2, arriba = H * 0.16, abajo = H * 0.62, medio = H * 0.4;
+  const cx = W / 2, arriba = H * 0.16, abajo = H * 0.62, medio = H * 0.4, A = tb.aplasta;
   const b = balonEn(ctx, cx, medio);
-  // Botes de un lado a otro, cada vez más rápidos (los offsets se van juntando)
-  const n = ctx.d.completo ? 7 : 4;
-  const pasos = Array.from({ length: n }, (_, k) => 1 / (k + 1.6));
-  const total = pasos.reduce((s, x) => s + x, 0);
+  // Botes de un lado a otro, cada vez más rápidos; el último cae en el campo del ganador justo en A
+  const n = ctx.d.completo ? 9 : 5;
+  const largos = Array.from({ length: n }, (_, k) => 1 / (k + 1.6));
+  const total = largos.reduce((s, x) => s + x, 0);
   const frames = [{ transform: en(cx, medio, ' rotate(0deg) scale(1)'), offset: 0 }];
   let o = 0;
   for (let k = 0; k < n; k++) {
     const ultimo = k === n - 1;
     const destino = ultimo ? (ganaAbajo ? abajo : arriba) : (k % 2 ? abajo : arriba);
     const lateral = (k % 2 ? 1 : -1) * W * 0.12;
-    const mitad = o + pasos[k] / total / 2;
-    o += pasos[k] / total;
+    const mitad = o + largos[k] / total / 2;
+    o += largos[k] / total;
     frames.push({ transform: en(cx + lateral, (medio + destino) / 2, ` rotate(${k * 180 + 90}deg) scale(1.2)`), offset: Math.min(0.999, mitad) });
     frames.push({ transform: en(cx, destino, ` rotate(${k * 180 + 180}deg) scale(1)`), offset: Math.min(1, o) });
   }
-  ctx.linea.anim(b, frames, { dur: T.intro * 0.92, easing: 'linear' });
-  ctx.linea.anim(b, [{ opacity: 1 }, { opacity: 0 }], { en: T.intro - 120, dur: 160, fill: 'forwards' });
+  ctx.linea.anim(b, frames, { dur: A, easing: 'linear' });
   let t = 0;
-  for (let k = 0; k < n; k++) { t += pasos[k] / total; if (k < 4) ctx.linea.en(T.intro * 0.92 * t, () => ctx.sonar('bote')); }
-  ctx.linea.en(T.intro * 0.9, () => {
+  for (let k = 0; k < n - 1; k++) { t += largos[k] / total; if (k % 2 === 0) ctx.linea.en(A * t, () => ctx.sonar('bote')); }
+  ctx.linea.en(A, () => {
     const [x, y] = ctx.centro(b);
-    ctx.fx.chispas(x, y, 18, { color: ctx.color(ctx.d.ganador), fuerza: 8 });
+    ctx.fx.chispas(x, y, 22, { color: ctx.color(ctx.d.ganador), fuerza: 9 });
+    ctx.temblor(4, 0, 260);
   });
-  conBarra(ctx, T.intro);
 }
 
 export function escudos(ctx) {
-  const { T } = datos(ctx);
+  const { tb, ganaAbajo } = empezar(ctx);
   const { W, H } = medidas(ctx);
-  const cx = W / 2, cy = H * 0.4;
-  const choque = T.intro * 0.5;
+  const cx = W / 2, cy = H * 0.4, A = tb.aplasta;
+  const llegan = tb.pelea[0] + 300;
+  const empujes = pasos(llegan, A - 100, 6);
   const uno = lado => {
     const l = ctx.lados[lado];
+    const gana = (lado === 'abajo') === ganaAbajo;
     const el = poner(ctx, '<div class="slr-pt-escudo"></div>');
     el.appendChild(foto(ctx, l, 'slr-pt-foto--grande'));
     const r = el.getBoundingClientRect().height;
     const s = lado === 'arriba' ? -1 : 1;
-    const t = (y, extra = '') => `translate3d(${cx}px, ${y.toFixed(1)}px, 0) translate(-50%, -50%)${extra}`;
-    ctx.linea.anim(el, [
-      { transform: t(cy + s * H * 0.7, ' scale(.8)'), offset: 0 },
-      { transform: t(cy + s * r * 0.42, ' scale(1.1)'), offset: choque / T.intro },
-      { transform: t(cy + s * r * 0.95, ' scale(1)'), offset: Math.min(0.9, choque / T.intro + 0.2) },
-      { transform: t(cy + s * r * 0.95, ' scale(1)'), opacity: 0, offset: 1 },
-    ], { dur: T.intro, easing: 'cubic-bezier(.6,0,.4,1)' });
+    const t = (y, extra = '') => ({ transform: centrada(cx, y, extra) });
+    const junto = cy + s * r * 0.45;
+    const f = [{ ...t(cy + s * H * 0.7, ' scale(.8)'), offset: 0 }, { ...t(junto, ' scale(1.05)'), offset: llegan / A }];
+    // Se empujan: ahora uno, ahora el otro
+    empujes.slice(1).forEach((g, k) => f.push({ ...t(junto + s * (k % 2 ? 1 : -1) * (4 + k * 1.5), ` scale(${k % 2 ? 1 : 1.08})`), offset: g / A }));
+    f.push({ ...t(junto, ' scale(1.05)'), offset: 1 });
+    ctx.linea.anim(el, f, { dur: A, easing: 'ease-in-out' });
+    // El desenlace: el ganador avanza; el otro sale despedido
+    ctx.linea.anim(el, gana ? [t(junto, ' scale(1.05)'), t(cy + s * r * 0.15, ' scale(1.2)'), t(cy + s * r * 0.3, ' scale(1.1)')]
+      : [t(junto, ' scale(1.05)'), { ...t(cy + s * H * 0.6, ' scale(.7) rotate(25deg)'), opacity: 0 }], { en: A, dur: 600, easing: 'cubic-bezier(.2,.8,.3,1)', fill: 'forwards' });
   };
   uno('arriba'); uno('abajo');
-  ctx.linea.en(choque, () => {
+  const choque = () => { const e = ctx.escenario.getBoundingClientRect(); return [e.left + cx, e.top + cy]; };
+  ctx.linea.en(llegan, () => { ctx.sonar('choque'); const [x, y] = choque(); ctx.fx.chispas(x, y, 20, { color: '#ffffff', fuerza: 8 }); ctx.temblor(4, 0, 260); });
+  ctx.linea.en(A, () => {
     ctx.sonar('choque');
-    const e = ctx.escenario.getBoundingClientRect();
-    const x = e.left + cx, y = e.top + cy;
-    ctx.fx.explotar(x, y, '#ffffff');
+    const [x, y] = choque();
+    ctx.fx.explotar(x, y, ctx.color(ctx.d.ganador));
     ctx.fx.chispas(x, y, 30, { color: ctx.color(ctx.lados.abajo), fuerza: 10 });
     ctx.fx.chispas(x, y, 30, { color: ctx.color(ctx.lados.arriba), fuerza: 10 });
     ctx.temblor(8, 0, 420);
   });
-  conBarra(ctx, T.intro);
 }

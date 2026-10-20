@@ -1452,3 +1452,60 @@ Medido con `tests/slr/banco/rendimiento-apertura.mjs`: Chrome a 390×844 (DPR 2,
     - nada se sale de la pantalla en el 30, 60 y 95 %;
     - los textos duran al menos lo de la regla;
     - con CPU ×6, fluido.
+
+## Reproducción animada de los partidos (4.ª entrega: archivo de ajustes, iconos y correcciones)
+
+### Decisiones de Marcos
+
+- **Archivo de ajustes para tocar a mano:** `js/slr/partido/ajustes.js`. Un solo objeto con secciones y un comentario en cada valor (qué hace, unidades y rango). Contiene:
+  - tiempos y regla de lectura;
+  - velocidad de la pelea de las barras;
+  - fondo: velocidad del césped por escena y ancho de las franjas;
+  - textos (listas: si hay varios, uno al azar con el PRNG de la animación);
+  - efectos: temblor, partículas, tamaño del balón;
+  - ritmo: umbrales de igualado y de sorpresa.
+
+  El resto del código lee solo de ahí. Un valor no válido usa el de por defecto con un aviso en la consola, sin romper nada.
+- **Tiempos:** a mitad de camino entre la 2.ª y la 3.ª entrega; a partir de ahí los ajusta Marcos.
+- **Fallos:**
+  - el césped dejaba una franja negra abajo: ahora cubre toda la escena y las franjas se reciclan fuera de la vista;
+  - en las escenas con barra, la animación va a la vez que la barra y su desenlace coincide con el golpe final.
+- **Escenas:**
+  - control «botas»: de nuevo las botas entrando por los lados;
+  - ataque: el balón siempre rodando y girando en un sitio fijo, con el césped corriendo debajo y una microvibración;
+  - chut: chispas en el punto de choque con el portero;
+  - gol «red»: la portería de lado, el balón entra y la red se abomba (como `img/slr/partido/gol-red.svg`);
+  - gol «chilena»: la bota boca abajo golpea el balón, que entra haciendo un tirabuzón.
+- **Iconos con un mismo estilo** (trazo de un color, grosor uniforme, esquinas redondeadas, sin rellenos, `currentColor`), como SVG sueltos en `img/slr/partido/`.
+
+### Decisiones mías
+
+- **Carga de los ajustes (`config.js`):**
+  - tiene los valores por defecto con su rango (el esquema) y valida cada valor de `ajustes.js`;
+  - ajusta a su sitio: números en rango (los enteros se redondean), listas de textos no vacíos (un texto suelto vale como lista de uno), opciones de una lista (el ritmo del césped);
+  - avisa de las claves que faltan o sobran;
+  - `ajustes.js` se carga con un `import()` protegido: si tiene un error de escritura, se usan todos los de por defecto y se avisa;
+  - un test comprueba que `ajustes.js` coincide con los de por defecto.
+- **Los dos SVG de referencia (`bota.svg` y `gol-red.svg`) no estaban** en el repositorio ni en el disco. Los he dibujado siguiendo la descripción.
+- **Iconos** (todos con trazo 3,5 sobre 64 y extremos redondeados):
+  - `bota`, `balon`, `puno`, `guante` (la atrapada usa dos, uno en espejo) y `brazo`;
+  - `porteria` (palos) y `porteria-red` (red, por separado para hundirla);
+  - `gol-red-porteria`, `gol-red-red` y `gol-red-red-abombada` (las piezas que se animan);
+  - `gol-red.svg`, la referencia de cómo queda al final.
+
+  Se pintan como máscara CSS con el color del texto (el del equipo o blanco), así que se cambian solo con sustituir el archivo. Se piden al abrir el reproductor. El balón lleva un círculo oscuro detrás para leerse sobre el césped.
+- **Césped:** pasa a la raíz de la capa (detrás del marcador y los controles, que ahora son translúcidos) y sobresale dos franjas por arriba y por abajo: la animación recorre exactamente dos franjas, así que se recicla fuera de la vista. Cada escena toma su ritmo de `fondo.escenas`, en el sentido de quien ataca.
+- **Barra y animación a la vez:** `barra()` devuelve `{ pelea, aplasta, fin }` y las escenas colocan su desenlace en `aplasta`:
+  - control: las botas forcejean y la del ganador chuta; el balón bota y cae en el lado del ganador; los escudos se empujan y el ganador echa al otro;
+  - chut: el balón empuja contra el portero y, al aplastar, entra o rebota.
+
+  Las animaciones del desenlace usan `fill: 'forwards'`, para no tapar el forcejeo.
+- **Tiempos** (todos en `ajustes.js`):
+  - saque: 2,3 s (1,6 s quieto);
+  - control completo: 4,2 s (con la barra);
+  - chut completo: 2,8 s;
+  - lectura: 1,2 s + 0,2 s por palabra.
+- **Parada:** durante el gesto la carta del portero se atenúa, para que se lean los guantes.
+- **Tests:**
+  - `partido-ajustes.test.mjs`: ajustes iguales a los de por defecto; valores no válidos usan el de por defecto con aviso; enteros y rangos; lectura y textos al azar con la semilla.
+  - `banco/partido.mjs`, además de lo de antes: el césped cubre siempre toda la pantalla, y en control y chut la barra y la animación se ven a la vez.

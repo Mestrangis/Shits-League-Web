@@ -14,14 +14,14 @@
    · Temblores solo visuales: nada de vibración del dispositivo.
 ═══════════════════════════════════════════════ */
 import { abrirCapa, cerrarHasta, esc } from '../ui.js';
-import { TIEMPOS } from './config.js';
+import { AJUSTES, TIEMPOS, texto } from './config.js';
 import { Linea } from './linea.js';
 import { decorar, prng } from './azar.js';
 import { REGISTRO, VARIANTES } from './escenas/registro.js';
 import { sonar, silenciado, silenciar } from './sonido.js';
 import { Particulas, sprite } from '../particulas.js';
 import { cargarFotos } from '../imagenes.js';
-import { foto, framesTemblor } from './escenas/comun.js';
+import { foto, framesTemblor, ICONOS, urlIcono } from './escenas/comun.js';
 
 export const COLORES = Object.freeze({ abajo: '#39FF88', arriba: '#FF8A3D' });
 
@@ -44,30 +44,36 @@ export function reproducir(guion, cartas = {}, opts = {}) {
   const el = document.createElement('div');
   el.className = 'slr-partido';
   el.dataset.partidoReproductor = '';
+  // Del archivo de ajustes: el tamaño del balón y el ancho de las franjas del césped
+  el.style.setProperty('--pt-balon-max', `${AJUSTES.efectos.balon}px`);
+  el.style.setProperty('--pt-franja', `${AJUSTES.fondo.franja}px`);
   const gol = l => `<b class="slr-pt-marcador__goles" data-goles="${l}">0</b>`;
   el.innerHTML = `
+    <div class="slr-pt-cesped" data-cesped aria-hidden="true"></div>
     <canvas class="slr-partido__lienzo" aria-hidden="true"></canvas>
     <header class="slr-pt-marcador">
       <div class="slr-pt-marcador__eq slr-pt-marcador__eq--izq" style="--c:${COLORES.abajo}"><span data-foto="${lados.abajo}"></span><span class="slr-pt-marcador__nombre">${esc(equipo(lados.abajo).nombre ?? '')}</span></div>
       <div class="slr-pt-marcador__centro">${gol(lados.abajo)}<span class="slr-pt-reloj" data-reloj>0'</span>${gol(lados.arriba)}</div>
       <div class="slr-pt-marcador__eq slr-pt-marcador__eq--der" style="--c:${COLORES.arriba}"><span class="slr-pt-marcador__nombre">${esc(equipo(lados.arriba).nombre ?? '')}</span><span data-foto="${lados.arriba}"></span></div>
     </header>
-    <div class="slr-pt-temblor" data-temblor><div class="slr-pt-cesped" data-cesped aria-hidden="true"></div><div class="slr-pt-escenario" data-escenario></div></div>
+    <div class="slr-pt-temblor" data-temblor><div class="slr-pt-escenario" data-escenario></div></div>
     <nav class="slr-pt-controles">
       <button type="button" class="slr-pt-boton" data-silencio aria-label="Silenciar"></button>
       <button type="button" class="slr-pt-boton" data-velocidad>×1</button>
       ${opts.soloEscenas ? '<button type="button" class="slr-pt-boton" data-pausa>⏸</button>' : ''}
-      <span class="slr-pt-pista" data-pista>Toca para avanzar</span>
+      <span class="slr-pt-pista" data-pista>${esc(texto('toca'))}</span>
       <button type="button" class="slr-pt-boton slr-pt-boton--saltar" data-saltar>${opts.soloEscenas ? 'Cerrar' : 'Saltar ⏭'}</button>
     </nav>`;
   const $ = s => el.querySelector(s);
   const escenario = $('[data-escenario]'), temblorEl = $('[data-temblor]'), reloj = $('[data-reloj]');
-  const ctxBase = { T: TIEMPOS, lados, lado: ladoDe, hacia, color, equipo, carta, sonar };
+  const ctxBase = { T: TIEMPOS, A: AJUSTES, lados, lado: ladoDe, hacia, color, equipo, carta, sonar };
+  // Los iconos (máscaras) se piden ya, para que no aparezcan vacíos la primera vez
+  for (const n of ICONOS) { const im = new Image(); im.src = urlIcono(n); }
   for (const f of el.querySelectorAll('[data-foto]')) f.replaceWith(foto(ctxBase, f.dataset.foto));
 
   // ── Estado ──
   let i = -1, linea = null, vivo = true, frame = 0, ultimo = 0, vel = opts.velocidad ?? 1, espera = 0, visto = false;
-  let minuto = 0, objetivoMinuto = 0, pasoMinuto = TIEMPOS.minuto_max, acumMinuto = 0;
+  let minuto = 0, objetivoMinuto = 0, pasoMinuto = TIEMPOS.reloj_minuto_max, acumMinuto = 0;
   const goles = [0, 0];
 
   // ── Canvas de partículas ──
@@ -83,11 +89,12 @@ export function reproducir(guion, cartas = {}, opts = {}) {
   // ── Césped: franjas que corren en el sentido del ataque (una sola animación infinita) ──
   // sentido: 'baja' (las franjas bajan: se avanza hacia arriba) · 'sube' · null (quieto)
   const cespedEl = $('[data-cesped]');
-  const animCesped = cespedEl.animate([{ transform: 'translate3d(0, -128px, 0)' }, { transform: 'translate3d(0, 0, 0)' }],
-    { duration: 2 * TIEMPOS.cesped.normal, iterations: Infinity, easing: 'linear' });
+  const F = AJUSTES.fondo.franja, VEL = AJUSTES.fondo.velocidad;
+  // El césped sobresale dos franjas por arriba y por abajo: al moverse una vuelta (dos franjas), nunca deja hueco
+  const BAJAN = [{ transform: 'translate3d(0, 0, 0)' }, { transform: `translate3d(0, ${2 * F}px, 0)` }];
+  const SUBEN = [{ transform: `translate3d(0, ${2 * F}px, 0)` }, { transform: 'translate3d(0, 0, 0)' }];
+  const animCesped = cespedEl.animate(BAJAN, { duration: 2 * VEL.normal, iterations: Infinity, easing: 'linear' });
   let cespedRitmo = 0, cespedSentido = 1;   // velocidad (0: quieto) y sentido (1: las franjas bajan)
-  const BAJAN = [{ transform: 'translate3d(0, -128px, 0)' }, { transform: 'translate3d(0, 0, 0)' }];
-  const SUBEN = [{ transform: 'translate3d(0, 0, 0)' }, { transform: 'translate3d(0, -128px, 0)' }];
   const aplicarCesped = () => {
     if (!cespedRitmo) { animCesped.pause(); return; }
     animCesped.playbackRate = Math.abs(cespedRitmo) * vel;
@@ -97,7 +104,7 @@ export function reproducir(guion, cartas = {}, opts = {}) {
     if (animCesped.playState !== 'running') animCesped.play();
   };
   const cesped = (sentido, ritmo = 'normal') => {
-    cespedRitmo = !sentido ? 0 : (sentido === 'baja' ? 1 : -1) * (TIEMPOS.cesped.normal / (TIEMPOS.cesped[ritmo] ?? TIEMPOS.cesped.normal));
+    cespedRitmo = !sentido || ritmo === 'parado' ? 0 : (sentido === 'baja' ? 1 : -1) * (VEL.normal / (VEL[ritmo] ?? VEL.normal));
     aplicarCesped();
   };
   // Para quien ataca: si sube, las franjas bajan
@@ -124,7 +131,7 @@ export function reproducir(guion, cartas = {}, opts = {}) {
     const sig = escenas.slice(desde + 1).find(x => x.tipo === 'saque' || x.tipo === 'final');
     objetivoMinuto = Math.max(minuto, (sig?.tipo === 'final' ? 90 : (sig?.minuto ?? minuto + 1)) - 1);
     const estimado = sig?.tipo === 'final' ? 6000 : 9000;
-    pasoMinuto = Math.min(TIEMPOS.minuto_max, estimado / Math.max(1, objetivoMinuto - minuto));
+    pasoMinuto = Math.min(TIEMPOS.reloj_minuto_max, estimado / Math.max(1, objetivoMinuto - minuto));
     acumMinuto = 0;
     pintarReloj();
   }
@@ -133,9 +140,12 @@ export function reproducir(guion, cartas = {}, opts = {}) {
   function montar(k) {
     escenario.replaceChildren();
     temblorEl.style.transform = '';
-    cesped('baja', 'lento');   // por defecto, un paseo suave; cada escena lo cambia
     fx.vaciar();
     const d = escenas[k];
+    // El césped de esta escena (ajustes: fondo.escenas), en el sentido del que ataca
+    const ritmo = AJUSTES.fondo.escenas[d.tipo] ?? 'lento';
+    const quien = d.equipo ?? d.saca;
+    if (quien) cespedAtaque(quien, ritmo); else cesped('baja', ritmo);
     pintarGoles(d.marcador ?? goles);
     prepararReloj(k);
     const variantes = REGISTRO[d.tipo];
@@ -143,6 +153,8 @@ export function reproducir(guion, cartas = {}, opts = {}) {
     const l = new Linea();
     if (!crear) { l.en(1, () => {}); return l; }
     fx.rng = prng(d.semilla ?? k);
+    fx.factor = AJUSTES.efectos.particulas;
+    const rngTextos = prng((d.semilla ?? k) ^ 0x2545f491);
     const ctx = {
       ...ctxBase, d, linea: l, escenario, fx, rng: prng((d.semilla ?? k) ^ 0x5bd1e995),
       centro: n => { const r = n.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; },
@@ -150,6 +162,7 @@ export function reproducir(guion, cartas = {}, opts = {}) {
       temblor: (fuerza, en = 0, dur = 400) => { temblorEl.animate(framesTemblor(fuerza), { delay: en / vel, duration: dur / vel, easing: 'linear' }); },
       marcador: (g, l) => pintarGoles(g, l),
       cesped, cespedAtaque,
+      texto: clave => texto(clave, rngTextos),
     };
     try { crear(ctx); } catch (e) { console.error('[partido] escena', d.tipo, d.variante, e); }
     cargarFotos(escenario.querySelectorAll('.slr-carta'));
@@ -192,7 +205,7 @@ export function reproducir(guion, cartas = {}, opts = {}) {
     else if (linea && !linea.terminada) linea.avanzar(dt * vel);
     else if (linea?.terminada) {
       espera += dt * vel;
-      if (espera >= TIEMPOS.hueco) { espera = 0; siguiente(); }
+      if (espera >= TIEMPOS.entre_escenas) { espera = 0; siguiente(); }
     }
     if (minuto < objetivoMinuto) {
       acumMinuto += dt * vel;

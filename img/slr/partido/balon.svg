@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 64 64"><!-- Balón -->
+  <circle cx="32" cy="32" r="26"/>
+  <path d="M32 21.5l9.5 6.9-3.6 11.2H26.1l-3.6-11.2z"/>
+  <path d="M32 21.5V7M41.5 28.4l13.2-4.6M37.9 39.6l8.4 11.2M26.1 39.6l-8.4 11.2M22.5 28.4L9.3 23.8"/>
+</svg>

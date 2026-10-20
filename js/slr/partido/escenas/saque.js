@@ -5,8 +5,7 @@ import { esc } from '../../ui.js';
 
 export function cruce(ctx) {
   const T = ctx.T.saque, l = ctx.d.equipo, nombre = ctx.equipo(l).nombre ?? '';
-  ctx.cespedAtaque(l, 'normal');
-  const { el, fin } = franja(ctx, `<span class="slr-pt-franja__foto"></span><b>${esc(nombre)}</b><em>ATACA ${ctx.hacia(l) < 0 ? '▲' : '▼'}</em>`,
+  const { el, fin } = franja(ctx, `<span class="slr-pt-franja__foto"></span><b>${esc(nombre)}</b><em>${esc(ctx.texto('ataca'))} ${ctx.hacia(l) < 0 ? '▲' : '▼'}</em>`,
     { entra: T.entra, queda: T.queda, sale: T.sale, texto: `${nombre} ataca`, color: ctx.color(l), clase: `slr-pt-franja--${ctx.lado(l)}` });
   el.querySelector('.slr-pt-franja__foto').replaceWith(foto(ctx, l));
   ctx.linea.en(80, () => ctx.sonar('saque', { equipo: l }));

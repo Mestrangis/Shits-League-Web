@@ -2,7 +2,8 @@
 //  · Muestrario (Modo pruebas) a 360 y 412 px y en PC (1366×768): cada escena y cada
 //    variante (a 412 px, también con el rival atacando hacia abajo) se reproduce y, en el
 //    30, 60 y 95 %, nada importante se sale de la pantalla. Capturas de cada una. Los
-//    textos duran al menos lo que manda la regla de lectura. CPU ×6: fluido.
+//    textos duran al menos lo que manda la regla de lectura (ajustes.js). El césped cubre
+//    siempre toda la pantalla y, en las escenas con barra, la animación va a la vez. CPU ×6: fluido.
 //  · Tu partido sin ver: la clasificación no cuenta esa jornada, el calendario, la pestaña
 //    Equipo y el aviso no enseñan el resultado. La primera vez se reproduce solo (desde el
 //    aviso): tap, ×2, «Saltar» al final con el resultado; al terminar, la crónica, y ya
@@ -15,6 +16,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { env, rpcOk, rpc, leer } from '../api-util.mjs';
+import { leer as tiempoLectura } from '../../../js/slr/partido/config.js';
 
 const SALIDA = process.env.SALIDA;
 const SOLO = process.env.SOLO ? new Set(process.env.SOLO.split(',')) : null;
@@ -120,7 +122,7 @@ try {
     const p = q('[data-p]'); p.value = ${o.p ?? 50}; p.dispatchEvent(new Event('input'));
     q('[data-version]').value = ${JSON.stringify(o.version ?? 'completa')}; q('[data-poder]').value = ${JSON.stringify(o.poder ?? '')}; return 0; })()`);
   // Textos de la escena y cuánto llevan en pantalla: ninguno se va antes de leer(texto)
-  const MIN_TEXTO = t => 1500 + 250 * t.trim().split(/\s+/).filter(Boolean).length;
+  const MIN_TEXTO = t => tiempoLectura(t);   // la regla de ajustes.js (lectura)
 
   for (const pt of PANTALLAS) {
     console.log(`\nMuestrario · ${pt.nombre}`);
@@ -156,6 +158,17 @@ try {
         if (typeof f === 'string') { malos.push(f); break; }
         if (f.sw > f.vw || f.cw !== f.vw) malos.push(`capa ${f.cw}/${f.vw}, scrollWidth ${f.sw}`);
         malos.push(...f.malos.map(x => `${frac * 100} %: ${x}`));
+        const extra = await ev(`(() => {
+          const capa = document.querySelector('[data-partido-reproductor]'), R = capa.getBoundingClientRect();
+          const c = capa.querySelector('.slr-pt-cesped').getBoundingClientRect();
+          const op = n => { let x = n, o = 1; while (x && x !== capa) { o *= Number(getComputedStyle(x).opacity); x = x.parentElement; } return o; };
+          const barra = capa.querySelector('.slr-pt-barra');
+          const piezas = [...capa.querySelectorAll('.slr-pt-pieza, .slr-pt-escudo, .slr-pt-balon')].filter(n => op(n) > 0.5).length;
+          return { cubre: c.top <= R.top + 1 && c.bottom >= R.bottom - 1 && c.left <= R.left + 1 && c.right >= R.right - 1,
+            barra: barra ? op(barra) : null, piezas };
+        })()`);
+        if (!extra.cubre) malos.push(`${frac * 100} %: el césped no cubre toda la pantalla`);
+        if ((tipo === 'control' || tipo === 'chut') && frac === 0.6 && !(extra.barra > 0.8 && extra.piezas > 0)) malos.push(`60 %: barra (${extra.barra}) y animación (${extra.piezas} piezas) no van a la vez`);
         await foto(`${nombre}-${k}`);
         if (k < 3) await ev(`document.querySelector('[data-partido-reproductor]')?.reproductor.reanudar(); 0`);   // la última se cierra en pausa
       }
@@ -175,7 +188,7 @@ try {
         await ev(`document.querySelector('[data-partido-reproductor]')?.reproductor.pausar(); 0`);
         await cerrarReproductor();
       }
-      check(!cortos.length, 'los textos se quedan al menos 1,5 s + 0,25 s por palabra', cortos.join(' | '));
+      check(!cortos.length, 'los textos se quedan al menos lo que dice ajustes.js (lectura)', cortos.join(' | '));
     }
     // Fluidez: una jugada entera con gol, con la CPU ×6 (un Android normal)
     if (!SOLO && pt.movil) {

@@ -17,7 +17,7 @@ export function vs(ctx) {
   };
   bloque(ctx.lados.arriba);
   bloque(ctx.lados.abajo);
-  rotulo(ctx, 'VS', { en: T.entrada - 150, dur: T.total - T.entrada - 250, clase: 'slr-pt-rotulo--vs' });
+  rotulo(ctx, ctx.texto('vs'), { en: T.entrada - 150, dur: T.total - T.entrada - 250, clase: 'slr-pt-rotulo--vs' });
   ctx.linea.en(T.entrada - 100, () => {
     const [x, y] = ctx.centro(ctx.escenario);
     ctx.fx.chispas(x, y, 34, { color: '#ffffff', fuerza: 10 });

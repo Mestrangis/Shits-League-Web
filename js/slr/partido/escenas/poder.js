@@ -8,7 +8,7 @@ export function carta(ctx) {
   const T = ctx.T.poder, d = ctx.d, lado = ctx.lado(d.equipo);
   const total = Math.max(T.total, T.entrada + leer(`poder ${d.poder}`) + 400);
   const c = cartaPartido(ctx, d.carta, `slr-pt-carta--poder slr-pt-carta--${lado}`);
-  const nombre = poner(ctx, `<div class="slr-pt-poder slr-pt-poder--${lado}" style="--c:${ctx.color(d.equipo)}"><small>⚡ PODER</small><b>${esc(d.poder)}</b></div>`);
+  const nombre = poner(ctx, `<div class="slr-pt-poder slr-pt-poder--${lado}" style="--c:${ctx.color(d.equipo)}"><small>${esc(ctx.texto('poder'))}</small><b>${esc(d.poder)}</b></div>`);
   const desde = lado === 'arriba' ? '-160%' : '160%';
   const o = x => x / total;
   ctx.linea.anim(c, [
