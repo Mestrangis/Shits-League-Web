@@ -37,7 +37,7 @@ export const AJUSTES = {
                silbato: 1300 },// ms hasta que suena el silbato inicial (0–5000)
     saque:   { entra: 350,     // ms que tarda la franja en entrar; 0 = aparece de golpe (0–1000)
                queda: 1600,    // ms quieta en el centro, como mínimo (la regla de LECTURA puede alargarla) (500–5000)
-               sale: 150 },    // ms que tarda en salir; 0 = desaparece de golpe (0–1000)
+               sale: 25 },    // ms que tarda en salir; 0 = desaparece de golpe (0–1000)
     poder:   { total: 2300,    // ms que se ve la carta con su poder (1000–6000)
                entrada: 550 }, // ms que tarda en entrar la carta (0–1500)
 
