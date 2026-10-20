@@ -298,10 +298,28 @@ try {
   await esperar(`!!document.querySelector('.slr-avisos')`, 5000);
   const aviso = await ev(`[...document.querySelectorAll('.slr-aviso__texto')].map(x => x.textContent).find(x => /Jornada 1/.test(x)) ?? ''`);
   check(/ya se ha jugado/.test(aviso) && !/cobrado/.test(aviso), `aviso de la jornada sin resultado ni cobros: «${aviso.replace(/\\s+/g, ' ').trim().slice(0, 70)}»`);
+  // Screen Wake Lock falso (en headless no hay): cuenta lo que se pide y lo que se suelta
+  const wakeLockFalso = (rechaza = false) => ev(`(() => { window.__wl = { pedidos: 0, soltados: 0, bloqueos: [] };
+    Object.defineProperty(navigator, 'wakeLock', { configurable: true, value: { request: async tipo => {
+      window.__wl.pedidos++;
+      if (${rechaza}) throw new DOMException('No', 'NotAllowedError');
+      const b = new EventTarget(); b.type = tipo; b.released = false;
+      b.release = async () => { if (b.released) return; b.released = true; window.__wl.soltados++; b.dispatchEvent(new Event('release')); };
+      window.__wl.bloqueos.push(b); return b; } } });
+    return 0; })()`);
+  await wakeLockFalso();
   // Desde el aviso: se reproduce solo
   await ev(`[...document.querySelectorAll('[data-aviso]')].find(b => /ya se ha jugado/.test(b.textContent))?.click(); 0`);
   check(await esperar(`document.querySelector('[data-partido-reproductor]')?.dataset.escena === 'inicio'`, 10000), 'la primera vez, el partido se reproduce solo (desde el aviso)');
   check(!(await ev(`!!document.querySelector('.slr-cronica')`)), 'sin la crónica debajo (no se ve el resultado)');
+  await dormir(200);
+  const wl1 = await ev(`({ ...window.__wl, tipo: window.__wl.bloqueos[0]?.type, on: document.querySelector('[data-partido-reproductor]').reproductor.pantallaEncendida })`);
+  check(wl1.pedidos === 1 && wl1.tipo === 'screen' && wl1.on, `pantalla encendida: se pide al empezar (${wl1.pedidos} petición, «${wl1.tipo}»)`);
+  // Cambiar de app y volver: el navegador lo suelta solo y se vuelve a pedir
+  await ev(`window.__wl.bloqueos[0].release(); document.dispatchEvent(new Event('visibilitychange')); 0`);
+  await dormir(200);
+  const wl2 = await ev(`({ ...window.__wl, on: document.querySelector('[data-partido-reproductor]').reproductor.pantallaEncendida })`);
+  check(wl2.pedidos === 2 && wl2.on, `pantalla encendida: al volver a la app se pide otra vez (${wl2.pedidos} peticiones)`);
   await dormir(900);
   await foto('real-1-inicio');
   const nombres = await ev(`[...document.querySelectorAll('.slr-pt-marcador__nombre')].map(n => n.textContent)`);
@@ -333,7 +351,62 @@ try {
   const f = await fuera();
   check(typeof f === 'object' && !f.malos.length, 'el final cabe en la pantalla', JSON.stringify(f));
   check(await esperar(`!document.querySelector('[data-partido-reproductor]')`, 12000), 'al terminar se cierra');
-  check(await esperar(`!!document.querySelector('.slr-cronica [data-ver-partido]')`, 8000), 'y queda la crónica como resumen, con «▶ Ver partido»');
+  const wl3 = await ev(`({ pedidos: window.__wl.pedidos, sueltos: window.__wl.bloqueos.every(b => b.released) })`);
+  check(wl3.sueltos && wl3.pedidos === 2, 'pantalla encendida: al cerrar se suelta (y no se vuelve a pedir)');
+  check(await esperar(`!!document.querySelector('.slr-cronica [data-ver-partido]')`, 8000), 'y queda la pantalla del partido, con «▶ Ver partido»');
+  // La pantalla del partido, de arriba abajo
+  await esperar(`!!document.querySelector('.slr-pp__lista li')`, 5000);
+  const leerPP = () => ev(`(() => { const r = document.querySelector('.slr-pp'); if (!r) return null; const q = s => r.querySelector(s);
+    const ancho = document.documentElement.clientWidth;
+    return { goles: q('.slr-pp__resultado b').textContent.replace(/\\s/g, ''), goleadores: r.querySelectorAll('.slr-pp__goleadores li').length,
+      izq: q('.slr-pp__eq--izq b').textContent, fotos: r.querySelectorAll('.slr-pp__foto').length,
+      filas: [...r.querySelectorAll('.slr-pp__fila > span:not(.slr-pp__barra)')].map(x => x.textContent), previa: !!q('.slr-pp__previa'),
+      cartas: [...r.querySelectorAll('.slr-pp__alineaciones .slr-carta')].map(c => Math.round(c.getBoundingClientRect().width)),
+      lineas: r.querySelectorAll('.slr-pp__alineacion').length,
+      notas: r.querySelectorAll('.slr-pp__lista li').length, mejor: r.querySelectorAll('.slr-pp__lista li.es-mejor').length,
+      ordenNotas: [...r.querySelectorAll('.slr-pp__nota')].map(b => Number(b.textContent.replace(',', '.'))),
+      jugadas: r.querySelectorAll('.slr-pp__cronica .slr-jugada').length,
+      orden: [...r.querySelectorAll('.slr-pp__cabeza, .slr-pp__estadisticas, .slr-pp__alineaciones, .slr-pp__notas, .slr-pp__cronica')].map(x => x.className.match(/slr-pp__(cabeza|estadisticas|alineaciones|notas|cronica)/)[1]),
+      fuera: [...r.querySelectorAll('.slr-pp__cabeza, .slr-pp__fila, .slr-pp__carta, .slr-pp__jugador, .slr-jugada')].filter(x => { const b = x.getBoundingClientRect(); return b.width && (b.left < -1 || b.right > ancho + 1); }).length,
+      scroll: document.documentElement.scrollWidth <= ancho };
+  })()`);
+  const pp = await leerPP();
+  const golesTxt = `${esperados[0]}–${esperados[1]}`;
+  check(pp && pp.goles === golesTxt && pp.goleadores === esperados[0] + esperados[1] && pp.izq === 'Bot Uno FC' && pp.fotos === 2,
+    `cabecera: tu equipo a la izquierda, ${pp?.goles} y ${pp?.goleadores} goleadores`, JSON.stringify(pp && { goles: pp.goles, goleadores: pp.goleadores, izq: pp.izq, fotos: pp.fotos }));
+  const FILAS = ['Posesión', 'Robos', 'Ataques que superan la defensa', 'Cortes', 'Tiros a puerta', 'Goles esperados', 'Paradas', 'Poderes activados'];
+  check(JSON.stringify(pp?.filas) === JSON.stringify(FILAS) && pp.previa, 'estadísticas: las 8 filas comparadas y la probabilidad de antes del partido', JSON.stringify(pp?.filas));
+  check(pp?.lineas === 2 && pp.cartas.length >= 14 && pp.cartas.every(w => w >= 40), `alineaciones: las dos, con ${pp?.cartas.length} cartas de verdad`, JSON.stringify(pp?.cartas));
+  check(pp?.notas === pp?.cartas.length && pp.mejor === 1
+    && pp.ordenNotas.every((n, k) => k === 0 || pp.ordenNotas[k - 1] >= n), `notas: ${pp?.notas}, ordenadas y con la mejor marcada`);
+  check(pp?.jugadas >= 10 && JSON.stringify(pp.orden) === JSON.stringify(['cabeza', 'estadisticas', 'alineaciones', 'notas', 'cronica']),
+    `y la crónica al final (${pp?.jugadas} jugadas; orden ${pp?.orden.join(' → ')})`);
+  check(pp?.scroll && !pp.fuera, '412 px: nada se sale de la pantalla', JSON.stringify({ fuera: pp?.fuera }));
+  // Capturas por secciones a 360, 412 y en PC (y nada se sale)
+  const fotosPP = async nombre => {
+    for (const s of ['cabeza', 'estadisticas', 'alineaciones', 'notas', 'cronica']) {
+      // La cabecera, desde arriba del todo (con scrollIntoView quedaría bajo la cabecera fija de la hoja)
+      await ev(s === 'cabeza'
+        ? `(() => { const h = document.querySelector('.slr-pp').closest('.slr-hoja'); h.scrollTop = 0; h.querySelector('.slr-hoja__cuerpo').scrollTop = 0; return 0; })()`
+        : `document.querySelector('.slr-pp__${s}')?.scrollIntoView({ block: 'start' }); 0`);
+      await dormir(450);
+      await foto(`pp-${nombre}-${s}`);
+    }
+    await ev(`document.querySelector('.slr-pp__cabeza')?.scrollIntoView({ block: 'start' }); 0`);
+  };
+  await fotosPP('real');
+  for (const pt of [PANTALLAS[0], PANTALLAS[2]]) {
+    await pantalla(pt);
+    await dormir(500);
+    const x = await leerPP();
+    check(x?.scroll && !x.fuera && x.cartas.every(w => w >= 40), `${pt.nombre}: la pantalla del partido cabe (cartas de ${Math.min(...(x?.cartas ?? [0]))}–${Math.max(...(x?.cartas ?? [0]))} px)`, JSON.stringify({ fuera: x?.fuera, scroll: x?.scroll }));
+    await fotosPP('real');
+  }
+  await android(412);
+  // Tocar una carta: su detalle en grande
+  await clic('.slr-pp__carta[data-carta-id]');
+  check(await esperar(`!!document.querySelector('.slr-detalle .slr-carta--l')`, 8000), 'tocar una carta abre su detalle en grande');
+  await ev(`history.back(); 0`); await dormir(400);
   await ev(`history.back(); 0`); await dormir(400);
   await ev(`history.back(); 0`); await dormir(400);
   const visto = (await leer(`partidos?select=id&id=eq.${mio.id}`)).datos.length === 1;
@@ -351,10 +424,20 @@ try {
   await clic(`.slr-cruce [data-partido="${mio.id}"]`);
   check(await esperar(`!!document.querySelector('.slr-cronica [data-ver-partido]')`, 10000), 'abrirlo otra vez: la crónica con «▶ Ver partido» (no se reproduce solo)');
   check(!(await ev(`!!document.querySelector('[data-partido-reproductor]')`)), 'sin reproducción automática');
+  check(await ev(`!!document.querySelector('.slr-pp__estadisticas') && !!document.querySelector('.slr-pp__notas')`), 'es la pantalla del partido (estadísticas y notas)');
+  await wakeLockFalso(true);
+  await clic('.slr-cronica [data-ver-partido]');
+  check(await esperar(`!!document.querySelector('[data-partido-reproductor]')?.dataset.escena`, 10000), '«▶ Ver partido» se reproduce aunque el navegador rechace la pantalla encendida');
+  await ev(`history.back(); 0`); await dormir(500);
   await ev(`history.back(); 0`); await dormir(400);
   // El partido de otro: con su resultado directamente
   const ajeno = await ev(`[...document.querySelectorAll('.slr-cruce.es-ajeno [data-partido][data-jugado]')].map(b => b.textContent.replace(/\\s+/g, ''))[0] ?? ''`);
   check(/^\d+–\d+$/.test(ajeno), `el partido de otros, con su resultado (${ajeno})`);
+  await ev(`document.querySelector('.slr-cruce.es-ajeno [data-partido][data-jugado]')?.click(); 0`);
+  check(await esperar(`!!document.querySelector('.slr-pp__estadisticas')`, 10000) && !(await ev(`!!document.querySelector('[data-partido-reproductor]')`)),
+    'el partido de otros: su pantalla del partido, sin animación');
+  await foto('pp-ajeno');
+  await ev(`history.back(); 0`); await dormir(400);
 
   check(!errores.length, 'sin errores en la consola', errores.slice(0, 3).join(' | '));
 } catch (e) {

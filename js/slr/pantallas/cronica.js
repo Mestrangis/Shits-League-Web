@@ -1,30 +1,34 @@
 /* ═══════════════════════════════════════════════
-   SHITS LEAGUE RUSH — crónica de un partido (provisional)
-   Hasta que llegue el reproductor (entrega 3). El partido se reproduce aquí con
-   el motor (semilla + alineaciones congeladas) y la crónica sale de esos
-   eventos; si el marcador no coincide con el guardado, se avisa.
+   SHITS LEAGUE RUSH — pantalla del partido (estadísticas y crónica)
+   Se abre al terminar la reproducción (o con «Saltar»), al entrar a un partido
+   ya visto y en los partidos de los demás. Mientras no hayas visto TU partido,
+   no se abre sin pasar por la reproducción (spoilers).
+   El partido se reproduce aquí con el motor (semilla + alineaciones
+   congeladas) y todo sale de esos eventos (partido/estadisticas.js); si el
+   marcador no coincide con el guardado, se avisa.
 
-   · Colores por equipo en todo: verde el del usuario y naranja el rival; si el
-     usuario no juega, verde el local y naranja el visitante (leyenda arriba).
-   · Arriba, las dos alineaciones dibujadas en un campo.
-   · Cada jugada es un bloque (minuto y quién saca) con una línea por suceso:
-     poderes, posesión, ocasión, tirador, remate, cansancio y lesiones.
-   · Regla de porcentajes: el % es la probabilidad que tenía lo que ocurrió y
-     va junto al equipo o la carta que lo consiguió.
-   · Al final, un resumen: posesiones, ocasiones, tiros, paradas, poderes por
-     equipo y la carta con más PR de cada lado.
-   · Motor v2: arriba, la táctica de cada equipo, quién ganó el cruce y las
-     sinergias; en el descanso, el plan B y los cambios (con su motivo); y al
-     final, la energía que gastó cada carta (solo en liga).
+   De arriba abajo (en PC, el cuerpo en dos columnas):
+   · Cabecera: los equipos con sus fotos, el resultado y los goleadores (minuto
+     y ⚡ si hubo poder en la jugada del gol).
+   · Estadísticas comparadas (tu equipo, o el local, a la izquierda) y la
+     probabilidad de victoria antes del partido.
+   · Alineaciones con las cartas de verdad por líneas y los cambios; tocar una
+     carta abre su detalle.
+   · Notas de los jugadores (0–10) frente a la esperada; la mejor, marcada.
+   · La crónica: tácticas, jugadas, lesiones y energía gastada.
+
+   Colores por equipo: verde el del usuario y naranja el rival; si el usuario
+   no juega, verde el local y naranja el visitante.
 ═══════════════════════════════════════════════ */
 import { rpc, leer } from '../api.js';
 import { esc, hoja } from '../ui.js';
-import { describirPoder } from '../carta.js';
-import { campoHTML, enlazarCampo } from '../campo.js';
+import { describirPoder, cartaHTML, ovr } from '../carta.js';
 import { motorDe } from '../motores.js';
 import { TACTICA, CONDICION_PLAN_B, CONDICION_CAMBIO, MOTIVO_CAMBIO, chipTactica, textoSinergia } from '../tactica.js';
 import { tramoEnergia } from '../energia.js';
-import { abrirPartido } from '../partido/abrir.js';
+import { abrirPartido, cartasParaPintar } from '../partido/abrir.js';
+import { estadisticasPartido, jugadores, notasPartido } from '../partido/estadisticas.js';
+import { abrirDetalle } from './detalle.js';
 import { marcarVisto } from '../rush.js';
 
 const pct = p => `${Math.round(p * 100)} %`;
@@ -159,47 +163,143 @@ function energiaGastada(p, eq) {
     <p class="slr-suave">Después, todas las cartas recuperan 20 (y las que no jugaron, 20 más).</p>`;
 }
 
-function resumen(sim, eq, p, al, nombre) {
-  const est = sim?.estadisticas ?? p.estadisticas ?? {};
-  const poderes = [0, 0];
-  for (const e of sim?.eventos ?? []) if (e.tipo === 'poder') poderes[e.equipo === 'A' ? 0 : 1]++;
-  const pr = p.pr ?? sim?.pr ?? {};
-  const mejor = lado => {
-    const ids = cartasDe(al[lado]).map(c => c.id).filter(id => id in pr);
-    const id = ids.sort((a, b) => pr[b] - pr[a])[0];
-    return id ? `${esc(nombre[id])} <small>(${pr[id].toFixed(1).replace('.', ',')})</small>` : '—';
-  };
-  const filaEst = (titulo, v) => `<tr><td class="${eq.A.clase}">${v?.[0] ?? '—'}</td><th>${titulo}</th><td class="${eq.B.clase}">${v?.[1] ?? '—'}</td></tr>`;
-  return `
-    <table class="slr-resumen">
-      <thead><tr><th class="${eq.A.clase}">${esc(eq.A.nombre)}</th><th></th><th class="${eq.B.clase}">${esc(eq.B.nombre)}</th></tr></thead>
-      <tbody>
-        ${filaEst('Goles', p.goles)}
-        ${filaEst('Posesiones', est.posesiones)}
-        ${filaEst('Ocasiones', est.ocasiones)}
-        ${filaEst('Tiros', est.tiros)}
-        ${filaEst('Paradas', est.paradas)}
-        ${filaEst('Poderes activados', poderes)}
-        <tr><td class="${eq.A.clase}">${mejor('local')}</td><th>Más PR</th><td class="${eq.B.clase}">${mejor('visitante')}</td></tr>
-      </tbody>
-    </table>`;
+/* ── Pantalla del partido ─────────────────────────────────────────────── */
+const coma = x => String(x).replace('.', ',');
+const OTRA = { A: 'B', B: 'A' };
+const I = { A: 0, B: 1 };
+const NOMBRE_LINEA = { por: 'Portero', def: 'Defensa', med: 'Medio', del: 'Delantero' };
+const LINEAS = ['por', 'def', 'med', 'del'];
+const esCanterano = id => String(id).startsWith('canterano-');
+
+// Una carta para pintar: la de verdad o, si no está (Canteranos), una hecha con la congelada
+function cartaPintable(id, cartas, congelada) {
+  if (cartas[id]) return cartas[id];
+  const c = congelada ?? {};
+  const [ata, def, con] = [c.ATA ?? c.ata ?? 0, c.DEF ?? c.def ?? 0, c.CON ?? c.con ?? 0];
+  return { id, nombre: c.nombre ?? '?', tipo: 'individual', acabado: 'normal', rareza: 'comun', personas: [], poderes: [], ata, def, con, ovr: ovr(ata, def, con) };
 }
 
-function tablaPR(p, al, eq, nombre) {
-  const pr = p.pr ?? {};
-  const fila = (lado, letra) => cartasDe(al[lado]).map(c => c.id).filter(id => id in pr)
-    .sort((a, b) => pr[b] - pr[a]).map(id => {
-      const esp = p.pr_esperado?.[id], r = esp ? pr[id] / esp : null;
-      return `<li><span class="${eq[letra].clase}">${esc(nombre[id])}</span>
-        <b class="${r == null ? '' : r > 1.25 ? 'es-bien' : r < 0.75 ? 'es-mal' : ''}">${pr[id].toFixed(1).replace('.', ',')}</b>
-        <em>${esp != null ? `esp. ${esp.toFixed(1).replace('.', ',')}` : ''}</em></li>`;
+// 1. Cabecera: fotos, resultado grande y goleadores de cada lado
+function cabecera(p, s, eq, izq, nombre) {
+  const der = OTRA[izq];
+  const lado = l => `<div class="slr-pp__eq slr-pp__eq--${l === izq ? 'izq' : 'der'} ${eq[l].clase}">
+      <span class="avatar slr-pp__foto" data-avatar="${esc(eq[l].dueno)}" aria-hidden="true">${esc((eq[l].nombre || '?').slice(0, 1))}</span>
+      <b>${esc(eq[l].nombre)}</b></div>`;
+  const goleadores = l => `<ul class="slr-pp__goleadores slr-pp__goleadores--${l === izq ? 'izq' : 'der'}">${s.goleadores.filter(g => g.equipo === l).map(g => `
+      <li><span class="${eq[l].clase}">${esc(nombre[g.carta] ?? '?')}</span> <time>${g.minuto}'</time>${g.poderes.length
+        ? ` <i class="slr-pp__poder" title="${esc(`Poder: ${g.poderes.join(', ')}`)}">⚡</i>` : ''}</li>`).join('')}</ul>`;
+  const pen = p.penaltis ?? s.penaltis;
+  return `
+    <header class="slr-pp__cabeza">
+      ${lado(izq)}
+      <div class="slr-pp__resultado">
+        <b><i class="${eq[izq].clase}">${p.goles[I[izq]]}</i>–<i class="${eq[der].clase}">${p.goles[I[der]]}</i></b>
+        ${pen ? `<small>${pen[I[izq]]}–${pen[I[der]]} en penaltis</small>` : ''}
+      </div>
+      ${lado(der)}
+      ${goleadores(izq)}${goleadores(der)}
+    </header>`;
+}
+
+// 2. Estadísticas en filas comparadas: una barra a dos colores y los números a cada lado
+function estadisticas(p, s, eq, izq) {
+  const der = OTRA[izq];
+  const fila = (titulo, v, fmt = x => x) => {
+    const a = v[I[izq]], b = v[I[der]], tot = a + b;
+    return `<li class="slr-pp__fila ${tot ? '' : 'es-vacia'}">
+        <b class="${eq[izq].clase}">${fmt(a)}</b><span>${titulo}</span><b class="${eq[der].clase}">${fmt(b)}</b>
+        <span class="slr-pp__barra" style="--a:${tot ? (100 * a / tot).toFixed(1) : 50}%"><i class="${eq[izq].clase}-fondo"></i><i class="${eq[der].clase}-fondo"></i></span>
+      </li>`;
+  };
+  let previa = '';
+  if (p.p_local != null) {
+    const pv = { A: p.p_local, B: p.p_visitante }, emp = Math.max(0, 1 - p.p_local - p.p_visitante);
+    previa = `<div class="slr-pp__previa">
+        <p>Probabilidad de victoria antes del partido</p>
+        <div class="slr-pp__tres">
+          <span class="${eq[izq].clase}"><b>${pct(pv[izq])}</b><small>${esc(eq[izq].nombre)}</small></span>
+          <span><b>${pct(emp)}</b><small>Empate</small></span>
+          <span class="${eq[der].clase}"><b>${pct(pv[der])}</b><small>${esc(eq[der].nombre)}</small></span>
+        </div>
+        <span class="slr-pp__barra slr-pp__barra--tres" style="--a:${(100 * pv[izq]).toFixed(1)}%;--e:${(100 * emp).toFixed(1)}%"><i class="${eq[izq].clase}-fondo"></i><i></i><i class="${eq[der].clase}-fondo"></i></span>
+      </div>`;
+  }
+  return `
+    <section class="slr-pp__seccion slr-pp__estadisticas">
+      <h3 class="slr-subtitulo">Estadísticas</h3>
+      <ul class="slr-pp__filas">
+        ${fila('Posesión', s.posesion, pct)}
+        ${fila('Robos', s.robos)}
+        ${fila('Ataques que superan la defensa', s.ataques)}
+        ${fila('Cortes', s.cortes)}
+        ${fila('Tiros a puerta', s.tiros)}
+        ${fila('Goles esperados', s.xg, x => coma(x.toFixed(1)))}
+        ${fila('Paradas', s.paradas)}
+        ${fila('Poderes activados', s.poderes)}
+      </ul>
+      ${previa}
+    </section>`;
+}
+
+// 3. Alineaciones: las cartas por líneas; el que sale, atenuado, y el que entra a su lado
+function alineaciones(p, j, eq, izq, cartas) {
+  const al = { A: p.alineaciones_congeladas.local, B: p.alineaciones_congeladas.visitante };
+  const boton = (id, l, marca, clase) => {
+    const c = cartaPintable(id, cartas, j.cartas[id]);
+    return `<button type="button" class="slr-pp__carta ${clase}" ${esCanterano(id) ? 'disabled' : `data-carta-id="${esc(id)}"`} title="${esc(c.nombre)}">
+        ${cartaHTML(c, { tam: 's', energia: false, capitan: al[l]?.capitan_id === id })}${marca ? `<span class="slr-pp__marca">${marca}</span>` : ''}</button>`;
+  };
+  const equipo = l => {
+    const filas = LINEAS.map(linea => {
+      // Cada titular y, a su lado, los que fueron entrando en su hueco
+      const html = j[l][linea].map(id => {
+        let out = '', actual = id, entro = '';
+        for (let c; (c = j.cambios.find(x => x.equipo === l && x.sale === actual)); actual = c.entra) {
+          const m = c.motivo === 'descanso' ? 'Descanso' : `Lesión ${c.minuto}'`;
+          out += boton(actual, l, entro ? `↑ ${entro} · ↓ ${m}` : `↓ ${m}`, 'es-sale');
+          entro = m;
+        }
+        return out + boton(actual, l, entro ? `↑ ${entro}` : '', entro ? 'es-entra' : '');
+      }).join('');
+      return `<div class="slr-pp__linea"><small>${NOMBRE_LINEA[linea]}</small><div>${html}</div></div>`;
     }).join('');
-  return `<ul class="slr-cronica__pr">${fila('local', 'A')}${fila('visitante', 'B')}</ul>`;
+    const n = j.cambios.filter(x => x.equipo === l).length;
+    return `<div class="slr-pp__alineacion">
+        <h4 class="${eq[l].clase}">${esc(eq[l].nombre)} <small>${esc(al[l]?.formacion ?? '')}${n ? ` · ${n} ${n === 1 ? 'cambio' : 'cambios'}` : ''}</small></h4>
+        ${filas}
+      </div>`;
+  };
+  return `
+    <section class="slr-pp__seccion slr-pp__alineaciones">
+      <h3 class="slr-subtitulo">Alineaciones</h3>
+      ${equipo(izq)}${equipo(OTRA[izq])}
+    </section>`;
+}
+
+// 4. Notas: nota del partido frente a la esperada, ordenadas; la mejor carta, marcada
+function notas(lista, eq, nombre) {
+  const fmt = x => coma(x.toFixed(1));
+  return `
+    <section class="slr-pp__seccion slr-pp__notas">
+      <h3 class="slr-subtitulo">Notas de los jugadores</h3>
+      <ol class="slr-pp__lista">${lista.map(n => {
+        const d = n.diferencia;
+        return `<li class="${n.mejor ? 'es-mejor' : ''}">
+          <button type="button" class="slr-pp__jugador" ${esCanterano(n.id) ? 'disabled' : `data-carta-id="${esc(n.id)}"`}>
+            <span class="slr-pp__punto ${eq[n.equipo].clase}-fondo"></span>
+            <span class="slr-pp__quien"><b>${esc(nombre[n.id] ?? '?')}</b><small>${NOMBRE_LINEA[n.linea] ?? ''}${n.mejor ? ' · <em>★ Mejor del partido</em>' : ''}</small></span>
+            <b class="slr-pp__nota">${fmt(n.nota)}</b>
+            <span class="slr-pp__esperada"><small>esp. ${fmt(n.esperada)}</small>
+              <i class="${d > 0 ? 'es-sube' : d < 0 ? 'es-baja' : ''}">${d > 0 ? '▲' : d < 0 ? '▼' : '='} ${fmt(Math.abs(d))}</i></span>
+          </button></li>`;
+      }).join('')}</ol>
+      <p class="slr-suave">La nota sale de los puntos de rendimiento del partido; la esperada, de la media de la carta frente a la de todas las que jugaron.</p>
+    </section>`;
 }
 
 // La primera vez que abres un partido TUYO ya jugado se reproduce solo; cuenta como visto
-// al llegar al final o al pulsar «Saltar» y entonces queda la crónica. Las siguientes, la
-// crónica con «▶ Ver partido». Los de los demás, la crónica directamente.
+// al llegar al final o al pulsar «Saltar» y entonces se abre la pantalla del partido. Las
+// siguientes, la pantalla con «▶ Ver partido». Los de los demás, la pantalla directamente.
 export async function abrirCronica(partidoId, ctx, { soloCronica = false } = {}) {
   const p = await rpc('slr_partido', { partido_id: partidoId });
   if (p.mio && !p.visto && !soloCronica) {
@@ -210,16 +310,21 @@ export async function abrirCronica(partidoId, ctx, { soloCronica = false } = {})
     });
     if (r) return;
   }
-  const eqs = await leer(`equipos?select=id,nombre&id=in.(${p.local_id},${p.visitante_id})`);
-  const nombreEq = id => eqs.find(e => e.id === id)?.nombre ?? 'Equipo';
   const al = p.alineaciones_congeladas;
+  const reales = [...new Set([...cartasDe(al.local), ...cartasDe(al.visitante)].map(c => c.id))].filter(id => !esCanterano(id));
+  const [eqs, cartas] = await Promise.all([
+    leer(`equipos?select=id,nombre,usuarios(nombre,interno)&id=in.(${p.local_id},${p.visitante_id})`),
+    cartasParaPintar(reales).catch(() => ({})),
+  ]);
+  const datosEq = id => { const e = eqs.find(x => x.id === id); return { nombre: e?.nombre ?? 'Equipo', dueno: e?.usuarios?.interno ? '' : (e?.usuarios?.nombre ?? '') }; };
   const yo = ctx.datos.equipo?.id;
-  // Verde el equipo del usuario y naranja el rival; si no juega, verde el local
+  // Verde el equipo del usuario y naranja el rival; si no juega, verde el local (y a la izquierda)
   const verde = [p.local_id, p.visitante_id].includes(yo) ? yo : p.local_id;
   const eq = {
-    A: { nombre: nombreEq(p.local_id), clase: p.local_id === verde ? 'slr-propio' : 'slr-rival' },
-    B: { nombre: nombreEq(p.visitante_id), clase: p.visitante_id === verde ? 'slr-propio' : 'slr-rival' },
+    A: { ...datosEq(p.local_id), clase: p.local_id === verde ? 'slr-propio' : 'slr-rival' },
+    B: { ...datosEq(p.visitante_id), clase: p.visitante_id === verde ? 'slr-propio' : 'slr-rival' },
   };
+  const izq = p.visitante_id === verde ? 'B' : 'A';
   const nombre = {};
   for (const c of [...cartasDe(al.local), ...cartasDe(al.visitante)]) nombre[c.id] = c.nombre;
   const poderDe = (cartaId, nombrePoder) => {
@@ -238,42 +343,39 @@ export async function abrirCronica(partidoId, ctx, { soloCronica = false } = {})
     aviso = `No se pudo reproducir el partido: ${e.message}`;
   }
 
+  // Todo sale de los eventos (y de las alineaciones congeladas)
+  const s = estadisticasPartido(sim?.eventos ?? []);
+  const j = jugadores(al, sim?.eventos ?? []);
+  const medias = Object.fromEntries(Object.entries(j.cartas).map(([id, c]) => [id, cartaPintable(id, cartas, c).ovr]));
+  const lista = sim ? notasPartido({ jugadores: j, pr: sim.pr ?? p.pr ?? {}, medias }) : [];
+
   const el = hoja(`
-    <div class="slr-cronica">
+    <div class="slr-cronica slr-pp">
       <p class="slr-cronica__tipo">${p.tipo === 'amistoso' ? 'Amistoso' : `Jornada ${p.jornada}`}</p>
+      ${cabecera(p, s, eq, izq, nombre)}
       ${sim ? '<button class="slr-btn slr-btn--grande slr-cronica__ver" type="button" data-ver-partido>▶ Ver partido</button>' : ''}
-      <div class="slr-marcador slr-cronica__marcador">
-        <span class="${eq.A.clase}">${esc(eq.A.nombre)}</span>
-        <b><i class="${eq.A.clase}">${p.goles[0]}</i>–<i class="${eq.B.clase}">${p.goles[1]}</i></b>
-        <span class="${eq.B.clase}">${esc(eq.B.nombre)}</span>
-      </div>
-      <p class="slr-cronica__leyenda"><span class="${eq.A.clase}">● ${esc(eq.A.nombre)}</span> <small>local</small>
-        <span class="${eq.B.clase}">● ${esc(eq.B.nombre)}</span> <small>visitante</small></p>
-      ${p.p_local != null ? `<p class="slr-suave slr-cronica__prev">Antes del partido: gana ${esc(eq.A.nombre)} ${pct(p.p_local)} · empate ${pct(1 - p.p_local - p.p_visitante)} · gana ${esc(eq.B.nombre)} ${pct(p.p_visitante)}</p>` : ''}
       ${aviso ? `<div class="slr-banner slr-banner--pausa"><b>Aviso</b><span>${esc(aviso)}</span></div>` : ''}
-      ${cabeceraTacticas(sim, eq)}
 
-      <div class="slr-cronica__campos">
-        ${campoHTML(al.local, { titulo: eq.A.nombre, clase: eq.A.clase, nota: 'local' })}
-        ${campoHTML(al.visitante, { titulo: eq.B.nombre, clase: eq.B.clase, nota: 'visitante' })}
-      </div>
+      ${sim ? `<div class="slr-pp__cuerpo">
+        ${estadisticas(p, s, eq, izq)}
+        ${alineaciones(p, j, eq, izq, cartas)}
+        ${notas(lista, eq, nombre)}
+      </div>` : ''}
 
-      <h3 class="slr-subtitulo">Jugadas</h3>
-      ${sim ? jugadas(sim.eventos, eq, nombre, poderDe) : '<p class="slr-suave">Sin jugadas.</p>'}
-      <p class="slr-cronica__nota">El % es la probabilidad que tenía lo que ocurrió.</p>
+      <section class="slr-pp__seccion slr-pp__cronica">
+        <h3 class="slr-subtitulo">Crónica</h3>
+        ${cabeceraTacticas(sim, eq)}
+        ${sim ? jugadas(sim.eventos, eq, nombre, poderDe) : '<p class="slr-suave">Sin jugadas.</p>'}
+        <p class="slr-cronica__nota">El % es la probabilidad que tenía lo que ocurrió.</p>
+        ${(p.lesiones ?? []).length ? `<p class="slr-cronica__lesiones">🚑 Lesiones: ${p.lesiones.map(id => esc(nombre[id] ?? id)).join(', ')}${p.tipo === 'liga' ? ' (tocadas la próxima jornada)' : ''}</p>` : ''}
+        ${energiaGastada(p, eq)}
+      </section>
+    </div>`, { titulo: 'Partido', completa: true });
 
-      <h3 class="slr-subtitulo">Resumen</h3>
-      ${resumen(sim, eq, p, al, nombre)}
-      ${(p.lesiones ?? []).length ? `<p class="slr-cronica__lesiones">🚑 Lesiones: ${p.lesiones.map(id => esc(nombre[id] ?? id)).join(', ')}${p.tipo === 'liga' ? ' (tocadas la próxima jornada)' : ''}</p>` : ''}
-
-      ${energiaGastada(p, eq)}
-
-      <h3 class="slr-subtitulo">Rendimiento (PR) de cada carta</h3>
-      <p class="slr-suave">«esp.» es lo esperado según las 200 simulaciones previas.</p>
-      ${tablaPR(p, al, eq, nombre)}
-    </div>`, { titulo: 'Crónica', completa: true });
-
-  enlazarCampo(el, ctx);
+  if (typeof window.renderAvatar === 'function') {
+    el.querySelectorAll('[data-avatar]').forEach(a => { if (a.dataset.avatar) window.renderAvatar(a, a.dataset.avatar); });
+  }
+  el.querySelectorAll('[data-carta-id]').forEach(b => b.addEventListener('click', () => abrirDetalle(b.dataset.cartaId, ctx).catch(() => {})));
   el.querySelector('[data-ver-partido]')?.addEventListener('click', () => abrirPartido(partidoId, ctx, { p, alVisto: () => { if (p.mio) marcarVisto(partidoId); } }));
   // Tocar el nombre de un poder: su descripción
   el.querySelectorAll('[data-poder]').forEach(b => b.addEventListener('click', () => {

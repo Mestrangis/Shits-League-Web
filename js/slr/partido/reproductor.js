@@ -252,8 +252,26 @@ export function reproducir(guion, cartas = {}, opts = {}) {
     siguiente();
   });
 
+  // ── Pantalla encendida (Screen Wake Lock) mientras el reproductor está abierto ──
+  // El navegador la suelta solo al cambiar de app: al volver, se pide otra vez. Si no
+  // hay API o la rechaza, no pasa nada (sin errores ni avisos, y sin trucos con vídeos).
+  let bloqueo = null, pidiendo = false;
+  const soltarPantalla = () => { const b = bloqueo; bloqueo = null; b?.release().catch(() => {}); };
+  const pedirPantalla = () => {
+    if (!vivo || bloqueo || pidiendo || document.visibilityState !== 'visible' || !navigator.wakeLock?.request) return;
+    pidiendo = true;
+    navigator.wakeLock.request('screen').then(b => {
+      bloqueo = b;
+      b.addEventListener('release', () => { if (bloqueo === b) bloqueo = null; });
+      if (!vivo) soltarPantalla();   // se cerró mientras se pedía
+    }).catch(() => {}).finally(() => { pidiendo = false; });
+  };
+  document.addEventListener('visibilitychange', pedirPantalla);
+
   function limpiar() {
     vivo = false;
+    document.removeEventListener('visibilitychange', pedirPantalla);
+    soltarPantalla();
     cancelAnimationFrame(frame);
     linea?.pausar();   // se queda quieta mientras la capa se va (cancelar la haría saltar al principio)
     animCesped.pause();
@@ -263,6 +281,7 @@ export function reproducir(guion, cartas = {}, opts = {}) {
   }
 
   abrirCapa(el, limpiar);
+  pedirPantalla();
   frame = requestAnimationFrame(bucle);
   siguiente();
   const control = {
@@ -274,6 +293,7 @@ export function reproducir(guion, cartas = {}, opts = {}) {
     reanudar: () => pausar(false),
     saltar: () => $('[data-saltar]').click(),
   };
+  Object.defineProperty(control, 'pantallaEncendida', { get: () => !!bloqueo });
   el.reproductor = control;   // para las pruebas
   return control;
 }

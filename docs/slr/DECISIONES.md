@@ -1538,3 +1538,40 @@ Medido con `tests/slr/banco/rendimiento-apertura.mjs`: Chrome a 390×844 (DPR 2,
   - `banco/partido.mjs`, en cada pantalla: la viñeta cuadrada, centrada, entera y sin rótulo encima, con las cartas con tamaño; el tap deja cada una de las 7 en su último fotograma; y dos jugadas enteras (chut → gol y chut → parada) en la misma caja.
   - para medir, el banco termina el temblor de la pantalla (mueve y gira la capa, y agranda las cajas que se miden);
   - con la CPU ×6, una jugada entera con poder y gol va a 55 fps (p95 33 ms) a 360 y a 412 px.
+
+## Pantalla encendida y pantalla del partido (estadísticas)
+
+### Decisiones de Marcos
+
+- **Que no se apague la pantalla durante un partido** con la Screen Wake Lock API: se pide al empezar la reproducción, se suelta al cerrarla, al terminar o al salir, y se vuelve a pedir al volver a la app con el partido abierto. Si el navegador no la tiene o la rechaza, no pasa nada (sin errores ni avisos). Nada de vídeos ocultos.
+- **Pantalla del partido:** sustituye a la crónica. Se abre al terminar la reproducción (o con «Saltar»), al entrar a un partido ya visto y en los de los demás (sin animación). Mientras no hayas visto tu partido, no se abre sin pasar por la reproducción (spoilers, igual que antes). Todo sale de los eventos del partido, los mismos que usa el guion. De arriba abajo:
+  1. cabecera: los equipos con sus fotos, el resultado grande y los goleadores con el minuto (⚡ si hubo poder);
+  2. estadísticas comparadas (tu equipo, o el local, a la izquierda): posesión, robos, ataques que superan la defensa, cortes, tiros a puerta, goles esperados, paradas y poderes; y la probabilidad de victoria de antes del partido aparte;
+  3. alineaciones con las cartas de verdad por líneas y los cambios; tocar una carta abre su detalle;
+  4. notas de los jugadores (0–10) frente a la esperada, con ▲/▼, ordenadas y con la mejor carta marcada;
+  5. la crónica en texto.
+- **Nota esperada:** 5 + (media de la carta − media de todas las que jugaron) / 10, entre 3 y 8.
+
+### Decisiones mías
+
+- **Pantalla encendida (`reproductor.js`):** el bloqueo vive lo que el reproductor (muestrario incluido). Un `visibilitychange` lo vuelve a pedir si no hay uno activo (no se piden dos a la vez); al cerrar se suelta, y si se cierra mientras se está pidiendo, se suelta en cuanto llega.
+- **Cálculo (`js/slr/partido/estadisticas.js`, sin DOM):**
+  - posesión: % de duelos de control ganados; robos: duelos ganados sin sacar (los contraataques);
+  - ataques que superan la defensa: ocasiones con éxito; cortes: las del rival sin éxito (dos filas);
+  - tiros a puerta: chuts; goles esperados: la suma de la p de cada chut, con un decimal; paradas: chuts del rival sin gol; poderes: eventos `poder`;
+  - goleadores: el tirador de cada chut con gol, con su minuto; el ⚡ sale si su equipo activó algún poder en esa jugada (se ve el nombre al pasar el dedo o el ratón);
+  - la tanda de penaltis (copa) va debajo del resultado y no cuenta en las estadísticas.
+- **Conversión de PR a nota:** no había ninguna. He puesto esta: nota = 5 + (PR − referencia de su línea) / escala de su línea, entre 0 y 10, con un decimal. Referencia y escala por línea: portero 2 y 1,6; defensa 0,9 y 0,5; medio 2,5 y 0,8; delantero 3,3 y 1,6.
+  - La referencia es más o menos el PR medio de esa línea, medido en 3.000 partidos simulados con cada versión del motor. Así, una carta normal en su línea saca un 5.
+  - Hace falta una escala por línea porque cada una suma PR de forma muy distinta. El portero gana 2 por parada y pierde 1 por gol; los defensas se reparten los cortes; los delanteros suman 1 por tiro y 3 más por gol.
+  - El PR es el del motor al reproducir el partido (el mismo que se guardó).
+- **Quién jugó:** los titulares y los que entraron (cambios del descanso y lesiones con suplente), en la línea del que salió. En las alineaciones, el que sale se ve atenuado con «↓ Descanso» o «↓ Lesión 63'», y el que entra va a su lado con «↑».
+- **Media de la carta:** la OVR que se ve en la carta. Los Canteranos (no son cartas) se pintan con sus stats congeladas y no se abren.
+- **Diseño:** en el móvil, una columna. En PC (≥ 900 px), el cuerpo va en dos columnas: estadísticas y notas a la izquierda, alineaciones a la derecha. La cabecera y la crónica ocupan todo el ancho. Fuera la tabla de resumen, la tabla de PR y los campitos de la crónica de antes (y su CSS).
+- **Tests:**
+  - `partido-estadisticas.test.mjs` (nuevo): con las cuatro versiones del motor, 300 partidos de liga y 100 de copa cada una, las estadísticas cuadran con las del motor y con los eventos: posesiones, ocasiones, cortes, tiros, paradas, goles, robos, poderes, goles esperados, goleadores y penaltis. Quién jugó coincide con las cartas con PR. Las notas van ordenadas, entre 0 y 10, con una sola mejor. También la conversión y la nota esperada.
+  - `banco/partido.mjs`, con un Wake Lock falso (en headless no hay):
+    - se pide al empezar, se vuelve a pedir al volver a la app y se suelta al cerrar;
+    - si se rechaza, se reproduce igual y sin errores;
+    - la pantalla del partido sección a sección, cabe a 360, 412 y en PC, y tocar una carta abre su detalle;
+    - el partido de otros abre su pantalla sin animación.

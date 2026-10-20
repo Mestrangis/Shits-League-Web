@@ -778,8 +778,6 @@ button.slr-aviso:active { background: rgba(57,255,136,.08) !important; }
 /* Crónica */
 .slr-cronica { display: flex; flex-direction: column; gap: 10px; }
 .slr-cronica__tipo { font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--slr-suave); text-align: center; }
-.slr-cronica__marcador { padding: 8px 0; }
-.slr-cronica__prev { text-align: center; }
 .slr-cronica__jugadas { list-style: none; display: flex; flex-direction: column; gap: 6px; }
 .slr-cronica__jugadas li {
   display: grid; grid-template-columns: 54px 1fr; gap: 8px;
@@ -802,13 +800,6 @@ button.slr-aviso:active { background: rgba(57,255,136,.08) !important; }
 .slr-cronica__equipo li small { color: #FF9C9C; font-size: 10px; }
 .slr-cronica__equipo li b { font-family: 'Anton', sans-serif; font-weight: 400; }
 .slr-cronica__c { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: var(--slr-oro); color: #2a1a00; font-size: 10px; }
-.slr-cronica__pr { list-style: none; display: flex; flex-direction: column; }
-.slr-cronica__pr li { display: grid; grid-template-columns: 1fr auto 44px 56px; gap: 8px; align-items: baseline; padding: 6px 0; border-top: 1px solid rgba(31,224,101,.07); font-size: 13px; }
-.slr-cronica__pr small { font-size: 11px; color: var(--slr-suave); }
-.slr-cronica__pr b { font-family: 'Anton', sans-serif; font-weight: 400; font-size: 16px; text-align: right; }
-.slr-cronica__pr b.es-bien { color: var(--slr-propio); }
-.slr-cronica__pr b.es-mal { color: var(--slr-rival); }
-.slr-cronica__pr em { font-style: normal; font-size: 11px; color: var(--slr-suave); text-align: right; }
 
 /* ── Perfil ──────────────────────────────────────────────────────────────── */
 .slr-perfil { display: flex; align-items: center; gap: 16px; }
@@ -1269,10 +1260,6 @@ button.slr-aviso:active { background: rgba(57,255,136,.08) !important; }
 .slr-campito__suplente { color: #C9E8D5 !important; text-decoration: underline; text-decoration-color: rgba(255,255,255,.15); }
 
 /* Crónica */
-.slr-cronica__leyenda { display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: 4px 10px; font-size: 13px; font-weight: 700; }
-.slr-cronica__leyenda small { font-size: 10.5px; font-weight: 600; color: var(--slr-suave); margin-left: -6px; }
-.slr-cronica__campos { display: flex; flex-direction: column; gap: 14px; }
-@media (min-width: 640px) { .slr-cronica__campos { display: grid; grid-template-columns: 1fr 1fr; } }
 .slr-jugadas { list-style: none; display: flex; flex-direction: column; gap: 8px; }
 .slr-jugada { padding: 10px 12px; border-radius: 12px; background: rgba(3,12,7,.5); border: 1px solid rgba(255,255,255,.05); }
 .slr-jugada.es-gol { border-color: rgba(57,255,136,.35); background: rgba(57,255,136,.07); }
@@ -1293,15 +1280,89 @@ button.slr-aviso:active { background: rgba(57,255,136,.08) !important; }
 .slr-suceso--menor { font-size: 12px; color: var(--slr-suave); }
 .slr-suceso--lesion { color: #FF9C9C; }
 .slr-cronica__nota { font-size: 11.5px; color: var(--slr-suave); font-style: italic; }
-.slr-resumen { width: 100%; border-collapse: collapse; font-size: 13.5px; }
-.slr-resumen th, .slr-resumen td { padding: 7px 6px; border-top: 1px solid rgba(31,224,101,.08); }
-.slr-resumen thead th { border-top: none; font-family: 'Anton', sans-serif; font-weight: 400; font-size: 15px; text-transform: uppercase; }
-.slr-resumen tbody th { font-size: 11px; font-weight: 800; letter-spacing: .06em; color: var(--slr-suave); text-align: center; text-transform: uppercase; }
-.slr-resumen td:first-child, .slr-resumen thead th:first-child { text-align: left; }
-.slr-resumen td:last-child, .slr-resumen thead th:last-child { text-align: right; }
-.slr-resumen td { font-family: 'Anton', sans-serif; font-size: 17px; }
-.slr-resumen td small { font-family: 'Sora', sans-serif; font-size: 11px; color: var(--slr-suave); }
-.slr-cronica__pr li { grid-template-columns: 1fr 44px 56px !important; }
+
+/* Pantalla del partido (pantallas/cronica.js): cabecera, estadísticas, alineaciones, notas y crónica */
+.slr-pp { gap: 14px; }
+.slr-pp__cabeza { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 6px 10px; padding: 6px 0 2px; }
+.slr-pp__eq { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; text-align: center; }
+.slr-pp__eq b { font-family: 'Anton', sans-serif; font-weight: 400; font-size: clamp(14px, 4.4vw, 22px); line-height: 1.1; text-transform: uppercase; letter-spacing: .02em; overflow-wrap: anywhere; }
+.slr-pp__foto { width: clamp(46px, 15vw, 72px); height: clamp(46px, 15vw, 72px); font-size: clamp(20px, 6vw, 30px); border: 2px solid currentColor; }
+.slr-pp__resultado { display: flex; flex-direction: column; align-items: center; }
+.slr-pp__resultado b { font-family: 'Anton', sans-serif; font-weight: 400; font-size: clamp(46px, 15vw, 84px); line-height: 1; letter-spacing: .02em; color: #fff; white-space: nowrap; }
+.slr-pp__resultado i { font-style: normal; }
+.slr-pp__resultado small { font-size: 11.5px; color: var(--slr-suave); }
+.slr-pp__goleadores { list-style: none; display: flex; flex-direction: column; gap: 2px; font-size: 12.5px; min-width: 0; }
+.slr-pp__goleadores--izq { grid-column: 1; text-align: center; }
+.slr-pp__goleadores--der { grid-column: 3; text-align: center; }
+.slr-pp__goleadores li { overflow-wrap: anywhere; }
+.slr-pp__goleadores span { font-weight: 700; }
+.slr-pp__goleadores time { color: var(--slr-suave); font-size: 11.5px; }
+.slr-pp__poder { font-style: normal; color: var(--slr-oro); }
+.slr-pp .slr-cronica__ver { align-self: center; }
+.slr-pp__cuerpo { display: flex; flex-direction: column; gap: 14px; }
+.slr-pp__seccion { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+
+.slr-pp__filas { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+.slr-pp__fila { display: grid; grid-template-columns: 52px 1fr 52px; align-items: baseline; gap: 4px 8px; }
+.slr-pp__fila > b { font-family: 'Anton', sans-serif; font-weight: 400; font-size: 18px; }
+.slr-pp__fila > b:last-of-type { text-align: right; }
+.slr-pp__fila > span:not(.slr-pp__barra) { text-align: center; font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--slr-suave); }
+.slr-pp__barra { grid-column: 1 / -1; display: flex; gap: 3px; height: 6px; }
+.slr-pp__barra i { border-radius: 3px; min-width: 3px; }
+.slr-pp__barra i:first-child { width: var(--a); }
+.slr-pp__barra i:last-child { flex: 1; }
+.slr-pp__fila.es-vacia .slr-pp__barra i { background: rgba(255,255,255,.12) !important; }
+.slr-pp__previa { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; padding: 10px 12px; border-radius: 12px; background: rgba(3,12,7,.5); border: 1px solid rgba(255,255,255,.05); }
+.slr-pp__previa > p { font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--slr-suave); text-align: center; }
+.slr-pp__tres { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; }
+.slr-pp__tres span { display: flex; flex-direction: column; min-width: 0; }
+.slr-pp__tres span:nth-child(2) { align-items: center; }
+.slr-pp__tres span:last-child { align-items: flex-end; text-align: right; }
+.slr-pp__tres b { font-family: 'Anton', sans-serif; font-weight: 400; font-size: 18px; }
+.slr-pp__tres small { font-size: 11px; color: var(--slr-suave); overflow-wrap: anywhere; }
+.slr-pp__barra--tres i:nth-child(2) { width: var(--e); flex: none; background: rgba(255,255,255,.25); }
+
+.slr-pp__alineacion { display: flex; flex-direction: column; gap: 6px; padding: 10px; border-radius: 14px; background: rgba(3,12,7,.5); border: 1px solid rgba(255,255,255,.05); }
+.slr-pp__alineacion h4 { font-family: 'Anton', sans-serif; font-weight: 400; font-size: 16px; text-transform: uppercase; letter-spacing: .03em; overflow-wrap: anywhere; }
+.slr-pp__alineacion h4 small { font-family: 'Sora', sans-serif; font-size: 11px; color: var(--slr-suave); text-transform: none; letter-spacing: 0; }
+.slr-pp__linea > small { display: block; margin-bottom: 4px; font-size: 10px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--slr-suave); }
+.slr-pp__linea > div { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.slr-pp__carta { position: relative; width: clamp(58px, 18vw, 92px); padding: 0; background: none; border: 0; cursor: pointer; }
+.slr-pp__carta .slr-carta { width: 100%; }
+.slr-pp__carta.es-sale .slr-carta { opacity: .45; filter: grayscale(.6); }
+.slr-pp__marca { display: block; margin-top: 3px; font-size: 9.5px; font-weight: 800; line-height: 1.2; color: var(--slr-suave); text-align: center; }
+.slr-pp__carta.es-entra .slr-pp__marca { color: var(--slr-propio); }
+.slr-pp__carta.es-sale .slr-pp__marca { color: #FF9C9C; }
+
+.slr-pp__lista { list-style: none; display: flex; flex-direction: column; }
+.slr-pp__lista li { border-top: 1px solid rgba(31,224,101,.07); }
+.slr-pp__jugador { display: grid; grid-template-columns: 10px minmax(0, 1fr) 46px 74px; align-items: center; gap: 8px; width: 100%; padding: 7px 4px; background: none; border: 0; color: inherit; text-align: left; cursor: pointer; }
+.slr-pp__jugador:disabled { cursor: default; }
+.slr-pp__punto { width: 10px; height: 10px; border-radius: 50%; }
+.slr-pp__quien { display: flex; flex-direction: column; min-width: 0; }
+.slr-pp__quien b { font-size: 13.5px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.slr-pp__quien small { font-size: 11px; color: var(--slr-suave); }
+.slr-pp__quien em { font-style: normal; font-weight: 800; color: var(--slr-oro); }
+.slr-pp__nota { font-family: 'Anton', sans-serif; font-weight: 400; font-size: 22px; text-align: right; }
+.slr-pp__esperada { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.25; }
+.slr-pp__esperada small { font-size: 10.5px; color: var(--slr-suave); }
+.slr-pp__esperada i { font-style: normal; font-size: 12.5px; font-weight: 800; color: var(--slr-suave); }
+.slr-pp__esperada i.es-sube { color: var(--slr-propio); }
+.slr-pp__esperada i.es-baja { color: #FF6B6B; }
+.slr-pp__lista li.es-mejor { border-radius: 12px; background: rgba(255,210,58,.08); box-shadow: inset 0 0 0 1px rgba(255,210,58,.35); }
+.slr-pp__lista li.es-mejor + li { border-top-color: transparent; }
+.slr-pp__lista li.es-mejor .slr-pp__nota { color: var(--slr-oro); }
+.slr-pp__cronica { gap: 10px; }
+@media (min-width: 900px) {
+  .slr-pp__cuerpo { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; gap: 18px 28px; }
+  .slr-pp__estadisticas { grid-column: 1; grid-row: 1; }
+  .slr-pp__notas { grid-column: 1; grid-row: 2; }
+  .slr-pp__alineaciones { grid-column: 2; grid-row: 1 / span 2; }
+  .slr-pp__carta { width: 84px; }
+  .slr-pp__eq b { font-size: 26px; }
+  .slr-pp__foto { width: 84px; height: 84px; font-size: 34px; }
+  .slr-pp__resultado b { font-size: 96px; }
+}
 
 /* Ficha de equipo */
 .slr-ficha-eq { display: flex; flex-direction: column; gap: 12px; }
