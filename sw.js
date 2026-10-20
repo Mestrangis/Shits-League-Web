@@ -5,7 +5,7 @@
    cambio relevante para forzar limpieza de cachés viejas.
 ═══════════════════════════════════════════════ */
 
-const CACHE_NAME = 'shits-league-v33';
+const CACHE_NAME = 'shits-league-v34';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();

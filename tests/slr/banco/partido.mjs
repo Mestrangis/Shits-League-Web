@@ -73,7 +73,9 @@ try {
   const fuera = () => ev(`(() => {
     const capa = document.querySelector('[data-partido-reproductor]'); if (!capa) return 'sin capa';
     const vw = document.documentElement.clientWidth, R = capa.getBoundingClientRect();
-    const sel = '.slr-pt-carta, .slr-pt-rotulo b, .slr-pt-barra, .slr-pt-panel, .slr-pt-lesion, .slr-pt-vs, .slr-pt-poder, .slr-pt-marcador, .slr-pt-controles, .slr-pt-porteria';
+    // Sin el temblor de la pantalla (mueve y gira unos px y grados: no es «salirse»)
+    capa.querySelector('[data-temblor]').getAnimations().forEach(a => a.finish());
+    const sel = '.slr-pt-carta:not(.slr-pt-vineta .slr-pt-carta), .slr-pt-rotulo b, .slr-pt-barra, .slr-pt-panel, .slr-pt-lesion, .slr-pt-vs, .slr-pt-poder, .slr-pt-marcador, .slr-pt-controles, .slr-pt-vineta';
     const malos = [...capa.querySelectorAll(sel)].filter(n => {
       let x = n, op = 1; while (x && x !== capa) { op *= Number(getComputedStyle(x).opacity); x = x.parentElement; }
       if (op < 0.85) return false;
@@ -105,6 +107,7 @@ try {
   const RESULTADO = { gol: 'ataca', parada: 'defiende', pase: 'ataca', corte: 'defiende' };
   // Las que dependen del sentido: también con el rival atacando hacia abajo
   const CON_SENTIDO = new Set(['saque', 'control', 'ataque', 'pase', 'corte', 'chut', 'gol', 'parada']);
+  const VINETA = new Set(['chut', 'gol', 'parada']);
   const PANTALLAS = [
     { nombre: '360 px', w: 360, movil: true }, { nombre: '412 px', w: 412, movil: true, dosSentidos: true },
     { nombre: 'PC', w: 1366, h: 768, movil: false },
@@ -133,6 +136,7 @@ try {
     await clic('[data-pruebas="escenas-partido"]');
     await esperar(`!!document.querySelector('[data-tipo]')`, 5000);
     const botones = await ev(`[...document.querySelectorAll('[data-tipo]')].map(b => [b.dataset.tipo, b.dataset.variante])`);
+    if (!botones?.length) console.log(`  (sin muestrario: ${await ev(`location.hash + ' · ' + document.querySelectorAll('.slr-hoja').length + ' hojas · ' + (document.querySelector('[data-partido-reproductor]') ? 'reproductor abierto' : 'sin reproductor')`)})`);
     const vistas = new Set();
     const pasadas = [];
     for (const [tipo, variante] of botones) {
@@ -163,17 +167,76 @@ try {
           const c = capa.querySelector('.slr-pt-cesped').getBoundingClientRect();
           const op = n => { let x = n, o = 1; while (x && x !== capa) { o *= Number(getComputedStyle(x).opacity); x = x.parentElement; } return o; };
           const barra = capa.querySelector('.slr-pt-barra');
-          const piezas = [...capa.querySelectorAll('.slr-pt-pieza, .slr-pt-escudo, .slr-pt-balon')].filter(n => op(n) > 0.5).length;
+          const piezas = [...capa.querySelectorAll('.slr-pt-pieza, .slr-pt-escudo, .slr-pt-balon, .slr-pt-vineta')].filter(n => op(n) > 0.5).length;
           return { cubre: c.top <= R.top + 1 && c.bottom >= R.bottom - 1 && c.left <= R.left + 1 && c.right >= R.right - 1,
             barra: barra ? op(barra) : null, piezas };
         })()`);
         if (!extra.cubre) malos.push(`${frac * 100} %: el césped no cubre toda la pantalla`);
+        if (VINETA.has(tipo)) {
+          const vi = await ev(`(() => {
+            const capa = document.querySelector('[data-partido-reproductor]'), v = capa.querySelector('.slr-pt-vineta');
+            if (!v) return { no: true };
+            capa.querySelector('[data-temblor]').getAnimations().forEach(a => a.finish());
+            const r = v.getBoundingClientRect(), vw = document.documentElement.clientWidth;
+            const choca = [...capa.querySelectorAll('.slr-pt-rotulo b')].filter(b => Number(getComputedStyle(b.parentElement).opacity) > 0.3).some(b => {
+              const q = b.getBoundingClientRect(); return q.bottom > r.top + 2 && q.top < r.bottom - 2 && q.right > r.left && q.left < r.right; });
+            const cartas = [...v.querySelectorAll('.slr-carta')].map(c => Math.round(c.getBoundingClientRect().width));
+            return { cuadrada: Math.abs(r.width - r.height) <= 2, centrada: Math.abs(r.left + r.width / 2 - vw / 2) <= 2, choca, cartas };
+          })()`);
+          if (vi.no) malos.push(`${frac * 100} %: sin viñeta`);
+          else {
+            if (!vi.cuadrada || !vi.centrada) malos.push(`${frac * 100} %: la viñeta no está cuadrada y centrada`);
+            if (vi.choca) malos.push(`${frac * 100} %: un rótulo tapa la viñeta`);
+            if (vi.cartas.some(w => w < 20)) malos.push(`${frac * 100} %: cartas de la viñeta sin tamaño (${vi.cartas})`);
+          }
+        }
         if ((tipo === 'control' || tipo === 'chut') && frac === 0.6 && !(extra.barra > 0.8 && extra.piezas > 0)) malos.push(`60 %: barra (${extra.barra}) y animación (${extra.piezas} piezas) no van a la vez`);
         await foto(`${nombre}-${k}`);
         if (k < 3) await ev(`document.querySelector('[data-partido-reproductor]')?.reproductor.reanudar(); 0`);   // la última se cierra en pausa
       }
       check(abierto && !malos.length, `${pt.nombre} · ${tipo}/${variante}${ataca === 'B' ? ' (ataca el rival)' : ''}: se reproduce y nada se sale`, malos.slice(0, 4).join(' | '));
       await cerrarReproductor();
+    }
+    if (!SOLO || SOLO.has('chut')) {
+      // Tap / «Saltar» (terminar): la viñeta se queda en su último fotograma
+      const ultimos = [];
+      for (const [tipo, variante] of [['chut', 'disparo'], ['gol', 'red'], ['gol', 'chilena'], ['gol', 'ardiendo'], ['parada', 'punos'], ['parada', 'atrapada'], ['parada', 'estirada']]) {
+        await ajustar({ res: RESULTADO[tipo] ?? 'ataca' });
+        await clic(`[data-tipo="${tipo}"][data-variante="${variante}"]`);
+        await esperar(`document.querySelector('[data-partido-reproductor]')?.dataset.escena === ${JSON.stringify(tipo)}`, 4000);
+        await dormir(300);
+        const v = (await ev(`(() => { const r = document.querySelector('[data-partido-reproductor]')?.reproductor; r?.linea.terminar(true);
+          const c = document.querySelector('.slr-pt-vineta'); return { ms: Number(c?.dataset.ms), dur: Number(c?.dataset.dur) }; })()`)) ?? {};
+        if (!(v.dur > 0 && v.ms === v.dur)) ultimos.push(`${tipo}/${variante}: ${v.ms}/${v.dur}`);
+        await cerrarReproductor();
+      }
+      check(!ultimos.length, `${pt.nombre} · el tap y «Saltar» dejan cada viñeta en su último fotograma`, ultimos.join(' | '));
+      // Una jugada entera: el chut empalma con el gol o la parada en la misma caja
+      for (const res of ['ataca', 'defiende']) {
+        await ajustar({ res, version: 'completa' });
+        await clic('[data-jugada]');
+        const sigue = res === 'ataca' ? 'gol' : 'parada';
+        const hasta = async tipo => esperar(`document.querySelector('[data-partido-reproductor]')?.dataset.escena === ${JSON.stringify(tipo)}`, 60000);
+        let ok = await hasta('chut');
+        ok = ok && await esperar(`(() => { const r = document.querySelector('[data-partido-reproductor]')?.reproductor; const l = r?.linea;
+          if (!l || l.t < l.dur - 120) return false; r.pausar(); return true; })()`, 15000);
+        const caja = () => ev(`(() => { const r = document.querySelector('.slr-pt-vineta')?.getBoundingClientRect(); return r ? [r.left, r.top, r.width, r.height].map(Math.round) : null; })()`);
+        const antes = await caja();
+        await foto(`jugada-${sigue}-1-chut-final`);
+        await ev(`document.querySelector('[data-partido-reproductor]').reproductor.reanudar(); 0`);
+        ok = ok && await esperar(`(() => { const r = document.querySelector('[data-partido-reproductor]')?.reproductor;
+          if (r?.escena?.tipo !== ${JSON.stringify(sigue)}) return false; r.pausar(); return true; })()`, 8000);
+        await dormir(80);
+        const despues = await caja();
+        await foto(`jugada-${sigue}-2-inicio`);
+        await ev(`document.querySelector('[data-partido-reproductor]').reproductor.reanudar(); 0`);
+        await esperar(`(() => { const r = document.querySelector('[data-partido-reproductor]')?.reproductor; const l = r?.linea;
+          if (r?.escena?.tipo !== ${JSON.stringify(sigue)} || !l || l.t < l.dur * 0.7) return false; r.pausar(); return true; })()`, 15000);
+        await foto(`jugada-${sigue}-3-desenlace`);
+        await cerrarReproductor();
+        check(ok && antes && despues && antes.every((x, k) => Math.abs(x - despues[k]) <= 1),
+          `${pt.nombre} · jugada entera: el chut empalma con ${sigue === 'gol' ? 'el gol' : 'la parada'} en la misma caja (${antes} → ${despues})`);
+      }
     }
     // Lectura: los rótulos y franjas duran al menos lo que manda la regla (medido en sus animaciones)
     if (!SOLO && pt.w === 412) {

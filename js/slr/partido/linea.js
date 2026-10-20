@@ -11,6 +11,9 @@
    · cancelar(): lo para todo y no deja nada a medias
    · velocidad(v): ×1 / ×2
    · pausar() / reanudar(): congela la escena donde está (muestrario, al cerrar)
+   · cuadros(fn, { en, dur }): para lo que se pinta por programa (las viñetas):
+     fn(ms locales, de 0 a dur) en cada avanzar(), fn(0) al iniciar y fn(dur) al
+     terminar; así el tap, «Saltar», la pausa y el ×2 funcionan igual
    La duración es la de la animación o aviso que acabe más tarde (o la fijada).
 ═══════════════════════════════════════════════ */
 
@@ -18,6 +21,7 @@ export class Linea {
   constructor(duracion = 0) {
     this.anims = [];
     this.avisos = [];      // { t, fn, estado }
+    this.cuadrosFn = [];   // { fn, en, dur }
     this.t = 0;
     this.dur = duracion;
     this.estado = 'lista';   // lista · corriendo · terminada · cancelada
@@ -34,6 +38,19 @@ export class Linea {
     return a;
   }
 
+  // Algo que se pinta por programa en cada fotograma: fn(ms locales, 0…dur)
+  cuadros(fn, { en = 0, dur } = {}) {
+    this.cuadrosFn.push({ fn, en, dur });
+    this.dur = Math.max(this.dur, en + dur);
+    return this;
+  }
+  pintarCuadros(final = false) {
+    for (const c of this.cuadrosFn) {
+      const ms = final ? c.dur : Math.min(c.dur, Math.max(0, this.t - c.en));
+      try { c.fn(ms); } catch (e) { console.error(e); }
+    }
+  }
+
   // Un aviso en el ms t. estado: también se ejecuta al saltar al final (p. ej. el marcador)
   en(t, fn, { estado = false } = {}) {
     this.avisos.push({ t, fn, estado, hecho: false });
@@ -46,6 +63,7 @@ export class Linea {
     this.estado = 'corriendo';
     this.velocidad(vel);
     for (const a of this.anims) a.play();
+    for (const c of this.cuadrosFn) { try { c.fn(0); } catch (e) { console.error(e); } }
     this.avanzar(0);
   }
 
@@ -58,6 +76,7 @@ export class Linea {
   avanzar(ms) {
     if (this.estado !== 'corriendo') return;
     this.t += ms;
+    this.pintarCuadros();
     for (const a of this.avisos) {
       if (!a.hecho && a.t <= this.t) { a.hecho = true; try { a.fn(); } catch (e) { console.error(e); } }
     }
@@ -74,6 +93,7 @@ export class Linea {
       if (!saltando || a.estado) { try { a.fn(); } catch (e) { console.error(e); } }
     }
     for (const a of this.anims) { try { a.finish(); } catch { /* infinita: se cancela */ a.cancel(); } }
+    this.pintarCuadros(true);   // lo pintado por programa, en su último fotograma
     this.estado = 'terminada';
   }
 

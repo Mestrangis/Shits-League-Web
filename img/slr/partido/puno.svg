@@ -1,6 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 64 64"><!-- Guante de portero cerrado en puño (los nudillos arriba) -->
-  <path d="M17 24a7 7 0 0 1 7-7h17a7 7 0 0 1 7 7v11a7 7 0 0 1-7 7H24a7 7 0 0 1-7-7z"/>
-  <path d="M27 17v9M34.5 17v9M41.5 17.5v8.5"/>
-  <path d="M17 29h-1.5a5.5 5.5 0 0 0 0 11H19"/>
-  <path d="M22 42v12h22V42M22 48h22"/>
-</svg>

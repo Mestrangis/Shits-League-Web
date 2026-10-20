@@ -1509,3 +1509,32 @@ Medido con `tests/slr/banco/rendimiento-apertura.mjs`: Chrome a 390×844 (DPR 2,
 - **Tests:**
   - `partido-ajustes.test.mjs`: ajustes iguales a los de por defecto; valores no válidos usan el de por defecto con aviso; enteros y rangos; lectura y textos al azar con la semilla.
   - `banco/partido.mjs`, además de lo de antes: el césped cubre siempre toda la pantalla, y en control y chut la barra y la animación se ven a la vez.
+
+## Reproducción animada de los partidos (5.ª entrega: viñetas de chut, goles y paradas)
+
+### Decisiones de Marcos
+
+- **Viñetas propias** en `js/slr/partido/vinetas.js` (chut «choque», goles «red», «chilena» y «ardiendo», paradas «puños», «atrapada» y «estirada»). Su dibujo y sus tiempos internos no se tocan: solo se conectan. Cada una devuelve `{ el, render(ms), dur, momentos }` y `render(ms)` es puro.
+- **Cartas de verdad** dentro de las viñetas (`cartaHTML`, al 100 % del ancho de su hueco).
+- **Entradas y salidas** de franjas y rótulos (`saque.entra`, `saque.sale`, `inicio.entrada`, `poder.entrada`) pueden bajar hasta 0 ms.
+- **Chut:** la viñeta en una caja cuadrada centrada y la barra debajo, como estaba. La viñeta dura lo que la escena y suelta el balón en el golpe final de la barra (`aplasta`); el sonido «chut», en ese momento.
+- **Gol y parada:** las viñetas, con `trasChut` (empalman con la del chut), en una caja cuadrada centrada de más o menos `min(94vw, 62vh, 560px)`, sin filtros CSS (al final, `54vh`: con 62vh, en PC la carta del tirador, que la viñeta pinta algo por debajo de su caja, tapaba el título de la barra del chut; en el móvil manda el 94vw y no cambia).
+  - gol: «chut» en `golpe` (si lo hay), y en `impacto` «gol», temblor, marcador y el rótulo «GOL» con el goleador, sin tapar la viñeta y sin las explosiones;
+  - parada: en `impacto` «parada», un temblor pequeño y el rótulo con el nombre del portero.
+- **Ajustes:** los tiempos de `gol.red/chilena/ardiendo` y `parada` se sustituyen por la sección `vinetas`, una escala por variante (1 por defecto, de 0,3 a 3; 2 = el doble de lenta). Se mantienen `gol.marcador` y `gol.celebracion`. Los valores que Marcos había ajustado a mano se conservan.
+
+### Decisiones mías
+
+- **`Linea.cuadros(fn, { en, dur })`:** lo que se pinta por programa se apunta en la línea de tiempo: `fn(0)` al iniciar, sus ms locales (entre 0 y `dur`) en cada `avanzar()`, nada en pausa y `fn(dur)` al terminar. Así el ×2, la pausa, el tap y «Saltar» funcionan igual que con las animaciones WAAPI, y el tap deja la viñeta en su último fotograma.
+- **`montarVineta()` y `cartaVineta()`** (en `escenas/comun.js`): montan la caja, le pasan la semilla del PRNG de la jugada (el mismo partido se ve siempre igual) y la conectan con `cuadros`. Si una carta no se encuentra, la viñeta recibe `null` y usa su hueco.
+- **La caja** es la misma en las tres escenas (`.slr-pt-vineta`, arriba y centrada), así que el chut empalma con el gol o la parada sin moverse. Los rótulos («GOL», la parada) van en el hueco de debajo, y el «¡SORPRESA!» del chut entre la viñeta y la barra.
+- **Fuera lo que ya no se usa:**
+  - iconos `puno`, `guante`, `brazo`, `porteria`, `porteria-red`, `gol-red-porteria`, `gol-red-red`, `gol-red-red-abombada` y `gol-red` (quedan `balon` y `bota`);
+  - su CSS, el de la portería, las cartas de tirador y portero, el brillo y el gol «red»;
+  - los tiempos `chut.disparo_*`.
+- **Tests:**
+  - `partido-linea.test.mjs` (nuevo): `cuadros` con inicio, avance, pausa, terminar y ×2;
+  - `partido-ajustes.test.mjs`: ahora comprueba que `ajustes.js` se carga sin avisos (ya no es igual a los de por defecto, porque Marcos lo ha ajustado), que las entradas y salidas admiten 0 y las escalas de las viñetas;
+  - `banco/partido.mjs`, en cada pantalla: la viñeta cuadrada, centrada, entera y sin rótulo encima, con las cartas con tamaño; el tap deja cada una de las 7 en su último fotograma; y dos jugadas enteras (chut → gol y chut → parada) en la misma caja.
+  - para medir, el banco termina el temblor de la pantalla (mueve y gira la capa, y agranda las cajas que se miden);
+  - con la CPU ×6, una jugada entera con poder y gol va a 55 fps (p95 33 ms) a 360 y a 412 px.

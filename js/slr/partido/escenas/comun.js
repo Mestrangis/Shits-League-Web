@@ -27,7 +27,7 @@ export function nodo(html) {
 export const poner = (ctx, html) => ctx.escenario.appendChild(nodo(html));
 
 /* ── Iconos (img/slr/partido/*.svg) ────────────────────────────────────── */
-export const ICONOS = ['balon', 'bota', 'puno', 'guante', 'brazo', 'porteria', 'porteria-red', 'gol-red-porteria', 'gol-red-red', 'gol-red-red-abombada'];
+export const ICONOS = ['balon', 'bota'];
 export const urlIcono = nombre => `img/slr/partido/${nombre}.svg`;
 export const icono = (nombre, clase = '') => `<i class="slr-pt-ico slr-pt-ico--${nombre} ${clase}" aria-hidden="true"></i>`;
 
@@ -113,7 +113,7 @@ export function vibra(ctx, el, { en = 0, dur = 1000, fuerza = 3 } = {}) {
    el que tenía poco): en el último momento va hacia el favorito y se da la vuelta.
    Poderes: arranca inclinada hacia el lado del que lo activó.
    Devuelve { inicio, pelea: [desde, hasta], aplasta, fin }. */
-export function barra(ctx, { pAbajo, ganaAbajo, en = 0, dur = 1600, sorpresa = false, inclina = 0, titulo = '', arriba = false }) {
+export function barra(ctx, { pAbajo, ganaAbajo, en = 0, dur = 1600, sorpresa = false, inclina = 0, titulo = '', arriba = false, claseSorpresa = '' }) {
   const T = ctx.A.barra;
   const ab = ctx.lados.abajo, ar = ctx.lados.arriba;
   const el = poner(ctx, `
@@ -148,7 +148,7 @@ export function barra(ctx, { pAbajo, ganaAbajo, en = 0, dur = 1600, sorpresa = f
   if (sorpresa) {
     const t = pelea[1];
     ctx.linea.en(t, () => ctx.sonar('sorpresa'));
-    finRotulo = rotulo(ctx, ctx.texto('sorpresa'), { en: t, clase: `slr-pt-rotulo--sorpresa ${arriba ? 'slr-pt-rotulo--abajo' : ''}`, color: ctx.color(ganaAbajo ? ab : ar) });
+    finRotulo = rotulo(ctx, ctx.texto('sorpresa'), { en: t, clase: `slr-pt-rotulo--sorpresa ${claseSorpresa || (arriba ? 'slr-pt-rotulo--abajo' : '')}`, color: ctx.color(ganaAbajo ? ab : ar) });
   }
   // Llamarada del ganador al aplastar
   ctx.linea.en(aplasta - 40, () => {
@@ -190,3 +190,24 @@ export function pieza(ctx, nombre, { clase = '', color = '' } = {}) {
   return poner(ctx, `<div class="slr-pt-pieza slr-pt-pieza--${nombre} ${clase}"${color ? ` style="color:${color}"` : ''}>${icono(nombre)}</div>`);
 }
 export const centrada = (x, y, extra = '') => `${en(x, y)} translate(-50%, -50%)${extra}`;
+
+/* ── Viñetas (js/slr/partido/vinetas.js) ───────────────────────────────── */
+// La carta de verdad para una viñeta (ocupa el 100 % del ancho de su caja); null → la viñeta pone una de reserva
+export function cartaVineta(ctx, id) {
+  const c = ctx.carta(id);
+  if (c?.ata == null) return null;
+  const el = document.createElement('div');
+  el.className = 'slr-pt-carta-vineta';
+  el.innerHTML = cartaHTML(c, { tam: 's', energia: false });
+  return el;
+}
+// Monta una viñeta en su caja CUADRADA y la engancha a la línea de tiempo (render(ms) en cada fotograma)
+export function montarVineta(ctx, fabrica, opciones = {}) {
+  const caja = poner(ctx, '<div class="slr-pt-vineta"></div>');
+  const v = fabrica({ ...opciones, semilla: Math.floor(ctx.rng() * 4294967296) });
+  caja.appendChild(v.el);
+  v.render(0);                     // ya en el DOM: así mide su tamaño
+  caja.dataset.dur = Math.round(v.dur);
+  ctx.linea.cuadros(ms => { v.render(ms); caja.dataset.ms = Math.round(ms); }, { dur: v.dur });
+  return { v, caja };
+}

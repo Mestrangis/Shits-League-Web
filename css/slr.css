@@ -2135,7 +2135,7 @@ html.slr-sin-seleccion input, html.slr-sin-seleccion textarea { -webkit-user-sel
    (balón, botas, guantes…) van en left:0/top:0 y se colocan con transform en px;
    las demás, con left/top y la animación encima. Tamaños con vw y vh a la vez
    para aprovechar la pantalla también en PC. */
-.slr-partido { --pt-carta: min(26vw, 17vh, 150px); --pt-porteria: min(80vw, 62vh, 520px); --pt-franja: 64px; --pt-balon-max: 64px;
+.slr-partido { --pt-vineta: min(94vw, 54vh, 560px); --pt-carta: min(26vw, 17vh, 150px); --pt-porteria: min(80vw, 62vh, 520px); --pt-franja: 64px; --pt-balon-max: 64px;
   position: absolute; inset: 0; z-index: 30; overflow: hidden; display: grid; grid-template-rows: auto minmax(0, 1fr) auto;
   grid-template-columns: minmax(0, 1fr); user-select: none; -webkit-user-select: none; touch-action: manipulation; color: #fff;
   background: #06180d; animation: slr-ap-entrar .25s ease-out; }
@@ -2175,20 +2175,9 @@ html.slr-sin-seleccion input, html.slr-sin-seleccion textarea { -webkit-user-sel
   -webkit-mask: var(--ico) center / contain no-repeat; mask: var(--ico) center / contain no-repeat; }
 .slr-pt-ico--balon { --ico: url("../img/slr/partido/balon.svg"); }
 .slr-pt-ico--bota { --ico: url("../img/slr/partido/bota.svg"); }
-.slr-pt-ico--puno { --ico: url("../img/slr/partido/puno.svg"); }
-.slr-pt-ico--guante { --ico: url("../img/slr/partido/guante.svg"); }
-.slr-pt-ico--brazo { --ico: url("../img/slr/partido/brazo.svg"); }
-.slr-pt-ico--porteria { --ico: url("../img/slr/partido/porteria.svg"); }
-.slr-pt-ico--porteria-red { --ico: url("../img/slr/partido/porteria-red.svg"); }
-.slr-pt-ico--gol-red-porteria { --ico: url("../img/slr/partido/gol-red-porteria.svg"); }
-.slr-pt-ico--gol-red-red { --ico: url("../img/slr/partido/gol-red-red.svg"); }
-.slr-pt-ico--gol-red-red-abombada { --ico: url("../img/slr/partido/gol-red-red-abombada.svg"); }
 /* Piezas sueltas (botas, guantes, brazo): se colocan con transform por su centro */
 .slr-pt-pieza { position: absolute; left: 0; top: 0; z-index: 8; aspect-ratio: 1; will-change: transform; filter: drop-shadow(0 4px 8px rgba(0,0,0,.6)); }
 .slr-pt-pieza--bota { width: min(30vw, 19vh, 170px); z-index: 5; }
-.slr-pt-pieza--puno { width: min(18vw, 11vh, 100px); }
-.slr-pt-pieza--guante { width: min(22vw, 13vh, 120px); }
-.slr-pt-pieza--brazo { width: min(78vw, 52vh, 460px); aspect-ratio: 160 / 48; }
 
 /* Piezas */
 .slr-pt-foto { --t: 44px; display: inline-flex; flex: none; width: var(--t); height: var(--t); border-radius: 50%; overflow: hidden; border: 2.5px solid var(--c, #fff);
@@ -2204,12 +2193,8 @@ html.slr-sin-seleccion input, html.slr-sin-seleccion textarea { -webkit-user-sel
 .slr-pt-balon::before { content: ""; position: absolute; inset: 8%; border-radius: 50%; background: rgba(4,16,9,.72); box-shadow: 0 4px 10px rgba(0,0,0,.55); }
 .slr-pt-balon .slr-pt-ico { position: relative; }
 .slr-pt-balon--libre { left: 0; top: 0; }
-.slr-pt-balon--grande { --b: min(19vw, 12vh, calc(var(--pt-balon-max) * 1.6)); }
-.slr-pt-balon--golred { --b: calc(min(84vw, 62vh, 560px) * .1625); z-index: 4; }
 .slr-pt-balon--fantasma .slr-pt-ico { opacity: var(--o); }
 .slr-pt-balon--fantasma::before { display: none; }
-.slr-pt-balon.es-ardiendo::after { content: ""; position: absolute; inset: -45%; border-radius: 50%; z-index: -1;
-  background: radial-gradient(circle, rgba(255,210,58,.95) 0%, rgba(255,122,26,.7) 40%, transparent 70%); }
 .slr-pt-escudo { position: absolute; left: 0; top: 0; z-index: 5; will-change: transform; }
 .slr-pt-rotulo { position: absolute; left: 50%; top: 40%; z-index: 7; display: flex; flex-direction: column; align-items: center; pointer-events: none; will-change: transform, opacity; }
 .slr-pt-rotulo b { font-family: 'Anton', sans-serif; font-weight: 400; font-size: clamp(44px, min(14vw, 9vh), 120px); line-height: 1; letter-spacing: .02em; white-space: nowrap;
@@ -2220,14 +2205,12 @@ html.slr-sin-seleccion input, html.slr-sin-seleccion textarea { -webkit-user-sel
 .slr-pt-rotulo--vs b { font-size: clamp(54px, min(17vw, 11vh), 140px); color: #fff; text-shadow: 0 0 26px var(--slr-propio), 0 0 10px #fff; }
 .slr-pt-rotulo--gol { top: 50%; z-index: 9; }
 .slr-pt-rotulo--gol b { font-size: clamp(90px, min(34vw, 22vh), 260px); }
-.slr-pt-rotulo--gol.slr-pt-rotulo--bajo { top: 76%; }
 .slr-pt-rotulo--sorpresa { top: 27%; }
 .slr-pt-rotulo--sorpresa.slr-pt-rotulo--abajo { top: 73%; }
 .slr-pt-rotulo--sorpresa b { font-size: clamp(38px, min(12vw, 7.5vh), 100px); }
 .slr-pt-rotulo--robo { top: 30%; }
-.slr-pt-rotulo--corte.slr-pt-rotulo--abajo, .slr-pt-rotulo--parada.slr-pt-rotulo--abajo { top: 74%; }
-.slr-pt-rotulo--corte.slr-pt-rotulo--arriba, .slr-pt-rotulo--parada.slr-pt-rotulo--arriba { top: 26%; }
-.slr-pt-rotulo--parada b { font-size: clamp(38px, min(12.5vw, 8vh), 104px); }
+.slr-pt-rotulo--corte.slr-pt-rotulo--abajo { top: 74%; }
+.slr-pt-rotulo--corte.slr-pt-rotulo--arriba { top: 26%; }
 .slr-pt-franja { position: absolute; left: -6%; right: -6%; top: 46%; z-index: 7; height: clamp(62px, min(17vw, 11vh), 110px); background: var(--c);
   box-shadow: 0 0 28px var(--c); will-change: transform; }
 .slr-pt-franja__dentro { height: 100%; display: flex; align-items: center; justify-content: center; gap: 12px; padding: 0 12%; transform: skewX(12deg); color: #041009; }
@@ -2268,32 +2251,21 @@ html.slr-sin-seleccion input, html.slr-sin-seleccion textarea { -webkit-user-sel
 .slr-pt-carta--ruleta { position: relative; flex: 0 1 min(24vw, 19vh, 170px); width: auto; min-width: 0; }
 .slr-pt-ruleta__luz { position: absolute; inset: -5px; border-radius: 12px; border: 3px solid var(--c); opacity: 0; pointer-events: none;
   box-shadow: 0 0 16px var(--c), inset 0 0 16px var(--c); }
-/* Portería: arriba (atacas tú) o abajo (ataca el rival, la portería dada la vuelta) */
-.slr-pt-porteria { position: absolute; left: 50%; width: var(--pt-porteria); aspect-ratio: 160 / 70; transform: translateX(-50%); z-index: 2; color: #fff; }
-.slr-pt-porteria .slr-pt-ico { position: absolute; inset: 0; }
-.slr-pt-porteria__red { transform-origin: 50% 0; will-change: transform; }
-.slr-pt-porteria--abajo .slr-pt-ico--porteria { transform: scaleY(-1); }
-.slr-pt-porteria--arriba { top: 1.5%; }
-.slr-pt-porteria--abajo { bottom: 1.5%; }
-.slr-pt-porteria.es-delante { z-index: 5; }
-.slr-pt-carta--portero { left: 50%; width: min(24vw, 17vh, 150px); transform: translate3d(-50%, 0, 0); z-index: 3; }
-.slr-pt-carta--portero-arriba { top: calc(1.5% + var(--pt-porteria) * .12); }
-.slr-pt-carta--portero-abajo { bottom: calc(1.5% + var(--pt-porteria) * .12); }
-.slr-pt-carta--tirador { width: min(21vw, 15vh, 130px); }
-.slr-pt-carta--tirador-abajo { bottom: 3%; left: 5%; }
-.slr-pt-carta--tirador-arriba { top: 3%; right: 5%; }
-.slr-pt-brillo { position: absolute; left: 50%; width: min(120vw, 75vh, 680px); aspect-ratio: 1; z-index: 2; pointer-events: none; opacity: 0;
-  background: radial-gradient(circle, color-mix(in srgb, var(--c) 70%, transparent) 0%, color-mix(in srgb, var(--c) 25%, transparent) 35%, transparent 65%); }
-.slr-pt-brillo--arriba { top: calc(1.5% + var(--pt-porteria) * .12 + min(24vw, 17vh, 150px) * .7); }
-.slr-pt-brillo--abajo { top: calc(100% - 1.5% - var(--pt-porteria) * .12 - min(24vw, 17vh, 150px) * .7); }
-/* Gol «red»: la portería vista de lado, en el centro (como img/slr/partido/gol-red.svg) */
-.slr-pt-golred { position: absolute; left: 50%; top: 38%; width: min(84vw, 62vh, 560px); aspect-ratio: 160 / 120; transform: translate(-50%, -50%); z-index: 5; color: #fff; }
-.slr-pt-golred .slr-pt-ico { position: absolute; inset: 0; }
-.slr-pt-golred__abombada { opacity: 0; transform-origin: 60% 50%; }
 .slr-pt-carta--mini { position: relative; width: min(64px, 8.5vh); }
 .slr-pt-carta--mejor { position: relative; width: min(40vw, 170px, 26vh); margin: 0 auto; }
 .slr-pt-carta.es-lesionada::after { content: "✚"; position: absolute; right: -8px; top: -8px; width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%;
   background: #e5343a; color: #fff; font-size: 16px; font-weight: 900; box-shadow: 0 0 10px #e5343a; }
+
+/* Viñetas (js/slr/partido/vinetas.js): chut, goles y paradas. Caja CUADRADA, arriba y centrada,
+   sin filtros; las cartas de verdad ocupan el 100 % del ancho de su hueco. Los rótulos van en
+   el hueco de debajo (sin taparla) y el «¡SORPRESA!» del chut, entre la viñeta y la barra. */
+.slr-pt-vineta { position: absolute; left: 50%; top: 2%; width: var(--pt-vineta); aspect-ratio: 1; transform: translateX(-50%); z-index: 5; pointer-events: none; }
+.slr-pt-carta-vineta .slr-carta { width: 100%; }
+.slr-pt-rotulo--vineta { top: calc((2% + var(--pt-vineta) + 100%) / 2); }
+.slr-pt-rotulo--gol.slr-pt-rotulo--vineta b { font-size: clamp(54px, min(19vw, 11vh), 150px); }
+.slr-pt-rotulo--parada.slr-pt-rotulo--vineta b { font-size: clamp(34px, min(11vw, 7vh), 90px); }
+.slr-pt-rotulo--sorpresa.slr-pt-rotulo--entre { top: calc((2% + var(--pt-vineta) + 88% - 90px) / 2); }
+.slr-pt-rotulo--sorpresa.slr-pt-rotulo--entre b { font-size: clamp(30px, min(10vw, 6vh), 70px); }
 
 /* Barra de porcentajes (el color de tu equipo, a la izquierda, como en el marcador) */
 .slr-pt-barra { position: absolute; left: 50%; bottom: 12%; width: min(86vw, 640px); z-index: 6; transform: translate(-50%, 0); will-change: transform, opacity; }

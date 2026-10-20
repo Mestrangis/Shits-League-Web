@@ -8,12 +8,18 @@ import { AJUSTES as USUARIO } from '../../js/slr/partido/ajustes.js';
 import { AJUSTES, POR_DEFECTO, ESQUEMA, validar, leer, texto } from '../../js/slr/partido/config.js';
 import { prng } from '../../js/slr/partido/azar.js';
 
-test('ajustes.js trae los valores por defecto y se carga sin avisos', () => {
+test('ajustes.js (el que se toca a mano) se carga sin avisos y es lo que usa la reproducción', () => {
   const avisos = [];
   const a = validar(USUARIO, ESQUEMA, '', avisos);
-  assert.deepEqual(avisos, []);
-  assert.deepEqual(a, POR_DEFECTO);
-  assert.deepEqual(AJUSTES, POR_DEFECTO);
+  assert.deepEqual(avisos, [], 'ningún valor fuera de rango ni ninguna clave de más o de menos');
+  assert.deepEqual(AJUSTES, a);
+  // Las entradas y salidas de franjas y rótulos pueden bajar hasta 0 ms
+  const v = validar({ tiempos: { saque: { entra: 0, sale: 0 }, inicio: { entrada: 0 }, poder: { entrada: 0 } } });
+  assert.deepEqual([v.tiempos.saque.entra, v.tiempos.saque.sale, v.tiempos.inicio.entrada, v.tiempos.poder.entrada], [0, 0, 0, 0]);
+  // Viñetas: una escala por variante, de 0,3 a 3
+  assert.deepEqual(Object.keys(POR_DEFECTO.vinetas), ['gol_red', 'gol_chilena', 'gol_ardiendo', 'parada_punos', 'parada_atrapada', 'parada_estirada']);
+  assert.equal(validar({ vinetas: { gol_red: 5 } }).vinetas.gol_red, 1);
+  assert.equal(validar({ vinetas: { gol_red: 2 } }).vinetas.gol_red, 2);
 });
 
 test('un valor no válido usa el de por defecto y avisa; nunca se rompe', () => {
