@@ -1380,7 +1380,7 @@ Medido con `tests/slr/banco/rendimiento-apertura.mjs`: Chrome a 390×844 (DPR 2,
   - la clasificación (con un aviso para ir a verlo) y la ficha de cualquier equipo: posición, goles y lista de resultados sin ese partido;
   - el aviso al jugar un amistoso, que ya no dice el resultado.
 - **Reproducción automática:** la crónica, al abrir un partido tuyo no visto, lanza la reproducción sin pintar la crónica debajo (no se ve el resultado). Si la cierras antes de tiempo, no cuenta como visto. Al llegar al final se abre la crónica.
-- **Pendiente de decidir (dinero y stats):** el saldo de arriba y los movimientos de Perfil incluyen el bonus de sorpresa (600 por ganar, 300 por empatar, si eras el menos favorito) y el ojo clínico. Ocultarlo en la web no es fiable: el saldo es uno y se usa para comprar. Opciones:
+- **Dinero y stats:** decidido en la 3.ª entrega (cobros pendientes). Antes: el saldo de arriba y los movimientos de Perfil incluyen el bonus de sorpresa (600 por ganar, 300 por empatar, si eras el menos favorito) y el ojo clínico. Ocultarlo en la web no es fiable: el saldo es uno y se usa para comprar. Opciones:
   - (a) que el servidor deje esos dos cobros pendientes y los pague al marcar el partido como visto (o, como mucho, al cerrar la siguiente jornada; los bots, al momento);
   - (b) dejarlo como está.
   - Las demás stats de la jornada (energía, lesiones, PR) no dicen el resultado directamente; la crónica ya solo se abre después de verlo.
@@ -1388,3 +1388,67 @@ Medido con `tests/slr/banco/rendimiento-apertura.mjs`: Chrome a 390×844 (DPR 2,
   - `api-paso19.mjs`: sin ver, `mio`/`visto`, clasificación oculta solo para quien no lo ha visto, idempotencia y solo el último partido;
   - `banco/partido.mjs`: clasificación, calendario, pestaña Equipo y aviso sin resultado; la primera vez se reproduce solo desde el aviso; al terminar, la crónica; tras recargar, ya visto.
   - `api-paso4`, `api-paso5`, `banco/tacticas` y `banco/equipo` marcan el partido como visto antes de mirar la clasificación o la crónica.
+
+## Reproducción animada de los partidos (3.ª entrega: velocidad, composición vertical, variantes y dinero)
+
+### Decisiones de Marcos
+
+- **Dinero (opción A):** el bonus de sorpresa y el de ojo clínico quedan pendientes en el servidor. Se pagan al ver el partido o, como tarde, al cerrar la jornada siguiente. Los bots cobran al momento. Mientras está pendiente, nada en los movimientos de Perfil delata el resultado.
+- **Velocidad:**
+  - casi todo, más del doble de lento;
+  - un texto se queda como mínimo 1,5 s más algo por palabra y no se salta salvo con el tap;
+  - la franja del saque, mucho más tiempo;
+  - las barras pelean más despacio;
+  - el partido puede durar 3–4 minutos.
+- **Composición vertical:**
+  - el rival arriba y tu equipo abajo (si no es tu partido, el local abajo); atacas hacia arriba;
+  - de fondo, las franjas de césped corriendo en el sentido del ataque;
+  - en ataque contra defensa, las cartas de la defensa rival grandes, a lo ancho, en su campo;
+  - en PC se aprovecha la pantalla.
+- **Cortes distintos:** entrada (se lanza deslizándose y se queda el balón), despeje (lo golpea y sale fuera girando) y choque (como estaba).
+- **Chut:** más tensión. Tiembla todo, y el balón empuja temblando contra el portero mientras pelea la barra.
+- **Goles distintos, con el balón dentro de la red:**
+  - red: cámara detrás de la portería; el balón viene hacia ti y la red se hunde;
+  - chilena: una pierna boca abajo golpea el balón;
+  - ardiendo: lento, balón grande, estela de fuego y todo temblando.
+- **Paradas:** un gráfico animado por encima, además del texto:
+  - puños: dos guantes cerrados golpean y despejan;
+  - atrapada: dos guantes agarran el balón;
+  - estirada: un brazo estirado lo toca in extremis.
+- **No se tocan:** lesión, descanso, final y las barras, salvo los tiempos.
+
+### Decisiones mías
+
+- **Cobros pendientes (servidor):**
+  - tabla privada `cobros_pendientes`;
+  - al publicar, `apartar_bonus` saca de `jornadas.cobros` (que se lee en público) los dos bonus de los equipos de personas (no internos) y los deja pendientes;
+  - `slr_marcar_visto` paga los de ese partido y devuelve `cobrado`; la web refresca el saldo y avisa con «Bonus del partido: +N»;
+  - `cerrar_jornada` paga lo pendiente de jornadas anteriores;
+  - el aviso de la jornada suma solo lo cobrado de verdad;
+  - si la temporada se acaba, lo pendiente de la última jornada se paga al verlo o al cerrar la primera jornada de la siguiente.
+- **Tiempos** (todos en `config.js`): `leer(texto) = 1500 + 250 ms por palabra`. Los rótulos y las franjas duran al menos eso y la escena no termina antes. Más del doble en todo:
+  - saque: 3,5 s, con la franja quieta 2,6 s;
+  - control completo: 6,2 s;
+  - jugada con gol: unos 30 s; jugada cortada: unos 16 s.
+  - la barra pelea con 6 empujones en vez de 7, en más tiempo.
+- **Vertical:**
+  - el guion da `lados: { abajo, arriba }` y el reproductor, `hacia(equipo)` (−1 sube, 1 baja);
+  - en el marcador y en la barra, el de abajo va a la izquierda y en verde;
+  - las trayectorias se calculan en px con el tamaño real del escenario, así que sirven en móvil y en PC;
+  - los tamaños usan vw y vh a la vez.
+- **Césped:** una sola animación infinita (transform) detrás del escenario. Cada escena elige sentido y ritmo: el saque lo pone hacia su ataque, el robo lo da la vuelta, el ataque y el chut corren rápido y los cortes y las paradas lo paran.
+- **Portería:** arriba si atacas tú, abajo (dada la vuelta) si ataca el rival; la barra del chut se pone en el otro extremo.
+- **Goles de frente** (chilena y ardiendo): la red se pinta por encima del balón, para que se vea dentro. El portero cae vencido.
+- **Gráficos nuevos**, planos y en el color del equipo (`comun.js`): pierna de chilena, guante cerrado, guante abierto, brazo con guante y la red vista desde detrás.
+- **Muestrario:** se elige quién ataca (tú hacia arriba o el rival hacia abajo), su probabilidad y quién gana.
+- **Tests:**
+  - `api-paso20.mjs`: cinco jornadas con dos personas y cuatro bots:
+    - los bonus de las personas no salen en público ni en sus movimientos hasta verlo;
+    - al verlo se cobra exactamente lo pendiente, una sola vez;
+    - quien no lo ve cobra al cerrar la jornada siguiente;
+    - los bots, al momento.
+  - `banco/partido.mjs`:
+    - cada variante a 360 y 412 px y en PC; a 412 px, también con el rival atacando hacia abajo;
+    - nada se sale de la pantalla en el 30, 60 y 95 %;
+    - los textos duran al menos lo de la regla;
+    - con CPU ×6, fluido.

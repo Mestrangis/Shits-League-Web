@@ -8,7 +8,9 @@
    · «Saltar»: directo al resultado final. · ×1 / ×2. · Silenciar.
    · Un solo bucle (requestAnimationFrame) para el tiempo, el reloj y las
      partículas (un canvas, DPR ≤ 1,5, calidad adaptativa).
-   · Tu equipo siempre a la izquierda (si juegas); si no, el local.
+   · Composición vertical: tu equipo (si juegas; si no, el local) abajo, en verde,
+     atacando hacia arriba; el rival arriba, en naranja. En el marcador, el de
+     abajo a la izquierda. El césped corre en el sentido del ataque.
    · Temblores solo visuales: nada de vibración del dispositivo.
 ═══════════════════════════════════════════════ */
 import { abrirCapa, cerrarHasta, esc } from '../ui.js';
@@ -21,7 +23,7 @@ import { Particulas, sprite } from '../particulas.js';
 import { cargarFotos } from '../imagenes.js';
 import { foto, framesTemblor } from './escenas/comun.js';
 
-export const COLORES = Object.freeze({ izq: '#39FF88', der: '#FF8A3D' });
+export const COLORES = Object.freeze({ abajo: '#39FF88', arriba: '#FF8A3D' });
 
 /**
  * guion: el de crearGuion (sin decorar: aquí se eligen las variantes)
@@ -31,7 +33,8 @@ export const COLORES = Object.freeze({ izq: '#39FF88', der: '#FF8A3D' });
 export function reproducir(guion, cartas = {}, opts = {}) {
   if (!opts.yaDecorado) decorar(guion, guion.partidoId ?? 'partido', VARIANTES);
   const lados = guion.lados;
-  const ladoDe = l => (l === lados.izq ? 'izq' : 'der');
+  const ladoDe = l => (l === lados.abajo ? 'abajo' : 'arriba');
+  const hacia = l => (ladoDe(l) === 'abajo' ? -1 : 1);   // hacia dónde ataca: −1 sube, 1 baja
   const color = l => COLORES[ladoDe(l)];
   const equipo = l => guion.equipos[l] ?? {};
   const carta = id => cartas[id] ?? (guion.stats?.[id] ? { nombre: guion.stats[id].nombre } : null);
@@ -45,11 +48,11 @@ export function reproducir(guion, cartas = {}, opts = {}) {
   el.innerHTML = `
     <canvas class="slr-partido__lienzo" aria-hidden="true"></canvas>
     <header class="slr-pt-marcador">
-      <div class="slr-pt-marcador__eq slr-pt-marcador__eq--izq" style="--c:${COLORES.izq}"><span data-foto="${lados.izq}"></span><span class="slr-pt-marcador__nombre">${esc(equipo(lados.izq).nombre ?? '')}</span></div>
-      <div class="slr-pt-marcador__centro">${gol(lados.izq)}<span class="slr-pt-reloj" data-reloj>0'</span>${gol(lados.der)}</div>
-      <div class="slr-pt-marcador__eq slr-pt-marcador__eq--der" style="--c:${COLORES.der}"><span class="slr-pt-marcador__nombre">${esc(equipo(lados.der).nombre ?? '')}</span><span data-foto="${lados.der}"></span></div>
+      <div class="slr-pt-marcador__eq slr-pt-marcador__eq--izq" style="--c:${COLORES.abajo}"><span data-foto="${lados.abajo}"></span><span class="slr-pt-marcador__nombre">${esc(equipo(lados.abajo).nombre ?? '')}</span></div>
+      <div class="slr-pt-marcador__centro">${gol(lados.abajo)}<span class="slr-pt-reloj" data-reloj>0'</span>${gol(lados.arriba)}</div>
+      <div class="slr-pt-marcador__eq slr-pt-marcador__eq--der" style="--c:${COLORES.arriba}"><span class="slr-pt-marcador__nombre">${esc(equipo(lados.arriba).nombre ?? '')}</span><span data-foto="${lados.arriba}"></span></div>
     </header>
-    <div class="slr-pt-temblor" data-temblor><div class="slr-pt-escenario" data-escenario></div></div>
+    <div class="slr-pt-temblor" data-temblor><div class="slr-pt-cesped" data-cesped aria-hidden="true"></div><div class="slr-pt-escenario" data-escenario></div></div>
     <nav class="slr-pt-controles">
       <button type="button" class="slr-pt-boton" data-silencio aria-label="Silenciar"></button>
       <button type="button" class="slr-pt-boton" data-velocidad>×1</button>
@@ -59,7 +62,7 @@ export function reproducir(guion, cartas = {}, opts = {}) {
     </nav>`;
   const $ = s => el.querySelector(s);
   const escenario = $('[data-escenario]'), temblorEl = $('[data-temblor]'), reloj = $('[data-reloj]');
-  const ctxBase = { T: TIEMPOS, lados, lado: ladoDe, color, equipo, carta, sonar };
+  const ctxBase = { T: TIEMPOS, lados, lado: ladoDe, hacia, color, equipo, carta, sonar };
   for (const f of el.querySelectorAll('[data-foto]')) f.replaceWith(foto(ctxBase, f.dataset.foto));
 
   // ── Estado ──
@@ -75,7 +78,30 @@ export function reproducir(guion, cartas = {}, opts = {}) {
   const medir = () => { canvas.width = Math.round(innerWidth * dpr); canvas.height = Math.round(innerHeight * dpr); };
   medir();
   addEventListener('resize', medir);
-  sprite(COLORES.izq); sprite(COLORES.der); sprite('#ffffff'); sprite('#ff7a1a'); sprite('#ffd23a');
+  sprite(COLORES.abajo); sprite(COLORES.arriba); sprite('#ffffff'); sprite('#ff7a1a'); sprite('#ffd23a');
+
+  // ── Césped: franjas que corren en el sentido del ataque (una sola animación infinita) ──
+  // sentido: 'baja' (las franjas bajan: se avanza hacia arriba) · 'sube' · null (quieto)
+  const cespedEl = $('[data-cesped]');
+  const animCesped = cespedEl.animate([{ transform: 'translate3d(0, -128px, 0)' }, { transform: 'translate3d(0, 0, 0)' }],
+    { duration: 2 * TIEMPOS.cesped.normal, iterations: Infinity, easing: 'linear' });
+  let cespedRitmo = 0, cespedSentido = 1;   // velocidad (0: quieto) y sentido (1: las franjas bajan)
+  const BAJAN = [{ transform: 'translate3d(0, -128px, 0)' }, { transform: 'translate3d(0, 0, 0)' }];
+  const SUBEN = [{ transform: 'translate3d(0, 0, 0)' }, { transform: 'translate3d(0, -128px, 0)' }];
+  const aplicarCesped = () => {
+    if (!cespedRitmo) { animCesped.pause(); return; }
+    animCesped.playbackRate = Math.abs(cespedRitmo) * vel;
+    const sentido = Math.sign(cespedRitmo);
+    // Una animación infinita no puede ir hacia atrás: para cambiar de sentido se cambian los fotogramas
+    if (sentido !== cespedSentido) { cespedSentido = sentido; animCesped.effect.setKeyframes(sentido > 0 ? BAJAN : SUBEN); }
+    if (animCesped.playState !== 'running') animCesped.play();
+  };
+  const cesped = (sentido, ritmo = 'normal') => {
+    cespedRitmo = !sentido ? 0 : (sentido === 'baja' ? 1 : -1) * (TIEMPOS.cesped.normal / (TIEMPOS.cesped[ritmo] ?? TIEMPOS.cesped.normal));
+    aplicarCesped();
+  };
+  // Para quien ataca: si sube, las franjas bajan
+  const cespedAtaque = (l, ritmo) => cesped(hacia(l) < 0 ? 'baja' : 'sube', ritmo);
 
   // ── Marcador y reloj ──
   const pintarGoles = (g, golpeA = null) => {
@@ -107,6 +133,7 @@ export function reproducir(guion, cartas = {}, opts = {}) {
   function montar(k) {
     escenario.replaceChildren();
     temblorEl.style.transform = '';
+    cesped('baja', 'lento');   // por defecto, un paseo suave; cada escena lo cambia
     fx.vaciar();
     const d = escenas[k];
     pintarGoles(d.marcador ?? goles);
@@ -122,6 +149,7 @@ export function reproducir(guion, cartas = {}, opts = {}) {
       // Temblor de toda la escena (visual; se lanza en el momento, como las chispas)
       temblor: (fuerza, en = 0, dur = 400) => { temblorEl.animate(framesTemblor(fuerza), { delay: en / vel, duration: dur / vel, easing: 'linear' }); },
       marcador: (g, l) => pintarGoles(g, l),
+      cesped, cespedAtaque,
     };
     try { crear(ctx); } catch (e) { console.error('[partido] escena', d.tipo, d.variante, e); }
     cargarFotos(escenario.querySelectorAll('.slr-carta'));
@@ -183,9 +211,10 @@ export function reproducir(guion, cartas = {}, opts = {}) {
     vel = vel === 1 ? 2 : 1;
     e.currentTarget.textContent = `×${vel}`;
     linea?.velocidad(vel);
+    aplicarCesped();
   });
   const pausar = si => {
-    if (si) linea?.pausar(); else linea?.reanudar();
+    if (si) { linea?.pausar(); animCesped.pause(); } else { linea?.reanudar(); aplicarCesped(); }
     const b = $('[data-pausa]');
     if (b) b.textContent = linea?.estado === 'pausada' ? '▶' : '⏸';
   };
@@ -214,6 +243,7 @@ export function reproducir(guion, cartas = {}, opts = {}) {
     vivo = false;
     cancelAnimationFrame(frame);
     linea?.pausar();   // se queda quieta mientras la capa se va (cancelar la haría saltar al principio)
+    animCesped.pause();
     removeEventListener('resize', medir);
     fx.vaciar();
     opts.alTerminar?.({ visto });

@@ -173,6 +173,11 @@ export async function marcarVisto(partidoId) {
   if (!r) return;
   const antes = datos.sinVer?.partido_id;
   datos.sinVer = r.sin_ver ?? null;
+  // Lo que quedaba pendiente de ese partido (bonus de sorpresa y ojo clínico) ya se ha cobrado
+  if (r.cobrado > 0) {
+    toast(`Bonus del partido: +${miles(r.cobrado)}`, 'ok');
+    await recargar('yo').catch(() => {});
+  }
   if (antes && antes !== datos.sinVer?.partido_id) pintar().catch(() => {});
 }
 

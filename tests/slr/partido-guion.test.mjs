@@ -107,11 +107,11 @@ test('los eventos desconocidos o mal formados se ignoran sin romper nada', () =>
   assert.deepEqual(vacio.escenas.map(e => e.tipo), ['inicio', 'final']);
 });
 
-test('tu equipo a la izquierda; si no juegas, el local', () => {
+test('tu equipo abajo (ataca hacia arriba); si no juegas, el local', () => {
   const { r, al, p } = partido('2.0.0', 5);
-  assert.deepEqual(crearGuion({ partido: p, alineaciones: al, eventos: r.eventos, equipos, yo: 'eqB' }).lados, { izq: 'B', der: 'A' });
-  assert.deepEqual(crearGuion({ partido: p, alineaciones: al, eventos: r.eventos, equipos, yo: 'eqA' }).lados, { izq: 'A', der: 'B' });
-  assert.deepEqual(crearGuion({ partido: p, alineaciones: al, eventos: r.eventos, equipos, yo: 'otro' }).lados, { izq: 'A', der: 'B' });
+  assert.deepEqual(crearGuion({ partido: p, alineaciones: al, eventos: r.eventos, equipos, yo: 'eqB' }).lados, { abajo: 'B', arriba: 'A' });
+  assert.deepEqual(crearGuion({ partido: p, alineaciones: al, eventos: r.eventos, equipos, yo: 'eqA' }).lados, { abajo: 'A', arriba: 'B' });
+  assert.deepEqual(crearGuion({ partido: p, alineaciones: al, eventos: r.eventos, equipos, yo: 'otro' }).lados, { abajo: 'A', arriba: 'B' });
 });
 
 test('la misma semilla da el mismo guion y las mismas variantes; sin repetir la misma seguida', () => {

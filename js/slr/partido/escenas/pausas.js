@@ -21,7 +21,7 @@ export function aviso(ctx) {
 }
 
 export function resumen(ctx) {
-  const d = ctx.d, T = ctx.T.descanso, iz = ctx.lados.izq, de = ctx.lados.der;
+  const d = ctx.d, T = ctx.T.descanso, iz = ctx.lados.abajo, de = ctx.lados.arriba;
   const g = l => d.marcador[l === 'A' ? 0 : 1];
   const pos = Math.round((d.posesion?.[iz] ?? 0.5) * 100);
   const caja = poner(ctx, `<div class="slr-pt-panel">
@@ -52,7 +52,7 @@ export function resumen(ctx) {
 }
 
 export function resultado(ctx) {
-  const d = ctx.d, T = ctx.T.final, iz = ctx.lados.izq, de = ctx.lados.der;
+  const d = ctx.d, T = ctx.T.final, iz = ctx.lados.abajo, de = ctx.lados.arriba;
   const g = l => d.goles[l === 'A' ? 0 : 1];
   const pen = d.penaltis ? `<p class="slr-pt-panel__sub">Penaltis ${d.penaltis[iz === 'A' ? 0 : 1]}–${d.penaltis[de === 'A' ? 0 : 1]}</p>` : '';
   const caja = poner(ctx, `<div class="slr-pt-panel slr-pt-panel--final">

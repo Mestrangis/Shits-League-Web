@@ -1,6 +1,8 @@
 // Prueba en Chrome headless de la reproducción de partidos (Android emulado a 360 y 412 px):
-//  · Muestrario (Modo pruebas): cada escena y cada variante se reproduce y, en varios
-//    momentos, nada importante se sale de la pantalla. Capturas de cada una.
+//  · Muestrario (Modo pruebas) a 360 y 412 px y en PC (1366×768): cada escena y cada
+//    variante (a 412 px, también con el rival atacando hacia abajo) se reproduce y, en el
+//    30, 60 y 95 %, nada importante se sale de la pantalla. Capturas de cada una. Los
+//    textos duran al menos lo que manda la regla de lectura. CPU ×6: fluido.
 //  · Tu partido sin ver: la clasificación no cuenta esa jornada, el calendario, la pestaña
 //    Equipo y el aviso no enseñan el resultado. La primera vez se reproduce solo (desde el
 //    aviso): tap, ×2, «Saltar» al final con el resultado; al terminar, la crónica, y ya
@@ -97,10 +99,32 @@ try {
   await cdp('Page.enable');
 
   // Resultado de cada escena del muestrario según su variante
-  const RESULTADO = { gol: 'izq', parada: 'der', pase: 'izq', corte: 'der' };
-  for (const w of [360, 412]) {
-    console.log(`\nMuestrario a ${w} px`);
-    await android(w);
+  // Resultado de cada escena del muestrario según su variante (gana el que ataca o el que defiende)
+  const RESULTADO = { gol: 'ataca', parada: 'defiende', pase: 'ataca', corte: 'defiende' };
+  // Las que dependen del sentido: también con el rival atacando hacia abajo
+  const CON_SENTIDO = new Set(['saque', 'control', 'ataque', 'pase', 'corte', 'chut', 'gol', 'parada']);
+  const PANTALLAS = [
+    { nombre: '360 px', w: 360, movil: true }, { nombre: '412 px', w: 412, movil: true, dosSentidos: true },
+    { nombre: 'PC', w: 1366, h: 768, movil: false },
+  ];
+  const pantalla = async pt => {
+    if (pt.movil) return android(pt.w);
+    ancho = pt.w;
+    await cdp('Emulation.setUserAgentOverride', { userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36' });
+    await cdp('Emulation.setDeviceMetricsOverride', { width: pt.w, height: pt.h, deviceScaleFactor: 1, mobile: false });
+    await cdp('Emulation.setTouchEmulationEnabled', { enabled: false });
+    await dormir(300);
+  };
+  const ajustar = (o) => ev(`(() => { const q = s => document.querySelector(s);
+    q('[data-ataca]').value = ${JSON.stringify(o.ataca ?? 'A')}; q('[data-resultado]').value = ${JSON.stringify(o.res ?? 'ataca')};
+    const p = q('[data-p]'); p.value = ${o.p ?? 50}; p.dispatchEvent(new Event('input'));
+    q('[data-version]').value = ${JSON.stringify(o.version ?? 'completa')}; q('[data-poder]').value = ${JSON.stringify(o.poder ?? '')}; return 0; })()`);
+  // Textos de la escena y cuánto llevan en pantalla: ninguno se va antes de leer(texto)
+  const MIN_TEXTO = t => 1500 + 250 * t.trim().split(/\s+/).filter(Boolean).length;
+
+  for (const pt of PANTALLAS) {
+    console.log(`\nMuestrario · ${pt.nombre}`);
+    await pantalla(pt);
     await entrar();
     await clic('.slr-nav__item[data-seccion="perfil"]');
     await esperar(`!!document.querySelector('[data-pruebas="escenas-partido"]')`, 10000);
@@ -108,53 +132,66 @@ try {
     await esperar(`!!document.querySelector('[data-tipo]')`, 5000);
     const botones = await ev(`[...document.querySelectorAll('[data-tipo]')].map(b => [b.dataset.tipo, b.dataset.variante])`);
     const vistas = new Set();
+    const pasadas = [];
     for (const [tipo, variante] of botones) {
       if (SOLO && !SOLO.has(tipo)) continue;
-      const res = RESULTADO[tipo] ?? (vistas.has(tipo) ? 'der' : 'izq');
-      vistas.add(tipo);
-      await ev(`(() => { const s = document.querySelector('[data-resultado]'); s.value = ${JSON.stringify(res)};
-        const p = document.querySelector('[data-p]'); p.value = ${tipo === 'control' && res === 'der' ? 70 : 50}; p.dispatchEvent(new Event('input'));
-        document.querySelector('[data-version]').value = 'completa'; document.querySelector('[data-poder]').value = ''; return 0; })()`);
+      pasadas.push({ tipo, variante, ataca: 'A' });
+      if (pt.dosSentidos && CON_SENTIDO.has(tipo)) pasadas.push({ tipo, variante, ataca: 'B' });
+    }
+    for (const { tipo, variante, ataca } of pasadas) {
+      const res = RESULTADO[tipo] ?? (vistas.has(`${tipo}${ataca}`) ? 'defiende' : 'ataca');
+      vistas.add(`${tipo}${ataca}`);
+      await ajustar({ ataca, res, p: tipo === 'control' && res === 'defiende' ? 70 : 50 });
       await clic(`[data-tipo="${tipo}"][data-variante="${variante}"]`);
       const abierto = await esperar(`document.querySelector('[data-partido-reproductor]')?.dataset.escena === ${JSON.stringify(tipo)}`, 4000);
       const malos = [];
+      const nombre = `${tipo}-${variante}${ataca === 'B' ? '-rival' : ''}`;
       // En el 30, el 60 y el 95 % de la escena: pausa, mira y sigue
       for (const [k, frac] of [[1, 0.3], [2, 0.6], [3, 0.95]]) {
         const llego = await esperar(`(() => { const r = document.querySelector('[data-partido-reproductor]')?.reproductor; const l = r?.linea;
-          if (!l || l.t < l.dur * ${frac}) return false; r.pausar(); return true; })()`, 8000);
+          if (!l || l.t < l.dur * ${frac}) return false; r.pausar(); return true; })()`, 20000);
         if (!llego) { malos.push(`no llega al ${frac * 100} %`); break; }
         await dormir(60);
         const f = await fuera();
         if (typeof f === 'string') { malos.push(f); break; }
         if (f.sw > f.vw || f.cw !== f.vw) malos.push(`capa ${f.cw}/${f.vw}, scrollWidth ${f.sw}`);
         malos.push(...f.malos.map(x => `${frac * 100} %: ${x}`));
-        await foto(`${tipo}-${variante}-${k}`);
+        await foto(`${nombre}-${k}`);
         if (k < 3) await ev(`document.querySelector('[data-partido-reproductor]')?.reproductor.reanudar(); 0`);   // la última se cierra en pausa
       }
-      check(abierto && !malos.length, `${w} px · ${tipo}/${variante}: se reproduce y nada se sale`, malos.slice(0, 4).join(' | '));
+      check(abierto && !malos.length, `${pt.nombre} · ${tipo}/${variante}${ataca === 'B' ? ' (ataca el rival)' : ''}: se reproduce y nada se sale`, malos.slice(0, 4).join(' | '));
       await cerrarReproductor();
     }
+    // Lectura: los rótulos y franjas duran al menos lo que manda la regla (medido en sus animaciones)
+    if (!SOLO && pt.w === 412) {
+      const cortos = [];
+      for (const [tipo, variante] of [['saque', 'franja'], ['robo', 'contraataque'], ['corte', 'entrada'], ['gol', 'red'], ['parada', 'punos'], ['poder', 'carta']]) {
+        await ajustar({ res: RESULTADO[tipo] ?? 'ataca' });
+        await clic(`[data-tipo="${tipo}"][data-variante="${variante}"]`);
+        await esperar(`document.querySelector('[data-partido-reproductor]')?.dataset.escena === ${JSON.stringify(tipo)}`, 4000);
+        const textos = await ev(`[...document.querySelectorAll('[data-partido-reproductor] .slr-pt-rotulo, [data-partido-reproductor] .slr-pt-franja')]
+          .map(n => ({ t: n.textContent.replace(/\s+/g, ' ').trim(), dur: Math.max(0, ...n.getAnimations().map(a => a.effect.getTiming().duration)) }))`);
+        for (const x of textos) if (x.dur < MIN_TEXTO(x.t)) cortos.push(`${tipo}: «${x.t}» ${Math.round(x.dur)} ms`);
+        await ev(`document.querySelector('[data-partido-reproductor]')?.reproductor.pausar(); 0`);
+        await cerrarReproductor();
+      }
+      check(!cortos.length, 'los textos se quedan al menos 1,5 s + 0,25 s por palabra', cortos.join(' | '));
+    }
     // Fluidez: una jugada entera con gol, con la CPU ×6 (un Android normal)
-    if (!SOLO) {
-      await ev(`(() => { document.querySelector('[data-poder]').value = 'izq'; document.querySelector('[data-resultado]').value = 'izq';
-        document.querySelector('[data-version]').value = 'completa'; return 0; })()`);
+    if (!SOLO && pt.movil) {
+      await ajustar({ poder: 'ataca', res: 'ataca' });
       await cdp('Emulation.setCPUThrottlingRate', { rate: 6 });
-      await ev(`window.__frames = []; (function f(t) { window.__frames.push(t); if (window.__frames.length < 4000) requestAnimationFrame(f); })(performance.now()); 0`);
+      await ev(`window.__frames = []; (function f(t) { window.__frames.push(t); if (window.__frames.length < 9000) requestAnimationFrame(f); })(performance.now()); 0`);
       await clic('[data-jugada]');
       await esperar(`!!document.querySelector('[data-partido-reproductor]')`, 4000);
-      await esperar(`!document.querySelector('[data-partido-reproductor]')`, 60000);
+      const t0 = Date.now();
+      await esperar(`!document.querySelector('[data-partido-reproductor]')`, 120000);
+      const segundos = (Date.now() - t0) / 1000;
       await cdp('Emulation.setCPUThrottlingRate', { rate: 1 });
       const m = await ev(`(() => { const f = window.__frames, d = f.slice(1).map((t, i) => t - f[i]).filter(x => x < 1000).sort((a, b) => a - b);
         const total = d.reduce((s, x) => s + x, 0); return { fps: Math.round(1000 * d.length / total), p95: Math.round(d[Math.floor(d.length * 0.95)]), max: Math.round(d.at(-1)), lentos: d.filter(x => x > 50).length, n: d.length }; })()`);
-      check(m.fps >= 45, `${w} px · CPU ×6, jugada entera con poder y gol: ${m.fps} fps, p95 ${m.p95} ms, ${m.lentos} frames > 50 ms (máx ${m.max} ms)`);
+      check(m.fps >= 45, `${pt.nombre} · CPU ×6, jugada entera con poder y gol (${segundos.toFixed(0)} s): ${m.fps} fps, p95 ${m.p95} ms, ${m.lentos} frames > 50 ms (máx ${m.max} ms)`);
     }
-    // Con un poder: arranca la barra inclinada
-    await ev(`(() => { document.querySelector('[data-poder]').value = 'izq'; document.querySelector('[data-version]').value = 'completa'; return 0; })()`);
-    await clic('[data-tipo="poder"][data-variante="carta"]');
-    await esperar(`document.querySelector('[data-partido-reproductor]')?.dataset.escena === 'poder'`, 4000);
-    await dormir(600);
-    await foto('poder-entrada');
-    await cerrarReproductor();
     await ev(`history.back(); 0`);
     await dormir(500);
   }

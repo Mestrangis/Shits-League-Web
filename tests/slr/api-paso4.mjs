@@ -244,6 +244,12 @@ try {
         .sort((a, b) => b - a).slice(0, 3);
       if (bonos.length) esperado[eq].bonus_ojo_clinico = bonos.reduce((s, x) => s + x, 0);
     }
+    // Sin destripar (api-paso20): el bonus de sorpresa y el de ojo clínico se cobran al ver el partido
+    for (const b of [A, Bv]) {
+      const antes = (await movimientos(b)).slice(movs0[b.equipo]);
+      check(!antes.some(m => ['bonus_sorpresa', 'bonus_ojo_clinico'].includes(m.tipo)), `${b.nombre}: sin bonus de sorpresa ni ojo clínico hasta ver el partido`);
+      await rpcOk('slr_marcar_visto', { token: b.token, partido_id: P1.id });
+    }
     for (const b of bots) {
       const nuevos = (await movimientos(b)).slice(movs0[b.equipo]);
       const porTipo = {};

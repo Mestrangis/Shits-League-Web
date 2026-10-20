@@ -48,18 +48,18 @@ const versionMayor = v => Number(String(v ?? '2').split('.')[0]) || 2;
  * partido: { id, version_motor, goles: [l, v], penaltis, pr }
  * alineaciones: { local, visitante } (las congeladas)
  * eventos: los del motor (simularPartido(…).eventos)
- * yo: id del equipo del usuario (para ponerlo a la izquierda), o null
+ * yo: id del equipo del usuario (va abajo y ataca hacia arriba; si no juega, el local), o null
  * equipos: { A: { id, nombre, dueno }, B: {…} } (se copian tal cual)
  * pr: puntos de rendimiento por carta (si el partido no los trae)
  */
 export function crearGuion({ partido = {}, alineaciones = {}, eventos = [], yo = null, equipos = {}, pr = null }) {
   const stats = {};
   const al = { A: prepararAlineacion(alineaciones.local, stats, 'A'), B: prepararAlineacion(alineaciones.visitante, stats, 'B') };
-  const izq = yo && equipos.B?.id === yo ? 'B' : 'A';
+  const abajo = yo && equipos.B?.id === yo ? 'B' : 'A';
   const guion = {
     version: partido.version_motor ?? null,
     partidoId: partido.id ?? null,
-    lados: { izq, der: OTRO[izq] },
+    lados: { abajo, arriba: OTRO[abajo] },
     equipos: { A: { ...(equipos.A ?? {}), letra: 'A' }, B: { ...(equipos.B ?? {}), letra: 'B' } },
     stats,
     escenas: [],
