@@ -52,7 +52,7 @@ import { rpc, nuevoIntento } from '../api.js';
 import { esc, miles, abrirCapa, cerrarHasta, toast, faltan } from '../ui.js';
 import { cartaHTML, normalizarCarta, RAREZAS } from '../carta.js';
 import { sobreHTML, dorsoHTML, moverLamina } from '../sobre-arte.js';
-import { asegurarFotos, urlFoto } from '../imagenes.js';
+import { asegurarFotos, urlCarta } from '../imagenes.js';
 import { Particulas, sprite, rayosDe } from '../particulas.js';
 
 export const SONIDOS = { alSonar: null };
@@ -119,13 +119,6 @@ export function abrirEleccionPendiente(ctx, pend, opts = {}) {
   });
 }
 
-// Ancho en pantalla de cada carta del abanico (el mismo que pone el CSS)
-function anchoCarta(n) {
-  const pc = innerWidth >= 900;
-  if (n === 1) return pc ? Math.min(innerHeight * 0.46, 380) : Math.min(innerWidth * 0.62, 300);
-  return pc ? Math.min(innerHeight * 0.30, 260) : Math.min(innerWidth * 0.30, 210);
-}
-
 async function crearApertura(ctx, o) {
   const mejor = mejorDe(o.cartas);
   const luz = LUZ[mejor];
@@ -183,8 +176,8 @@ async function crearApertura(ctx, o) {
   // ── Precarga: sobre, dorso y fotos de las cartas, decodificadas antes de animar ──
   if (espera) espera.fijarCierre(limpiar);
   else abrirCapa(el, limpiar);
-  const w = anchoCarta(o.cartas.length);
-  await asegurarFotos([o.imagen, o.dorso, ...o.cartas.map(c => c.imagen_url && urlFoto(c.imagen_url, w))]);
+  // Las cartas se revelan grandes (tam 'l'): la foto grande, la misma que pintará cargarFotoCarta
+  await asegurarFotos([o.imagen, o.dorso, ...o.cartas.map(c => c.imagen_url && urlCarta(c.imagen_url, 'grande'))]);
   if (!vivo) return el;
   // Lo caro, todavía con «Preparando el sobre…»: sprites, rayos y las cartas (ocultas)
   if (!quieto) { sprite(luz); sprite('#ffffff'); rayosDe(luz); }

@@ -1,69 +1,84 @@
 /* ═══════════════════════════════════════════════
    SHITS LEAGUE RUSH — fotos de las cartas
-   · URLs de Cloudinary con pocos anchos fijos (ANCHOS × DPR, redondeado al
-     siguiente): pocas transformaciones distintas y más aciertos de caché.
-     Siempre f_auto (respeta la transparencia de los PNG) y q_auto.
-   · Vista previa (blur-up): una versión diminuta (w_24, borrosa) que llega en
-     un instante y da los colores reales mientras carga la buena.
-   · Precarga: al pintar una pantalla se piden TODAS sus fotos, sin esperar al
-     scroll: primero las que se ven (prioridad alta) y luego el resto (baja).
-     precargar(urls) adelanta las de la página siguiente.
-   · Caché: las URLs ya descargadas y decodificadas se recuerdan; al volver a
-     una pantalla la foto se pone sin fundido (sale de la caché del navegador).
-     El service worker no toca las peticiones a Cloudinary (sw.js).
+   · Solo DOS tamaños por foto (recorte 5:7, f_auto y q_auto de Cloudinary):
+       pequeña (400 px de ancho): listas, plantilla, mercado, alineación, reproducción…
+       grande (1000 px): el detalle de la carta y la apertura de sobres
+     Nítidas en un móvil de pantalla densa (una carta de lista mide ~130 px CSS:
+     ×3 = 390 px; la del detalle, hasta ~330: ×3 = 990 px). La misma carta es
+     siempre la misma URL: una sola descarga.
+   · El service worker las guarda en su caché de fotos («primero la caché», las
+     600 más recientes). Aquí se lleva un índice de lo que ya está guardado: esas
+     salen directamente, sin el esqueleto de carga.
+   · Al pintar una pantalla se piden todas sus fotos: primero las que se ven
+     (prioridad alta) y luego el resto (baja). precargar(urls) adelanta las de la
+     página siguiente; la precarga en segundo plano está en precarga-fotos.js.
 ═══════════════════════════════════════════════ */
 
-export const ANCHOS = [160, 240, 320, 480, 640, 960];
-const MINI = 'c_fill,ar_5:7,g_auto,w_24,f_auto,q_auto:low,e_blur:400';
+export const TAMANOS = Object.freeze({ pequena: 400, grande: 1000 });
+export const CACHE_FOTOS = 'slr-fotos-cartas';   // la misma que en sw.js
 
-const dpr = () => Math.min(3, window.devicePixelRatio || 1);
 const deCloudinary = url => typeof url === 'string' && url.includes('res.cloudinary.com') && url.includes('/image/upload/');
 const transformar = (url, t) => url.replace(/(\/image\/upload\/)/, `$1${t}/`);
 
-// Ancho de la petición: el ancho en pantalla × DPR, redondeado al siguiente fijo
-export function anchoFijo(anchoCss) {
-  const px = Math.max(1, anchoCss) * dpr();
-  return ANCHOS.find(a => a >= px) ?? ANCHOS[ANCHOS.length - 1];
+// La URL de la foto de una carta en uno de los dos tamaños
+export function urlCarta(url, tam = 'pequena') {
+  return deCloudinary(url) ? transformar(url, `c_fill,ar_5:7,g_auto,w_${TAMANOS[tam] ?? TAMANOS.pequena},f_auto,q_auto`) : url;
 }
+// Por el ancho en pantalla (CSS): las de más de 220 px, grandes
+export const urlFoto = (url, anchoCss = 0) => urlCarta(url, anchoCss > 220 ? 'grande' : 'pequena');
 
-// Recorte 5:7 centrado en lo importante (g_auto)
-export function urlFoto(url, anchoCss) {
-  return deCloudinary(url) ? transformar(url, `c_fill,ar_5:7,g_auto,w_${anchoFijo(anchoCss)},f_auto,q_auto`) : url;
-}
-export function urlMini(url) {
-  return deCloudinary(url) ? transformar(url, MINI) : null;
-}
-
-/* ── Caché ───────────────────────────────────────────────────────────────── */
-const listas = new Set();        // URLs descargadas y decodificadas
+/* ── Lo que ya está descargado ───────────────────────────────────────────── */
+const listas = new Set();        // URLs descargadas y decodificadas en esta sesión
+const enCache = new Set();       // URLs guardadas en la caché del service worker
 const guardadas = [];            // las últimas Image, para que el navegador no las suelte
 const MAX_GUARDADAS = 400;
 export const yaCargada = url => listas.has(url);
+export const yaGuardada = url => listas.has(url) || enCache.has(url);
+export const guardarComoCacheada = url => { enCache.add(url); };
 function recordar(url, im) {
   listas.add(url);
+  enCache.add(url);
   if (im) {
     guardadas.push(im);
     if (guardadas.length > MAX_GUARDADAS) guardadas.shift();
   }
 }
+// Lee una vez la caché de fotos del service worker (al abrir Rush)
+let indice = null;
+export function cargarIndice() {
+  return (indice ??= (async () => {
+    try {
+      if (!globalThis.caches || !(await caches.has(CACHE_FOTOS))) return;
+      for (const k of await (await caches.open(CACHE_FOTOS)).keys()) enCache.add(k.url);
+    } catch { /* sin Cache Storage: todo por la red */ }
+  })());
+}
+
+/* ── Fotos que se están viendo y cargan (la precarga en segundo plano espera) ── */
+let cargando = 0;
+export const fotosCargando = () => cargando;
 
 /* ── Cola: primero las visibles, luego el resto con prioridad baja ───────── */
 let tardias = [];
 let programada = false;
-function vaciarTardias() {
+// Por trozos, mientras quede tiempo libre en el fotograma: cientos de fotos de golpe
+// (la lista completa de la herramienta de admin) serían una tarea larga
+function vaciarTardias(plazo) {
   programada = false;
-  const lote = tardias;
-  tardias = [];
-  for (const f of lote) f();
+  const hasta = performance.now() + 8;
+  while (tardias.length && (plazo?.timeRemaining ? plazo.timeRemaining() > 1 : performance.now() < hasta)) tardias.shift()();
+  if (tardias.length) programar();
+}
+function programar() {
+  if (programada) return;
+  programada = true;
+  // Después de que las visibles hayan salido (y sin competir con el pintado)
+  (window.requestIdleCallback ?? (cb => setTimeout(cb, 50)))(vaciarTardias, { timeout: 300 });
 }
 function enCola(alta, f) {
   if (alta) { f(); return; }
   tardias.push(f);
-  if (!programada) {
-    programada = true;
-    // Después de que las visibles hayan salido (y sin competir con el pintado)
-    (window.requestIdleCallback ?? (cb => setTimeout(cb, 50)))(vaciarTardias, { timeout: 300 });
-  }
+  programar();
 }
 
 // Precarga en segundo plano (página siguiente): solo descarga y decodifica
@@ -94,51 +109,51 @@ export function asegurarFotos(urls, msMax = 2500) {
 }
 
 /* ── Una carta ───────────────────────────────────────────────────────────── */
-// Ancho de reserva si la carta aún no tiene tamaño (p. ej. en una hoja que se abre)
-const ANCHO_TAM = { xs: 90, s: 170, l: 380 };
-
 const enPantalla = r => r.width > 0 && r.bottom > -40 && r.top < innerHeight + 40 && r.right > 0 && r.left < innerWidth;
 
 // Varias cartas a la vez: primero se miden todas y luego se tocan (medir después
 // de escribir obligaría a recalcular la maquetación una vez por carta)
+// En las listas de hasta 60 cartas, todas las ya guardadas salen al momento; en las enormes
+// (la herramienta de admin entera), las que no se ven, en los ratos libres siguientes
+export const AL_MOMENTO_HASTA = 60;
 export function cargarFotos(cartas) {
   const con = [...cartas].filter(c => c.querySelector('img.slr-carta__img[data-foto]'));
   const rects = con.map(c => c.getBoundingClientRect());
-  con.forEach((c, i) => cargarFotoCarta(c, rects[i]));
+  const todas = con.length <= AL_MOMENTO_HASTA;
+  con.forEach((c, i) => cargarFotoCarta(c, rects[i], todas));
 }
 
-// Estados de la carta (clases): sin nada → esqueleto con brillo; con-mini → la
-// vista previa borrosa; con-foto → la buena (fundido de 250 ms); sin-foto → falló
-export function cargarFotoCarta(carta, rect = carta.getBoundingClientRect()) {
+// Estados de la carta (clases): sin nada → esqueleto con brillo; con-foto → la foto
+// (fundido de 250 ms; sin fundido ni esqueleto si ya estaba guardada); sin-foto → falló
+export function cargarFotoCarta(carta, rect = carta.getBoundingClientRect(), guardadasAlMomento = true) {
   const img = carta.querySelector('img.slr-carta__img[data-foto]');
   if (!img) return;
   const base = img.dataset.foto;
   img.removeAttribute('data-foto');
-  const tam = carta.className.match(/slr-carta--(xs|s|l)\b/)?.[1] ?? 's';
-  const url = urlFoto(base, rect.width || ANCHO_TAM[tam]);
+  const url = urlCarta(base, /slr-carta--l\b/.test(carta.className) ? 'grande' : 'pequena');
 
   const fallo = () => carta.classList.add('slr-carta--sin-foto');
-  if (listas.has(url)) {
-    // Ya decodificada: al momento, sin fundido
-    carta.classList.add('con-foto', 'sin-fundido');
-    img.src = url;
+  const alta = enPantalla(rect);
+  if (yaGuardada(url)) {
+    // Ya en la caché (o decodificada): sin esqueleto ni fundido. Las que no se ven, por la
+    // cola de baja prioridad (cientos de golpe serían una tarea larga en las listas grandes)
+    img.addEventListener('error', fallo, { once: true });
+    enCola(alta || guardadasAlMomento, () => {
+      carta.classList.add('con-foto', 'sin-fundido');
+      img.src = url;
+    });
     return;
   }
-  const mini = carta.querySelector('img.slr-carta__mini');
-  const urlM = urlMini(base);
-  if (mini && urlM) {
-    mini.addEventListener('load', () => carta.classList.add('con-mini'), { once: true });
-    mini.src = urlM;
-  }
   img.addEventListener('load', () => {
+    if (alta) cargando--;
     img.decode().catch(() => {}).then(() => {
       recordar(url);
       carta.classList.add('con-foto');
     });
   }, { once: true });
-  img.addEventListener('error', fallo, { once: true });
-  const alta = enPantalla(rect);
+  img.addEventListener('error', () => { if (alta) cargando--; fallo(); }, { once: true });
   enCola(alta, () => {
+    if (alta) cargando++;
     img.fetchPriority = alta ? 'high' : 'low';
     img.src = url;
   });

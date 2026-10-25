@@ -16,6 +16,14 @@ import { toast } from './ui.js';
 
 export const TOKEN_KEY = 'SLR_TOKEN';
 
+// Peticiones a Supabase en curso (la precarga de fotos en segundo plano espera a que no haya)
+let enCurso = 0;
+export const enVuelo = () => enCurso;
+async function pedir(url, opciones) {
+  enCurso++;
+  try { return await fetch(url, opciones); } finally { enCurso--; }
+}
+
 export class ErrorSesion extends Error {}
 
 let ganchos = { reautenticar: async () => 'perdida', perdida: () => {}, sinAcceso: () => {} };
@@ -72,7 +80,7 @@ async function conSesion(hacer) {
 export async function rpc(fn, args = {}, { silencioso = false } = {}) {
   let r;
   try {
-    r = await conSesion(() => fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
+    r = await conSesion(() => pedir(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
       method: 'POST',
       headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
       body: JSON.stringify({ token: token(), ...args }),
@@ -105,7 +113,7 @@ export function nuevoIntento() {
 }
 
 export async function leer(ruta) {
-  const r = await fetch(`${SUPABASE_URL}/rest/v1/${ruta}`, { headers: { apikey: SUPABASE_KEY } });
+  const r = await pedir(`${SUPABASE_URL}/rest/v1/${ruta}`, { headers: { apikey: SUPABASE_KEY } });
   const datos = await leerRespuesta(r);
   if (!r.ok) {
     const e = new Error(datos?.message || 'No se pudieron leer los datos');
@@ -118,7 +126,7 @@ export async function leer(ruta) {
 export async function funcion(cuerpo) {
   let r;
   try {
-    r = await conSesion(() => fetch(`${SUPABASE_URL}/functions/v1/slr-simular`, {
+    r = await conSesion(() => pedir(`${SUPABASE_URL}/functions/v1/slr-simular`, {
       method: 'POST',
       headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
       body: JSON.stringify({ token: token(), ...cuerpo }),

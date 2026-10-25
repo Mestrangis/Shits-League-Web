@@ -7,7 +7,7 @@
 import { rpc, leer } from '../api.js';
 import { toast } from '../ui.js';
 import { normalizarCarta } from '../carta.js';
-import { asegurarFotos, urlFoto } from '../imagenes.js';
+import { asegurarFotos, urlCarta } from '../imagenes.js';
 import { motorDe } from '../motores.js';
 import { crearGuion } from './guion.js';
 import { reproducir } from './reproductor.js';
@@ -44,7 +44,7 @@ export async function abrirPartido(partidoId, ctx, opts = {}) {
       equipos: { A: eq(p.local_id), B: eq(p.visitante_id) }, pr: sim.pr, bonusCruce: motor.CONFIG?.BONUS_CRUCE ?? null,
     });
     // Fotos decodificadas antes de empezar (como mucho 2,5 s)
-    await asegurarFotos(Object.values(cartas).map(c => c.imagen_url && urlFoto(c.imagen_url, 130)).filter(Boolean));
+    await asegurarFotos(Object.values(cartas).map(c => c.imagen_url && urlCarta(c.imagen_url, 'pequena')).filter(Boolean));
     return reproducir(guion, cartas, { alVisto: opts.alVisto, alTerminar: opts.alTerminar });
   } catch (e) {
     toast(`No se pudo reproducir el partido: ${e.message}`, 'error');

@@ -1669,3 +1669,28 @@ Medido con `tests/slr/banco/rendimiento-apertura.mjs`: Chrome a 390×844 (DPR 2,
 - **«Descargando Shits League Rush…»:** en la portada, con el porcentaje por bytes y los MB. JUGAR espera a que termine. Si la descarga falla, no se bloquea: sigue por la red.
 - **`modulepreload`:** al ver la portada se piden de golpe los 71 módulos que carga Rush al entrar (el cierre de los imports de `rush.js`), más `css/slr.css`. Antes se descubrían en cadena.
 - **Bancos:** los que pulsaban JUGAR nada más verlo ahora esperan a que esté activo.
+
+#### Fase 2: imágenes de las cartas
+
+- **Dos tamaños** (recorte 5:7, `f_auto`, `q_auto`): pequeña de 400 px y grande de 1000 px.
+  - Pequeña: listas, plantilla, mercado, alineación y reproducción.
+  - Grande: el detalle (`tam: 'l'`) y la revelación de los sobres.
+  - Con DPR 3, una carta de lista (~130 px) pide 390 y la del detalle (~330) pide 990.
+  - Antes eran seis anchos × DPR, más una vista previa borrosa (`w_24`): la misma carta se descargaba varias veces. La vista previa se quita; mientras carga, el esqueleto de siempre.
+- **Caché del service worker** `slr-fotos-cartas`:
+  - «primero la caché», con las fotos pedidas siempre con CORS (no opacas);
+  - se queda con las 600 más recientes por orden de llegada y recorta cada 20 nuevas;
+  - sobrevive a las versiones de la app.
+- **Sin esqueleto:** al abrir Rush se lee el índice de esa caché, y las fotos ya guardadas salen directamente (`con-foto sin-fundido`).
+  - En las listas de hasta 60 cartas, todas al momento.
+  - En las enormes (la herramienta de admin entera, 467 filas), las que no se ven, en los ratos libres siguientes y por trozos. Hacerlo todo de golpe subía la tarea más larga de ~380 a ~470 ms; así queda en ~360.
+- **Precarga en segundo plano** (`js/slr/precarga-fotos.js`):
+  - Solo cuando no hay peticiones a Supabase en curso (`enVuelo()` de `api.js`) ni fotos visibles cargando, con `requestIdleCallback`, de dos en dos y con prioridad baja.
+  - Orden: las propias, las del rival de la jornada, las del mercado y la subasta del día (cuando se carga el mercado) y, solo el admin, el catálogo.
+  - La respuesta no se lee en la página (la guarda el service worker).
+  - Con `navigator.connection.saveData`, nada. El álbum completo no se precarga.
+- **Tests:**
+  - `fotos.test.mjs`: tamaños, orden, una vez cada foto, ahorro de datos, las ya guardadas y la espera mientras la app está ocupada;
+  - `sw.test.mjs`: CORS, caché y límite de 600;
+  - `banco/fotos.mjs` (a 360 y 412 px, red lenta y sin conexión);
+  - `banco/listas.mjs`, adaptado (sin vista previa, solo 400 px en las listas).

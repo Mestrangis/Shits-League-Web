@@ -21,6 +21,8 @@ import * as perfil from './pantallas/perfil.js';
 import * as alineacion from './pantallas/alineacion.js';
 import { abrirEleccionPendiente } from './pantallas/apertura.js';
 import { abrirHacerHueco } from './hueco.js';
+import { cargarIndice } from './imagenes.js';
+import { precargarFotos, fotosDelMercado, imagenDe } from './precarga-fotos.js';
 
 const ES_LOCAL = ['localhost', '127.0.0.1'].includes(location.hostname);
 
@@ -330,6 +332,26 @@ function pintarCargando(texto = 'Cargando…') {
   main.innerHTML = `<div class="slr-cargando"><span class="slr-balon"></span>${esc(texto)}</div>`;
 }
 
+/* ── Fotos en segundo plano ──────────────────────────────────────────────────
+   Cuando no hay nada importante cargando, se bajan las fotos pequeñas que
+   probablemente se verán: las propias, las del rival de la jornada, las del
+   mercado y la subasta del día y, solo el admin, el catálogo (precarga-fotos.js). */
+async function precargarFotosDeFondo() {
+  if (!datos.equipo) return;
+  precargarFotos('propias', datos.cartas.map(c => c.imagen_url));
+  const p = miPartido(proximaJornada());
+  const rival = p && (p.local.equipo_id === datos.equipo.id ? p.visitante.equipo_id : p.local.equipo_id);
+  if (rival) {
+    const filas = await leer(`cartas?select=disenos_carta(imagen_url)&equipo_id=eq.${rival}`).catch(() => []);
+    precargarFotos('rival', filas.map(imagenDe));
+  }
+  if (datos.mercado) fotosDelMercado(datos.mercado);
+  if (datos.yo?.es_admin) {
+    const d = await leer('disenos_carta?select=imagen_url&imagen_url=not.is.null&limit=5000').catch(() => []);
+    precargarFotos('catalogo', d.map(x => x.imagen_url));
+  }
+}
+
 /* ── Abrir y cerrar ──────────────────────────────────────────────────────── */
 function alVolver(e) {
   const profundidad = e.state?.slr;
@@ -392,7 +414,8 @@ export async function abrir(op) {
   if (!raiz) construir();
   pintarCargando();
   try {
-    await recargar();
+    // El índice de la caché de fotos antes de pintar: las guardadas salen sin esqueleto
+    await Promise.all([recargar(), cargarIndice()]);
   } catch (e) {
     if (e instanceof ErrorSesion) return;      // sesionPerdida ya ha cerrado la sesión
     main.innerHTML = `<div class="slr-vacio"><b>No se pudo cargar Rush</b><p>${esc(e.message)}</p></div>`;
@@ -402,6 +425,7 @@ export async function abrir(op) {
   await navegar(seccion);
   cargarAvisos();
   comprobarPendiente({ abrirHueco: true });
+  precargarFotosDeFondo().catch(() => {});
 }
 
 /* ── Pendientes que reaparecen en cualquier pantalla: elección de sobre y

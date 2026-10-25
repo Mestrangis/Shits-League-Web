@@ -127,10 +127,12 @@ try {
   await clic('[data-seccion=plantilla]');
   await esperar(`document.querySelectorAll('.slr-pantalla .slr-carta--con-imagen').length > 0`, 30000);
   const alto0 = await ev(`[...document.querySelectorAll('.slr-pantalla .slr-carta--con-imagen')].map(c => Math.round(c.getBoundingClientRect().height))`);
-  const esqueleto = await ev(`(() => { const c = document.querySelector('.slr-pantalla .slr-carta--con-imagen:not(.con-mini):not(.con-foto)');
-    return c ? getComputedStyle(c.querySelector('.slr-carta__arte'), '::after').animationName : null; })()`);
-  check(esqueleto === 'slr-brillo-carga', `al principio, esqueleto con brillo animado (${esqueleto})`);
-  check(await esperar(`document.querySelectorAll('.slr-pantalla .slr-carta.con-mini').length > 0`, 20000), 'llega la vista previa borrosa');
+  // Las que ya están en la caché de fotos (las de Equipo son la misma foto pequeña) salen
+  // directamente; las demás, con el esqueleto hasta que llegan
+  const esqueleto = await ev(`(() => { const c = document.querySelector('.slr-pantalla .slr-carta--con-imagen:not(.con-foto)');
+    return c ? getComputedStyle(c.querySelector('.slr-carta__arte'), '::after').animationName
+      : document.querySelectorAll('.slr-pantalla .slr-carta.con-foto.sin-fundido').length ? 'ya guardadas' : null; })()`);
+  check(['slr-brillo-carga', 'ya guardadas'].includes(esqueleto), `al principio, esqueleto con brillo animado o la foto ya guardada (${esqueleto})`);
   check(await esperar(`(() => { const t = document.querySelectorAll('.slr-pantalla .slr-carta--con-imagen'); return t.length && [...t].every(c => c.matches('.con-foto, .slr-carta--sin-foto')); })()`, 60000),
     'y todas las fotos de la plantilla, también las que no se ven (sin esperar al scroll)');
   await dormir(600);
@@ -138,9 +140,7 @@ try {
   const alto1 = await ev(`[...document.querySelectorAll('.slr-pantalla .slr-carta--con-imagen')].map(c => Math.round(c.getBoundingClientRect().height))`);
   check(JSON.stringify(alto0) === JSON.stringify(alto1), `sin saltos de tamaño (${alto0[0]} px de alto antes y después) · ${n1} frames grabados`);
   const anchos = await ev(`[...new Set([...document.querySelectorAll('.slr-carta__img')].map(i => i.src.match(/w_(\\d+)/)?.[1]).filter(Boolean))]`);
-  check(anchos.every(w => [160, 240, 320, 480, 640, 960].includes(Number(w))), `anchos pedidos a Cloudinary, solo los fijos: ${anchos.join(', ')}`);
-  const mini = await ev(`document.querySelector('.slr-carta__mini')?.src ?? ''`);
-  check(/w_24,f_auto,q_auto:low,e_blur/.test(mini), 'vista previa: w_24, f_auto (respeta la transparencia), calidad baja y e_blur');
+  check(anchos.length && anchos.every(w => w === '400'), `en la lista, solo la foto pequeña: ${anchos.join(', ')}`);
   await foto('plantilla-cargada');
 
   // ── Álbum en «Fast 3G» (cada vez que se abre, la caché vuelve a estar activa luego) ──
@@ -244,8 +244,8 @@ try {
   await cdp('Network.setCacheDisabled', { cacheDisabled: true });
   await red(true);
   await clic('[data-album]');
-  await esperar(`!!document.querySelector('.slr-album .slr-carta--con-imagen:not(.con-mini):not(.con-foto)')`, 10000);
-  const quieto = await ev(`(() => { const c = document.querySelector('.slr-album .slr-carta--con-imagen:not(.con-mini):not(.con-foto)'); if (!c) return 'ya cargada';
+  await esperar(`!!document.querySelector('.slr-album .slr-carta--con-imagen:not(.con-foto)')`, 10000);
+  const quieto = await ev(`(() => { const c = document.querySelector('.slr-album .slr-carta--con-imagen:not(.con-foto)'); if (!c) return 'ya cargada';
     const a = getComputedStyle(c.querySelector('.slr-carta__arte'), '::after'); return a.content + ' / ' + a.animationName; })()`);
   check(/^none/.test(quieto), `con prefers-reduced-motion, esqueleto sin brillo (${quieto})`);
   await red(false);

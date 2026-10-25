@@ -1086,20 +1086,17 @@ button.slr-aviso:active { background: rgba(57,255,136,.08) !important; }
 .slr-carta--con-imagen .slr-carta__stats { border-top-color: color-mix(in srgb, var(--c1) 60%, transparent); }
 /* Carga de la foto (js/slr/imagenes.js), sin saltos: la carta tiene su 5:7 desde
    el principio. 1) Esqueleto: el fondo del tipo o del color, nombre y stats, y un
-   brillo diagonal en la zona de la foto. 2) Vista previa diminuta y borrosa con
-   los colores reales. 3) La foto buena encima, con un fundido de 250 ms.
+   brillo diagonal en la zona de la foto. 2) La foto encima, con un fundido de
+   250 ms; si ya estaba en la caché, directamente (sin esqueleto ni fundido).
    Si falla: el esqueleto quieto y las iniciales. */
-.slr-carta__mini, .slr-carta--con-imagen .slr-carta__img {
+.slr-carta--con-imagen .slr-carta__img {
   position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 30%;
 }
-.slr-carta__mini { opacity: 0; filter: blur(1.6cqw); transform: scale(1.06); transition: opacity .2s ease; }
-.slr-carta.con-mini .slr-carta__mini { opacity: 1; }
 .slr-carta--con-imagen .slr-carta__img { opacity: 0; transition: opacity .25s ease; }
 .slr-carta.con-foto .slr-carta__img { opacity: 1; }
-.slr-carta.sin-fundido .slr-carta__img, .slr-carta.sin-fundido .slr-carta__mini { transition: none; }
-.slr-carta.con-foto.sin-fundido .slr-carta__mini { display: none; }
+.slr-carta.sin-fundido .slr-carta__img { transition: none; }
 @media (prefers-reduced-motion: no-preference) {
-  .slr-carta--con-imagen:not(.con-mini):not(.con-foto):not(.slr-carta--sin-foto) .slr-carta__arte::after {
+  .slr-carta--con-imagen:not(.con-foto):not(.slr-carta--sin-foto) .slr-carta__arte::after {
     content: ''; position: absolute; inset: 0 -100%;
     background: linear-gradient(110deg, transparent 38%, rgba(255,255,255,.16) 50%, transparent 62%);
     animation: slr-brillo-carga 1.4s linear infinite;
@@ -1112,9 +1109,9 @@ button.slr-aviso:active { background: rgba(57,255,136,.08) !important; }
   display: grid; place-items: center; position: absolute; inset: 0 0 30%;
 }
 /* Si la foto no carga, vuelve el fondo del tipo */
-.slr-carta--sin-foto .slr-carta__img, .slr-carta--sin-foto .slr-carta__mini { visibility: hidden; }
+.slr-carta--sin-foto .slr-carta__img { visibility: hidden; }
 @media (prefers-reduced-motion: reduce) {
-  .slr-carta__mini, .slr-carta--con-imagen .slr-carta__img { transition: none; }
+  .slr-carta--con-imagen .slr-carta__img { transition: none; }
 }
 
 /* Tamaños */

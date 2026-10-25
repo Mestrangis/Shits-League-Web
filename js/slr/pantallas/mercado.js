@@ -22,6 +22,7 @@ import { TACTICA, ESTAMINA, barraEnergia } from '../tactica.js';
 import { asegurarHueco, plantillaOcupada, plantillaMaxima } from '../hueco.js';
 import { abrirDetalle } from './detalle.js';
 import { pintarTienda } from './tienda.js';
+import { fotosDelMercado } from '../precarga-fotos.js';
 
 const SUBS = { subastas: 'Subastas', sobres: 'Sobres', venta: 'En venta', ofertas: 'Ofertas' };
 const ORDEN_RAREZA = ['comun', 'rara', 'epica', 'legendaria'];
@@ -282,6 +283,7 @@ export async function pintar(cont, ctx) {
   const repintar = async () => {
     m = await rpc('slr_mercado', { liga_id: ctx.datos.liga.id });
     ctx.datos.mercado = m;
+    fotosDelMercado(m);
     dibujar();
   };
   function dibujar() {

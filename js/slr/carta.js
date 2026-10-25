@@ -131,10 +131,9 @@ const PERSONAS_TIPO = { individual: 1, duo: 2, trio: 3, grupo: 3, especial: 0 };
 
 function arte(c) {
   if (c.imagen_url) {
-    // Sin src: lo pone cargarFotoCarta al pintarse (vista previa diminuta y la
-    // buena al ancho real). Las iniciales solo se ven si la foto falla.
-    return `<img class="slr-carta__mini" alt="" decoding="async" draggable="false">
-      <img class="slr-carta__img" data-foto="${esc(c.imagen_url)}" alt="" decoding="async" draggable="false">
+    // Sin src: lo pone cargarFotoCarta al pintarse (en el tamaño pequeño o el grande;
+    // si ya está en la caché, sin esqueleto). Las iniciales solo se ven si la foto falla.
+    return `<img class="slr-carta__img" data-foto="${esc(c.imagen_url)}" alt="" decoding="async" draggable="false">
       <span class="slr-carta__iniciales slr-carta__iniciales--foto">${esc(iniciales(c.nombre))}</span>`;
   }
   const n = c.personas.length || (PERSONAS_TIPO[c.tipo] ?? 1);
