@@ -82,7 +82,12 @@ try {
     await ctx2.close();
 
     // ── Desde la caché (cuando ya se ha descargado también lo demás, en segundo plano) ──
-    const todoBajado = await page.waitForFunction(async () => { const r = await navigator.serviceWorker.getRegistration(); return !!r?.active && !r.installing && !r.waiting; }, null, { timeout: 180000, polling: 500 }).then(() => true, () => false);
+    // (un bucle: waitForFunction no espera a una función async: la promesa ya cuenta como «sí»)
+    let todoBajado = false;
+    for (let k = 0; k < 360 && !todoBajado; k++) {
+      todoBajado = await page.evaluate(async () => { const r = await navigator.serviceWorker.getRegistration(); return !!r?.active && !r.installing && !r.waiting; }).catch(() => false);
+      if (!todoBajado) await dormir(500);
+    }
     check(todoBajado, 'lo demás (lo que no necesita Rush) termina de bajar en segundo plano');
     const deRed = [];
     const mirar = r => { const u = new URL(r.url()); if (u.host === 'localhost:3000' && !/\/(sw|precarga)\.js$/.test(u.pathname) && !r.fromServiceWorker()) deRed.push(u.pathname); };

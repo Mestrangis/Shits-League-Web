@@ -1,16 +1,16 @@
 // Generado por herramientas/precarga.mjs: NO se edita a mano.
 // archivos: [ruta, bytes, resumen del contenido] · rush: módulos que se cargan al entrar en Rush
 // critico: lo que Rush necesita para funcionar (se descarga primero)
-self.PRECARGA = { "version": "af90e6d2b357", "archivos": [
+self.PRECARGA = { "version": "5f8981c03714", "archivos": [
   ["assets/apple-touch-icon.png", 18995, "52a8d73f0141" ],
   ["assets/clasificación23-24.png", 96637, "ea0b1bd62d14" ],
   ["assets/goles23-24.png", 58943, "71377552d927" ],
   ["assets/icon-192.png", 20895, "58104155893b" ],
   ["assets/icon-512.png", 98459, "5de674612788" ],
   ["assets/jugadores/carta-vacia.png", 24905, "35f95d9fe9b8" ],
-  ["assets/logo-s-black.png", 15286, "79ace4cd1fea" ],
-  ["assets/logo-s-green.png", 237765, "140c7e6571d8" ],
-  ["assets/logo-s-green2.png", 27868, "6f027d8a2da5" ],
+  ["assets/logo-s-black.png", 7707, "76d70ad335d5" ],
+  ["assets/logo-s-green.png", 16563, "3a46da35a277" ],
+  ["assets/logo-s-green2.png", 14946, "5e28cc55aace" ],
   ["assets/slr-muestra-sin-fondo.png", 16666, "a194a65af839" ],
   ["css/acabados/brillante.css", 2519, "f0c2286bec3e" ],
   ["css/acabados/foil.css", 2403, "a001b4fa81f9" ],
@@ -24,9 +24,9 @@ self.PRECARGA = { "version": "af90e6d2b357", "archivos": [
   ["img/slr/tacticas/tactica-posesion.svg", 5765, "01ef18df12b7" ],
   ["img/slr/tacticas/tactica-presion.svg", 4069, "6857a2df60e4" ],
   ["index.html", 8106, "dd0b7887272e" ],
-  ["js/app.js", 31298, "0367f2871a6b" ],
+  ["js/app.js", 32065, "d32019ddd63c" ],
   ["js/calendar.js", 1526, "e8f6099dab60" ],
-  ["js/push.js", 4728, "07297f14516a" ],
+  ["js/push.js", 4983, "ce7687117e57" ],
   ["js/rush-panel.js", 18511, "b2032d8eae43" ],
   ["js/session.js", 9142, "d1fc1194ea4c" ],
   ["js/sheets.js", 5869, "df2076ed2f41" ],

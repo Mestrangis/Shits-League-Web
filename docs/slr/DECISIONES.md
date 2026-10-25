@@ -1769,3 +1769,40 @@ El service worker los descarga primero y avisa en cuanto los tiene; JUGAR solo e
     - el reintento usa el mismo intento.
   - `api-intentos.mjs` (API real): el mismo intento dos veces hace la acción una vez (venta, compra cobrada una vez); lo que falla no se guarda; intentos ajenos, funciones fuera de la lista o sin intento, rechazados.
   - `banco/acciones.mjs`, a 360 y 412 px con red lenta: pujar, comprar, «Haz hueco» y cambiar el nombre, con el «cargando» al momento y un doble toque que hace una sola acción; y un fallo con su mensaje.
+
+#### Fase 5: lo que más pesa
+
+- **Logo de la barra superior** (`assets/logo-s-green.png`): era un PNG de 1268 × 1267 (232 KB) que se pinta a 35 px de alto (~106 px con DPR 3). Ahora es de 160 × 160 (16 KB) y se ve igual: comparado a su tamaño real, sin diferencias. Lo cuanticé a 256 colores (4 KB), pero dejaba bandas en el degradado, así que lo descarté.
+- **Los dos logos del último partido** (70 px en pantalla): de 1712 y 720 px a 224 px (27 → 15 KB y 15 → 8 KB).
+  - La lista de precarga baja de 1725 a 1489 KB.
+- **OneSignal:** su SDK se pedía al final de `init()` y competía con el arranque; ahora va en el primer rato libre (como mucho a los 4 s).
+- **Con `#rush`, la Shits League normal** (estadísticas e Inicio) espera unos 3 s y un rato libre, o hasta que se va a otra pestaña. Antes se colaba justo cuando se tocaba JUGAR y lo retrasaba.
+- **Consultas:** con un token del bot, `slr_rush_inicio` tarda lo mismo que `slr_yo` (~115–125 ms, casi todo red). Las tablas que leen las funciones nuevas ya tienen sus índices (`cartas(equipo_id)`, `ventas(vendedor_id)`, `jornadas(liga_id)`, `partidos(jornada_id/local/visitante)`, `historial(liga_id, creado_en)`, `movimientos(equipo_id)`…). No hacía falta ninguno nuevo.
+- **La medida** ahora pulsa JUGAR en cuanto está activo, sin las esperas de Playwright a que el botón esté quieto. Las fuentes, al llegar sin bloquear, lo mueven unos píxeles, y Playwright esperaba a que parase: eso no es un retraso para una persona.
+
+#### Antes y después
+
+Móvil 412 × 915 con la CPU ×4 y «4G lenta» (150 ms, 1,6 / 0,75 Mbit/s); mediana de 3 pasadas; `tests/slr/banco/rendimiento-app.mjs`.
+
+| Arranque | Antes: portada | Antes: Equipo | Después: portada | Después: Equipo se ve | Después: se puede usar |
+|---|---|---|---|---|---|
+| En frío (sin caché) | 4,1 s | 11,0 s | 12,3 s | 12,9 s | 12,9 s |
+| En caliente (a los pocos minutos) | 1,1 s | 2,5 s | 0,4 s | 1,2 s | 1,4 s |
+| Al día siguiente (caché del navegador caducada) | 2,3 s | 8,2 s | 0,3 s | 1,0 s | 1,1 s |
+
+| Pantalla (tiempo · llamadas a Supabase) | Antes | Después |
+|---|---|---|
+| Entrar en Rush | 11,0 s · 16 | 12,9 s · 2 (el login de Rush y slr_rush_inicio) |
+| Plantilla | 0,3 s · 0 | 0,3 s · 0 |
+| Mercado | 0,8 s · 1 | 0,1 s · 0 (precargado) |
+| Liga | 0,6 s · 1 | 0,1 s · 0 (precargado) |
+| Mercado / Liga otra vez | 0,4 s · 1 cada una | 0,1 s · 0 |
+| Entrar en caliente | 2,5 s · 17 | 1,4 s · 6 (1 de la entrada y la precarga de las demás) |
+| Al día siguiente | 8,2 s · 17, 103 archivos de la red | 1,1 s · 1, 4 de la red (Sheets y Google; la web, de la caché) |
+| **Sesión típica** (entrar, Equipo, Plantilla, Mercado, Liga, salir) | 22 llamadas · 1,54 MB | 6 llamadas · 1,69 MB (la primera vez incluye la precarga de la app y de las fotos) |
+
+**Lecturas:**
+- **En frío** es un poco más lento (12,9 s frente a 11,0): la primera vez, JUGAR espera a descargar lo que Rush necesita para funcionar sin red (~305 KB comprimidos), como se pidió. Esto se mide con un proxy local con HTTP/1.1 (6 conexiones); GitHub Pages sirve con HTTP/2, que en producción debería acortar esa descarga, pero no está medido.
+- **En caliente**, en una traza con el toque en cuanto JUGAR está activo, Equipo se ve con lo fresco a los ~0,9 s de abrir la app. Lo que queda es pintar Equipo (~270 ms con la CPU ×4) y, para «se puede usar», la respuesta de `slr_rush_inicio`.
+- **Al día siguiente** es lo que más ha mejorado (de 8,2 a 1,1 s): la web ya no se revalida archivo a archivo.
+- **La medida «al día siguiente» de antes** esperaba mal a que el service worker estuviera activo: `waitForFunction` no espera a una función `async`, porque la promesa ya cuenta como «sí». Ahora es un bucle, igual que en `banco/version.mjs`.

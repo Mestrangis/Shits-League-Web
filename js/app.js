@@ -26,7 +26,12 @@ function guardarDatos() {
     }));
   } catch { /* sin espacio o sin almacenamiento: la próxima vez, por la red */ }
 }
+let datosRestaurados = null;   // lo restaurado de la última vez (una sola vez al arrancar)
 function restaurarDatos() {
+  if (datosRestaurados !== null) return datosRestaurados;
+  return (datosRestaurados = restaurarDatosAhora());
+}
+function restaurarDatosAhora() {
   try {
     const d = JSON.parse(localStorage.getItem(DATOS_GUARDADOS_KEY) || 'null');
     if (!d?.jugadores?.length || !d?.jornadas) return false;
@@ -259,8 +264,15 @@ function initTabs() {
 
 // desde: 'derecha' | 'izquierda' → la pestaña entra deslizándose desde ese lado
 // (solo cuando el cambio viene de un swipe; con click no hay animación)
+// Entrando directo a Rush, lo de la Shits League normal espera (ver init); si antes se va a
+// otra pestaña, se prepara ya con lo guardado para que salga con sus datos
+let soltarPrincipal = null;
 function switchTab(name, { desde } = {}) {
   if (name === STATE.activeTab) return;
+  if (name !== 'rush' && soltarPrincipal) {
+    if (restaurarDatos()) initHero();
+    soltarPrincipal();
+  }
   const anterior = STATE.activeTab;
   const scrollAntes = window.scrollY;   // antes de cambiar de panel (luego puede quedar recortado)
   const saliente = document.getElementById(`panel-${anterior}`);
@@ -704,8 +716,12 @@ async function init() {
   if (tabInicial === 'rush') {
     switchTab('rush');
     // Rush primero (pintado y listo para tocar); lo de la Shits League normal (calcular las
-    // estadísticas y pintar Inicio) en el siguiente rato libre: Rush no lo necesita
-    await new Promise(r => (window.requestIdleCallback ?? (f => setTimeout(f, 50)))(r, { timeout: 1500 }));
+    // estadísticas y pintar Inicio) a los ~3 s, en un rato libre: Rush no lo necesita y no
+    // debe retrasar el toque en JUGAR. Si antes se va a otra pestaña, en ese momento
+    await new Promise(r => {
+      soltarPrincipal = () => { soltarPrincipal = null; r(); };
+      setTimeout(() => (window.requestIdleCallback ?? (f => setTimeout(f, 50)))(() => soltarPrincipal?.(), { timeout: 2000 }), 3000);
+    });
   }
   const guardados = restaurarDatos();
   if (guardados) {

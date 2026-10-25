@@ -116,7 +116,9 @@ try {
     const hastaListo = async (pg = page) => {
       const page = pg;
       const portada = await page.waitForFunction(() => { const b = document.getElementById('rushJugar'); return b && !b.disabled && performance.now(); }, null, { timeout: 120000, polling: 50 }).then(h => h.jsonValue());
-      await page.click('#rushJugar');
+      // Se toca en cuanto está activo (como alguien con prisa): sin las esperas de Playwright a que
+      // el botón esté quieto (las fuentes, al llegar, lo mueven unos píxeles)
+      await page.$eval('#rushJugar', b => b.click());
       // Se ve (aunque sea lo de la última vez, atenuado) y se puede usar (con los datos frescos)
       const visible = await page.waitForFunction(() => document.querySelector('.slr-main .slr-pantalla[data-seccion="equipo"]') && performance.now(), null, { timeout: 120000, polling: 50 }).then(h => h.jsonValue());
       const equipo = await page.waitForFunction(() => document.querySelector('.slr-main .slr-pantalla[data-seccion="equipo"]:not(.es-atenuada)') && performance.now(), null, { timeout: 120000, polling: 50 }).then(h => h.jsonValue());
@@ -165,7 +167,11 @@ try {
     await hastaListo(page2);
     // Hasta que la app esté entera en la caché del service worker (si lo hay)
     // (con el service worker ya activo, no solo con lo crítico de Rush descargado)
-    await page2.waitForFunction(async () => { const r = await navigator.serviceWorker?.getRegistration(); return !r || (!!r.active && !r.installing && !r.waiting); }, null, { timeout: 180000, polling: 500 });
+    // (un bucle: waitForFunction no espera a una función async)
+    for (let k = 0; k < 360; k++) {
+      if (await page2.evaluate(async () => { const r = await navigator.serviceWorker?.getRegistration(); return !r || (!!r.active && !r.installing && !r.waiting); }).catch(() => false)) break;
+      await dormir(500);
+    }
     await dormir(1000);
     await page2.goto('about:blank');
     c = fase();

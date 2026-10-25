@@ -47,10 +47,14 @@ function initPush() {
     }
   });
 
-  const s = document.createElement('script');
-  s.src = ONESIGNAL_SDK_URL;
-  s.defer = true;
-  document.head.appendChild(s);
+  // El SDK, en el primer rato libre (como mucho a los 4 s): no compite con lo que se está
+  // viendo al arrancar (las notificaciones no tienen prisa)
+  (window.requestIdleCallback ?? (f => setTimeout(f, 2000)))(() => {
+    const s = document.createElement('script');
+    s.src = ONESIGNAL_SDK_URL;
+    s.async = true;
+    document.head.appendChild(s);
+  }, { timeout: 4000 });
 
   document.getElementById('pushAcceptBtn').addEventListener('click', aceptarPush);
   document.getElementById('pushLaterBtn').addEventListener('click', posponerPush);
