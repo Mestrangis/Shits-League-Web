@@ -1694,3 +1694,24 @@ Medido con `tests/slr/banco/rendimiento-apertura.mjs`: Chrome a 390×844 (DPR 2,
   - `sw.test.mjs`: CORS, caché y límite de 600;
   - `banco/fotos.mjs` (a 360 y 412 px, red lenta y sin conexión);
   - `banco/listas.mjs`, adaptado (sin vista previa, solo 400 px en las listas).
+
+#### Fase 3: datos de cada pantalla
+
+- **Una llamada por pantalla:**
+  - entrar en Rush: `slr_rush_inicio` (antes, 14 llamadas);
+  - Liga: `slr_rush_liga` (sus tres vistas);
+  - Mercado: `slr_mercado`;
+  - Perfil: `slr_movimientos` (el admin, a la vez, su panel).
+  - `tests/slr/api-pantallas.mjs` comprueba que devuelven lo mismo que las llamadas sueltas de antes.
+- **`js/slr/datos-pantallas.js`:** la última respuesta de cada pantalla, en memoria e IndexedDB, por jugador y liga.
+  - Fresca durante `DATOS_FRESCOS_MS` (15 s, en `config.js`).
+  - Una sola petición a la vez por pantalla.
+  - `recargar()`, tras cualquier acción, invalida la entrada, Mercado, Liga y Perfil.
+- **`rush.js → pintar`:**
+  - fresca: se pinta tal cual;
+  - si no: lo de la última vez atenuado y `inert`, con la rueda `#ptrSpinner` de la Shits League;
+  - la primera vez, solo la rueda;
+  - lo que llega tarde de otra pantalla no pinta (contador);
+  - sin conexión: se queda lo de la última vez y se avisa.
+  - Al terminar, se piden en segundo plano las demás pestañas.
+- **Tests:** `datos-pantallas.test.mjs` y `banco/datos.mjs` (41 comprobaciones a 360 y 412 px).

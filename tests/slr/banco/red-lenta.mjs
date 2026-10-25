@@ -15,7 +15,15 @@ import net from 'node:net';
 
 export async function redLenta({ rtt = 150, bajada = 1.6e6, subida = 750e3, cacheWeb = 'max-age=600' } = {}) {
   const libre = { bajada: 0, subida: 0 };
-  const red = { offline: false, url: '', cacheWeb };
+  // offline = true corta también las conexiones ya abiertas (un túnel abierto seguiría funcionando)
+  const abiertas = new Set();
+  let sinRed = false;
+  const red = {
+    url: '', cacheWeb,
+    get offline() { return sinRed; },
+    set offline(v) { sinRed = !!v; if (sinRed) { for (const s of abiertas) s.destroy(); abiertas.clear(); } },
+  };
+  const vigilar = s => { abiertas.add(s); s.on('close', () => abiertas.delete(s)); };
   // Hora a la que sale un trozo de n bytes en ese sentido para ese canal (respeta el orden del canal)
   const turno = (sentido, n, canal) => {
     const ahora = Date.now();
@@ -43,6 +51,7 @@ export async function redLenta({ rtt = 150, bajada = 1.6e6, subida = 750e3, cach
   };
 
   const servidor = http.createServer((pet, res) => {
+    vigilar(pet.socket);
     if (red.offline) { res.socket.destroy(); return; }
     // Petición normal (la web en localhost): se reenvía y la respuesta baja frenada
     const destino = new URL(pet.url);
@@ -62,6 +71,7 @@ export async function redLenta({ rtt = 150, bajada = 1.6e6, subida = 750e3, cach
   // HTTPS (Supabase, Cloudinary, Google…): túnel con la red frenada en los dos sentidos
   servidor.on('connect', (pet, cliente, cabeza) => {
     if (red.offline) { cliente.destroy(); return; }
+    vigilar(cliente);
     const [host, puerto] = pet.url.split(':');
     const remoto = net.connect(Number(puerto) || 443, host, () => {
       setTimeout(() => {
@@ -71,6 +81,7 @@ export async function redLenta({ rtt = 150, bajada = 1.6e6, subida = 750e3, cach
         canalizar(remoto, cliente, 'bajada');
       }, rtt);
     });
+    vigilar(remoto);
     remoto.on('error', () => cliente.destroy());
     cliente.on('error', () => remoto.destroy());
   });

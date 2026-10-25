@@ -12,7 +12,8 @@
 import { rpc, leer, configurarSesion, borrarToken, ErrorSesion } from './api.js';
 import { esc, miles, crear, fijarRaiz, ajustarCapas, capasAbiertas, toast, hoja, cerrarCapa, fechaHora } from './ui.js';
 import { normalizarCarta, iniciarAcabados, pararAcabados } from './carta.js';
-import { cargarColecciones } from './colecciones.js';
+import { fijarColecciones } from './colecciones.js';
+import { guardado, pedir, invalidar, esFresco, fijarAmbito } from './datos-pantallas.js';
 import * as previa from './pantallas/previa.js';
 import * as plantilla from './pantallas/plantilla.js';
 import * as mercado from './pantallas/mercado.js';
@@ -22,7 +23,7 @@ import * as alineacion from './pantallas/alineacion.js';
 import { abrirEleccionPendiente } from './pantallas/apertura.js';
 import { abrirHacerHueco } from './hueco.js';
 import { cargarIndice } from './imagenes.js';
-import { precargarFotos, fotosDelMercado, imagenDe } from './precarga-fotos.js';
+import { precargarFotos, fotosDelMercado } from './precarga-fotos.js';
 
 const ES_LOCAL = ['localhost', '127.0.0.1'].includes(location.hostname);
 
@@ -88,80 +89,72 @@ export function alineacionConfirmada() {
   return !!ref && new Date(al.guardada_en) > new Date(ref);
 }
 
-/* ── Carga ───────────────────────────────────────────────────────────────── */
+/* ── Carga ───────────────────────────────────────────────────────────────────
+   Todo lo de la entrada llega en UNA llamada (slr_rush_inicio): el jugador, la
+   liga, la temporada, el calendario, las colecciones, las cartas, la alineación,
+   las tácticas, los avisos y los pendientes. Es la clave 'base' de los datos
+   guardados (datos-pantallas.js): las pantallas Equipo y Plantilla solo usan esto;
+   Mercado, Liga y Perfil tienen además su propia llamada. */
 function mismoNombre(a, b) {
   const n = s => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
   return !!a && n(a) === n(b);
 }
 
-async function cargarYo() {
-  let yo = await rpc('slr_yo', {}, { silencioso: true });
-  if (!mismoNombre(yo.usuario.nombre, datos.jugador)) {
+async function cargarBase() {
+  let b = await rpc('slr_rush_inicio', { prueba: ES_LOCAL }, { silencioso: true });
+  if (!mismoNombre(b.yo.usuario.nombre, datos.jugador)) {
     // La sesión de Rush es de otra persona: otra sesión en silencio con el
     // código guardado; si tampoco encaja, se cierra la sesión de Shits League
     borrarToken();
-    if (await opciones.reautenticar() === 'ok') yo = await rpc('slr_yo', {}, { silencioso: true });
-    if (!mismoNombre(yo.usuario.nombre, datos.jugador)) {
+    if (await opciones.reautenticar() === 'ok') b = await rpc('slr_rush_inicio', { prueba: ES_LOCAL }, { silencioso: true });
+    if (!mismoNombre(b.yo.usuario.nombre, datos.jugador)) {
       borrarToken();
       opciones.sesionPerdida();
       throw new ErrorSesion('La sesión de Rush no coincide con la de Shits League');
     }
   }
-  if (!yo.tiene_acceso) {
+  if (!b.yo.tiene_acceso) {
     opciones.sinAcceso();
     throw new ErrorSesion('Sin acceso a la beta de Rush');
   }
-  datos.yo = yo;
-  const prueba = ES_LOCAL ? yo.ligas.find(l => l.es_prueba) : null;
-  datos.liga = prueba ?? (yo.liga_principal ? { ...yo.liga_principal, es_prueba: false } : null);
-  datos.equipo = datos.liga ? yo.equipos.find(e => e.liga_id === datos.liga.id) ?? null : null;
+  return b;
 }
 
-async function cargarCartas() {
-  const eq = datos.equipo.id;
-  const [filas, ventas] = await Promise.all([
-    leer(`cartas?select=id,diseno_id,equipo_id,multiplicador_clausula,blindada_hasta,tocada_en_jornada,adquirida_en,energia,` +
-      `disenos_carta(nombre,tipo,acabado,color,tier,rareza,coleccion_id,perfil,personas,ata,def,con,valor,poderes,imagen_url,texto,estamina,tactica_favorita)&equipo_id=eq.${eq}`),
-    leer(`ventas?select=id,carta_id,precio&vendedor_id=eq.${eq}&estado=eq.activa`),
-  ]);
-  datos.cartas = filas.map(f => ({
+// Pone en `datos` lo que llega de slr_rush_inicio (fresco o guardado de la última vez)
+export function aplicarBase(b) {
+  const yo = b.yo;
+  datos.yo = yo;
+  const prueba = ES_LOCAL ? yo.ligas.find(l => l.es_prueba && l.id === b.liga_id) : null;
+  datos.liga = prueba ?? (yo.liga_principal && yo.liga_principal.id === b.liga_id ? { ...yo.liga_principal, es_prueba: false } : null);
+  datos.equipo = datos.liga ? yo.equipos.find(e => e.liga_id === datos.liga.id) ?? null : null;
+  fijarColecciones(b.colecciones);   // para el fondo, el emblema y el nombre de la colección de cada carta
+  datos.ligaInfo = b.liga ?? null;
+  datos.temporada = b.temporada ?? null;
+  datos.sinVer = b.sin_ver?.sin_ver ?? null;
+  datos.fotosRival = b.fotos_rival ?? [];
+  if (!datos.equipo) {
+    Object.assign(datos, { jornadas: [], cartas: [], alineacion: null, tacticas: null, sobrePendiente: null, huecoPendiente: null });
+    avisos = [];
+    return;
+  }
+  // slr_calendario no trae publicada_en (hace falta para saber si la alineación está confirmada)
+  const cal = b.calendario ?? {};
+  datos.jornadas = (cal.temporada && cal.temporada.id === b.temporada?.id ? cal.jornadas : [])
+    .map(j => ({ ...j, publicada_en: b.publicadas?.find(p => p.id === j.id)?.publicada_en ?? null }));
+  datos.cartas = (b.cartas ?? []).map(f => ({
     ...normalizarCarta(f),
     multiplicador: Number(f.multiplicador_clausula),
     clausula: Math.round(f.disenos_carta.valor * Number(f.multiplicador_clausula)),
     blindada_hasta: f.blindada_hasta && new Date(f.blindada_hasta) > Date.now() ? f.blindada_hasta : null,
     tocada_en_jornada: f.tocada_en_jornada,
     adquirida_en: f.adquirida_en,
-    en_venta: ventas.find(v => v.carta_id === f.id) ?? null,
+    en_venta: b.ventas?.find(v => v.carta_id === f.id) ?? null,
   }));
-}
-
-async function cargarLiga() {
-  const id = datos.liga.id;
-  // Todo a la vez (antes iban en tres tandas: liga → temporada → calendario)
-  const [[info], [temporada], cal, publicadas] = await Promise.all([
-    leer(`ligas?select=id,nombre,estado,temporada,config,pausada_en&id=eq.${id}`),
-    leer(`temporadas?select=id,numero,estado,iniciada_en,terminada_en&liga_id=eq.${id}&order=numero.desc&limit=1`),
-    datos.equipo ? rpc('slr_calendario', { liga_id: id }) : null,
-    datos.equipo ? leer(`jornadas?select=id,publicada_en&liga_id=eq.${id}&limit=500`) : [],
-    cargarColecciones(id),            // para el fondo, el emblema y el nombre de la colección de cada carta
-    datos.equipo ? rpc('slr_sin_ver', { liga_id: id }, { silencioso: true }).catch(() => null) : null,
-  ]).then(r => { datos.sinVer = r[5]?.sin_ver ?? null; return r; });
-  datos.ligaInfo = info;
-  datos.temporada = temporada ?? null;
-  if (!datos.equipo) { datos.jornadas = []; return; }
-  // slr_calendario no trae publicada_en (hace falta para saber si la alineación está confirmada)
-  datos.jornadas = (cal.temporada && cal.temporada.id === temporada?.id ? cal.jornadas : [])
-    .map(j => ({ ...j, publicada_en: publicadas.find(p => p.id === j.id)?.publicada_en ?? null }));
-}
-
-// La alineación es pública; las tácticas guardadas (motor v2) solo las lee su dueño
-async function cargarAlineacion() {
-  const [[al], tac] = await Promise.all([
-    leer(`alineaciones?equipo_id=eq.${datos.equipo.id}`),
-    rpc('slr_mis_tacticas', { equipo_id: datos.equipo.id }, { silencioso: true }).catch(() => null),
-  ]);
-  datos.alineacion = al ?? null;
-  datos.tacticas = tac ?? { tactica: 'posesion', plan_b: null, gestion: 'normal', cambios_avanzados: [] };
+  datos.alineacion = b.alineacion ?? null;
+  datos.tacticas = b.tacticas ?? { tactica: 'posesion', plan_b: null, gestion: 'normal', cambios_avanzados: [] };
+  datos.sobrePendiente = b.sobre_pendiente ?? null;
+  datos.huecoPendiente = b.hueco_pendiente?.sobran > 0 ? b.hueco_pendiente : null;
+  avisos = (b.notificaciones?.notificaciones ?? []).filter(n => !n.liga_id || n.liga_id === datos.liga.id).slice(0, 40);
 }
 
 /* ── Partidos vistos (sin destripar) ────────────────────────────────────────
@@ -175,25 +168,25 @@ export async function marcarVisto(partidoId) {
   if (!r) return;
   const antes = datos.sinVer?.partido_id;
   datos.sinVer = r.sin_ver ?? null;
+  // La clasificación ya cuenta ese partido
+  invalidar('liga');
   // Lo que quedaba pendiente de ese partido (bonus de sorpresa y ojo clínico) ya se ha cobrado
   if (r.cobrado > 0) {
     toast(`Bonus del partido: +${miles(r.cobrado)}`, 'ok');
-    await recargar('yo').catch(() => {});
+    await recargar().catch(() => {});
   }
   if (antes && antes !== datos.sinVer?.partido_id) pintar().catch(() => {});
 }
 
-// partes: 'yo', 'liga', 'cartas', 'alineacion' (sin partes, todo)
-export async function recargar(...partes) {
-  const todo = !partes.length, toca = p => todo || partes.includes(p);
-  if (toca('yo')) await cargarYo();
-  if (!datos.liga) return;
-  const tareas = [];
-  if (toca('liga')) tareas.push(cargarLiga());
-  if (datos.equipo && toca('cartas')) tareas.push(cargarCartas());
-  if (datos.equipo && toca('alineacion')) tareas.push(cargarAlineacion());
-  await Promise.all(tareas);
+// Datos frescos de la entrada (una llamada) tras una acción. Las partes ('yo', 'liga',
+// 'cartas', 'alineacion') se aceptan por compatibilidad: llega todo junto. Lo guardado
+// de las demás pantallas deja de contar como fresco (la acción puede haberlo cambiado).
+export async function recargar() {
+  invalidar('base', 'mercado', 'liga', 'perfil');
+  const b = await pedir('base', cargarBase);
+  aplicarBase(b);
   pintarBarra();
+  pintarPendiente();
 }
 
 /* ── Pintado ─────────────────────────────────────────────────────────────── */
@@ -309,27 +302,113 @@ export function navegar(id, { arriba = true } = {}) {
   return pintar({ arriba });
 }
 
-export async function pintar({ arriba = false } = {}) {
-  const n = ++pintando;
-  const cont = crear(`<div class="slr-pantalla" data-seccion="${seccion}"></div>`);
-  const ctx = { navegar, recargar, pintar, datos };
-  try {
-    if (!datos.liga || !datos.equipo) await previa.pintar(cont, ctx);
-    else await SECCIONES.find(s => s.id === seccion).modulo.pintar(cont, ctx);
-  } catch (e) {
-    if (e instanceof ErrorSesion) return;
-    console.error('[rush]', e);
-    cont.innerHTML = `<div class="slr-vacio"><b>Algo ha fallado</b><p>${esc(e.message)}</p>
-      <button class="slr-btn" type="button" data-reintentar>Reintentar</button></div>`;
-    cont.querySelector('[data-reintentar]').addEventListener('click', () => recargar().then(() => pintar()));
-  }
-  if (n !== pintando || !main) return;  // otra pantalla se pintó mientras tanto
-  main.replaceChildren(cont);
-  if (arriba) main.scrollTop = 0;
+/* ── Pintar una pantalla con sus datos ───────────────────────────────────────
+   Cada pantalla usa la clave 'base' (lo de la entrada) y, Mercado, Liga y Perfil,
+   además la suya (su módulo exporta cargar(ctx): UNA llamada).
+   · Datos de hace menos de 15 s (DATOS_FRESCOS_MS): se pinta tal cual, sin esperar.
+   · Si no: lo de la última vez de fondo, atenuado y sin poder tocarlo, y en el
+     centro la rueda de «arrastrar para recargar» de la Shits League (#ptrSpinner)
+     hasta que llegan los frescos. La primera vez, sin nada guardado, solo la rueda.
+   · Las pestañas de abajo funcionan siempre: lo que llegue tarde de una pantalla
+     que ya no se ve no pinta nada (contador `pintando`).
+   · Al terminar, se piden en segundo plano los datos de las otras pestañas. */
+const modulo = id => (!datos.liga || !datos.equipo ? previa : SECCIONES.find(s => s.id === id).modulo);
+const clavesDe = id => (datos.liga && datos.equipo && modulo(id).cargar ? ['base', id] : ['base']);
+const cargadorDe = clave => (clave === 'base' ? cargarBase : () => modulo(clave).cargar({ datos }));
+
+// La rueda de la Shits League, en el centro, por encima de Rush
+function rueda(si) {
+  const r = document.getElementById('ptrSpinner');
+  if (!r) return;
+  if (si) { r.dataset.rush = '1'; r.classList.add('visible'); }
+  else if (r.dataset.rush) { delete r.dataset.rush; r.classList.remove('visible'); }
 }
 
-function pintarCargando(texto = 'Cargando…') {
-  main.innerHTML = `<div class="slr-cargando"><span class="slr-balon"></span>${esc(texto)}</div>`;
+async function dibujar(n, id, dato, { atenuada = false, arriba = false } = {}) {
+  const cont = crear(`<div class="slr-pantalla" data-seccion="${id}"></div>`);
+  const ctx = { navegar, recargar, pintar, datos, pantalla: dato, invalidar };
+  try {
+    await modulo(id).pintar(cont, ctx);
+  } catch (e) {
+    if (e instanceof ErrorSesion) return false;
+    console.error('[rush]', e);
+    pintarError(cont, e);
+  }
+  if (n !== pintando || !main) return false;   // otra pantalla se pintó mientras tanto
+  cont.classList.toggle('es-atenuada', atenuada);
+  cont.inert = atenuada;
+  if (atenuada) cont.setAttribute('aria-busy', 'true');
+  main.replaceChildren(cont);
+  if (arriba) main.scrollTop = 0;
+  return true;
+}
+function pintarError(cont, e) {
+  cont.innerHTML = `<div class="slr-vacio"><b>Algo ha fallado</b><p>${esc(e.message)}</p>
+    <button class="slr-btn" type="button" data-reintentar>Reintentar</button></div>`;
+  cont.querySelector('[data-reintentar]').addEventListener('click', () => pintar({ frescos: true }));
+}
+
+// frescos: pedirlo todo otra vez aunque lo guardado sea de hace menos de 15 s
+export async function pintar({ arriba = false, frescos = false } = {}) {
+  const n = ++pintando, id = seccion;
+  rueda(false);
+  const claves = clavesDe(id);
+  const guardados = await Promise.all(claves.map(guardado));
+  if (n !== pintando) return;
+  const hayTodo = guardados.every(Boolean);
+  const todoFresco = !frescos && hayTodo && guardados.every(esFresco);
+  if (hayTodo) {
+    aplicarBase(guardados[0].datos);
+    pintarBarra();
+    await dibujar(n, id, guardados[1]?.datos, { atenuada: !todoFresco, arriba });
+    if (todoFresco) { precargarOtras(); return; }
+  } else if (main) {
+    main.replaceChildren();
+  }
+  if (n !== pintando) return;
+  rueda(true);
+  try {
+    const nuevos = await Promise.all(claves.map((c, i) => (!frescos && esFresco(guardados[i]) ? guardados[i].datos : pedir(c, cargadorDe(c)))));
+    if (n !== pintando) return;
+    aplicarBase(nuevos[0]);
+    pintarBarra();
+    pintarPendiente();
+    await dibujar(n, id, nuevos[1], { arriba: arriba && !hayTodo });
+  } catch (e) {
+    if (e instanceof ErrorSesion || n !== pintando) return;
+    console.error('[rush]', e);
+    if (!hayTodo) {
+      const cont = crear(`<div class="slr-pantalla" data-seccion="${id}"></div>`);
+      pintarError(cont, e);
+      main?.replaceChildren(cont);
+    } else {
+      // Se queda lo de la última vez (ya se puede tocar) y se avisa
+      const cont = main?.querySelector('.slr-pantalla');
+      if (cont) { cont.classList.remove('es-atenuada'); cont.inert = false; cont.removeAttribute('aria-busy'); }
+      toast(e.red ? 'Sin conexión: se ve lo de la última vez' : `No se pudieron actualizar los datos: ${e.message}`, 'error');
+    }
+  } finally {
+    if (n === pintando) rueda(false);
+  }
+  precargarOtras();
+}
+
+// En segundo plano, de una en una: los datos de las otras pestañas principales que no estén frescos
+let precargando = false;
+function precargarOtras() {
+  if (precargando || !datos.equipo) return;
+  precargando = true;
+  (window.requestIdleCallback ?? (cb => setTimeout(cb, 300)))(async () => {
+    try {
+      for (const s of SECCIONES) {
+        for (const c of clavesDe(s.id)) {
+          if (!raiz) return;
+          if (esFresco(await guardado(c))) continue;
+          await pedir(c, cargadorDe(c)).catch(() => {});
+        }
+      }
+    } finally { precargando = false; }
+  }, { timeout: 2000 });
 }
 
 /* ── Fotos en segundo plano ──────────────────────────────────────────────────
@@ -339,12 +418,7 @@ function pintarCargando(texto = 'Cargando…') {
 async function precargarFotosDeFondo() {
   if (!datos.equipo) return;
   precargarFotos('propias', datos.cartas.map(c => c.imagen_url));
-  const p = miPartido(proximaJornada());
-  const rival = p && (p.local.equipo_id === datos.equipo.id ? p.visitante.equipo_id : p.local.equipo_id);
-  if (rival) {
-    const filas = await leer(`cartas?select=disenos_carta(imagen_url)&equipo_id=eq.${rival}`).catch(() => []);
-    precargarFotos('rival', filas.map(imagenDe));
-  }
+  precargarFotos('rival', datos.fotosRival ?? []);   // llegan con slr_rush_inicio
   if (datos.mercado) fotosDelMercado(datos.mercado);
   if (datos.yo?.es_admin) {
     const d = await leer('disenos_carta?select=imagen_url&imagen_url=not.is.null&limit=5000').catch(() => []);
@@ -411,20 +485,17 @@ export async function abrir(op) {
   opciones = op;
   datos.jugador = op.jugador;
   configurarSesion({ reautenticar: op.reautenticar, sesionPerdida: op.sesionPerdida, sinAcceso: op.sinAcceso });
+  // Lo guardado es de este jugador y de esta liga (principal, o la de prueba en local)
+  fijarAmbito(`${op.jugador}|${ES_LOCAL ? 'prueba' : 'principal'}`);
   if (!raiz) construir();
-  pintarCargando();
-  try {
-    // El índice de la caché de fotos antes de pintar: las guardadas salen sin esqueleto
-    await Promise.all([recargar(), cargarIndice()]);
-  } catch (e) {
-    if (e instanceof ErrorSesion) return;      // sesionPerdida ya ha cerrado la sesión
-    main.innerHTML = `<div class="slr-vacio"><b>No se pudo cargar Rush</b><p>${esc(e.message)}</p></div>`;
-    toast(e.message, 'error');
-    return;
-  }
+  // El índice de la caché de fotos antes de pintar: las guardadas salen sin esqueleto.
+  // pintar() enseña lo de la última vez (atenuado) o la rueda, y pide lo fresco
+  await cargarIndice();
   await navegar(seccion);
-  cargarAvisos();
-  comprobarPendiente({ abrirHueco: true });
+  if (!raiz || !datos.equipo) return;
+  pintarCampana();
+  pintarPendiente();
+  if (datos.huecoPendiente && !datos.sobrePendiente) abrirHuecoPendiente();
   precargarFotosDeFondo().catch(() => {});
 }
 

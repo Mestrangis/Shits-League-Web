@@ -23,6 +23,7 @@ import { asegurarHueco, plantillaOcupada, plantillaMaxima } from '../hueco.js';
 import { abrirDetalle } from './detalle.js';
 import { pintarTienda } from './tienda.js';
 import { fotosDelMercado } from '../precarga-fotos.js';
+import { guardar } from '../datos-pantallas.js';
 
 const SUBS = { subastas: 'Subastas', sobres: 'Sobres', venta: 'En venta', ofertas: 'Ofertas' };
 const ORDEN_RAREZA = ['comun', 'rara', 'epica', 'legendaria'];
@@ -272,19 +273,22 @@ export function hojaImporte({ titulo, texto, valor, minimo = 1, ok, impuesto = n
 }
 
 /* ── Pantalla ───────────────────────────────────────────────────────────── */
+// Los datos de la pantalla, en UNA llamada (rush.js los guarda y decide cuándo pedirlos)
+export const cargar = ({ datos }) => rpc('slr_mercado', { liga_id: datos.liga.id }, { silencioso: true });
+
 export async function pintar(cont, ctx) {
   clearInterval(reloj);
   reloj = setInterval(() => {
     if (!cont.isConnected) { clearInterval(reloj); return; }
     cont.querySelectorAll('[data-cuenta]').forEach(e => { e.textContent = (e.textContent.startsWith('⏱') ? '⏱ ' : '') + faltan(e.dataset.cuenta); });
   }, 30000);
-  cont.innerHTML = `<header class="slr-cabecera"><h1 class="slr-titulo">Mercado</h1></header><div class="slr-cargando-bloque"></div>`;
-  let m;
+  let m = ctx.pantalla;
+  const usar = datos => { m = datos; ctx.datos.mercado = m; fotosDelMercado(m); };
+  // Tras una acción: los datos nuevos (guardados para la próxima vez) y, si se sigue aquí, se repinta
   const repintar = async () => {
-    m = await rpc('slr_mercado', { liga_id: ctx.datos.liga.id });
-    ctx.datos.mercado = m;
-    fotosDelMercado(m);
-    dibujar();
+    usar(await cargar(ctx));
+    guardar('mercado', m);
+    if (cont.isConnected) dibujar();
   };
   function dibujar() {
     const n = { ofertas: m.ofertas_recibidas.length + m.intercambios.filter(i => !i.enviado).length, subastas: m.subastas.filter(s => s.mi_puja != null).length };
@@ -368,7 +372,7 @@ export async function pintar(cont, ctx) {
       toast('Intercambio retirado', 'ok'); await repintar();
     }).catch(() => {})));
   }
-  await repintar();
+  if (m) { usar(m); dibujar(); } else await repintar();
 }
 
 // Para otras pantallas: abre el Mercado en una sub-pestaña

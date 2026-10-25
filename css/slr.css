@@ -130,6 +130,9 @@ html.slr-abierto, html.slr-abierto body { overflow: hidden; }
   gap: 14px;
   animation: slr-pantalla .22s ease-out;
 }
+/* Lo de la última vez mientras llegan los datos frescos (rush.js → pintar): se ve, atenuado,
+   pero no se puede tocar; encima, la rueda de la Shits League (#ptrSpinner) */
+.slr-pantalla.es-atenuada { opacity: .45; filter: saturate(.6); pointer-events: none; user-select: none; transition: opacity .15s; }
 @keyframes slr-pantalla { from { opacity: 0; transform: translateY(6px); } }
 
 .slr-titulo {

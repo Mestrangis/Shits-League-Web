@@ -7,7 +7,7 @@
    naranja (empate); los demás en gris. Marcador grande y, junto a cada
    equipo, la foto de perfil de su dueño en Shits League (👤 si no tiene).
 ═══════════════════════════════════════════════ */
-import { rpc, leer, funcion } from '../api.js';
+import { rpc, funcion } from '../api.js';
 import { esc, diaHora, toast, conEspera, fechaHora } from '../ui.js';
 import { enJuego, proximaJornada, sinVer } from '../rush.js';
 import { ESTADOS_LIGA } from './perfil.js';
@@ -35,10 +35,7 @@ function tabla(filas, yo) {
 }
 
 // Dueño de cada equipo de la liga: { equipoId: nombre } (para la foto de perfil)
-async function duenos(liga) {
-  const eqs = await leer(`equipos?select=id,usuarios(nombre,interno)&liga_id=eq.${liga}`);
-  return Object.fromEntries(eqs.map(e => [e.id, e.usuarios?.interno ? '' : (e.usuarios?.nombre ?? '')]));
-}
+const duenos = eqs => Object.fromEntries(eqs.map(e => [e.id, e.usuarios?.interno ? '' : (e.usuarios?.nombre ?? '')]));
 const avatar = nombre => `<span class="avatar slr-cruce__avatar" data-avatar="${esc(nombre ?? '')}" aria-hidden="true">👤</span>`;
 // Las fotos las pinta renderAvatar de js/session.js (global de la app)
 function pintarAvatares(cont) {
@@ -84,18 +81,13 @@ function calendario(jornadas, yo, dueno) {
 
 // Sin temporada (o antes de la primera) la clasificación sale vacía: se listan
 // los equipos de la liga para poder jugar amistosos igualmente
-async function filasSinTemporada(liga) {
-  const eqs = await leer(`equipos?select=id,nombre,usuarios(nombre,interno)&liga_id=eq.${liga}&order=creado_en`);
+function filasSinTemporada(eqs) {
   return eqs.map((e, i) => ({ posicion: i + 1, equipo_id: e.id, equipo: e.nombre,
     usuario: e.usuarios?.interno ? 'bot de pruebas' : e.usuarios?.nombre, pj: 0, g: 0, e: 0, p: 0, dg: 0, puntos: 0 }));
 }
 
 // La crónica de un amistoso lleva las tácticas guardadas de quien lo jugó: solo él la abre
-async function amistosos(liga, yo, dueno, usuario) {
-  const [ps, eqs] = await Promise.all([
-    leer(`partidos?select=id,local_id,visitante_id,goles_local,goles_visitante,simulado_en,creado_por&liga_id=eq.${liga}&tipo=eq.amistoso&order=simulado_en.desc&limit=8`),
-    leer(`equipos?select=id,nombre&liga_id=eq.${liga}`),
-  ]);
+function amistosos(ps, eqs, yo, dueno, usuario) {
   if (!ps.length) return '';
   const n = id => esc(eqs.find(e => e.id === id)?.nombre ?? 'Equipo');
   const lado = id => (id === yo ? 'slr-propio' : '');
@@ -114,9 +106,7 @@ async function amistosos(liga, yo, dueno, usuario) {
 // Historial público del mercado, para el pique: fichajes (compras, cláusulas,
 // intercambios y subastas resueltas) y sobres con épica o legendaria
 const ICONO_FICHAJE = { compra: '🏷️', clausula: '💥', intercambio: '🔁', subasta: '🔨', sobre: '🎴' };
-async function fichajes(liga) {
-  const filas = await leer(`historial?select=id,tipo,texto,creado_en,datos&liga_id=eq.${liga}` +
-    `&tipo=in.(compra,clausula,intercambio,subasta,sobre)&order=id.desc&limit=60`);
+function fichajes(filas) {
   if (!filas.length) return '<div class="slr-vacio" data-fichajes><b>Aún no hay fichajes</b><p>Aquí salen las compras, cláusulas, intercambios, subastas ganadas y los sobres con épica o legendaria.</p></div>';
   return `<ul class="slr-fichajes" data-fichajes>${filas.map(h => {
     const sobre = h.tipo === 'sobre', leg = sobre && (h.datos?.mejor === 'legendaria' || /legendaria/.test(h.texto));
@@ -142,15 +132,17 @@ function estadoLiga(datos) {
     </section>`;
 }
 
+// Los datos de la pantalla (las tres vistas), en UNA llamada: clasificación, equipos con su
+// dueño, los últimos amistosos y los fichajes. Cambiar de vista ya no pide nada.
+export const cargar = ({ datos }) => rpc('slr_rush_liga', { liga_id: datos.liga.id }, { silencioso: true });
+
 export async function pintar(cont, ctx) {
   const { datos } = ctx;
   const yo = datos.equipo.id;
-  let clas = null;
-  const dueno = vista === 'calendario' ? await duenos(datos.liga.id) : {};
-  if (vista === 'clasificacion') {
-    clas = await rpc('slr_clasificacion', { liga_id: datos.liga.id });
-    if (!clas.clasificacion.length) clas.clasificacion = await filasSinTemporada(datos.liga.id);
-  }
+  const d = ctx.pantalla ?? await cargar(ctx);
+  const dueno = duenos(d.equipos);
+  const clas = { ...d.clasificacion };
+  if (!clas.clasificacion?.length) clas.clasificacion = filasSinTemporada(d.equipos);
 
   cont.innerHTML = `
     <header class="slr-cabecera">
@@ -162,11 +154,11 @@ export async function pintar(cont, ctx) {
       </div>
     </header>
     ${estadoLiga(datos)}
-    ${vista === 'fichajes' ? await fichajes(datos.liga.id) : vista === 'clasificacion'
+    ${vista === 'fichajes' ? fichajes(d.fichajes) : vista === 'clasificacion'
       ? `${clas.sin_ver ? `<button class="slr-banner slr-sin-ver" type="button" data-partido="${esc(clas.sin_ver.partido_id)}" data-jugado="1">
           <b>▶ Tu partido de la jornada ${clas.sin_ver.numero} ya se ha jugado</b><span>La clasificación no cuenta esa jornada hasta que lo veas.</span></button>` : ''}
         ${tabla(clas.clasificacion, yo)}<p class="slr-suave">Un amistoso se juega al momento con las alineaciones guardadas: no da puntos, dinero ni lesiones.</p>`
-      : `${calendario(datos.jornadas, yo, dueno)}${await amistosos(datos.liga.id, yo, dueno, datos.yo?.usuario?.id)}`}`;
+      : `${calendario(datos.jornadas, yo, dueno)}${amistosos(d.amistosos, d.equipos, yo, dueno, datos.yo?.usuario?.id)}`}`;
   pintarAvatares(cont);
 
   cont.querySelectorAll('[data-vista]').forEach(b => b.addEventListener('click', () => { vista = b.dataset.vista; ctx.pintar(); }));
@@ -178,6 +170,7 @@ export async function pintar(cont, ctx) {
   }));
   cont.querySelectorAll('[data-amistoso]').forEach(b => b.addEventListener('click', () => conEspera(b, async () => {
     const r = await funcion({ accion: 'amistoso', rival_equipo_id: b.dataset.amistoso });
+    ctx.invalidar?.('liga');   // un amistoso más en la lista
     // Sin el resultado: se reproduce solo la primera vez
     await abrirCronica(r.partido_id, ctx);
   }).catch(() => {})));

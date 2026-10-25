@@ -35,14 +35,24 @@ export const ESTADOS_LIGA = {
 };
 
 /* ── Panel de administración (también lo usa previa.js) ──────────────────── */
-export async function panelAdmin(cont, ctx) {
+// Lo que necesita el panel de administración: los miembros y, en modo pruebas, el bombo
+export async function datosAdmin({ datos }) {
+  const liga = datos.liga, info = datos.ligaInfo ?? liga;
+  const [miembros, bombo] = await Promise.all([
+    leer(`equipos?select=id,nombre,saldo,creado_en,usuarios(nombre,interno)&liga_id=eq.${liga.id}&order=creado_en`),
+    info.config?.modo_beta === true ? rpc('slr_admin_bombo', { liga_id: liga.id }, { silencioso: true }).catch(() => null) : null,
+  ]);
+  return { miembros, bombo };
+}
+
+// admin: lo de datosAdmin si ya se tiene (la pantalla Perfil lo trae con sus datos)
+export async function panelAdmin(cont, ctx, admin = null) {
   const { datos, recargar } = ctx;
   const liga = datos.liga, info = datos.ligaInfo ?? liga;
   const estado = info.estado;
-  const miembros = await leer(`equipos?select=id,nombre,saldo,creado_en,usuarios(nombre,interno)&liga_id=eq.${liga.id}&order=creado_en`);
+  const { miembros, bombo } = admin ?? await datosAdmin(ctx);
   const bots = miembros.filter(m => m.usuarios?.interno);
   const modoBeta = info.config?.modo_beta === true;
-  const bombo = modoBeta ? await rpc('slr_admin_bombo', { liga_id: liga.id }, { silencioso: true }).catch(() => null) : null;
   const sinTemporada = ['preparacion', 'entre_temporadas'].includes(estado);
   const j = proximaJornada();
 
@@ -263,9 +273,20 @@ async function accionPruebas(boton, ctx) {
   }).catch(e => { if (e.message?.includes('tardando')) toast(e.message, 'error'); });
 }
 
+// Los datos de la pantalla, en UNA llamada: los movimientos del saldo. Para el admin, a la
+// vez, los de su panel (miembros y bombo), y así también se guardan
+export async function cargar(ctx) {
+  const [movimientos, admin] = await Promise.all([
+    rpc('slr_movimientos', { equipo_id: ctx.datos.equipo.id }, { silencioso: true }),
+    ctx.datos.liga.es_admin ? datosAdmin(ctx) : null,
+  ]);
+  return { movimientos, admin };
+}
+
 export async function pintar(cont, ctx) {
   const { datos } = ctx;
-  const movs = (await rpc('slr_movimientos', { equipo_id: datos.equipo.id })).slice().reverse();
+  const d = ctx.pantalla ?? await cargar(ctx);
+  const movs = d.movimientos.slice().reverse();
 
   cont.innerHTML = `
     <section class="slr-perfil">
@@ -300,5 +321,5 @@ export async function pintar(cont, ctx) {
   if (typeof window.renderAvatar === 'function') window.renderAvatar(av, datos.jugador);
   else av.textContent = '👤';
 
-  if (datos.liga.es_admin) await panelAdmin(cont.querySelector('[data-admin]'), ctx);
+  if (datos.liga.es_admin) await panelAdmin(cont.querySelector('[data-admin]'), ctx, d.admin);
 }

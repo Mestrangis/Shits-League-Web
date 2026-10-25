@@ -8,3 +8,6 @@
 
 export const SUPABASE_URL = 'https://vtqhefwspnqsjskqkxqg.supabase.co';
 export const SUPABASE_KEY = 'sb_publishable_VOrswpNPw1A9U4QoKEWdGQ_Rwr0DR4H';
+
+// Datos de una pantalla de Rush de hace menos de esto: se enseñan tal cual, sin pedirlos otra vez
+export const DATOS_FRESCOS_MS = 15000;

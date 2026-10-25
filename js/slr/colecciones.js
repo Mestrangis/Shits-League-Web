@@ -17,6 +17,9 @@ export async function cargarColecciones(ligaId) {
   return filas;
 }
 
+// Las que llegan con slr_rush_inicio (la misma lectura, en la llamada de entrada)
+export function fijarColecciones(filas) { mapa = new Map((filas ?? []).map(k => [k.id, k])); }
+
 export const coleccion = id => (id ? mapa.get(id) ?? null : null);
 export const listaColecciones = () => [...mapa.values()].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
 // Para el muestrario y las vistas previas del gestor (sin guardar)

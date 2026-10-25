@@ -1,6 +1,6 @@
 // Generado por herramientas/precarga.mjs: NO se edita a mano.
 // archivos: [ruta, bytes, resumen del contenido] · rush: módulos que se cargan al entrar en Rush
-self.PRECARGA = { "version": "32ac4d4cee13", "archivos": [
+self.PRECARGA = { "version": "889b2d5e7430", "archivos": [
   ["assets/apple-touch-icon.png", 18995, "52a8d73f0141" ],
   ["assets/clasificación23-24.png", 96637, "ea0b1bd62d14" ],
   ["assets/goles23-24.png", 58943, "71377552d927" ],
@@ -16,7 +16,7 @@ self.PRECARGA = { "version": "32ac4d4cee13", "archivos": [
   ["css/acabados/plateada.css", 2187, "38072b45c155" ],
   ["css/main.css", 46525, "023db1d2787a" ],
   ["css/rush-panel.css", 5133, "b75096796f60" ],
-  ["css/slr.css", 170021, "4097128234f6" ],
+  ["css/slr.css", 170331, "86c4fb3f6241" ],
   ["img/slr/partido/balon.svg", 376, "b31ad4f5e252" ],
   ["img/slr/partido/bota.svg", 7901, "22cb1af72a1e" ],
   ["img/slr/tacticas/tactica-contraataque.svg", 2960, "0717e2d9a127" ],
@@ -37,8 +37,9 @@ self.PRECARGA = { "version": "32ac4d4cee13", "archivos": [
   ["js/slr/bloques.js", 2170, "57fc4b251ede" ],
   ["js/slr/campo.js", 2575, "c2653a24f598" ],
   ["js/slr/carta.js", 27311, "55df25fb572d" ],
-  ["js/slr/colecciones.js", 1724, "062f199cee3d" ],
-  ["js/slr/config.js", 803, "8cdfb5390090" ],
+  ["js/slr/colecciones.js", 1903, "6431e9c1d6c2" ],
+  ["js/slr/config.js", 943, "c7a0974c20cc" ],
+  ["js/slr/datos-pantallas.js", 3958, "8ee68b17ef2b" ],
   ["js/slr/energia.js", 2971, "c74400cd22f6" ],
   ["js/slr/generador.js", 8303, "7111eac0e038" ],
   ["js/slr/hueco.js", 7950, "487ce0edd838" ],
@@ -58,11 +59,11 @@ self.PRECARGA = { "version": "32ac4d4cee13", "archivos": [
   ["js/slr/pantallas/edicion-multiple.js", 6963, "624ad11619ee" ],
   ["js/slr/pantallas/editor-carta.js", 22014, "834b166173dc" ],
   ["js/slr/pantallas/ficha-equipo.js", 7371, "51b890c27135" ],
-  ["js/slr/pantallas/liga.js", 12270, "d5205c8605fe" ],
-  ["js/slr/pantallas/mercado.js", 26730, "de1810a0d0f8" ],
+  ["js/slr/pantallas/liga.js", 11820, "fbf00ce52bff" ],
+  ["js/slr/pantallas/mercado.js", 27044, "2afe2bbf1181" ],
   ["js/slr/pantallas/muestrario-partido.js", 12054, "3beb3c4f3b56" ],
   ["js/slr/pantallas/muestrario.js", 9191, "db26047dc20e" ],
-  ["js/slr/pantallas/perfil.js", 19834, "d243d79dee93" ],
+  ["js/slr/pantallas/perfil.js", 20699, "dc4a5921187b" ],
   ["js/slr/pantallas/plantilla.js", 3067, "0b18115e4504" ],
   ["js/slr/pantallas/plantillas-admin.js", 13148, "e1cf9e6e0d9f" ],
   ["js/slr/pantallas/previa.js", 2942, "8c41cfdccc14" ],
@@ -96,7 +97,7 @@ self.PRECARGA = { "version": "32ac4d4cee13", "archivos": [
   ["js/slr/partido/sonido.js", 1820, "ad4f200bcccc" ],
   ["js/slr/partido/vinetas.js", 86186, "d4f35ff5e50c" ],
   ["js/slr/precarga-fotos.js", 3795, "4a6d98fb8259" ],
-  ["js/slr/rush.js", 24480, "ecc5faf2d873" ],
+  ["js/slr/rush.js", 27864, "a41ca20b8dc4" ],
   ["js/slr/seleccion.js", 8164, "66a1fe6f23bf" ],
   ["js/slr/sobre-arte.js", 4779, "5a4243797e3f" ],
   ["js/slr/tactica.js", 7434, "4360ecd84f31" ],
@@ -105,5 +106,5 @@ self.PRECARGA = { "version": "32ac4d4cee13", "archivos": [
   ["js/ui.js", 26304, "4f38b3db0d45" ],
   ["js/version.js", 8622, "900fad917e37" ],
   ["js/votacion.js", 12179, "0f24d238eb1a" ],
-  ["manifest.json", 404, "37e57e6a0ade" ] ], "rush": ["js/slr/acabados/brillante.js", "js/slr/acabados/foil.js", "js/slr/acabados/index.js", "js/slr/acabados/plateada.js", "js/slr/api.js", "js/slr/bloques.js", "js/slr/campo.js", "js/slr/carta.js", "js/slr/colecciones.js", "js/slr/config.js", "js/slr/energia.js", "js/slr/generador.js", "js/slr/hueco.js", "js/slr/imagenes.js", "js/slr/motor-v1.1.0.js", "js/slr/motor-v1.2.0.js", "js/slr/motor-v1.3.0.js", "js/slr/motor-v2.0.0.js", "js/slr/motores.js", "js/slr/pantallas/album.js", "js/slr/pantallas/alineacion.js", "js/slr/pantallas/apertura.js", "js/slr/pantallas/catalogo.js", "js/slr/pantallas/colecciones-admin.js", "js/slr/pantallas/cronica.js", "js/slr/pantallas/detalle.js", "js/slr/pantallas/edicion-multiple.js", "js/slr/pantallas/editor-carta.js", "js/slr/pantallas/ficha-equipo.js", "js/slr/pantallas/liga.js", "js/slr/pantallas/mercado.js", "js/slr/pantallas/muestrario-partido.js", "js/slr/pantallas/muestrario.js", "js/slr/pantallas/perfil.js", "js/slr/pantallas/plantilla.js", "js/slr/pantallas/plantillas-admin.js", "js/slr/pantallas/previa.js", "js/slr/pantallas/sobres-admin.js", "js/slr/pantallas/tienda.js", "js/slr/particulas.js", "js/slr/partido/abrir.js", "js/slr/partido/azar.js", "js/slr/partido/config.js", "js/slr/partido/escenas/ataque.js", "js/slr/partido/escenas/chut.js", "js/slr/partido/escenas/comun.js", "js/slr/partido/escenas/control.js", "js/slr/partido/escenas/corte.js", "js/slr/partido/escenas/gol.js", "js/slr/partido/escenas/inicio.js", "js/slr/partido/escenas/parada.js", "js/slr/partido/escenas/pase.js", "js/slr/partido/escenas/pausas.js", "js/slr/partido/escenas/poder.js", "js/slr/partido/escenas/registro.js", "js/slr/partido/escenas/robo.js", "js/slr/partido/escenas/saque.js", "js/slr/partido/escenas/tacticas.js", "js/slr/partido/escenas/tirador.js", "js/slr/partido/estadisticas.js", "js/slr/partido/guion.js", "js/slr/partido/linea.js", "js/slr/partido/reproductor.js", "js/slr/partido/sonido.js", "js/slr/partido/vinetas.js", "js/slr/precarga-fotos.js", "js/slr/rush.js", "js/slr/seleccion.js", "js/slr/sobre-arte.js", "js/slr/tactica.js", "js/slr/ui.js", "js/slr/valor.js" ]
+  ["manifest.json", 404, "37e57e6a0ade" ] ], "rush": ["js/slr/acabados/brillante.js", "js/slr/acabados/foil.js", "js/slr/acabados/index.js", "js/slr/acabados/plateada.js", "js/slr/api.js", "js/slr/bloques.js", "js/slr/campo.js", "js/slr/carta.js", "js/slr/colecciones.js", "js/slr/config.js", "js/slr/datos-pantallas.js", "js/slr/energia.js", "js/slr/generador.js", "js/slr/hueco.js", "js/slr/imagenes.js", "js/slr/motor-v1.1.0.js", "js/slr/motor-v1.2.0.js", "js/slr/motor-v1.3.0.js", "js/slr/motor-v2.0.0.js", "js/slr/motores.js", "js/slr/pantallas/album.js", "js/slr/pantallas/alineacion.js", "js/slr/pantallas/apertura.js", "js/slr/pantallas/catalogo.js", "js/slr/pantallas/colecciones-admin.js", "js/slr/pantallas/cronica.js", "js/slr/pantallas/detalle.js", "js/slr/pantallas/edicion-multiple.js", "js/slr/pantallas/editor-carta.js", "js/slr/pantallas/ficha-equipo.js", "js/slr/pantallas/liga.js", "js/slr/pantallas/mercado.js", "js/slr/pantallas/muestrario-partido.js", "js/slr/pantallas/muestrario.js", "js/slr/pantallas/perfil.js", "js/slr/pantallas/plantilla.js", "js/slr/pantallas/plantillas-admin.js", "js/slr/pantallas/previa.js", "js/slr/pantallas/sobres-admin.js", "js/slr/pantallas/tienda.js", "js/slr/particulas.js", "js/slr/partido/abrir.js", "js/slr/partido/azar.js", "js/slr/partido/config.js", "js/slr/partido/escenas/ataque.js", "js/slr/partido/escenas/chut.js", "js/slr/partido/escenas/comun.js", "js/slr/partido/escenas/control.js", "js/slr/partido/escenas/corte.js", "js/slr/partido/escenas/gol.js", "js/slr/partido/escenas/inicio.js", "js/slr/partido/escenas/parada.js", "js/slr/partido/escenas/pase.js", "js/slr/partido/escenas/pausas.js", "js/slr/partido/escenas/poder.js", "js/slr/partido/escenas/registro.js", "js/slr/partido/escenas/robo.js", "js/slr/partido/escenas/saque.js", "js/slr/partido/escenas/tacticas.js", "js/slr/partido/escenas/tirador.js", "js/slr/partido/estadisticas.js", "js/slr/partido/guion.js", "js/slr/partido/linea.js", "js/slr/partido/reproductor.js", "js/slr/partido/sonido.js", "js/slr/partido/vinetas.js", "js/slr/precarga-fotos.js", "js/slr/rush.js", "js/slr/seleccion.js", "js/slr/sobre-arte.js", "js/slr/tactica.js", "js/slr/ui.js", "js/slr/valor.js" ]
 };
