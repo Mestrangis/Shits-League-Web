@@ -17,7 +17,7 @@ test('ajustes.js (el que se toca a mano) se carga sin avisos y es lo que usa la 
   const v = validar({ tiempos: { saque: { entra: 0, sale: 0 }, inicio: { entrada: 0 }, poder: { entrada: 0 } } });
   assert.deepEqual([v.tiempos.saque.entra, v.tiempos.saque.sale, v.tiempos.inicio.entrada, v.tiempos.poder.entrada], [0, 0, 0, 0]);
   // Viñetas: una escala por variante, de 0,3 a 3
-  assert.deepEqual(Object.keys(POR_DEFECTO.vinetas), ['gol_red', 'gol_chilena', 'gol_ardiendo', 'parada_punos', 'parada_atrapada', 'parada_estirada']);
+  assert.deepEqual(Object.keys(POR_DEFECTO.vinetas), ['gol_red', 'gol_chilena', 'gol_ardiendo', 'parada_punos', 'parada_atrapada', 'parada_estirada', 'tacticas_choque', 'tacticas_cambio']);
   assert.equal(validar({ vinetas: { gol_red: 5 } }).vinetas.gol_red, 1);
   assert.equal(validar({ vinetas: { gol_red: 2 } }).vinetas.gol_red, 2);
 });

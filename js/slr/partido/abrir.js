@@ -33,14 +33,15 @@ export async function abrirPartido(partidoId, ctx, opts = {}) {
     const eqs = await leer(`equipos?select=id,nombre,usuarios(nombre,interno)&id=in.(${p.local_id},${p.visitante_id})`);
     const eq = id => { const e = eqs.find(x => x.id === id); return { id, nombre: e?.nombre ?? 'Equipo', dueno: e?.usuarios?.interno ? '' : (e?.usuarios?.nombre ?? '') }; };
     const ids = [...new Set([...cartasDe(al.local), ...cartasDe(al.visitante)].map(c => c.id))];
+    const motor = motorDe(p.version_motor);
     const [cartas, sim] = await Promise.all([
       cartasParaPintar(ids),
-      Promise.resolve().then(() => motorDe(p.version_motor).simularPartido(al.local, al.visitante, p.semilla)),
+      Promise.resolve().then(() => motor.simularPartido(al.local, al.visitante, p.semilla)),
     ]);
     const guion = crearGuion({
       partido: { id: p.id, version_motor: p.version_motor, goles: p.goles, penaltis: p.penaltis, pr: p.pr },
       alineaciones: al, eventos: sim.eventos, yo: ctx.datos?.equipo?.id ?? null,
-      equipos: { A: eq(p.local_id), B: eq(p.visitante_id) }, pr: sim.pr,
+      equipos: { A: eq(p.local_id), B: eq(p.visitante_id) }, pr: sim.pr, bonusCruce: motor.CONFIG?.BONUS_CRUCE ?? null,
     });
     // Fotos decodificadas antes de empezar (como mucho 2,5 s)
     await asegurarFotos(Object.values(cartas).map(c => c.imagen_url && urlFoto(c.imagen_url, 130)).filter(Boolean));

@@ -24,6 +24,7 @@ export const SONIDOS = {
   poder: '',
   lesion: '',
   silbato_descanso: '',
+  plan_b: '',
   silbato_final: '',
 };
 

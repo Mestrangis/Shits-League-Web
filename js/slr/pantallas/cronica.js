@@ -297,6 +297,19 @@ function notas(lista, eq, nombre) {
     </section>`;
 }
 
+// Al cerrar la reproducción: al momento, un fondo oscuro con «Cargando el partido…» debajo
+// del reproductor (que se desvanece), para que no asome lo de debajo; la pantalla del
+// partido se abre encima cuando está lista y entonces se quita.
+function pantallaDeCarga() {
+  const rep = document.querySelector('[data-partido-reproductor]');
+  const el = document.createElement('div');
+  el.className = 'slr-carga-partido';
+  el.setAttribute('role', 'status');
+  el.innerHTML = '<span class="slr-carga-partido__giro" aria-hidden="true"></span><p>Cargando el partido…</p>';
+  if (rep?.parentNode) rep.before(el); else document.body.appendChild(el);
+  return { quitar: (tras = 0) => setTimeout(() => el.remove(), tras) };
+}
+
 // La primera vez que abres un partido TUYO ya jugado se reproduce solo; cuenta como visto
 // al llegar al final o al pulsar «Saltar» y entonces se abre la pantalla del partido. Las
 // siguientes, la pantalla con «▶ Ver partido». Los de los demás, la pantalla directamente.
@@ -306,7 +319,12 @@ export async function abrirCronica(partidoId, ctx, { soloCronica = false } = {})
     const r = await abrirPartido(partidoId, ctx, {
       p,
       alVisto: () => marcarVisto(partidoId),
-      alTerminar: ({ visto }) => { if (visto) abrirCronica(partidoId, ctx, { soloCronica: true }).catch(() => {}); },
+      alTerminar: ({ visto }) => {
+        if (!visto) return;
+        const carga = pantallaDeCarga();
+        // Se quita cuando la hoja ya ha terminado de entrar (o si algo falla)
+        abrirCronica(partidoId, ctx, { soloCronica: true }).catch(() => {}).finally(() => carga.quitar(450));
+      },
     });
     if (r) return;
   }

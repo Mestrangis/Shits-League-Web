@@ -4,7 +4,8 @@
    probabilidad, quién ataca (tú, abajo y hacia arriba; o el rival, arriba y
    hacia abajo), el resultado (gana el que ataca o el que defiende: gol o
    parada, pasa o lo cortan, mantiene o roban), la versión (automática,
-   completa o rápida) y si hay un poder. Para revisar el diseño de cada una por separado,
+   completa o rápida), si hay un poder y cómo sale el cruce de tácticas (el plan B
+   es del equipo que ataca). Para revisar el diseño de cada una por separado,
    también una jugada entera y un partido de ejemplo (con tus cartas).
 ═══════════════════════════════════════════════ */
 import { esc, hoja, toast } from '../ui.js';
@@ -15,7 +16,7 @@ import { decorar } from '../partido/azar.js';
 import { RITMO } from '../partido/config.js';
 import { MOTOR_ACTUAL } from '../motores.js';
 
-const SIN_P = new Set(['inicio', 'saque', 'poder', 'robo', 'lesion', 'descanso', 'final']);
+const SIN_P = new Set(['inicio', 'cruce', 'planb', 'saque', 'poder', 'robo', 'lesion', 'descanso', 'final']);
 
 export function abrirMuestrarioPartido(ctx) {
   const mias = (ctx.datos.cartas ?? []).slice();
@@ -25,7 +26,7 @@ export function abrirMuestrarioPartido(ctx) {
       <p class="slr-suave">Cada botón reproduce esa escena con esa variante. Abajo, tu equipo (verde); arriba, el rival (naranja).
         Toca la pantalla para saltar al final de la escena; ⏸ la congela.</p>
       <div class="slr-muestra-pt__ajustes slr-tarjeta">
-        <label>Ataca
+        <label>Ataca (y, en el plan B, quién cambia)
           <select class="slr-input" data-ataca>
             <option value="A">Tu equipo (abajo, hacia arriba ▲)</option>
             <option value="B">El rival (arriba, hacia abajo ▼)</option>
@@ -47,10 +48,17 @@ export function abrirMuestrarioPartido(ctx) {
           <select class="slr-input" data-poder>
             <option value="">Ninguno</option><option value="ataca">Del que ataca</option><option value="defiende">Del que defiende</option>
           </select></label>
+        <label>Cruce de tácticas
+          <select class="slr-input" data-cruce>
+            <option value="abajo">Gana tu equipo (abajo)</option>
+            <option value="arriba">Gana el rival (arriba)</option>
+            <option value="igual">Misma táctica (sin ventaja)</option>
+          </select></label>
       </div>
       <div class="slr-muestra-pt__grupo"><h3>Seguidas</h3><div class="slr-muestra-pt__botones">
         <button class="slr-btn" type="button" data-jugada>▶ Una jugada entera</button>
         <button class="slr-btn" type="button" data-ejemplo>▶ Partido de ejemplo (con tus cartas)</button>
+        <button class="slr-btn" type="button" data-ejemplo-planb>▶ Partido con plan B</button>
       </div></div>
       ${Object.keys(REGISTRO).map(tipo => `<div class="slr-muestra-pt__grupo"><h3>${esc(NOMBRES[tipo] ?? tipo)}</h3><div class="slr-muestra-pt__botones">
         ${VARIANTES[tipo].map(v => `<button class="slr-btn slr-btn--fantasma" type="button" data-tipo="${tipo}" data-variante="${v}">${esc(v)}</button>`).join('')}
@@ -61,7 +69,7 @@ export function abrirMuestrarioPartido(ctx) {
   $('[data-p]').addEventListener('input', e => { $('[data-p-texto]').textContent = `${e.target.value} %`; });
   const ajustes = () => ({
     p: Number($('[data-p]').value) / 100, atacaGana: $('[data-resultado]').value === 'ataca', ataca: $('[data-ataca]').value,
-    version: $('[data-version]').value, poder: $('[data-poder]').value,
+    version: $('[data-version]').value, poder: $('[data-poder]').value, cruce: $('[data-cruce]').value,
   });
 
   // Dos equipos con tus cartas: el rival, con copias (ids con «~r») en otro orden
@@ -92,9 +100,17 @@ export function abrirMuestrarioPartido(ctx) {
     const defensas = alDf.def.map(c => ({ carta: c.id, DEF: c.DEF }));
     switch (tipo) {
       case 'inicio': return { ...comun, jugada: 0, minuto: 0, marcador: [0, 0], tacticas: { A: 'presion', B: 'contraataque' } };
+      case 'cruce': {
+        // Tu equipo (A) abajo: contraataque gana a posesión
+        const t = { abajo: { A: 'contraataque', B: 'posesion' }, arriba: { A: 'posesion', B: 'contraataque' }, igual: { A: 'presion', B: 'presion' } }[a.cruce];
+        return { ...comun, jugada: 0, minuto: 0, marcador: [0, 0], tacticas: t, cruce: { abajo: 'A', arriba: 'B', igual: null }[a.cruce],
+          bonus: MOTOR_ACTUAL.CONFIG.BONUS_CRUCE, momento: 'inicio' };
+      }
+      case 'planb': return { ...comun, jugada: 5, minuto: 45, equipo: at, de: 'posesion', a: 'presion', condicion: 'empatando' };
       case 'saque': return { ...comun, equipo: at };
       case 'poder': return { ...comun, equipo: quien, carta: (quien === at ? alAt : alDf).med[0].id, poder: 'Tiki-taka', momento: 'posesion' };
-      case 'control': return { ...comun, equipo: at, saca: at, ganador: gana, p: a.p, pGanador: pGana, robo: gana !== at, sorpresa: pGana < RITMO.SORPRESA_P, poderes };
+      case 'control': return { ...comun, equipo: at, saca: at, ganador: gana, p: a.p, pGanador: pGana, robo: gana !== at, sorpresa: pGana < RITMO.SORPRESA_P, poderes,
+        medios: { A: alA.med.map(c => c.id), B: alB.med.map(c => c.id) } };
       case 'robo': return { ...comun, equipo: df };
       case 'ataque': case 'pase': case 'corte':
         return { ...comun, equipo: at, defensor: df, defensas, p: a.p, exito: a.atacaGana, contraataque: false, poderes };
@@ -133,11 +149,25 @@ export function abrirMuestrarioPartido(ctx) {
     const tras = { ...a, ataca: a.atacaGana ? a.ataca : (a.ataca === 'A' ? 'B' : 'A') };   // tras un robo ataca el otro
     jugar(tipos.map(t => (['saque', 'poder', 'control', 'robo'].includes(t) ? datos(t, a) : datos(t, { ...tras, atacaGana: t === 'pase' ? true : a.atacaGana }))));
   });
-  $('[data-ejemplo]').addEventListener('click', () => {
-    const semilla = Math.floor(Math.random() * 4294967296);
-    const r = MOTOR_ACTUAL.simularPartido(alA, alB, semilla);
+  const ejemplo = (A, B, semilla) => {
+    const r = MOTOR_ACTUAL.simularPartido(A, B, semilla);
     const guion = crearGuion({ partido: { id: `ejemplo-${semilla}`, version_motor: MOTOR_ACTUAL.VERSION, goles: r.goles, pr: r.pr },
-      alineaciones: { local: alA, visitante: alB }, eventos: r.eventos, equipos, yo: equipos.A.id });
-    reproducir(guion, cartas, {});
+      alineaciones: { local: A, visitante: B }, eventos: r.eventos, equipos, yo: equipos.A.id, bonusCruce: MOTOR_ACTUAL.CONFIG.BONUS_CRUCE });
+    return reproducir(guion, cartas, {});
+  };
+  $('[data-ejemplo]').addEventListener('click', () => ejemplo(alA, alB, Math.floor(Math.random() * 4294967296)));
+  // Con plan B: los dos lo activan si van empatando al descanso; se busca una semilla en la que salte el de los dos (o, si no, el de uno)
+  $('[data-ejemplo-planb]').addEventListener('click', () => {
+    const A = { ...alA, tactica: 'posesion', plan_b: { condicion: 'empatando', tactica: 'contraataque' } };
+    const B = { ...alB, tactica: 'contraataque', plan_b: { condicion: 'empatando', tactica: 'presion' } };
+    const inicio = Math.floor(Math.random() * 4294967296);
+    let elegida = null;
+    for (let k = 0; k < 400; k++) {
+      const s = (inicio + k) >>> 0;
+      const n = MOTOR_ACTUAL.simularPartido(A, B, s).eventos.filter(e => e.tipo === 'plan_b').length;
+      if (n === 2) { elegida = s; break; }
+      if (n && elegida == null) elegida = s;
+    }
+    ejemplo(A, B, elegida ?? inicio);
   });
 }

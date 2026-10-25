@@ -30,14 +30,15 @@ export const ESQUEMA = {
     gol: { marcador: n(300, 0, 1500), celebracion: n(2000, 800, 6000) },
     lesion: n(2500, 1000, 6000), descanso: n(5300, 2000, 12000), final: n(6000, 2000, 15000),
   },
-  vinetas: { gol_red: n(1, 0.3, 3), gol_chilena: n(1, 0.3, 3), gol_ardiendo: n(1, 0.3, 3), parada_punos: n(1, 0.3, 3), parada_atrapada: n(1, 0.3, 3), parada_estirada: n(1, 0.3, 3) },
+  vinetas: { gol_red: n(1, 0.3, 3), gol_chilena: n(1, 0.3, 3), gol_ardiendo: n(1, 0.3, 3), parada_punos: n(1, 0.3, 3), parada_atrapada: n(1, 0.3, 3), parada_estirada: n(1, 0.3, 3),
+    tacticas_choque: n(1, 0.3, 3), tacticas_cambio: n(1, 0.3, 3) },
   lectura: { minimo: n(1200, 500, 4000), por_palabra: n(200, 0, 800) },
   barra: { aparece: n(300, 100, 1000), pelea: n(0.74, 0.4, 0.9), sorpresa: n(0.22, 0.1, 0.4), empujones: n(6, 2, 14, true), llamarada: n(550, 200, 1500) },
   fondo: {
     franja: n(64, 24, 160, true),
     velocidad: { lento: n(1400, 80, 5000), normal: n(520, 80, 5000), rapido: n(260, 80, 5000) },
     escenas: {
-      inicio: o('lento', RITMOS), saque: o('normal', RITMOS), poder: o('lento', RITMOS), control: o('lento', RITMOS), robo: o('rapido', RITMOS),
+      inicio: o('lento', RITMOS), cruce: o('parado', RITMOS), planb: o('parado', RITMOS), saque: o('normal', RITMOS), poder: o('lento', RITMOS), control: o('lento', RITMOS), robo: o('rapido', RITMOS),
       ataque: o('rapido', RITMOS), pase: o('rapido', RITMOS), corte: o('parado', RITMOS), tirador: o('normal', RITMOS), chut: o('rapido', RITMOS),
       gol: o('parado', RITMOS), parada: o('parado', RITMOS), lesion: o('parado', RITMOS), descanso: o('parado', RITMOS), final: o('parado', RITMOS),
     },

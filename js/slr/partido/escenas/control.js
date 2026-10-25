@@ -4,9 +4,11 @@
    · botas: entran por los lados (la tuya por la izquierda), pisan el balón y forcejean;
      al final la del ganador se lo lleva hacia su campo y salta fuego
    · bote: el balón bota de arriba abajo, cada vez más rápido, y se queda en el lado del que gana
-   · escudos: las fotos de los dos equipos se empujan en el centro; al final el ganador
+   · escudos: una carta del medio campo de cada equipo (las que se pelean el balón: un
+     medio titular en ese momento, elegido con el azar de la animación; sin medios,
+     cualquier titular menos el portero) se empujan en el centro; al final el ganador
      echa al otro y saltan rayos */
-import { pieza, foto, barra, inclinacion, balonEn, en, centrada, medidas, poner } from './comun.js';
+import { pieza, foto, barra, inclinacion, balonEn, en, centrada, medidas, poner, cartaPartido } from './comun.js';
 
 function empezar(ctx) {
   const d = ctx.d, dur = ctx.T.control[d.completo ? 'completo' : 'rapido'];
@@ -102,8 +104,10 @@ export function escudos(ctx) {
   const uno = lado => {
     const l = ctx.lados[lado];
     const gana = (lado === 'abajo') === ganaAbajo;
-    const el = poner(ctx, '<div class="slr-pt-escudo"></div>');
-    el.appendChild(foto(ctx, l, 'slr-pt-foto--grande'));
+    const medios = ctx.d.medios?.[l] ?? [];
+    const id = medios.length ? medios[Math.floor(ctx.rng() * medios.length)] : null;
+    const el = poner(ctx, `<div class="slr-pt-escudo ${id ? 'slr-pt-escudo--carta' : ''}" style="--c:${ctx.color(l)}"></div>`);
+    el.appendChild(id ? cartaPartido(ctx, id, 'slr-pt-carta--escudo') : foto(ctx, l, 'slr-pt-foto--grande'));
     const r = el.getBoundingClientRect().height;
     const s = lado === 'arriba' ? -1 : 1;
     const t = (y, extra = '') => ({ transform: centrada(cx, y, extra) });

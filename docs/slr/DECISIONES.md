@@ -1575,3 +1575,43 @@ Medido con `tests/slr/banco/rendimiento-apertura.mjs`: Chrome a 390×844 (DPR 2,
     - si se rechaza, se reproduce igual y sin errores;
     - la pantalla del partido sección a sección, cabe a 360, 412 y en PC, y tocar una carta abre su detalle;
     - el partido de otros abre su pantalla sin animación.
+
+## Reproducción: viñetas de tácticas, escudos con cartas y transición a la pantalla del partido
+
+### Decisiones de Marcos
+
+- **Viñetas nuevas** en `vinetas.js`: `VINETAS.tacticas.choque` y `VINETAS.tacticas.cambio`. Su dibujo y sus tiempos no se tocan: solo se conectan con `Linea.cuadros` en la misma caja cuadrada centrada.
+- **Cruce táctico al principio**, justo después del «VS». Sale del evento `tacticas`:
+  - cada lado (abajo / arriba) con su táctica y su color;
+  - gana el lado del equipo del `cruce` (o nadie);
+  - el premio es el `BONUS_CRUCE` del motor de ese partido, en texto («+6 %» con ×1,06);
+  - sonido «choque»;
+  - en los motores sin tácticas (v1.x) no sale.
+- **Plan B al descanso:** antes del resumen, una viñeta `tacticas.cambio` por cada evento `plan_b` (sonido «plan_b», nuevo). Después, si alguien ha cambiado, otro cruce con las tácticas y el cruce del evento `descanso`.
+- **Ajustes:** `vinetas.tacticas_choque` y `vinetas.tacticas_cambio` (escala, 1 por defecto, de 0,3 a 3).
+- **Duelo de control «escudos»:** en vez de las fotos de los dueños, chocan una carta del medio campo de cada equipo. Es un medio titular en ese momento, elegido con el azar de la animación; si un equipo no tiene medios, cualquier titular menos el portero.
+- **Al acabar la reproducción** ya no asoma la clasificación. Al momento aparece un fondo oscuro con un spinner y «Cargando el partido…», y la pantalla del partido aparece encima cuando está lista.
+
+### Decisiones mías
+
+- **Escenas nuevas en el guion:** `cruce` (variante `choque`) y `planb` (variante `cambio`), en `escenas/tacticas.js`, con su sitio en el registro y en el muestrario.
+  - El guion recibe `bonusCruce` (lo pone `abrir.js` con el `CONFIG` del motor del partido; así no conoce los motores).
+  - Orden al descanso: plan B de cada equipo → cruce nuevo → resumen del descanso (que sigue contando el plan B y los cambios).
+- **Ritmo del césped:** `cruce` y `planb` también tienen su entrada en `fondo.escenas` (parado), para que `ajustes.js` siga cuadrando con el esquema.
+- **Medios del duelo:** el guion ya lleva la alineación al día (cambios y lesiones), así que cada escena de control trae `medios: { A, B }` con los titulares de ese momento; la escena elige uno con `ctx.rng`. Si una carta no está (muestrario viejo), vuelve a la foto. La carta lleva el brillo del color de su equipo.
+- **Transición:** el fondo de carga se pone justo debajo del reproductor en cuanto empieza a cerrarse. La hoja del partido se abre encima, y el fondo se quita 450 ms después, cuando la hoja ya ha entrado (también si algo falla).
+- **Muestrario:**
+  - selector «Cruce de tácticas»: gana tu equipo (abajo), gana el rival (arriba) o misma táctica;
+  - el plan B es del equipo de «Ataca»;
+  - botón «Partido con plan B»: los dos equipos activan su plan B si van empatando al descanso, y se busca una semilla en la que salte el de los dos.
+- **Tests:**
+  - `partido-tacticas.test.mjs` (nuevo):
+    - cruce justo después del inicio, con el cruce y el premio del motor;
+    - nada en v1.x;
+    - plan B (una escena por equipo, sus datos, y el cruce nuevo justo antes del resumen);
+    - los medios del duelo siguen a los cambios y lesiones, y sin medios no entra el portero;
+  - `partido-ajustes`: las escalas nuevas;
+  - `banco/partido.mjs`:
+    - a 360, 412 y en PC: el cruce de las tres maneras, el plan B de cada lado, los escudos con dos cartas, y un partido con plan B (cruce → … → plan B → cruce → descanso);
+    - el tap deja las viñetas nuevas en su último fotograma;
+    - un amistoso de verdad con plan B: se repite hasta que salta, se recorre entero y, al cerrarlo, no hay ni un fotograma con lo de debajo a la vista.

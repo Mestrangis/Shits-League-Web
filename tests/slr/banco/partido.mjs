@@ -106,8 +106,8 @@ try {
   // Resultado de cada escena del muestrario según su variante (gana el que ataca o el que defiende)
   const RESULTADO = { gol: 'ataca', parada: 'defiende', pase: 'ataca', corte: 'defiende' };
   // Las que dependen del sentido: también con el rival atacando hacia abajo
-  const CON_SENTIDO = new Set(['saque', 'control', 'ataque', 'pase', 'corte', 'chut', 'gol', 'parada']);
-  const VINETA = new Set(['chut', 'gol', 'parada']);
+  const CON_SENTIDO = new Set(['saque', 'control', 'ataque', 'pase', 'corte', 'chut', 'gol', 'parada', 'planb']);
+  const VINETA = new Set(['chut', 'gol', 'parada', 'cruce', 'planb']);
   const PANTALLAS = [
     { nombre: '360 px', w: 360, movil: true }, { nombre: '412 px', w: 412, movil: true, dosSentidos: true },
     { nombre: 'PC', w: 1366, h: 768, movil: false },
@@ -123,7 +123,8 @@ try {
   const ajustar = (o) => ev(`(() => { const q = s => document.querySelector(s);
     q('[data-ataca]').value = ${JSON.stringify(o.ataca ?? 'A')}; q('[data-resultado]').value = ${JSON.stringify(o.res ?? 'ataca')};
     const p = q('[data-p]'); p.value = ${o.p ?? 50}; p.dispatchEvent(new Event('input'));
-    q('[data-version]').value = ${JSON.stringify(o.version ?? 'completa')}; q('[data-poder]').value = ${JSON.stringify(o.poder ?? '')}; return 0; })()`);
+    q('[data-version]').value = ${JSON.stringify(o.version ?? 'completa')}; q('[data-poder]').value = ${JSON.stringify(o.poder ?? '')};
+    q('[data-cruce]').value = ${JSON.stringify(o.cruce ?? 'abajo')}; return 0; })()`);
   // Textos de la escena y cuánto llevan en pantalla: ninguno se va antes de leer(texto)
   const MIN_TEXTO = t => tiempoLectura(t);   // la regla de ajustes.js (lectura)
 
@@ -197,10 +198,74 @@ try {
       check(abierto && !malos.length, `${pt.nombre} · ${tipo}/${variante}${ataca === 'B' ? ' (ataca el rival)' : ''}: se reproduce y nada se sale`, malos.slice(0, 4).join(' | '));
       await cerrarReproductor();
     }
+    if (!SOLO || SOLO.has('cruce')) {
+      // El texto de la viñeta (SVG) en un momento dado de la escena
+      const vinetaEn = async (frac, tipo) => {
+        await esperar(`(() => { const r = document.querySelector('[data-partido-reproductor]')?.reproductor; const l = r?.linea;
+          if (r?.escena?.tipo !== ${JSON.stringify(tipo)} || !l || l.t < l.dur * ${frac}) return false; r.pausar(); return true; })()`, 20000);
+        await dormir(60);
+        return ev(`(() => { const v = document.querySelector('.slr-pt-vineta'); return v ? [...v.querySelectorAll('text')].filter(x => Number(x.closest('g[opacity]')?.getAttribute('opacity') ?? 1) > 0.5).map(x => x.textContent).join(' | ') : ''; })()`);
+      };
+      const malosT = [];
+      for (const cruce of ['abajo', 'arriba', 'igual']) {
+        await ajustar({ cruce });
+        await clic('[data-tipo="cruce"][data-variante="choque"]');
+        const txt = await vinetaEn(0.7, 'cruce');
+        await foto(`cruce-${cruce}`);
+        if (cruce === 'igual' ? !/SIN VENTAJA/.test(txt) : !/\+6 %/.test(txt)) malosT.push(`${cruce}: «${txt.slice(0, 60)}»`);
+        await cerrarReproductor();
+      }
+      for (const ataca of ['A', 'B']) {
+        await ajustar({ ataca });
+        await clic('[data-tipo="planb"][data-variante="cambio"]');
+        const txt = await vinetaEn(0.75, 'planb');
+        await foto(`planb-${ataca === 'A' ? 'abajo' : 'arriba'}`);
+        if (!/PLAN B/.test(txt) || !/POSESIÓN\s+→\s+PRESIÓN/.test(txt)) malosT.push(`plan B ${ataca}: «${txt.slice(0, 80)}»`);
+        await cerrarReproductor();
+      }
+      check(!malosT.length, `${pt.nombre} · cruce (gana abajo, gana arriba, misma táctica) y plan B de cada lado`, malosT.join(' | '));
+      // Escudos: una carta del medio de cada equipo
+      await ajustar({});
+      await clic('[data-tipo="control"][data-variante="escudos"]');
+      await esperar(`(() => { const r = document.querySelector('[data-partido-reproductor]')?.reproductor; const l = r?.linea; if (!l || l.t < l.dur * 0.5) return false; r.pausar(); return true; })()`, 20000);
+      const esc = await ev(`[...document.querySelectorAll('.slr-pt-escudo .slr-carta')].map(c => c.dataset.carta)`);
+      const medios = await ev(`[...document.querySelectorAll('.slr-pt-escudo')].map(e => e.querySelector('.slr-pt-foto') ? 'foto' : 'carta')`);
+      await foto('control-escudos-medios');
+      check(esc?.length === 2 && medios.every(x => x === 'carta'), `${pt.nombre} · escudos: chocan dos cartas del medio campo (${esc?.length})`);
+      await cerrarReproductor();
+      // Un partido con plan B (de ejemplo, en el navegador): cruce → … → plan B → cruce nuevo → descanso
+      await clic('[data-ejemplo-planb]');
+      await esperar(`!!document.querySelector('[data-partido-reproductor]')?.reproductor`, 8000);
+      const tiposEj = await ev(`document.querySelector('[data-partido-reproductor]').reproductor.escenas.map(e => e.tipo)`);
+      const iD = tiposEj.indexOf('descanso');
+      const okOrden = tiposEj[1] === 'cruce' && tiposEj[iD - 1] === 'cruce' && tiposEj[iD - 2] === 'planb';
+      // Con taps hasta cada escena de tácticas: una foto de cada
+      const hasta = async (tipo, desde = 0) => {
+        for (let k = 0; k < 140; k++) {
+          const e = await ev(`(() => { const r = document.querySelector('[data-partido-reproductor]').reproductor; return { t: r.escena?.tipo, i: r.indice }; })()`);
+          if (e.t === tipo && e.i >= desde) return e.i;
+          await clic('.slr-pt-temblor'); await dormir(40);
+        }
+        return -1;
+      };
+      const i1 = await hasta('cruce');
+      await vinetaEn(0.7, 'cruce'); await foto('ejemplo-1-cruce');
+      await ev(`document.querySelector('[data-partido-reproductor]').reproductor.reanudar(); 0`);
+      const i2 = await hasta('planb', i1 + 1);
+      await vinetaEn(0.75, 'planb'); await foto('ejemplo-2-planb');
+      await ev(`document.querySelector('[data-partido-reproductor]').reproductor.reanudar(); 0`);
+      const i3 = await hasta('cruce', i2 + 1);
+      await vinetaEn(0.7, 'cruce'); await foto('ejemplo-3-cruce-descanso');
+      await ev(`document.querySelector('[data-partido-reproductor]').reproductor.reanudar(); 0`);
+      const i4 = await hasta('descanso', i3 + 1);
+      await dormir(900); await foto('ejemplo-4-descanso');
+      check(okOrden && i1 === 1 && i2 > i1 && i3 > i2 && i4 === i3 + 1, `${pt.nombre} · partido con plan B: cruce al principio y plan B → cruce → descanso (${tiposEj.filter(x => ['cruce', 'planb', 'descanso'].includes(x)).join(' → ')})`);
+      await cerrarReproductor();
+    }
     if (!SOLO || SOLO.has('chut')) {
       // Tap / «Saltar» (terminar): la viñeta se queda en su último fotograma
       const ultimos = [];
-      for (const [tipo, variante] of [['chut', 'disparo'], ['gol', 'red'], ['gol', 'chilena'], ['gol', 'ardiendo'], ['parada', 'punos'], ['parada', 'atrapada'], ['parada', 'estirada']]) {
+      for (const [tipo, variante] of [['cruce', 'choque'], ['planb', 'cambio'], ['chut', 'disparo'], ['gol', 'red'], ['gol', 'chilena'], ['gol', 'ardiendo'], ['parada', 'punos'], ['parada', 'atrapada'], ['parada', 'estirada']]) {
         await ajustar({ res: RESULTADO[tipo] ?? 'ataca' });
         await clic(`[data-tipo="${tipo}"][data-variante="${variante}"]`);
         await esperar(`document.querySelector('[data-partido-reproductor]')?.dataset.escena === ${JSON.stringify(tipo)}`, 4000);
@@ -330,7 +395,8 @@ try {
   await cdp('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   await dormir(250);
   const despues = await ev(`document.querySelector('[data-partido-reproductor]').dataset.escena`);
-  check(antes === 'inicio' && despues === 'saque', `el tap pasa a la siguiente escena (${antes} → ${despues})`);
+  // Motor v2: después del «VS» va el cruce de tácticas
+  check(antes === 'inicio' && despues === 'cruce', `el tap pasa a la siguiente escena (${antes} → ${despues})`);
   const vistas = [despues];
   for (let k = 0; k < 8; k++) {
     await dormir(350);
@@ -412,6 +478,59 @@ try {
   const visto = (await leer(`partidos?select=id&id=eq.${mio.id}`)).datos.length === 1;
   const c1 = await pjMio();
   check(visto && c1.pj === 1 && !c1.aviso, `visto: la clasificación ya cuenta la J1 (PJ ${c1.pj})`);
+
+  console.log('\nAmistoso con plan B (de verdad)');
+  await rpcOk('slr_guardar_tacticas', { token: t, equipo_id: U, tacticas: { tactica: 'posesion', plan_b: { condicion: 'empatando', tactica: 'contraataque' } } });
+  await clic('.slr-nav__item[data-seccion="liga"]');
+  await esperar(`!!document.querySelector('[data-vista="clasificacion"]')`, 10000);
+  await clic('[data-vista="clasificacion"]');
+  await esperar(`!!document.querySelector('.slr-tabla tr:not(.es-mio) [data-equipo]')`, 10000);
+  await clic('.slr-tabla tr:not(.es-mio) [data-equipo]');
+  await esperar(`!!document.querySelector('[data-amistoso]')`, 10000);
+  let conPlanB = false, intentos = 0;
+  for (; intentos < 10 && !conPlanB; intentos++) {
+    await clic('[data-amistoso]');
+    if (!(await esperar(`!!document.querySelector('[data-partido-reproductor]')?.reproductor`, 20000))) break;
+    conPlanB = await ev(`document.querySelector('[data-partido-reproductor]').reproductor.escenas.some(e => e.tipo === 'planb')`);
+    if (!conPlanB) { await ev(`history.back(); 0`); await esperar(`!document.querySelector('[data-partido-reproductor]')`, 3000); await dormir(300); }
+  }
+  check(conPlanB, `amistoso con plan B (${intentos} ${intentos === 1 ? 'amistoso' : 'amistosos'} hasta que salta)`);
+  if (conPlanB) {
+    const tiposA = await ev(`document.querySelector('[data-partido-reproductor]').reproductor.escenas.map(e => e.tipo)`);
+    const iDa = tiposA.indexOf('descanso');
+    check(tiposA[1] === 'cruce' && tiposA[iDa - 1] === 'cruce' && tiposA[iDa - 2] === 'planb',
+      `amistoso: cruce tras el «VS» y plan B → cruce nuevo → descanso (${tiposA.slice(0, 3).join(' → ')} … ${tiposA.slice(iDa - 2, iDa + 1).join(' → ')})`);
+    const premio = await (async () => {
+      await esperar(`(() => { const r = document.querySelector('[data-partido-reproductor]').reproductor; if (r.escena?.tipo !== 'cruce' || r.linea.t < r.linea.dur * 0.7) { if (r.escena?.tipo === 'inicio') document.querySelector('.slr-pt-temblor').click(); return false; } r.pausar(); return true; })()`, 20000);
+      await dormir(60);
+      await foto('amistoso-1-cruce');
+      return ev(`[...document.querySelectorAll('.slr-pt-vineta text')].map(x => x.textContent).join(' ')`);
+    })();
+    check(/\+6 %|SIN VENTAJA/.test(premio), `amistoso: el premio del cruce sale del motor del partido (${/\+6 %/.test(premio) ? '+6 %' : 'sin ventaja'})`);
+    await ev(`document.querySelector('[data-partido-reproductor]').reproductor.reanudar(); 0`);
+    // De escena en escena (con taps) hasta el descanso, y después hasta el final
+    for (let k = 0; k < 160; k++) {
+      const e = await ev(`document.querySelector('[data-partido-reproductor]')?.reproductor.escena?.tipo`);
+      if (e === 'planb') { await dormir(1500); await foto('amistoso-2-planb'); }
+      if (e === 'descanso') { await dormir(1200); await foto('amistoso-3-descanso'); break; }
+      await clic('.slr-pt-temblor'); await dormir(60);
+    }
+    // Al terminar: ni un fotograma con lo de debajo a la vista (reproductor, «Cargando el partido…» o la pantalla del partido)
+    await ev(`(() => { window.__asoma = 0; window.__carga = 0;
+      const mira = () => { const rep = document.querySelector('[data-partido-reproductor]'); const c = document.querySelector('.slr-carga-partido');
+        const pp = document.querySelector('.slr-hoja.abierta .slr-pp');
+        if (c) window.__carga++;
+        if ((!rep || rep.classList.contains('cerrando')) && !c && !pp) window.__asoma++;
+        if (!pp || c) requestAnimationFrame(mira); };
+      requestAnimationFrame(mira); return 0; })()`);
+    await clic('[data-saltar]');
+    const abre = await esperar(`!!document.querySelector('.slr-hoja.abierta .slr-pp') && !document.querySelector('.slr-carga-partido')`, 20000);
+    const asoma = await ev(`({ asoma: window.__asoma, carga: window.__carga })`);
+    check(abre && asoma.asoma === 0 && asoma.carga > 0, `al cerrar la reproducción, «Cargando el partido…» y la pantalla del partido encima, sin que asome nada (${asoma.carga} fotogramas cargando)`, JSON.stringify(asoma));
+    await foto('amistoso-4-pantalla');
+    await ev(`history.back(); 0`); await dormir(400);
+  }
+  await ev(`history.back(); 0`); await dormir(400);
 
   console.log('\nEn otro dispositivo (recarga): ya visto');
   await entrar();

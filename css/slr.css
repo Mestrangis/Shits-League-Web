@@ -1281,6 +1281,11 @@ button.slr-aviso:active { background: rgba(57,255,136,.08) !important; }
 .slr-suceso--lesion { color: #FF9C9C; }
 .slr-cronica__nota { font-size: 11.5px; color: var(--slr-suave); font-style: italic; }
 
+/* Entre la reproducción y la pantalla del partido: fondo oscuro y «Cargando el partido…» */
+.slr-carga-partido { position: absolute; inset: 0; z-index: 20; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+  background: #06180d; color: var(--slr-suave); font-size: 13px; font-weight: 700; letter-spacing: .04em; }
+.slr-carga-partido__giro { width: 34px; height: 34px; border-radius: 50%; border: 3px solid rgba(255,255,255,.18); border-top-color: var(--slr-propio); animation: slr-girar .7s linear infinite; }
+
 /* Pantalla del partido (pantallas/cronica.js): cabecera, estadísticas, alineaciones, notas y crónica */
 .slr-pp { gap: 14px; }
 .slr-pp__cabeza { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 6px 10px; padding: 6px 0 2px; }
@@ -2257,6 +2262,10 @@ html.slr-sin-seleccion input, html.slr-sin-seleccion textarea { -webkit-user-sel
 .slr-pt-balon--fantasma .slr-pt-ico { opacity: var(--o); }
 .slr-pt-balon--fantasma::before { display: none; }
 .slr-pt-escudo { position: absolute; left: 0; top: 0; z-index: 5; will-change: transform; }
+/* Escudos con carta: la carta del medio de cada equipo, con el brillo de su color */
+.slr-pt-escudo--carta { width: var(--pt-carta); }
+.slr-pt-escudo .slr-pt-carta--escudo { position: relative; width: 100%; }
+.slr-pt-escudo .slr-pt-carta--escudo .slr-carta { border-radius: 9px; box-shadow: 0 0 0 3px var(--c), 0 0 26px color-mix(in srgb, var(--c) 60%, transparent); }
 .slr-pt-rotulo { position: absolute; left: 50%; top: 40%; z-index: 7; display: flex; flex-direction: column; align-items: center; pointer-events: none; will-change: transform, opacity; }
 .slr-pt-rotulo b { font-family: 'Anton', sans-serif; font-weight: 400; font-size: clamp(44px, min(14vw, 9vh), 120px); line-height: 1; letter-spacing: .02em; white-space: nowrap;
   color: var(--c, #fff); text-shadow: 0 0 22px var(--c, #fff), 0 4px 0 rgba(0,0,0,.55); }

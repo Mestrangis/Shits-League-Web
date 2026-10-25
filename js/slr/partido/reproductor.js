@@ -287,6 +287,7 @@ export function reproducir(guion, cartas = {}, opts = {}) {
   const control = {
     el,
     get escena() { return escenas[i]; },
+    get escenas() { return escenas; },
     get indice() { return i; },
     get linea() { return linea; },
     pausar: () => pausar(true),

@@ -69,7 +69,7 @@ export const AJUSTES = {
   },
 
   /* ── VIÑETAS ──────────────────────────────────────────────────────────────
-     Las animaciones de gol y de parada (js/slr/partido/vinetas.js) tienen sus
+     Las animaciones de gol, de parada y de las tácticas (js/slr/partido/vinetas.js) tienen sus
      propios tiempos dentro; aquí solo se estiran o se encogen enteras.
      1 = como están dibujadas · 2 = el doble de lenta · 0.5 = el doble de rápida (0.3–3) */
   vinetas: {
@@ -79,6 +79,8 @@ export const AJUSTES = {
     parada_punos: 1,
     parada_atrapada: 1,
     parada_estirada: 1,
+    tacticas_choque: 1,        // el cruce de tácticas del principio (y el del descanso si hay plan B)
+    tacticas_cambio: 1,        // el plan B del descanso
   },
 
   /* ── LECTURA ─────────────────────────────────────────────────────────────
@@ -110,7 +112,7 @@ export const AJUSTES = {
       rapido: 260,
     },
     escenas: {                 // cómo corre en cada escena: 'parado', 'lento', 'normal' o 'rapido'
-      inicio: 'parado', saque: 'normal', poder: 'parado', control: 'lento', robo: 'rapido',
+      inicio: 'parado', cruce: 'parado', planb: 'parado', saque: 'normal', poder: 'parado', control: 'lento', robo: 'rapido',
       ataque: 'rapido', pase: 'rapido', corte: 'parado', tirador: 'rapido', chut: 'parado',
       gol: 'parado', parada: 'parado', lesion: 'parado', descanso: 'parado', final: 'parado',
     },

@@ -8,8 +8,9 @@
    aquí (version_motor).
 
    Escenas (en orden dentro de cada jugada):
-     inicio · saque · poder* · control · robo? · poder* · ataque · pase|corte
-     · tirador · poder* · chut · gol|parada · lesion* … descanso … final
+     inicio · cruce? (las tácticas, motor v2) ·
+     saque · poder* · control · robo? · poder* · ataque · pase|corte
+     · tirador · poder* · chut · gol|parada · lesion* … planb* · cruce? · descanso … final
    Cada escena: { tipo, jugada, minuto, marcador: [A, B] antes de la escena, … }.
    Equipos por letra: A el local y B el visitante (como el motor).
 ═══════════════════════════════════════════════ */
@@ -51,8 +52,9 @@ const versionMayor = v => Number(String(v ?? '2').split('.')[0]) || 2;
  * yo: id del equipo del usuario (va abajo y ataca hacia arriba; si no juega, el local), o null
  * equipos: { A: { id, nombre, dueno }, B: {…} } (se copian tal cual)
  * pr: puntos de rendimiento por carta (si el partido no los trae)
+ * bonusCruce: el premio del cruce de tácticas en el motor del partido (CONFIG.BONUS_CRUCE, p. ej. 1.06)
  */
-export function crearGuion({ partido = {}, alineaciones = {}, eventos = [], yo = null, equipos = {}, pr = null }) {
+export function crearGuion({ partido = {}, alineaciones = {}, eventos = [], yo = null, equipos = {}, pr = null, bonusCruce = null }) {
   const stats = {};
   const al = { A: prepararAlineacion(alineaciones.local, stats, 'A'), B: prepararAlineacion(alineaciones.visitante, stats, 'B') };
   const abajo = yo && equipos.B?.id === yo ? 'B' : 'A';
@@ -78,9 +80,19 @@ export function crearGuion({ partido = {}, alineaciones = {}, eventos = [], yo =
   const base = e => ({ jugada, minuto: e?.minuto ?? minuto, marcador: [...marcador] });
   const poner = esc => { guion.escenas.push(esc); return esc; };
   const deFase = fase => { const l = poderes.filter(p => p.fase === fase); poderes = poderes.filter(p => p.fase !== fase); return l; };
+  // Cruce de tácticas (motor v2): al principio y, si alguien activa el plan B, al descanso
+  const escenaCruce = (e, momento) => {
+    if (!e?.tacticas?.A || !e?.tacticas?.B) return;
+    poner({ tipo: 'cruce', ...base(e), jugada: e.jugada ?? jugada, tacticas: { ...e.tacticas }, cruce: e.cruce ?? null, bonus: bonusCruce, momento });
+  };
   const escenaDescanso = (e, sintetico) => {
     if (hayDescanso) return;
     hayDescanso = true;
+    // Plan B: uno por equipo que cambia y, después, el cruce con las tácticas nuevas
+    if (!sintetico) {
+      for (const p of descanso.planB) poner({ tipo: 'planb', ...base(e), jugada: e?.jugada ?? jugada, ...p });
+      if (descanso.planB.length) escenaCruce(e, 'descanso');
+    }
     const total = posesiones.A + posesiones.B;
     poner({ tipo: 'descanso', ...base(e), jugada: e?.jugada ?? jugada,
       posesion: total ? { A: posesiones.A / total, B: posesiones.B / total } : { A: 0.5, B: 0.5 },
@@ -99,6 +111,7 @@ export function crearGuion({ partido = {}, alineaciones = {}, eventos = [], yo =
         tacticas = e.tacticas ?? null;
         guion.escenas[0].tacticas = tacticas;
         guion.escenas[0].cruce = e.cruce ?? null;
+        escenaCruce(e, 'inicio');
         break;
       case 'inicio_jugada':
         jugada = e.jugada; minuto = e.minuto ?? minuto;
@@ -117,8 +130,11 @@ export function crearGuion({ partido = {}, alineaciones = {}, eventos = [], yo =
         if (!e.saca || !e.ganador || !Number.isFinite(e.p)) break;
         const pGanador = e.ganador === e.saca ? e.p : 1 - e.p;
         posesiones[e.ganador]++;
+        // Las cartas que se pelean el balón: los medios titulares en ese momento (sin medios, cualquiera menos el portero)
+        const medios = l => (al[l].med.length ? [...al[l].med] : [...al[l].def, ...al[l].del]);
         poner({ tipo: 'control', ...base(e), equipo: e.saca, saca: e.saca, ganador: e.ganador, p: e.p,
-          pGanador, robo: e.ganador !== e.saca, sorpresa: pGanador < RITMO.SORPRESA_P, poderes: deFase('control') });
+          pGanador, robo: e.ganador !== e.saca, sorpresa: pGanador < RITMO.SORPRESA_P, poderes: deFase('control'),
+          medios: { A: medios('A'), B: medios('B') } });
         if (e.ganador !== e.saca) poner({ tipo: 'robo', ...base(e), equipo: e.ganador });
         break;
       }

@@ -18,9 +18,11 @@ import * as chut from './chut.js';
 import * as gol from './gol.js';
 import * as parada from './parada.js';
 import * as pausas from './pausas.js';
+import * as tacticas from './tacticas.js';
 
 export const REGISTRO = Object.freeze({
   inicio: { vs: inicio.vs },
+  cruce: { choque: tacticas.choque },
   saque: { franja: saque.cruce },
   poder: { carta: poder.carta },
   control: { botas: control.botas, bote: control.bote, escudos: control.escudos },
@@ -33,6 +35,7 @@ export const REGISTRO = Object.freeze({
   gol: { red: gol.red, chilena: gol.chilena, ardiendo: gol.ardiendo },
   parada: { estirada: parada.estirada, punos: parada.punos, atrapada: parada.atrapada },
   lesion: { aviso: pausas.aviso },
+  planb: { cambio: tacticas.cambio },
   descanso: { resumen: pausas.resumen },
   final: { resultado: pausas.resultado },
 });
@@ -42,7 +45,7 @@ export const VARIANTES = Object.freeze(Object.fromEntries(Object.entries(REGISTR
 
 // Nombres para el muestrario
 export const NOMBRES = Object.freeze({
-  inicio: 'Inicio', saque: 'Saque', poder: 'Poder', control: 'Duelo de control', robo: 'Robo y contraataque',
+  inicio: 'Inicio', cruce: 'Cruce de tácticas', planb: 'Plan B (descanso)', saque: 'Saque', poder: 'Poder', control: 'Duelo de control', robo: 'Robo y contraataque',
   ataque: 'Ataque contra defensa', pase: 'El ataque pasa', corte: 'Corte', tirador: 'Quién chuta', chut: 'Chut',
   gol: 'Gol', parada: 'Parada', lesion: 'Lesión', descanso: 'Descanso', final: 'Final',
 });
