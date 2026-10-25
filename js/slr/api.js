@@ -10,11 +10,38 @@
    Sin acceso a la beta (error RUSH0 del servidor), sinAcceso() cierra Rush.
    Si el servidor ya no entiende la llamada (una función o columna que no
    existe: el código guardado es viejo), se actualiza la app (js/version.js).
+   · accion(): las que mueven dinero o cartas, con un identificador por intento
+     (slr_con_intento): si llega dos veces, el servidor no la repite.
+   · Que nunca parezca que no pasa nada: toda llamada que cambia algo pone en
+     «cargando» (desactivado, con un spinner) el botón que se acaba de tocar,
+     hasta que hay respuesta, y no se puede tocar dos veces.
 ═══════════════════════════════════════════════ */
 import { SUPABASE_URL, SUPABASE_KEY } from './config.js';
 import { toast } from './ui.js';
 
 export const TOKEN_KEY = 'SLR_TOKEN';
+
+/* ── El botón de la acción, en «cargando» ────────────────────────────────── */
+// Las que solo leen (o van solas, sin botón): no marcan nada. Cualquier otra, sí
+export const LECTURAS = new Set(['slr_yo', 'slr_partido', 'slr_notificaciones', 'slr_clasificacion', 'slr_sobre_pendiente',
+  'slr_sin_ver', 'slr_movimientos', 'slr_mis_tacticas', 'slr_mercado', 'slr_hueco_pendiente', 'slr_carta', 'slr_calendario',
+  'slr_admin_bombo', 'slr_admin_cartas', 'slr_tienda', 'slr_rush_inicio', 'slr_rush_liga', 'slr_admin_progresion',
+  'slr_marcar_visto', 'slr_anular_intento']);
+let pulsado = null;   // { boton, t }: el último botón tocado
+export function _pulsado(boton, t = Date.now()) { pulsado = boton ? { boton, t } : null; }   // y para las pruebas
+if (typeof document !== 'undefined') {
+  document.addEventListener('click', e => { const b = e.target?.closest?.('button'); if (b) _pulsado(b); }, true);
+}
+// Pone en «cargando» el botón tocado hace un momento (si no lo está ya); devuelve cómo quitarlo
+export function marcarBoton() {
+  const p = pulsado;
+  if (!p || Date.now() - p.t > 2000 || p.boton.isConnected === false || p.boton.classList?.contains('slr-esperando')) return () => {};
+  const b = p.boton;
+  b.disabled = true;
+  b.classList.add('slr-esperando');
+  b.setAttribute?.('aria-busy', 'true');
+  return () => { b.disabled = false; b.classList.remove('slr-esperando'); b.removeAttribute?.('aria-busy'); };
+}
 
 // Peticiones a Supabase en curso (la precarga de fotos en segundo plano espera a que no haya)
 let enCurso = 0;
@@ -77,7 +104,11 @@ async function conSesion(hacer) {
 }
 
 // silencioso: no muestra el toast (quien llama decide qué hacer con el error)
-export async function rpc(fn, args = {}, { silencioso = false } = {}) {
+export async function rpc(fn, args = {}, opciones = {}) {
+  const quitar = LECTURAS.has(fn) ? () => {} : marcarBoton();
+  try { return await llamar(fn, args, opciones); } finally { quitar(); }
+}
+async function llamar(fn, args = {}, { silencioso = false } = {}) {
   let r;
   try {
     r = await conSesion(() => pedir(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
@@ -101,6 +132,25 @@ export async function rpc(fn, args = {}, { silencioso = false } = {}) {
     throw e;
   }
   return datos;
+}
+
+// Una acción que mueve dinero o cartas, con un identificador por intento (slr_con_intento). Si la
+// conexión falla sin saber si ha llegado, se repite UNA vez con el MISMO intento: si ya se
+// hizo, el servidor devuelve lo mismo que la primera vez, sin volver a hacerla
+export async function accion(fn, args = {}, opciones = {}) {
+  const quitar = marcarBoton();
+  const intento = nuevoIntento();
+  const pedirla = silencioso => llamar('slr_con_intento', { intento, funcion: fn, args }, { ...opciones, silencioso });
+  try {
+    try {
+      return await pedirla(true);
+    } catch (e) {
+      if (e instanceof ErrorSesion) throw e;
+      if (!e.red) { if (!opciones.silencioso) toast(e.message, 'error'); throw e; }
+      await new Promise(r => setTimeout(r, 1200));
+      return await pedirla(opciones.silencioso);
+    }
+  } finally { quitar(); }
 }
 
 // Identificador de un intento de compra (o de elección): si la petición llega dos veces, el servidor no cobra otra vez

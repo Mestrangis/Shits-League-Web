@@ -11,8 +11,8 @@
      sobren, el servidor no deja hacer otras operaciones ni tocar la alineación;
      la hoja reaparece en cualquier pantalla (rush.js).
 ═══════════════════════════════════════════════ */
-import { rpc } from './api.js';
-import { esc, miles, monedas, hoja, cerrarHasta, confirmar, toast } from './ui.js';
+import { accion } from './api.js';
+import { esc, miles, monedas, hoja, cerrarHasta, confirmar, toast, conEspera } from './ui.js';
 import { cartaHTML } from './carta.js';
 import { configLiga } from './rush.js';
 
@@ -58,13 +58,14 @@ function elegirVenta(ctx, falta, que) {
         texto: `Vendes a <b>${esc(c.nombre)}</b> por <b>${miles(precio)}</b> para hacer hueco. No se puede deshacer.`,
         ok: `Vender por ${miles(precio)}`, peligro: true });
       if (!ok) return;
-      try {
-        await rpc('slr_vender_banco', { carta_id: c.id });
+      // Tras confirmar, el botón de la carta en «cargando» hasta que se vende
+      await conEspera(b, async () => {
+        await accion('slr_vender_banco', { carta_id: c.id });
         toast(`${c.nombre} vendida por ${miles(precio)}`, 'ok');
         await ctx.recargar('yo', 'cartas', 'alineacion');
         hecho = true;
         cerrarHasta(el);
-      } catch { /* el toast ya lo ha dicho */ }
+      }).catch(() => { /* el toast ya lo ha dicho */ });
     }));
   });
 }
@@ -119,13 +120,14 @@ export function abrirHacerHueco(ctx, { sobran, maxima = plantillaMaxima(), nueva
     const ok = await confirmar({ titulo: 'Vender al banco',
       texto: `Vendes ${lista.map(c => `<b>${esc(c.nombre)}</b>`).join(', ')} al banco. No se puede deshacer.`, ok: boton.textContent, peligro: true });
     if (!ok) return;
-    try {
-      const r = await rpc('slr_hacer_hueco', { liga_id: ctx.datos.liga.id, cartas: lista.map(c => c.id) });
+    // Tras confirmar, «Vender» en «cargando» hasta que se venden
+    await conEspera(boton, async () => {
+      const r = await accion('slr_hacer_hueco', { liga_id: ctx.datos.liga.id, cartas: lista.map(c => c.id) });
       toast(`${r.vendidas} ${r.vendidas === 1 ? 'carta vendida' : 'cartas vendidas'} por ${miles(r.cobrado)}`, 'ok');
       await ctx.recargar('yo', 'cartas', 'alineacion');
       ctx.datos.huecoPendiente = null;
       cerrarHasta(el);
-    } catch { /* el toast ya lo ha dicho */ }
+    }).catch(() => { /* el toast ya lo ha dicho */ });
   });
   pintar();
 }

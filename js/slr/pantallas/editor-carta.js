@@ -14,7 +14,7 @@
      triggers). Desde una liga de prueba la carta nace inactiva y solo existe
      en esa liga. "Crear y dar a…" la da a un equipo con slr_admin_mover_carta.
 ═══════════════════════════════════════════════ */
-import { rpc, leer } from '../api.js';
+import { rpc, leer, accion } from '../api.js';
 import { esc, hoja, cerrarCapa, conEspera, toast, monedas } from '../ui.js';
 import { cartaHTML, TIPOS, ACABADOS, RAREZAS, rarezaDeTier } from '../carta.js';
 import { listaColecciones } from '../colecciones.js';
@@ -382,7 +382,7 @@ async function darA(ctx, cartaId, nombre) {
       </button></li>`;
     }).join('')}</ul>`, { titulo: 'Dar a…' });
   h.querySelectorAll('[data-equipo]').forEach(b => b.addEventListener('click', () => conEspera(b, async () => {
-    const r = await rpc('slr_admin_mover_carta', { liga_id: liga, carta_id: cartaId, equipo_id: b.dataset.equipo });
+    const r = await accion('slr_admin_mover_carta', { liga_id: liga, carta_id: cartaId, equipo_id: b.dataset.equipo });
     toast(`${r.nombre} → ${r.ahora}`, 'ok');
     cerrarCapa();
     await ctx.recargar('cartas', 'alineacion');

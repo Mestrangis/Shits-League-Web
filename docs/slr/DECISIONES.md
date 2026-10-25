@@ -1748,3 +1748,24 @@ El service worker los descarga primero y avisa en cuanto los tiene; JUGAR solo e
 **Fotos:** la precarga en segundo plano espera a que el service worker mande en la página (si no, las fotos no entraban en su caché). Si no llega a mandar, sigue sin él al minuto.
 
 **Medida:** ahora separa «Equipo se ve» (aunque sea lo de la última vez, atenuado) de «Equipo se puede usar» (con lo fresco).
+
+#### Fase 4: que nunca parezca que no pasa nada
+
+- **Botón en «cargando» en TODAS las acciones**, sin depender de que cada pantalla se acuerde.
+  - `api.js` recuerda el último botón tocado (escucha los clics en fase de captura). Toda llamada que no sea de solo lectura (lista `LECTURAS`) lo pone desactivado y con spinner (`slr-esperando`) hasta que hay respuesta, también si falla.
+  - Desactivado, el navegador no entrega el segundo toque.
+  - Las que ya usaban `conEspera(boton, …)` siguen igual (el botón ya está marcado y no se toca dos veces).
+  - El spinner ahora se ve en cualquier botón de Rush, no solo en `.slr-btn`.
+  - Donde la acción llega tras un diálogo de confirmación (el botón tocado es el del diálogo, que se cierra), se marca el que la abrió con `conEspera`. Faltaba en «Haz hueco» (vender una carta y vender las elegidas). Las ediciones del admin ya lo tenían.
+- **Si falla:** el mensaje del servidor tal cual, en un aviso («No tienes saldo suficiente…»). Sin conexión, «Sin conexión con el servidor».
+- **Sin duplicados en lo que mueve dinero o cartas:** `accion(fn, args)` llama a `slr_con_intento` con un identificador nuevo por intento. Si la red falla sin saber si llegó, repite una vez con el mismo intento (el servidor devuelve lo de la primera vez sin repetirla). Si el servidor dice que no, no se repite.
+  - Pasan por ahí: comprar, poner y retirar de la venta, pujar y retirar la puja, ofertas (hacer, aceptar, rechazar, retirar, contraofertar), intercambios (proponer, aceptar, rechazar, retirar), cláusulas (pagar y cambiar), vender al banco, «Haz hueco» y mover una carta (admin).
+  - Los sobres ya tenían lo suyo.
+- **Tests:**
+  - `acciones.test.mjs`:
+    - nada llama a Supabase fuera de `api.js`;
+    - las que mueven dinero o cartas van por `accion()` y son exactamente las que admite el servidor;
+    - el botón se marca y se libera, también si falla, y las lecturas no lo tocan;
+    - el reintento usa el mismo intento.
+  - `api-intentos.mjs` (API real): el mismo intento dos veces hace la acción una vez (venta, compra cobrada una vez); lo que falla no se guarda; intentos ajenos, funciones fuera de la lista o sin intento, rechazados.
+  - `banco/acciones.mjs`, a 360 y 412 px con red lenta: pujar, comprar, «Haz hueco» y cambiar el nombre, con el «cargando» al momento y un doble toque que hace una sola acción; y un fallo con su mensaje.

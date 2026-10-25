@@ -240,6 +240,14 @@ html.slr-abierto, html.slr-abierto body { overflow: hidden; }
   animation: slr-girar .7s linear infinite;
 }
 @keyframes slr-girar { to { transform: rotate(360deg); } }
+/* Cualquier otro botón de Rush mientras su acción está en curso (api.js → marcarBoton, ui.js → conEspera) */
+.slr button.slr-esperando:not(.slr-btn) { position: relative; color: transparent !important; pointer-events: none; }
+.slr button.slr-esperando:not(.slr-btn) > * { visibility: hidden; }
+.slr button.slr-esperando:not(.slr-btn)::after {
+  content: ''; position: absolute; top: 50%; left: 50%; width: 16px; height: 16px; margin: -8px 0 0 -8px;
+  border-radius: 50%; border: 2px solid rgba(255,255,255,.3); border-top-color: var(--slr-propio);
+  animation: slr-girar .7s linear infinite;
+}
 .slr-botones { display: flex; gap: 10px; flex-wrap: wrap; }
 .slr-botones > .slr-btn { flex: 1; }
 

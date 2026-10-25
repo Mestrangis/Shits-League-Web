@@ -13,7 +13,7 @@
    Con el mercado cerrado, banner con el motivo y todo deshabilitado.
    Toda adquisición pasa antes por «Haz hueco» (hueco.js).
 ═══════════════════════════════════════════════ */
-import { rpc } from '../api.js';
+import { rpc, accion } from '../api.js';
 import { esc, miles, monedas, hoja, cerrarCapa, cerrarHasta, confirmar, conEspera, toast, faltan, diaHora } from '../ui.js';
 import { cartaHTML, normalizarCarta, RAREZAS } from '../carta.js';
 import { listaColecciones, coleccion } from '../colecciones.js';
@@ -163,14 +163,14 @@ function hojaPuja(s, m, ctx, repintar) {
     if (!(importe >= s.puja_minima)) { toast(`La puja mínima es ${miles(s.puja_minima)}`, 'error'); return; }
     if (s.mi_puja == null && !(await asegurarHueco(ctx, 1, { que: 'pujar' }))) return;
     await conEspera(boton, async () => {
-      await rpc('slr_pujar', { subasta_id: s.id, importe });
+      await accion('slr_pujar', { subasta_id: s.id, importe });
       toast(`Puja de ${miles(importe)} por ${c.nombre}`, 'ok');
       cerrarHasta(el);
       await repintar();
     }).catch(() => {});
   });
   el.querySelector('[data-retirar-puja]')?.addEventListener('click', e => conEspera(e.currentTarget, async () => {
-    await rpc('slr_retirar_puja', { subasta_id: s.id });
+    await accion('slr_retirar_puja', { subasta_id: s.id });
     toast('Puja retirada', 'ok');
     cerrarHasta(el);
     await repintar();
@@ -198,7 +198,7 @@ async function comprarVenta(v, m, ctx, repintar, boton) {
       Te quedarán ${miles(m.saldo - v.precio)}.`, ok: `Comprar por ${miles(v.precio)}` });
   if (!ok || !(await asegurarHueco(ctx, 1, { que: 'comprarla' }))) return;
   await conEspera(boton, async () => {
-    await rpc('slr_comprar_venta', { venta_id: v.id });
+    await accion('slr_comprar_venta', { venta_id: v.id });
     toast(`${c.nombre} es tuya`, 'ok');
     await ctx.recargar('yo', 'cartas');
     await repintar();
@@ -316,7 +316,7 @@ export async function pintar(cont, ctx) {
     cont.querySelectorAll('[data-pujar]').forEach(b => b.addEventListener('click', () => hojaPuja(buscar(m.subastas, b.dataset.pujar), m, ctx, repintar)));
     cont.querySelectorAll('[data-comprar]').forEach(b => b.addEventListener('click', () => comprarVenta(buscar(m.ventas, b.dataset.comprar), m, ctx, repintar, b)));
     cont.querySelectorAll('[data-retirar-venta]').forEach(b => b.addEventListener('click', () => conEspera(b, async () => {
-      await rpc('slr_retirar_venta', { venta_id: b.dataset.retirarVenta });
+      await accion('slr_retirar_venta', { venta_id: b.dataset.retirarVenta });
       toast('Carta retirada de la venta', 'ok');
       await ctx.recargar('cartas'); await repintar();
     }).catch(() => {})));
@@ -327,17 +327,17 @@ export async function pintar(cont, ctx) {
         (recibes ${miles(Math.round(o.importe * (1 - (m.impuesto ?? 0.05))))} tras el impuesto).`, ok: 'Aceptar' });
       if (!ok) return;
       await conEspera(b, async () => {
-        await rpc('slr_aceptar_oferta', { oferta_id: o.id });
+        await accion('slr_aceptar_oferta', { oferta_id: o.id });
         toast(`${c.nombre} vendida a ${o.de}`, 'ok');
         await ctx.recargar('yo', 'cartas', 'alineacion'); await repintar();
       }).catch(() => {});
     }));
     cont.querySelectorAll('[data-rechazar-oferta]').forEach(b => b.addEventListener('click', () => conEspera(b, async () => {
-      await rpc('slr_rechazar_oferta', { oferta_id: b.dataset.rechazarOferta });
+      await accion('slr_rechazar_oferta', { oferta_id: b.dataset.rechazarOferta });
       toast('Oferta rechazada', 'ok'); await repintar();
     }).catch(() => {})));
     cont.querySelectorAll('[data-retirar-oferta]').forEach(b => b.addEventListener('click', () => conEspera(b, async () => {
-      await rpc('slr_retirar_oferta', { oferta_id: b.dataset.retirarOferta });
+      await accion('slr_retirar_oferta', { oferta_id: b.dataset.retirarOferta });
       toast('Oferta retirada', 'ok'); await repintar();
     }).catch(() => {})));
     cont.querySelectorAll('[data-contraofertar]').forEach(b => b.addEventListener('click', async () => {
@@ -348,7 +348,7 @@ export async function pintar(cont, ctx) {
         impuesto: x => `Si la acepta, recibes ${miles(Math.round(x * (1 - imp)))} (−${Math.round(imp * 100)} % de impuesto).` });
       if (v == null) return;
       await conEspera(b, async () => {
-        await rpc('slr_contraofertar', { oferta_id: o.id, importe: v });
+        await accion('slr_contraofertar', { oferta_id: o.id, importe: v });
         toast('Contraoferta enviada', 'ok'); await repintar();
       }).catch(() => {});
     }));
@@ -358,17 +358,17 @@ export async function pintar(cont, ctx) {
       const ok = await confirmar({ titulo: 'Aceptar intercambio', texto: 'Las cartas y las monedas cambian de manos ahora mismo. No se puede deshacer.', ok: 'Aceptar' });
       if (!ok || (neto > 0 && !(await asegurarHueco(ctx, neto, { que: 'aceptar el intercambio' })))) return;
       await conEspera(b, async () => {
-        await rpc('slr_aceptar_intercambio', { intercambio_id: b.dataset.aceptarIntercambio });
+        await accion('slr_aceptar_intercambio', { intercambio_id: b.dataset.aceptarIntercambio });
         toast('Intercambio hecho', 'ok');
         await ctx.recargar('yo', 'cartas', 'alineacion'); await repintar();
       }).catch(() => {});
     }));
     cont.querySelectorAll('[data-rechazar-intercambio]').forEach(b => b.addEventListener('click', () => conEspera(b, async () => {
-      await rpc('slr_rechazar_intercambio', { intercambio_id: b.dataset.rechazarIntercambio });
+      await accion('slr_rechazar_intercambio', { intercambio_id: b.dataset.rechazarIntercambio });
       toast('Intercambio rechazado', 'ok'); await repintar();
     }).catch(() => {})));
     cont.querySelectorAll('[data-retirar-intercambio]').forEach(b => b.addEventListener('click', () => conEspera(b, async () => {
-      await rpc('slr_retirar_intercambio', { intercambio_id: b.dataset.retirarIntercambio });
+      await accion('slr_retirar_intercambio', { intercambio_id: b.dataset.retirarIntercambio });
       toast('Intercambio retirado', 'ok'); await repintar();
     }).catch(() => {})));
   }

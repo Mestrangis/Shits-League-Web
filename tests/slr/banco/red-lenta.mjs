@@ -23,7 +23,8 @@ export async function redLenta({ rtt = 150, bajada = 1.6e6, subida = 750e3, cach
     get offline() { return sinRed; },
     set offline(v) { sinRed = !!v; if (sinRed) { for (const s of abiertas) s.destroy(); abiertas.clear(); } },
   };
-  const vigilar = s => { abiertas.add(s); s.on('close', () => abiertas.delete(s)); };
+  // (una conexión que se reutiliza para varias peticiones se vigila una sola vez)
+  const vigilar = s => { if (abiertas.has(s)) return; abiertas.add(s); s.once('close', () => abiertas.delete(s)); };
   // Hora a la que sale un trozo de n bytes en ese sentido para ese canal (respeta el orden del canal)
   const turno = (sentido, n, canal) => {
     const ahora = Date.now();

@@ -10,7 +10,7 @@
    ventas, ofertas, intercambios y subastas y lo deja en el historial: no hay
    que tocar las tablas cartas o equipos a mano.
 ═══════════════════════════════════════════════ */
-import { rpc } from '../api.js';
+import { rpc, accion } from '../api.js';
 import { esc, hoja, cerrarCapa, conEspera, toast, monedas, miles, scrollDeHoja } from '../ui.js';
 import { cartaHTML, normalizarCarta, TIPOS, ACABADOS, RAREZAS } from '../carta.js';
 import { listaColecciones } from '../colecciones.js';
@@ -171,7 +171,7 @@ export async function abrirPlantillas(ctx) {
     if (e.target.closest('[data-dar]')) elegirEquipo(id);
     const libre = e.target.closest('[data-libre]');
     if (libre) conEspera(libre, async () => {
-      const r = await rpc('slr_admin_mover_carta', { liga_id: liga, carta_id: id, equipo_id: null });
+      const r = await accion('slr_admin_mover_carta', { liga_id: liga, carta_id: id, equipo_id: null });
       toast(`${r.nombre} queda libre`, 'ok');
       await despues();
     }).catch(() => {});
@@ -190,7 +190,7 @@ export async function abrirPlantillas(ctx) {
         </button></li>`;
       }).join('')}</ul>`, { titulo: 'Dar a…' });
     h.querySelectorAll('[data-equipo]').forEach(b => b.addEventListener('click', () => conEspera(b, async () => {
-      const r = await rpc('slr_admin_mover_carta', { liga_id: liga, carta_id: cartaId, equipo_id: b.dataset.equipo });
+      const r = await accion('slr_admin_mover_carta', { liga_id: liga, carta_id: cartaId, equipo_id: b.dataset.equipo });
       toast(`${r.nombre} → ${r.ahora}`, 'ok');
       cerrarCapa();
       await despues();

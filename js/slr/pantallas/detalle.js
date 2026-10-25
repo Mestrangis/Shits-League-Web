@@ -7,7 +7,7 @@
    y pagar su cláusula (si no está blindada; si lo está, cuánto le queda).
    Toda adquisición pasa antes por «Haz hueco».
 ═══════════════════════════════════════════════ */
-import { rpc, leer } from '../api.js';
+import { rpc, leer, accion } from '../api.js';
 import { esc, miles, monedas, hoja, cerrarCapa, confirmar, conEspera, toast, fechaCorta, diaHora, faltan } from '../ui.js';
 import { cartaHTML, normalizarCarta, describirPoder, lineaCarta } from '../carta.js';
 import { estaTocada, configLiga, motivoCierre } from '../rush.js';
@@ -131,13 +131,13 @@ export async function abrirDetalle(cartaId, ctx) {
     const precio = Math.round(Number(el.querySelector('[data-precio-venta]').value));
     if (!(precio >= 1)) { toast('Pon un precio', 'error'); return; }
     conEspera(e.currentTarget, async () => {
-      await rpc('slr_poner_en_venta', { carta_id: c.id, precio });
+      await accion('slr_poner_en_venta', { carta_id: c.id, precio });
       toast(`${c.nombre} en venta por ${miles(precio)}`, 'ok');
       await tras();
     }).catch(() => {});
   });
   el.querySelector('[data-retirar-venta]')?.addEventListener('click', e => conEspera(e.currentTarget, async () => {
-    await rpc('slr_retirar_venta', { venta_id: info.en_venta.venta_id });
+    await accion('slr_retirar_venta', { venta_id: info.en_venta.venta_id });
     toast(`${c.nombre} ya no está en venta`, 'ok');
     await tras();
   }).catch(() => {}));
@@ -171,7 +171,7 @@ export async function abrirDetalle(cartaId, ctx) {
     });
     if (!ok) return;
     await conEspera(boton, async () => {
-      const r = await rpc('slr_cambiar_clausula', { carta_id: c.id, multiplicador: mult });
+      const r = await accion('slr_cambiar_clausula', { carta_id: c.id, multiplicador: mult });
       toast(`Cláusula de ${c.nombre}: ${miles(r.clausula)}`, 'ok');
       await ctx.recargar('yo', 'cartas');
       cerrarCapa();
@@ -187,7 +187,7 @@ export async function abrirDetalle(cartaId, ctx) {
     });
     if (!ok) return;
     await conEspera(boton, async () => {
-      await rpc('slr_vender_banco', { carta_id: c.id });
+      await accion('slr_vender_banco', { carta_id: c.id });
       toast(`${c.nombre} vendida por ${miles(precioBanco)}`, 'ok');
       await ctx.recargar('yo', 'cartas', 'alineacion');
       cerrarCapa();
@@ -208,7 +208,7 @@ function enlazarFichar(el, c, info, ctx, tras) {
       impuesto: x => `Si la acepta, recibe ${miles(Math.round(x * (1 - imp)))} (−${Math.round(imp * 100)} % de impuesto).` });
     if (v == null || !(await asegurarHueco(ctx, 1, { que: 'ofertar' }))) return;
     await conEspera(boton, async () => {
-      await rpc('slr_ofertar', { carta_id: c.id, importe: v });
+      await accion('slr_ofertar', { carta_id: c.id, importe: v });
       toast(`Oferta de ${miles(v)} enviada`, 'ok');
       await tras();
     }).catch(() => {});
@@ -220,7 +220,7 @@ function enlazarFichar(el, c, info, ctx, tras) {
       ok: `Pagar ${miles(info.clausula)}`, peligro: true });
     if (!ok || !(await asegurarHueco(ctx, 1, { que: 'clausularla' }))) return;
     await conEspera(boton, async () => {
-      await rpc('slr_pagar_clausula', { carta_id: c.id });
+      await accion('slr_pagar_clausula', { carta_id: c.id });
       toast(`${c.nombre} es tuya`, 'ok');
       await tras();
     }).catch(() => {});
@@ -268,7 +268,7 @@ async function hojaIntercambio(c, info, ctx, tras) {
     if (!sel.mias.size || !sel.suyas.size) { toast('Elige al menos una carta de cada lado', 'error'); return; }
     if (!(await asegurarHueco(ctx, Math.max(0, sel.suyas.size - sel.mias.size), { que: 'el intercambio' }))) return;
     await conEspera(boton, async () => {
-      await rpc('slr_proponer_intercambio', { equipo_id: info.dueno.equipo_id, cartas_mias: [...sel.mias], cartas_suyas: [...sel.suyas],
+      await accion('slr_proponer_intercambio', { equipo_id: info.dueno.equipo_id, cartas_mias: [...sel.mias], cartas_suyas: [...sel.suyas],
         monedas_mias: mm, monedas_suyas: ms });
       toast('Intercambio propuesto', 'ok');
       cerrarCapa();
