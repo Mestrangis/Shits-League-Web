@@ -1715,3 +1715,11 @@ Medido con `tests/slr/banco/rendimiento-apertura.mjs`: Chrome a 390×844 (DPR 2,
   - sin conexión: se queda lo de la última vez y se avisa.
   - Al terminar, se piden en segundo plano las demás pestañas.
 - **Tests:** `datos-pantallas.test.mjs` y `banco/datos.mjs` (41 comprobaciones a 360 y 412 px).
+
+#### Arreglos de la fase 3 y publicación de las fases 0–3
+
+- **Mercado (banco):** el test ponía una carta en venta desde otro equipo y volvía al Mercado al momento, esperando verla. Con los datos guardados (15 s) se enseña lo de hace un momento, como se pidió. Ahora el test espera los 15 s, o vuelve a entrar tras `recargar()`, que invalida lo guardado. El «Esa carta ya está en venta» venía de ahí: la compra no se hacía y luego volvía a poner en venta la misma carta.
+- **Equipo (banco):** buscaba los campitos y la leyenda de la crónica antigua, que se quitaron con la pantalla del partido. Ahora comprueba la pantalla del partido.
+- **Versión (banco):** la actualización forzada se provocaba haciendo fallar `slr_yo`, que Rush ya no pide al entrar (ahora es `slr_rush_inicio`).
+- **`slr_con_intento`** (migración de la fase 4, ya aplicada): `tests/slr/api-intentos.mjs` lo prueba contra la API real (14 comprobaciones).
+- `CACHE_NAME` v38.

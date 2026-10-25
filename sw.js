@@ -16,7 +16,7 @@
    Sube CACHE_NAME para forzar una caché nueva entera.
 ═══════════════════════════════════════════════ */
 
-const CACHE_NAME = 'shits-league-v37';
+const CACHE_NAME = 'shits-league-v38';
 importScripts('precarga.js');   // self.PRECARGA = { version, archivos: [[ruta, bytes, resumen]], rush }
 
 const PREFIJO_APP = `${CACHE_NAME}-app-`;

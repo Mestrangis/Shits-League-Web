@@ -129,12 +129,14 @@ try {
     // ── Código viejo: una función de Supabase que ya no existe ──
     publicar('f00000000002');
     let fallo = true;
-    await ctx.route('**/rest/v1/rpc/slr_yo', r => {
+    await ctx.route('**/rest/v1/rpc/slr_rush_inicio', r => {
       if (!fallo) return r.continue();
       fallo = false;
-      return r.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ code: 'PGRST202', message: 'Could not find the function public.slr_yo(token) in the schema cache' }) });
+      return r.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ code: 'PGRST202', message: 'Could not find the function public.slr_rush_inicio(token, prueba) in the schema cache' }) });
     });
     await page.evaluate(() => sessionStorage.removeItem('SL_ACTUALIZACION_FORZADA'));
+    // Lo guardado de Rush vale 15 s: pasado ese rato, al entrar se pide (y falla)
+    await dormir(16000);
     // Una recarga de verdad (no el pushState de Rush al abrirse)
     const recarga = page.waitForEvent('load', { timeout: 90000 }).then(() => true, () => false);
     await page.click('#rushJugar');
@@ -149,7 +151,7 @@ try {
     }
     check(capa && recargo && ver2 === 'f00000000002', `función de Supabase que ya no existe: «Actualizando…», versión nueva y recarga (${ver2})`, JSON.stringify({ capa, recargo, ver2 }));
     check(await sinLogin(), 'el login sigue tras la actualización forzada');
-    await ctx.unroute('**/rest/v1/rpc/slr_yo');
+    await ctx.unroute('**/rest/v1/rpc/slr_rush_inicio');
     writeFileSync(PRECARGA, ORIGINAL);
     check(!errores.length, 'sin errores en la página', errores.slice(0, 3).join(' | '));
     await ctx.close();

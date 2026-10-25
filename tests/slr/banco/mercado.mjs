@@ -228,8 +228,11 @@ try {
   const ventaHueco = (await cartasDe(D.equipo))[0];
   await rpcOk('slr_poner_en_venta', { token: D.token, carta_id: ventaHueco.id, precio: ventaHueco.disenos_carta.valor + 20 });
   await clic('.slr-nav__item[data-seccion="perfil"]');
-  await dormir(700);
-  await clic('.slr-nav__item[data-seccion="mercado"]');   // vuelve a pedir el mercado (con la venta nueva)
+  // Lo guardado del Mercado vale 15 s (DATOS_FRESCOS_MS): pasado ese rato, al volver se pide
+  // otra vez y sale la venta nueva (antes, en cuanto se volvía)
+  await dormir(15500);
+  await clic('.slr-nav__item[data-seccion="mercado"]');
+  await esperar(`!!document.querySelector('.slr-main .slr-pantalla[data-seccion="mercado"]:not(.es-atenuada)')`, 15000);
   await esperar(`!!document.querySelector('[data-sub]')`, 8000);
   await sub('venta');
   await esperar(`!!document.querySelector('[data-comprar]')`, 8000);
@@ -334,6 +337,11 @@ try {
   const libresPc = (await leer(`cartas?select=id&liga_id=eq.${L}&equipo_id=is.null&reservada_por=is.null&limit=40`)).datos;
   for (const c of libresPc.slice(0, Math.max(0, 15 - tengoPc))) await rpc('slr_admin_mover_carta', { token: U.token, liga_id: L, carta_id: c.id, equipo_id: U.equipo });
   await ev(`import('/js/slr/rush.js').then(r => r.recargar('cartas')).then(() => 0)`);
+  // recargar() invalida lo guardado del Mercado: al volver a entrar se pide otra vez (con la venta nueva)
+  await clic('.slr-nav__item[data-seccion="perfil"]');
+  await dormir(500);
+  await clic('.slr-nav__item[data-seccion="mercado"]');
+  await esperar(`!!document.querySelector('.slr-main .slr-pantalla[data-seccion="mercado"]:not(.es-atenuada) [data-sub]')`, 15000);
   await sub('venta');
   await esperar(`!!document.querySelector('[data-comprar]')`, 8000);
   await clic('[data-comprar]');

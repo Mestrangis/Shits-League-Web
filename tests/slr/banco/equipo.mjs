@@ -157,15 +157,16 @@ try {
   await clic('.slr-cruce__marcador[data-jugado]');
   await esperar(`!!document.querySelector('.slr-cronica .slr-jugada')`, 20000);
   await dormir(600);
-  const cr = await ev(`({ campos: document.querySelectorAll('.slr-cronica .slr-campito').length, leyenda: document.querySelector('.slr-cronica__leyenda').textContent.replace(/\\s+/g, ' ').trim(),
+  // La pantalla del partido (antes, la crónica): alineaciones, jugadas, notas y estadísticas
+  const cr = await ev(`({ campos: document.querySelectorAll('.slr-pp__alineacion').length,
     jugadas: document.querySelectorAll('.slr-jugada:not(.slr-jugada--descanso)').length, aviso: document.querySelector('.slr-cronica .slr-banner')?.textContent ?? null,
     lineas: [...document.querySelectorAll('.slr-jugada')].slice(0, 3).map(j => [...j.querySelectorAll('.slr-suceso')].map(s => s.textContent.replace(/\\s+/g, ' ').trim())),
-    nota: document.querySelector('.slr-cronica__nota')?.textContent, resumen: [...document.querySelectorAll('.slr-resumen tbody th')].map(t => t.textContent),
-    poderes: document.querySelectorAll('.slr-suceso__poder').length })`);
-  check(cr.campos === 2 && cr.jugadas === 10 && !cr.aviso, `dos alineaciones en el campo, 10 jugadas y sin avisos (${cr.leyenda})`);
+    nota: document.querySelector('.slr-cronica__nota')?.textContent, filas: [...document.querySelectorAll('.slr-pp__fila > span:not(.slr-pp__barra)')].map(t => t.textContent),
+    notas: document.querySelectorAll('.slr-pp__lista li').length })`);
+  check(cr.campos === 2 && cr.jugadas === 10 && !cr.aviso, `las dos alineaciones, 10 jugadas y sin avisos`);
   check(cr.lineas.flat().every(l => !/\(\d+ %\)/.test(l) || /mantiene|roba|llega|corta|Dispara|GOOOL|Para /.test(l)), `jugada 1: ${cr.lineas[0].join(' / ')}`);
-  check(/probabilidad que tenía lo que ocurrió/.test(cr.nota ?? '') && cr.resumen.includes('Posesiones') && cr.resumen.includes('Poderes activados') && cr.resumen.includes('Más PR'),
-    'nota de los porcentajes y resumen (posesiones, ocasiones, tiros, paradas, poderes, más PR)');
+  check(/probabilidad que tenía lo que ocurrió/.test(cr.nota ?? '') && cr.filas.includes('Posesión') && cr.filas.includes('Poderes activados') && cr.notas > 0,
+    'nota de los porcentajes, estadísticas (posesión, …, poderes) y notas de los jugadores');
   await foto('cronica');
   await foto('cronica-jugadas', '.slr-jugadas');
   if (cr.poderes) {
@@ -173,7 +174,7 @@ try {
     check(await esperar(`[...document.querySelectorAll('.slr-hoja__titulo')].some(t => t.textContent === 'Poder')`, 5000), 'tocar un poder muestra su descripción');
     await atras();
   }
-  await clic('.slr-cronica .slr-mini[data-carta-id]');
+  await clic('.slr-cronica .slr-pp__carta[data-carta-id]');
   check(await esperar(`!!document.querySelector('.slr-detalle')`, 10000), 'tocar una carta de la alineación abre su ficha');
   await atras(); await atras();
 

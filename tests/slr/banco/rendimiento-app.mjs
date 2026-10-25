@@ -117,8 +117,10 @@ try {
       const page = pg;
       const portada = await page.waitForFunction(() => { const b = document.getElementById('rushJugar'); return b && !b.disabled && performance.now(); }, null, { timeout: 120000, polling: 50 }).then(h => h.jsonValue());
       await page.click('#rushJugar');
-      const equipo = await page.waitForFunction(() => document.querySelector('.slr-main .slr-pantalla[data-seccion="equipo"]') && performance.now(), null, { timeout: 120000, polling: 50 }).then(h => h.jsonValue());
-      return { portada, equipo };
+      // Se ve (aunque sea lo de la última vez, atenuado) y se puede usar (con los datos frescos)
+      const visible = await page.waitForFunction(() => document.querySelector('.slr-main .slr-pantalla[data-seccion="equipo"]') && performance.now(), null, { timeout: 120000, polling: 50 }).then(h => h.jsonValue());
+      const equipo = await page.waitForFunction(() => document.querySelector('.slr-main .slr-pantalla[data-seccion="equipo"]:not(.es-atenuada)') && performance.now(), null, { timeout: 120000, polling: 50 }).then(h => h.jsonValue());
+      return { portada, visible, equipo };
     };
     const medir = async (nombre, accion) => {
       const c = fase();
@@ -131,7 +133,7 @@ try {
     };
     const pestana = s => async () => {
       await page.click(`.slr-nav__item[data-seccion="${s}"]`);
-      await page.waitForFunction(x => document.querySelector(`.slr-main .slr-pantalla[data-seccion="${x}"]`), s, { timeout: 120000, polling: 50 });
+      await page.waitForFunction(x => document.querySelector(`.slr-main .slr-pantalla[data-seccion="${x}"]:not(.es-atenuada)`), s, { timeout: 120000, polling: 50 });
     };
 
     // Frío
@@ -182,12 +184,12 @@ try {
   const mb = b => (b / 1048576).toFixed(2).replace('.', ',');
   const s1 = ms => `${(ms / 1000).toFixed(1).replace('.', ',')} s`;
 
-  console.log('\n| Arranque | Portada Rush lista | Equipo pintado |\n|---|---|---|');
+  console.log('\n| Arranque | Portada Rush lista | Equipo se ve | Equipo se puede usar |\n|---|---|---|---|');
   const NOMBRE = { frio: 'En frío (sin caché)', caliente: 'En caliente (2.ª vez, a los pocos minutos)', caducada: 'En caliente, con la caché del navegador caducada (al día siguiente)' };
   for (const k of Object.keys(NOMBRE)) {
-    const fila = { medida: `arranque ${k}`, portada: mediana(pasadas.map(p => p[k].portada)), equipo: mediana(pasadas.map(p => p[k].equipo)) };
+    const fila = { medida: `arranque ${k}`, portada: mediana(pasadas.map(p => p[k].portada)), visible: mediana(pasadas.map(p => p[k].visible)), equipo: mediana(pasadas.map(p => p[k].equipo)) };
     filas.push(fila);
-    console.log(`| ${NOMBRE[k]} | ${s1(fila.portada)} | ${s1(fila.equipo)} |`);
+    console.log(`| ${NOMBRE[k]} | ${s1(fila.portada)} | ${s1(fila.visible)} | ${s1(fila.equipo)} |`);
   }
   console.log('\n| Pantalla | Tiempo | Supabase | Cloudinary | Otras | MB (imágenes) |\n|---|---|---|---|---|---|');
   const total = { supa: 0, cloud: 0, otras: 0, bytes: 0, bytesImg: 0 };
