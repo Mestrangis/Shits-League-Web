@@ -48,7 +48,11 @@
     controlAntes = true;
   });
 
-  window.addEventListener('load', () => {
+  // Se registra al terminar de cargar la página (para no quitarle red); si se entra directo a
+  // Rush, en cuanto está el HTML: Rush la necesita para funcionar
+  const registrar = () => {
+    if (registrar.hecho) return;
+    registrar.hecho = true;
     navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(r => {
       registro = r;
       alRegistrar(r);
@@ -62,7 +66,9 @@
       // Al volver a la app después de un rato, se mira si hay versión nueva
       document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') r.update().catch(() => {}); });
     }).catch(e => { alRegistrar(null); console.warn('[sw] No se pudo registrar:', e.message); });
-  });
+  };
+  if (location.hash === '#rush') document.addEventListener('DOMContentLoaded', registrar);
+  window.addEventListener('load', registrar);
 
   // Pregunta a un service worker cómo está su caché (null si no contesta: el antiguo no sabe)
   function preguntar(sw, ms = 1500) {
@@ -84,6 +90,8 @@
     const instalando = r?.installing ?? (!navigator.serviceWorker.controller ? r?.waiting : null);
     if (instalando) {
       const e = await preguntar(instalando);
+      // Lo que necesita Rush ya está (aunque lo demás siga bajando en segundo plano)
+      if (e?.critico) return { lista: true, rush: e.rush };
       return { lista: false, progreso: e?.progreso ?? null };
     }
     // Sin nada que descargar (o sin poder registrarse): se sigue por la red
@@ -98,7 +106,7 @@
     if (e.lista) return true;
     return new Promise(res => {
       const listo = () => { quitar(); navigator.serviceWorker.removeEventListener('controllerchange', alControl); res(true); };
-      const quitar = SLVersion.alProgreso(d => { if (d.lista || d.error) listo(); });
+      const quitar = SLVersion.alProgreso(d => { if (d.critico || d.lista || d.error) listo(); });
       const alControl = () => listo();
       navigator.serviceWorker.addEventListener('controllerchange', alControl);
     });

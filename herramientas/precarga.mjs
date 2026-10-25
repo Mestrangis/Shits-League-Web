@@ -76,9 +76,16 @@ export function generar() {
   const version = createHash('sha256').update(JSON.stringify(archivos)).digest('hex').slice(0, 12);
   // Lo que pide Rush al pulsar JUGAR (rush-panel.js): config.js y rush.js con sus imports
   const rush = cierreDeImports(['js/slr/config.js', 'js/slr/rush.js']);
+  // Lo que Rush necesita para funcionar (la primera vez, JUGAR solo espera a esto): sus
+  // módulos, su CSS (con los acabados que importa), sus iconos y los ajustes de la
+  // reproducción. Lo demás (lo de la Shits League normal, que la página ya ha pedido, y
+  // los logos) se descarga después, en segundo plano
+  const critico = [...new Set([...rush, 'js/slr/partido/ajustes.js', 'css/slr.css',
+    ...archivos.map(a => a[0]).filter(r => r.startsWith('css/acabados/') || r.startsWith('img/slr/'))])].sort();
   return `// Generado por herramientas/precarga.mjs: NO se edita a mano.\n` +
     `// archivos: [ruta, bytes, resumen del contenido] · rush: módulos que se cargan al entrar en Rush\n` +
-    `self.PRECARGA = ${JSON.stringify({ version, archivos, rush }, null, 1).replace(/\n\s+(?=["\d\]])/g, ' ').replace(/\[ /g, '[')};\n`;
+    `// critico: lo que Rush necesita para funcionar (se descarga primero)\n` +
+    `self.PRECARGA = ${JSON.stringify({ version, archivos, rush, critico }, null, 1).replace(/\n\s+(?=["\d\]])/g, ' ').replace(/\[ /g, '[')};\n`;
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {

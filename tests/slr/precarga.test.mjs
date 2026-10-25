@@ -69,6 +69,15 @@ test('Rush: los módulos que se piden de golpe son todos los que carga al entrar
   assert.ok(!PRECARGA.rush.includes('js/slr/partido/ajustes.js') && rutas.has('js/slr/partido/ajustes.js'));
 });
 
+test('lo crítico (lo único a lo que espera JUGAR la primera vez): lo de Rush, y nada de la Shits League normal ni logos', () => {
+  const critico = new Set(PRECARGA.critico);
+  for (const r of critico) assert.ok(rutas.has(r), r);
+  for (const r of PRECARGA.rush) assert.ok(critico.has(r), `${r} (módulo de Rush)`);
+  for (const r of ['css/slr.css', 'js/slr/partido/ajustes.js']) assert.ok(critico.has(r), r);
+  for (const r of rutas) if (r.startsWith('img/slr/') || r.startsWith('css/acabados/')) assert.ok(critico.has(r), r);
+  for (const r of ['index.html', 'js/app.js', 'css/main.css', 'assets/logo-s-green.png']) assert.ok(!critico.has(r), `${r} va después`);
+});
+
 /* ── Cambio de versión ──────────────────────────────────────────────────── */
 // js/version.js en un «navegador» sin service worker: lo que se prueba aquí es la regla
 function cargarVersion() {

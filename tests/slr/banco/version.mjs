@@ -81,7 +81,9 @@ try {
     check(inicio != null && enCurso === true, `la Shits League normal se ve mientras se descarga (inicio a los ${Math.round(inicio ?? 0)} ms, descarga aún en curso)`);
     await ctx2.close();
 
-    // ── Desde la caché ──
+    // ── Desde la caché (cuando ya se ha descargado también lo demás, en segundo plano) ──
+    const todoBajado = await page.waitForFunction(async () => { const r = await navigator.serviceWorker.getRegistration(); return !!r?.active && !r.installing && !r.waiting; }, null, { timeout: 180000, polling: 500 }).then(() => true, () => false);
+    check(todoBajado, 'lo demás (lo que no necesita Rush) termina de bajar en segundo plano');
     const deRed = [];
     const mirar = r => { const u = new URL(r.url()); if (u.host === 'localhost:3000' && !/\/(sw|precarga)\.js$/.test(u.pathname) && !r.fromServiceWorker()) deRed.push(u.pathname); };
     page.on('response', mirar);

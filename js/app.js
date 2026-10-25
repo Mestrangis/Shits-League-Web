@@ -15,6 +15,31 @@ let STATE = {
 };
 
 /* ── Datos ───────────────────────────────────────────────────────────────── */
+// La última respuesta de Sheets, guardada en el navegador: al arrancar se pinta con ella al
+// momento y lo fresco llega detrás (antes, nada se veía hasta que respondía Sheets)
+const DATOS_GUARDADOS_KEY = 'SL_DATOS';
+function guardarDatos() {
+  try {
+    localStorage.setItem(DATOS_GUARDADOS_KEY, JSON.stringify({
+      t: Date.now(), jugadores: STATE.jugadoresBase, jornadas: STATE.jornadas,
+      proximos: STATE.proximosPartidos, votaciones: STATE.votaciones,
+    }));
+  } catch { /* sin espacio o sin almacenamiento: la próxima vez, por la red */ }
+}
+function restaurarDatos() {
+  try {
+    const d = JSON.parse(localStorage.getItem(DATOS_GUARDADOS_KEY) || 'null');
+    if (!d?.jugadores?.length || !d?.jornadas) return false;
+    STATE.jugadoresBase = d.jugadores;
+    STATE.jornadas = d.jornadas;
+    STATE.alias = construirAlias(STATE.jugadoresBase);
+    STATE.jugadores = calcularStats(STATE.jugadoresBase, STATE.jornadas);
+    STATE.proximosPartidos = d.proximos ?? [];
+    STATE.votaciones = d.votaciones ?? [];
+    return true;
+  } catch { return false; }
+}
+
 async function loadData() {
   // Todo desde Sheets en paralelo — cero archivos locales de datos
   const [jugadores, jornadas, proximos, votaciones] = await Promise.all([
@@ -33,7 +58,7 @@ async function loadData() {
   if (proximos)  STATE.proximosPartidos = proximos;
   // No pisar un voto optimista que el Apps Script quizá aún no ha escrito
   if (votaciones && Date.now() - ultimoVotoEnviado > VOTO_PENDIENTE_MS) STATE.votaciones = votaciones;
-  if (jugadores && jornadas) STATE.ultimaCarga = Date.now();
+  if (jugadores && jornadas) { STATE.ultimaCarga = Date.now(); guardarDatos(); }
 }
 
 /* ── Recarga y refresco automático ───────────────────────────────────────── */
@@ -52,7 +77,7 @@ function recargarDatos() {
     try {
       await loadData();
       initHero();
-      document.querySelectorAll('.tab-panel').forEach(p => { p.dataset.rendered = ''; });
+      document.querySelectorAll('.tab-panel:not(#panel-rush)').forEach(p => { p.dataset.rendered = ''; });
       renderTabIfNeeded(STATE.activeTab);
     } catch (e) {
       console.warn('[app] No se pudieron recargar los datos:', e);
@@ -673,20 +698,35 @@ async function init() {
   initSwipeTabs();
   initPullToRefresh();
 
-  try {
-    await loadData();
-  } catch (e) {
-    console.error('[app] Error cargando datos:', e);
+  // Lo guardado de la última vez se pinta ya y lo fresco de Sheets llega detrás. Sin nada
+  // guardado (la primera vez) se espera a Sheets, salvo para ir a Rush, que no lo necesita
+  const tabInicial = tabDesdeHash();
+  if (tabInicial === 'rush') {
+    switchTab('rush');
+    // Rush primero (pintado y listo para tocar); lo de la Shits League normal (calcular las
+    // estadísticas y pintar Inicio) en el siguiente rato libre: Rush no lo necesita
+    await new Promise(r => (window.requestIdleCallback ?? (f => setTimeout(f, 50)))(r, { timeout: 1500 }));
+  }
+  const guardados = restaurarDatos();
+  if (guardados) {
+    recargarDatos();
+  } else {
+    try {
+      await loadData();
+    } catch (e) {
+      console.error('[app] Error cargando datos:', e);
+    }
   }
 
   initHero();
   renderTabIfNeeded('inicio');
-  const tabInicial = tabDesdeHash();
-  if (tabInicial) {
+  if (tabInicial && tabInicial !== 'rush') {
     switchTab(tabInicial);
     // Si se entra con hash (p. ej. desde una notificación), saltamos el hero
     // (en Rush, en móvil, el hero ya está oculto)
-    if (!(tabInicial === 'rush' && MQ_MOVIL.matches)) document.querySelector('.main').scrollIntoView({ block: 'start', behavior: 'instant' });
+    document.querySelector('.main').scrollIntoView({ block: 'start', behavior: 'instant' });
+  } else if (tabInicial === 'rush' && !MQ_MOVIL.matches) {
+    document.querySelector('.main').scrollIntoView({ block: 'start', behavior: 'instant' });
   }
   window.addEventListener('hashchange', () => {
     const tab = tabDesdeHash();

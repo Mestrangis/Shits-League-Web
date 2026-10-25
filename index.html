@@ -11,6 +11,11 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="assets/logo-s-green.png" type="image/png">
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+  <!-- Fuentes de Google sin bloquear el pintado (antes, un @import en main.css que esperaba a la red):
+       se ve con la de reserva y cambia en cuanto llegan; después salen de la caché del service worker -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&amp;family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&amp;family=Sora:wght@400;500;600;700;800&amp;display=swap" media="print" onload="this.media='all'">
   <link rel="stylesheet" href="css/main.css">
   <link rel="stylesheet" href="css/rush-panel.css">
 </head>

@@ -27,9 +27,14 @@ let entorno = {                      // lo que cambia en las pruebas
   // El service worker la guarda al pasar: aquí no hace falta leerla (se suelta sin tocar el hilo principal)
   descargar: url => fetch(url, { mode: 'cors', credentials: 'omit', priority: 'low' }).then(r => { r.body?.cancel().catch(() => {}); if (!r.ok) throw new Error(r.status); }),
   ocupado,
+  // Las fotos se guardan al pasar por el service worker: hasta que manda en la página (la
+  // primera vez, mientras termina de descargarse la app), se espera
+  swListo: () => !globalThis.navigator?.serviceWorker || !!navigator.serviceWorker.controller,
+  alSw: cb => navigator.serviceWorker.addEventListener('controllerchange', cb, { once: true }),
 };
+let esperandoSw = false;
 export function _entorno(e) { entorno = { ...entorno, ...e }; }
-export function _reiniciar() { for (const c of colas.values()) c.length = 0; vistas.clear(); activas = 0; programado = false; }
+export function _reiniciar() { for (const c of colas.values()) c.length = 0; vistas.clear(); activas = 0; programado = false; esperandoSw = false; }
 
 // Añade las fotos (imagen_url de las cartas) de un grupo. Se pueden pasar repetidas: cada foto va una vez
 export function precargarFotos(grupo, imagenes) {
@@ -60,6 +65,15 @@ function siguiente() {
 }
 function programar() {
   if (programado || activas >= A_LA_VEZ || !pendientes().length) return;
+  if (!entorno.swListo()) {
+    if (esperandoSw) return;
+    esperandoSw = true;
+    const seguir = () => { if (!esperandoSw) return; esperandoSw = false; programar(); };
+    entorno.alSw(seguir);
+    // Si el service worker no llega a mandar (no se pudo instalar), se sigue sin él
+    setTimeout(() => { entorno = { ...entorno, swListo: () => true }; seguir(); }, 60000);
+    return;
+  }
   programado = true;
   entorno.ocioso(trabajar);
 }

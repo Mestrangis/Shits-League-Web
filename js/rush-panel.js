@@ -86,9 +86,30 @@ function rushGuardarAcceso(acceso) {
   rushMostrarPestana(!!acceso && !!getSessionPlayer());
 }
 
+/* ── Lo de la entrada a Rush, pedido al arrancar ─────────────────────────────
+   slr_rush_inicio es UNA llamada con el jugador (¿tiene acceso?), la liga, el
+   calendario y todo lo que Rush necesita al entrar. Se pide nada más arrancar la
+   app: sirve para comprobar el acceso, para el estado de la portada y, si se
+   pulsa JUGAR antes de 15 s, Rush la usa sin volver a pedirla (rush.js). */
+window.rushPrecarga = null;   // { ambito, t, promesa, llegada }: llegada, cuándo respondió
+const rushAmbito = () => `${getSessionPlayer()}|${RUSH_ES_LOCAL ? 'prueba' : 'principal'}`;
+function rushPedirInicio(token) {
+  const promesa = rushRpc('slr_rush_inicio', { token, prueba: RUSH_ES_LOCAL });
+  const p = { ambito: rushAmbito(), t: Date.now(), promesa, llegada: null };
+  promesa.then(() => { p.llegada = Date.now(); }, () => {});
+  window.rushPrecarga = p;
+  promesa.catch(() => { if (window.rushPrecarga?.promesa === promesa) window.rushPrecarga = null; });
+  return promesa;
+}
+
 // Al arrancar y en cada cambio de sesión (app.js): primero lo guardado, sin
 // esperar a la red, y luego lo que diga el servidor
-async function rushVerificarAcceso() {
+// La comprobación de acceso en curso; da lo de la entrada a Rush (slr_rush_inicio) si lo ha pedido
+let rushVerificando = null;
+function rushVerificarAcceso() {
+  return (rushVerificando = rushVerificarAccesoAhora());
+}
+async function rushVerificarAccesoAhora() {
   const jugador = getSessionPlayer();
   // Sin código guardado es una sesión antigua: session.js la cierra
   if (!jugador || !getSessionCode()) { rushMostrarPestana(false); return; }
@@ -97,8 +118,9 @@ async function rushVerificarAcceso() {
     const token = rushToken();
     if (token) {
       try {
-        const yo = await rushRpc('slr_yo', { token });
-        if (rushMismoNombre(yo.usuario?.nombre, jugador)) { rushGuardarAcceso(yo.tiene_acceso); return; }
+        const b = await rushPedirInicio(token);
+        if (rushMismoNombre(b.yo.usuario?.nombre, jugador)) { rushGuardarAcceso(b.yo.tiene_acceso); return b; }
+        window.rushPrecarga = null;   // de otra persona: no vale
       } catch (e) {
         if (e.status !== 403) throw e;
       }
@@ -106,6 +128,8 @@ async function rushVerificarAcceso() {
     }
     const r = await rushReautenticar();
     if (r === 'perdida') rushSesionPerdida();
+    // Sesión nueva: también se pide ya lo de la entrada a Rush (portada y JUGAR)
+    else if (r === 'ok' && rushToken()) return await rushPedirInicio(rushToken()).catch(() => null);
   } catch (e) {
     console.warn('[rush] No se pudo comprobar el acceso:', e.message);   // se queda lo guardado
   }
@@ -230,7 +254,7 @@ async function rushComprobarDescarga(panel) {
   caja.innerHTML = `<b class="rush-descarga__titulo">Descargando Shits League Rush…</b>
     <span class="rush-descarga__barra" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i></i></span>
     <small class="rush-descarga__texto">Preparando…</small>
-    <small class="rush-descarga__nota">Solo la primera vez: después se abre al momento, también sin conexión.</small>`;
+    <small class="rush-descarga__nota">Solo la primera vez: lo justo para jugar; el resto, después y sin esperar.</small>`;
   portada.appendChild(caja);
   portada.classList.add('rush-portada--descargando');
   if (jugar) jugar.disabled = true;
@@ -260,24 +284,35 @@ function rushPrecargarModulos(lista) {
   for (const ruta of lista) frag.appendChild(Object.assign(document.createElement('link'), { rel: 'modulepreload', href: rushRuta(ruta) }));
   if (!document.getElementById('slrCss')) frag.appendChild(Object.assign(document.createElement('link'), { rel: 'preload', as: 'style', href: rushRuta('css/slr.css') }));
   document.head.appendChild(frag);
+  // Y en el siguiente rato libre se cargan y ejecutan (con su CSS): al pulsar JUGAR ya están
+  (window.requestIdleCallback ?? (f => setTimeout(f, 300)))(() => {
+    rushModulo ??= import(rushRuta('js/slr/rush.js'));
+    rushModulo.catch(() => { rushModulo = null; });
+    rushCargarCss();
+  }, { timeout: 3000 });
 }
 
 const RUSH_FECHA = new Intl.DateTimeFormat('es-ES', {
   timeZone: 'Europe/Madrid', weekday: 'long', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
 });
 
-// Liga que verá el usuario: la principal o, en local, la liga de prueba del bot
+// Liga que verá el usuario (la principal o, en local, la de prueba del bot) y su próxima
+// jornada: de lo pedido al arrancar si lo hay; si no, con lecturas públicas
 async function rushLigaVisible() {
-  const token = rushToken();
-  if (token && getSessionPlayer()) {
+  // Lo de la entrada a Rush que trae la comprobación de acceso (o lo que haya pedido otra)
+  const b0 = getSessionPlayer() ? await rushVerificando?.catch(() => null) : null;
+  const p = window.rushPrecarga;
+  if (b0 || (p && p.ambito === rushAmbito())) {
     try {
-      const yo = await rushRpc('slr_yo', { token });
-      const prueba = RUSH_ES_LOCAL && yo.ligas.find(l => l.es_prueba);
-      return prueba || yo.liga_principal;
-    } catch { /* sin token válido: se cae a la lectura pública */ }
+      const b = b0 ?? await p.promesa;
+      if (b.liga) {
+        const j = (b.calendario?.jornadas ?? []).find(x => ['programada', 'cerrada', 'simulada'].includes(x.estado));
+        return { liga: b.liga, jornada: j ? { numero: j.numero, estado: j.estado, cierre_en: j.cierre_en } : null };
+      }
+    } catch { /* se cae a la lectura pública */ }
   }
   const [liga] = await rushLeer('ligas?select=id,nombre,estado,temporada&es_prueba=eq.false&order=creada_en&limit=1');
-  return liga || null;
+  return { liga: liga || null, jornada: undefined };
 }
 
 async function rushCargarEstado(panel) {
@@ -285,7 +320,7 @@ async function rushCargarEstado(panel) {
   const caja  = panel.querySelector('#rushEstado');
   let estado = 'Sin conexión con Rush', clase = 'apagada';
   try {
-    const liga = await rushLigaVisible();
+    const { liga, jornada } = await rushLigaVisible();
     if (!liga) {
       estado = 'Todavía no hay liga';
     } else if (liga.estado === 'preparacion') {
@@ -295,7 +330,7 @@ async function rushCargarEstado(panel) {
     } else if (liga.estado === 'entre_temporadas') {
       estado = `Entre temporadas · la temporada ${liga.temporada} ha terminado`; clase = 'abierta';
     } else if (liga.estado === 'en_curso') {
-      const [j] = await rushLeer(`jornadas?select=numero,estado,cierre_en&liga_id=eq.${liga.id}` +
+      const [j] = jornada !== undefined ? [jornada] : await rushLeer(`jornadas?select=numero,estado,cierre_en&liga_id=eq.${liga.id}` +
         '&estado=in.(programada,cerrada,simulada)&order=cierre_en&limit=1');
       clase = 'viva';
       if (!j) estado = `Temporada ${liga.temporada} en marcha`;

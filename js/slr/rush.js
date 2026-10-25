@@ -14,6 +14,7 @@ import { esc, miles, crear, fijarRaiz, ajustarCapas, capasAbiertas, toast, hoja,
 import { normalizarCarta, iniciarAcabados, pararAcabados } from './carta.js';
 import { fijarColecciones } from './colecciones.js';
 import { guardado, pedir, invalidar, esFresco, fijarAmbito } from './datos-pantallas.js';
+import { DATOS_FRESCOS_MS } from './config.js';
 import * as previa from './pantallas/previa.js';
 import * as plantilla from './pantallas/plantilla.js';
 import * as mercado from './pantallas/mercado.js';
@@ -100,8 +101,20 @@ function mismoNombre(a, b) {
   return !!a && n(a) === n(b);
 }
 
-async function cargarBase() {
-  let b = await rpc('slr_rush_inicio', { prueba: ES_LOCAL }, { silencioso: true });
+// Lo que pidió la app al arrancar (rush-panel.js → rushPrecarga), si es de este jugador y aún
+// viene de camino o llegó hace menos de 15 s: así, al pulsar JUGAR, lo de la entrada ya está
+function tomarPrecarga() {
+  const p = window.rushPrecarga;
+  window.rushPrecarga = null;
+  const fresca = !p?.llegada || Date.now() - p.llegada < DATOS_FRESCOS_MS;
+  return p && p.ambito === `${datos.jugador}|${ES_LOCAL ? 'prueba' : 'principal'}` && fresca ? p : null;
+}
+
+// previo: lo de la precarga que ya ha llegado (se comprueba igual que lo pedido aquí)
+async function cargarBase(previo = null) {
+  const pre = previo ? null : tomarPrecarga();
+  let b = previo ?? (pre ? await pre.promesa.catch(() => null) : null);
+  b ??= await rpc('slr_rush_inicio', { prueba: ES_LOCAL }, { silencioso: true });
   if (!mismoNombre(b.yo.usuario.nombre, datos.jugador)) {
     // La sesión de Rush es de otra persona: otra sesión en silencio con el
     // código guardado; si tampoco encaja, se cierra la sesión de Shits League
@@ -490,7 +503,11 @@ export async function abrir(op) {
   if (!raiz) construir();
   // El índice de la caché de fotos antes de pintar: las guardadas salen sin esqueleto.
   // pintar() enseña lo de la última vez (atenuado) o la rueda, y pide lo fresco
-  await cargarIndice();
+  // Si lo pedido al arrancar ya ha llegado, cuenta como fresco: se pinta directamente
+  const pre = tomarPrecarga();
+  const yaLlego = pre?.llegada ? pre.promesa.then(b => pedir('base', () => cargarBase(b))).catch(() => {}) : null;
+  if (pre && !yaLlego) window.rushPrecarga = pre;   // aún de camino: la recoge cargarBase
+  await Promise.all([yaLlego, cargarIndice()]);
   await navegar(seccion);
   if (!raiz || !datos.equipo) return;
   pintarCampana();

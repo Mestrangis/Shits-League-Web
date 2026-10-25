@@ -1723,3 +1723,28 @@ Medido con `tests/slr/banco/rendimiento-apertura.mjs`: Chrome a 390×844 (DPR 2,
 - **Versión (banco):** la actualización forzada se provocaba haciendo fallar `slr_yo`, que Rush ya no pide al entrar (ahora es `slr_rush_inicio`).
 - **`slr_con_intento`** (migración de la fase 4, ya aplicada): `tests/slr/api-intentos.mjs` lo prueba contra la API real (14 comprobaciones).
 - `CACHE_NAME` v38.
+
+#### Arranque en caliente y en frío (tras las medidas de la fase 1)
+
+**Qué esperaba a la red en caliente** (Equipo a 3,2 s con la app ya en la caché):
+
+- **Google Sheets:** `init()` (`app.js`) esperaba a las cuatro lecturas de Sheets antes de ir a la pestaña inicial, también con `#rush`. Ahora:
+  - la última respuesta de Sheets se guarda (`SL_DATOS` en `localStorage`) y se pinta con ella al momento, y lo fresco llega detrás;
+  - con `#rush`, Rush se pinta primero y lo de la Shits League normal (estadísticas e Inicio) va en el siguiente rato libre;
+  - al refrescar Sheets en segundo plano, la portada de Rush no se repinta.
+- **Supabase en la portada y al entrar:** se pedía `slr_yo` (acceso), `slr_yo` y `jornadas` (estado de la portada) y, al pulsar JUGAR, `slr_rush_inicio`. Ahora `rush-panel.js` pide `slr_rush_inicio` una sola vez al arrancar (o justo después del login, si es una sesión nueva) y sirve para el acceso, el estado de la portada y la entrada a Rush.
+  - Si al pulsar JUGAR ya ha llegado, cuenta como fresca y se pinta directamente; si aún viene de camino, Rush la espera en vez de pedir otra.
+  - Vale 15 s desde que llega.
+- **Fuentes:** el `@import` de Google Fonts en `main.css` bloqueaba el CSS. Ahora `index.html` las carga sin bloquear (`preconnect` y `media="print"` → `all`), y después salen de la caché del service worker.
+- **Módulos de Rush:** al ver la portada, además del `modulepreload`, se cargan y ejecutan en el siguiente rato libre (con `css/slr.css`). Al pulsar JUGAR ya están.
+- **Lo que quedaba:** en una traza con la CPU ×4, JUGAR está activo a los ~110 ms y Equipo se ve a ~0,8 s de abrir la app. El resto es pintar Equipo (~250 ms de CPU ×4).
+
+**En frío, solo lo que necesita Rush.** La lista de precarga lleva `critico`:
+- los 71 módulos de Rush, `js/slr/partido/ajustes.js`, `css/slr.css` con sus acabados y los iconos de `img/slr/`;
+- son 83 archivos, 949 KB en bruto y unos 305 KB comprimidos.
+
+El service worker los descarga primero y avisa en cuanto los tiene; JUGAR solo espera a eso, y la barra de «Descargando Shits League Rush…» es de lo crítico. Queda en segundo plano lo de la Shits League normal (que la página ya ha pedido) y las imágenes de `assets/`: 23 archivos, unos 651 KB comprimidos, la mayoría el logo de 232 KB (fase 5). Con `#rush`, el service worker se registra en cuanto está el HTML, sin esperar al `load`. Antes, JUGAR esperaba a la app entera (~956 KB comprimidos).
+
+**Fotos:** la precarga en segundo plano espera a que el service worker mande en la página (si no, las fotos no entraban en su caché). Si no llega a mandar, sigue sin él al minuto.
+
+**Medida:** ahora separa «Equipo se ve» (aunque sea lo de la última vez, atenuado) de «Equipo se puede usar» (con lo fresco).

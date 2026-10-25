@@ -35,9 +35,9 @@ function almacen() {
 }
 
 // Un service worker «arrancado» con su lista; caches puede venir de una versión anterior
-function arrancar(archivos, { caches = almacen(), contenido = r => `contenido de ${r}` } = {}) {
+function arrancar(archivos, { caches = almacen(), contenido = r => `contenido de ${r}`, critico = archivos.map(a => a[0]) } = {}) {
   const oyentes = {}, mensajes = [], pedidos = [];
-  const PRECARGA = { version: createHash('sha256').update(JSON.stringify(archivos)).digest('hex').slice(0, 12), archivos, rush: [] };
+  const PRECARGA = { version: createHash('sha256').update(JSON.stringify(archivos)).digest('hex').slice(0, 12), archivos, rush: [], critico };
   const self = {
     registration: { scope: BASE },
     addEventListener: (t, f) => { oyentes[t] = f; },
@@ -78,6 +78,23 @@ test('instalación: precarga toda la lista, avisa del progreso y, la primera vez
   assert.ok(prog.every((m, i) => i === 0 || m.bytes >= prog[i - 1].bytes));
   assert.ok(sw.mensajes.some(m => m.lista && m.espera === false));
   assert.ok(sw.self.salto, 'sin versión anterior: skipWaiting');
+});
+
+test('primero lo que necesita Rush (lo crítico); en cuanto está, se avisa, y lo demás sigue después', async () => {
+  const lista = [['index.html', 10, 'a1a1a1a1a1a1'], ['js/app.js', 20, 'b1b1b1b1b1b1'], ['js/slr/rush.js', 30, 'c1c1c1c1c1c1'], ['css/slr.css', 40, 'd1d1d1d1d1d1'], ['assets/logo.png', 50, 'e1e1e1e1e1e1']];
+  const sw = arrancar(lista, { critico: ['js/slr/rush.js', 'css/slr.css'] });
+  await sw.evento('install').espera;
+  const orden = sw.pedidos.map(p => p.url.slice(BASE.length));
+  assert.deepEqual(orden.slice(0, 2).sort(), ['css/slr.css', 'js/slr/rush.js'], `primero lo crítico (${orden.join(', ')})`);
+  // El progreso es el de lo crítico (lo que bloquea JUGAR) y el aviso llega antes de que acabe lo demás
+  const prog = sw.mensajes.filter(m => m.bytes != null);
+  assert.equal(prog.at(-1).totalBytes, 70);
+  assert.equal(prog.at(-1).bytes, 70);
+  const iCritico = sw.mensajes.findIndex(m => m.critico), iLista = sw.mensajes.findIndex(m => m.lista);
+  assert.ok(iCritico >= 0 && iCritico < iLista, 'el aviso de lo crítico antes que el de la lista entera');
+  // «estado» del worker que instala: lo crítico ya está
+  const e = await new Promise(res => sw.evento('message', { data: { tipo: 'estado' }, ports: [{ postMessage: res }] }));
+  assert.ok(e.critico);
 });
 
 test('versión nueva: solo descarga lo que ha cambiado y espera a la próxima vez', async () => {

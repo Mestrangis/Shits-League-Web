@@ -164,7 +164,8 @@ try {
     await page2.goto(`${URL_APP}#rush`, { waitUntil: 'commit' });
     await hastaListo(page2);
     // Hasta que la app esté entera en la caché del service worker (si lo hay)
-    await page2.waitForFunction(async () => !window.SLVersion || (await window.SLVersion.estado()).lista, null, { timeout: 180000, polling: 500 });
+    // (con el service worker ya activo, no solo con lo crítico de Rush descargado)
+    await page2.waitForFunction(async () => { const r = await navigator.serviceWorker?.getRegistration(); return !r || (!!r.active && !r.installing && !r.waiting); }, null, { timeout: 180000, polling: 500 });
     await dormir(1000);
     await page2.goto('about:blank');
     c = fase();

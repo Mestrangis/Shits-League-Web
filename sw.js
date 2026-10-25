@@ -7,8 +7,9 @@
    · Una versión nueva se descarga en segundo plano y espera: se aplica la
      próxima vez que se abra la app, o al tocar «Actualizar» (js/version.js).
      La primera vez (sin versión anterior) se activa en cuanto termina.
-   · Mientras descarga, cuenta el progreso a las páginas (pantalla «Descargando
-     Shits League Rush…» de rush-panel.js).
+   · Primero lo que Rush necesita para funcionar (PRECARGA.critico) y, en cuanto
+     está, se avisa (JUGAR ya funciona); después, lo demás. Mientras, cuenta el
+     progreso de lo crítico a las páginas («Descargando Shits League Rush…»).
    · Fotos de las cartas (Cloudinary): caché propia, «primero la caché», con
      las 600 más recientes (el resto se borra).
    · Supabase, Google y el resto: directos a la red (los datos de Rush los
@@ -27,9 +28,11 @@ const MAX_FOTOS = 600;
 const LISTA = '__precarga__.json';                 // la lista de esa versión, dentro de su caché
 const BASE = new URL('./', self.registration.scope).href;
 const RUTAS = new Set(self.PRECARGA.archivos.map(([r]) => r));
+const CRITICO = new Set(self.PRECARGA.critico ?? []);
 
 /* ── Progreso a las páginas ───────────────────────────────────────────────── */
-let progreso = null;   // { hechos, total, bytes, totalBytes } mientras se precarga
+let progreso = null;   // { hechos, total, bytes, totalBytes } de lo crítico, mientras se precarga
+let criticoListo = false;
 async function avisar(datos) {
   const ps = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
   for (const p of ps) p.postMessage({ tipo: 'precarga', version: self.PRECARGA.version, ...datos });
@@ -54,10 +57,16 @@ async function precargar() {
     if (await cache.match(BASE + a[0])) continue;              // reintento: ya estaba
     pendientes.push(a);
   }
-  const totalBytes = self.PRECARGA.archivos.reduce((s, a) => s + a[1], 0);
-  progreso = { hechos: self.PRECARGA.archivos.length - pendientes.length, total: self.PRECARGA.archivos.length, bytes: 0, totalBytes };
-  progreso.bytes = self.PRECARGA.archivos.filter(a => !pendientes.includes(a)).reduce((s, a) => s + a[1], 0);
+  // Primero lo crítico (lo que necesita Rush), después lo demás
+  pendientes.sort((x, y) => CRITICO.has(y[0]) - CRITICO.has(x[0]));
+  const criticos = self.PRECARGA.archivos.filter(a => CRITICO.has(a[0]));
+  const totalBytes = criticos.reduce((s, a) => s + a[1], 0);
+  let faltanCriticos = pendientes.filter(a => CRITICO.has(a[0])).length;
+  progreso = { hechos: criticos.length - faltanCriticos, total: criticos.length, bytes: 0, totalBytes };
+  progreso.bytes = criticos.filter(a => !pendientes.includes(a)).reduce((s, a) => s + a[1], 0);
   avisar(progreso);
+  const yaCritico = () => { if (!criticoListo) { criticoListo = true; avisar({ critico: true }); } };
+  if (!faltanCriticos) yaCritico();
   // De seis en seis y con prioridad baja: no quita ancho de banda a la web
   let i = 0;
   const trabajador = async () => {
@@ -73,9 +82,12 @@ async function precargar() {
         if (res.redirected) res = new Response(await res.blob(), { status: res.status, statusText: res.statusText, headers: res.headers });
       }
       await cache.put(url, res);
-      progreso.hechos++;
-      progreso.bytes += bytes;
-      avisar(progreso);
+      if (CRITICO.has(ruta)) {
+        progreso.hechos++;
+        progreso.bytes += bytes;
+        avisar(progreso);
+        if (--faltanCriticos === 0) yaCritico();
+      }
     }
   };
   await Promise.all(Array.from({ length: 6 }, trabajador));
@@ -117,7 +129,7 @@ self.addEventListener('message', event => {
     event.waitUntil((async () => {
       const cache = await caches.open(CACHE_APP);
       const completa = !progreso && !!(await cache.match(LISTA));
-      event.ports[0]?.postMessage({ version: self.PRECARGA.version, completa, progreso, rush: self.PRECARGA.rush });
+      event.ports[0]?.postMessage({ version: self.PRECARGA.version, completa, critico: completa || criticoListo, progreso, rush: self.PRECARGA.rush });
     })());
   }
 });

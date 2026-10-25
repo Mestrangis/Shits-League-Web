@@ -52,8 +52,12 @@ try {
     const contar = nombre => llamadas.filter(x => x === nombre).length;
     // Retraso a voluntad de una función (para ver la rueda y las respuestas tardías)
     const lentas = new Map();
+    // Puertas: la respuesta de esa función espera hasta que se abre
+    const puertas = new Map();
+    const cerrar = n => { let abrir; puertas.set(n, { promesa: new Promise(res => { abrir = res; }), abrir: () => { puertas.delete(n); abrir(); } }); };
     await ctx.route('**/rest/v1/rpc/*', async r => {
       const n = r.request().url().split('/rpc/')[1];
+      if (puertas.has(n)) await puertas.get(n).promesa;
       if (lentas.has(n)) await dormir(lentas.get(n));
       return r.continue();
     });
@@ -62,21 +66,25 @@ try {
     const ir = async s => { await page.click(`.slr-nav__item[data-seccion="${s}"]`); };
     const lista = s => page.waitForSelector(`${pantalla(s)}:not(.es-atenuada)`, { timeout: 60000 }).then(() => true, () => false);
 
-    // ── Entrar la primera vez: solo la rueda, y UNA llamada ──
+    // ── Entrar la primera vez: solo la rueda, y UNA llamada (la que hace la app al arrancar,
+    // que Rush aprovecha: aquí sigue de camino al pulsar JUGAR) ──
+    llamadas.length = 0;
+    cerrar('slr_rush_inicio');
     await page.goto(`${URL_APP}#rush`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('#rushJugar:not([disabled])', { timeout: 180000 });
-    llamadas.length = 0;
-    lentas.set('slr_rush_inicio', 1500);
     await page.click('#rushJugar');
-    await page.waitForSelector('.slr', { timeout: 30000 });
+    await page.waitForSelector('.slr', { timeout: 60000 });
     await dormir(400);
     const primera = await page.evaluate(() => ({ rueda: document.getElementById('ptrSpinner').classList.contains('visible'), vacia: !document.querySelector('.slr-main .slr-pantalla') }));
+    puertas.get('slr_rush_inicio')?.abrir();
     await foto('1-primera-vez');
-    check(primera.rueda && primera.vacia, 'la primera vez, sin nada guardado: solo la rueda');
+    check(primera.rueda && primera.vacia, 'la primera vez, sin nada guardado: solo la rueda', JSON.stringify(primera));
     check(await lista('equipo'), 'y después, Equipo');
-    lentas.delete('slr_rush_inicio');
-    const alEntrar = llamadas.filter(x => !['slr_mercado', 'slr_rush_liga', 'slr_movimientos', 'slr_notificaciones'].includes(x));
-    check(contar('slr_rush_inicio') === 1 && alEntrar.length === 1, `entrar: una llamada a Supabase (${alEntrar.join(', ')})`);
+    // Desde que se abre la app hasta Equipo: solo slr_rush_inicio (además de la lectura pública
+    // del estado de la portada si no hay sesión; aquí la hay)
+    // (slr_login: la sesión de Rush de este navegador nuevo; con el token ya guardado no hace falta)
+    const alEntrar = llamadas.filter(x => !['slr_mercado', 'slr_rush_liga', 'slr_movimientos', 'slr_notificaciones', 'slr_login'].includes(x));
+    check(contar('slr_rush_inicio') === 1 && alEntrar.length === 1, `abrir la app y entrar en Rush: una llamada a Supabase, además del login (${alEntrar.join(', ')})`);
 
     // ── Precarga de las otras pestañas ──
     for (let k = 0; k < 40 && !(contar('slr_mercado') && contar('slr_rush_liga') && contar('slr_movimientos')); k++) await dormir(250);
