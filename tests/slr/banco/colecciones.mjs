@@ -86,7 +86,7 @@ try {
   // (si no, a veces se pulsaba el «Jugar» de la página que se estaba recargando)
   await ev('window.__paginaVieja = true; 0');
   await cdp('Page.reload', {});
-  await esperar(`!window.__paginaVieja && !!document.getElementById('rushJugar')`, 30000);
+  await esperar(`!window.__paginaVieja && (document.getElementById('rushJugar')?.disabled === false)`, 30000);
   await clic('#rushJugar');
   await esperar(`!!document.querySelector('.slr-nav__item')`, 30000);
 

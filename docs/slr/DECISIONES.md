@@ -1615,3 +1615,57 @@ Medido con `tests/slr/banco/rendimiento-apertura.mjs`: Chrome a 390×844 (DPR 2,
     - a 360, 412 y en PC: el cruce de las tres maneras, el plan B de cada lado, los escudos con dos cartas, y un partido con plan B (cruce → … → plan B → cruce → descanso);
     - el tap deja las viñetas nuevas en su último fotograma;
     - un amistoso de verdad con plan B: se repite hasta que salta, se recorre entero y, al cerrarlo, no hay ni un fotograma con lo de debajo a la vista.
+
+## Repaso de rendimiento (fases 0 a 5)
+
+### Decisiones de Marcos
+
+- **Por fases, con un commit por fase, midiendo antes y después** (Playwright, móvil con 4G lenta y CPU ×4): arranque en frío y en caliente, cada pestaña de Rush y las peticiones y MB por pantalla y en una sesión típica.
+- **La app se instala como un juego:** todos sus archivos precargados en una caché versionada, servidos desde ahí. La versión nueva se descarga en segundo plano y se aplica la próxima vez (o con «Hay una versión nueva · Actualizar»). Si el código guardado es viejo y el servidor ya no lo entiende, se actualiza solo. La primera descarga no bloquea la Shits League normal; solo Rush enseña «Descargando Shits League Rush…» con el porcentaje real.
+- **Imágenes de las cartas:** solo dos tamaños; caché propia con un límite; precarga en segundo plano (las del usuario, las del rival, las del mercado y, solo el admin, el catálogo); nada con el ahorro de datos; las que ya están en caché, sin esqueleto.
+- **Datos de cada pantalla:** una sola llamada siempre que se pueda; la última respuesta guardada; fresca (< 15 s) se enseña sin esperar; si no, lo de la última vez atenuado con la rueda de la Shits League hasta que llega lo nuevo; precarga de las otras pestañas; invalidación al hacer una acción.
+- **Que nunca parezca que no pasa nada:** todas las acciones con su botón «cargando», mensaje claro si fallan y protección contra duplicados en las que mueven dinero o cartas.
+
+### Decisiones mías
+
+#### Fase 0: cómo se mide
+
+- `tests/slr/banco/rendimiento-app.mjs` (Playwright 1.58.2, instalado solo para el banco en `tests/slr/banco`; la web sigue sin paso de compilación).
+  - Móvil: 412 × 915, DPR 2,625, táctil y CPU ×4.
+  - Red: «4G lenta» de Lighthouse (150 ms de ida y vuelta, 1,6 Mbit/s de bajada y 750 kbit/s de subida).
+  - Liga de prueba del bot: Bot Uno y 3 bots, con una jornada jugada y el partido ya visto. Se borra al terminar.
+  - Mediana de 3 pasadas.
+- **La red se limita con un proxy local** (`tests/slr/banco/red-lenta.mjs`) y no con la emulación de CDP: esa solo frena la página, no lo que pide el service worker (que en la versión vieja era todo). El proxy:
+  - sirve la web con las cabeceras de caché de GitHub Pages (`max-age=600`);
+  - sirve para la prueba «sin conexión».
+- **Tres arranques:**
+  - en frío, sin caché;
+  - en caliente, a los pocos minutos;
+  - en caliente con la caché del navegador caducada. Es lo normal en el móvil: GitHub Pages da 10 minutos, y pasado ese rato el service worker viejo («primero la red») revalidaba los ~100 archivos uno por uno.
+- **«Se puede usar»:** la portada de Rush con JUGAR activo y, después de pulsarlo, la pantalla Equipo pintada.
+
+#### Fase 1: la app se instala como un juego
+
+- **Lista de precarga generada:** `herramientas/precarga.mjs` escribe `precarga.js` con cada archivo, su tamaño, un resumen de su contenido (con LF, igual en Windows que en el despliegue), la versión y los módulos de Rush.
+  - Lo lanza el despliegue (`static.yml`) y un test comprueba que está al día. Nunca se edita a mano.
+  - Entra: `index.html`, `manifest.json`, todo `js/`, `css/` e `img/`, y las PNG/SVG de `assets/` que cita la web, de 300 KB como mucho.
+  - No entra: `tests/`, `docs/`, `supabase/`, `push/`, `herramientas/`, `sw.js`, `precarga.js`, ni las fotos JPG ni los PDF.
+- **`sw.js`:**
+  - `importScripts('precarga.js')`. Se registra con `updateViaCache: 'none'`, así que una lista nueva se nota aunque `sw.js` no cambie.
+  - Precarga en la caché `CACHE_NAME-app-<versión>`, de seis en seis y con prioridad baja.
+  - Lo que no ha cambiado se copia de la caché de la versión anterior sin descargarlo.
+  - La primera vez (o viniendo del service worker viejo) se activa en cuanto acaba; si hay una versión anterior, espera.
+  - Sirve la web desde la caché; las navegaciones dan `index.html`.
+  - Supabase, Google Sheets y OneSignal van directos a la red. Antes las lecturas de Supabase también se guardaban, sin necesidad.
+- **`js/version.js`** (lo carga `index.html` antes que nada):
+  - registro;
+  - aviso «Hay una versión nueva · Actualizar»;
+  - `rushListo()` y el progreso de la descarga;
+  - actualización forzada.
+- **Actualización forzada:** cuando Supabase contesta `PGRST202` (la función no existe o tiene otros parámetros), `PGRST200/204` (relación o columna) o `42883/42703`:
+  - busca la versión nueva, la aplica y recarga, con la capa «Actualizando Shits League…»;
+  - como mucho una vez cada 2 minutos, para no entrar en bucle;
+  - el mensaje que se ve es «La app se está actualizando…» y no el error técnico.
+- **«Descargando Shits League Rush…»:** en la portada, con el porcentaje por bytes y los MB. JUGAR espera a que termine. Si la descarga falla, no se bloquea: sigue por la red.
+- **`modulepreload`:** al ver la portada se piden de golpe los 71 módulos que carga Rush al entrar (el cierre de los imports de `rush.js`), más `css/slr.css`. Antes se descubrían en cadena.
+- **Bancos:** los que pulsaban JUGAR nada más verlo ahora esperan a que esté activo.

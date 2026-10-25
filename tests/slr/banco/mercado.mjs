@@ -84,7 +84,7 @@ try {
   await cdp('Page.navigate', { url: 'http://localhost:3000/#rush' });
   await ev('window.__paginaVieja = true; 0');
   await cdp('Page.reload', {});
-  await esperar(`!window.__paginaVieja && !!document.getElementById('rushJugar')`, 30000);
+  await esperar(`!window.__paginaVieja && (document.getElementById('rushJugar')?.disabled === false)`, 30000);
   await clic('#rushJugar');
   await esperar(`!!document.querySelector('.slr-nav:not([hidden])')`, 15000);
   await clic('.slr-nav__item[data-seccion="mercado"]');
@@ -206,7 +206,7 @@ try {
   check(!bloqueo.ok && /haz hueco/i.test(bloqueo.mensaje) && !tact.ok && /haz hueco/i.test(tact.mensaje), `con cartas de más: ni pujar ni tocar la alineación («${bloqueo.mensaje}»)`);
   // Al recargar la página, la hoja vuelve
   await cdp('Page.reload', {});
-  await esperar(`!!document.getElementById('rushJugar')`, 30000);
+  await esperar(`(document.getElementById('rushJugar')?.disabled === false)`, 30000);
   await dormir(800);
   await clic('#rushJugar');
   check(await esperar(`!!document.querySelector('[data-hacer-hueco]')`, 20000), 'si cierras la app, al volver la hoja reaparece sola');

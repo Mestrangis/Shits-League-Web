@@ -6,6 +6,11 @@
    Rush está en beta: la pestaña solo aparece con sesión y acceso. El acceso lo
    dice el servidor (slr_yo / slr_login → tiene_acceso) y se guarda en
    localStorage para que al arrancar no parpadee.
+   · La primera vez, la app se descarga entera en segundo plano (sw.js). Si se
+     entra aquí antes de que acabe, «Descargando Shits League Rush…» con el
+     porcentaje real, hasta que termina.
+   · Al ver la portada se piden de golpe los módulos de Rush (modulepreload): al
+     pulsar JUGAR ya están, en vez de descubrirse uno tras otro.
 ═══════════════════════════════════════════════ */
 
 const RUSH_TOKEN_KEY = 'SLR_TOKEN';
@@ -36,7 +41,11 @@ async function rushRpc(funcion, args) {
     body: JSON.stringify(args),
   });
   const datos = await r.json().catch(() => null);
-  if (!r.ok) throw Object.assign(new Error(datos?.message || `Error en ${funcion}`), { status: r.status });
+  if (!r.ok) {
+    // El código guardado es más viejo que el servidor: se actualiza la app
+    if (window.SLVersion?.esErrorDeVersion(r.status, datos)) window.SLVersion.forzarActualizacion();
+    throw Object.assign(new Error(datos?.message || `Error en ${funcion}`), { status: r.status });
+  }
   return datos;
 }
 
@@ -174,6 +183,8 @@ function rushCerrarSesion() {
 /* ── Panel ───────────────────────────────────────────────────────────────── */
 function renderRushPanel() {
   const conSesion = !!getSessionPlayer();
+  // Sin service worker al mando (primera vez): JUGAR espera a saber si la app ya está descargada
+  const porComprobar = 'serviceWorker' in navigator && !navigator.serviceWorker.controller;
   return `
     <section class="rush-portada">
       <div class="rush-portada__fondo" aria-hidden="true"></div>
@@ -185,7 +196,7 @@ function renderRushPanel() {
       <div class="rush-portada__estado" id="rushEstado">
         <span class="rush-portada__punto"></span><span id="rushEstadoTexto">Cargando…</span>
       </div>
-      <button class="rush-portada__jugar" id="rushJugar" type="button" ${conSesion ? '' : 'disabled'}>
+      <button class="rush-portada__jugar" id="rushJugar" type="button" ${conSesion && !porComprobar ? '' : 'disabled'}>
         ${conSesion ? 'JUGAR' : 'Inicia sesión para jugar'}
       </button>
       ${conSesion ? '' : '<button class="rush-portada__entrar" id="rushEntrar" type="button">ENTRAR CON MI CÓDIGO</button>'}
@@ -196,6 +207,59 @@ function bindRushPanel(panel) {
   panel.querySelector('#rushJugar')?.addEventListener('click', rushJugar);
   panel.querySelector('#rushEntrar')?.addEventListener('click', () => openSessionModal());
   rushCargarEstado(panel);
+  rushComprobarDescarga(panel);
+}
+
+/* ── Descarga de la app (primera vez) y módulos de Rush por adelantado ─────── */
+const rushMb = b => (b / 1048576).toFixed(1).replace('.', ',');
+async function rushComprobarDescarga(panel) {
+  const v = window.SLVersion;
+  if (!v) return;
+  const e = await v.estado().catch(() => ({ lista: true }));
+  const jugar = panel.querySelector('#rushJugar');
+  if (e.lista) {
+    if (jugar?.isConnected && getSessionPlayer()) jugar.disabled = false;
+    rushPrecargarModulos(e.rush);
+    return;
+  }
+  const portada = panel.querySelector('.rush-portada');
+  if (!portada || portada.querySelector('.rush-descarga')) return;
+  const caja = document.createElement('div');
+  caja.className = 'rush-descarga';
+  caja.setAttribute('role', 'status');
+  caja.innerHTML = `<b class="rush-descarga__titulo">Descargando Shits League Rush…</b>
+    <span class="rush-descarga__barra" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i></i></span>
+    <small class="rush-descarga__texto">Preparando…</small>
+    <small class="rush-descarga__nota">Solo la primera vez: después se abre al momento, también sin conexión.</small>`;
+  portada.appendChild(caja);
+  portada.classList.add('rush-portada--descargando');
+  if (jugar) jugar.disabled = true;
+  const pintar = d => {
+    if (!d || d.totalBytes == null) return;
+    const pct = Math.min(100, Math.round(100 * d.bytes / Math.max(1, d.totalBytes)));
+    caja.querySelector('i').style.width = `${pct}%`;
+    caja.querySelector('[role="progressbar"]').setAttribute('aria-valuenow', String(pct));
+    caja.querySelector('.rush-descarga__texto').textContent = `${pct} % · ${rushMb(d.bytes)} de ${rushMb(d.totalBytes)} MB`;
+  };
+  pintar(e.progreso);
+  const dejar = v.alProgreso(pintar);
+  await v.rushListo();
+  dejar();
+  caja.remove();
+  portada.classList.remove('rush-portada--descargando');
+  if (jugar?.isConnected && getSessionPlayer()) jugar.disabled = false;
+  rushPrecargarModulos((await v.estado().catch(() => ({}))).rush);
+}
+
+// Pide de golpe los módulos que carga Rush al entrar (y su CSS), una sola vez
+let rushModulosPedidos = false;
+function rushPrecargarModulos(lista) {
+  if (rushModulosPedidos || !Array.isArray(lista) || !lista.length) return;
+  rushModulosPedidos = true;
+  const frag = document.createDocumentFragment();
+  for (const ruta of lista) frag.appendChild(Object.assign(document.createElement('link'), { rel: 'modulepreload', href: rushRuta(ruta) }));
+  if (!document.getElementById('slrCss')) frag.appendChild(Object.assign(document.createElement('link'), { rel: 'preload', as: 'style', href: rushRuta('css/slr.css') }));
+  document.head.appendChild(frag);
 }
 
 const RUSH_FECHA = new Intl.DateTimeFormat('es-ES', {

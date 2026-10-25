@@ -48,8 +48,8 @@ async function navegador(movil) {
   // (si no, a veces se pulsaba el «Jugar» de la página que se estaba recargando)
   await ev('window.__paginaVieja = true; 0');
   await cdp('Page.reload', {});   // cambiar solo el hash no recarga: hace falta para leer la sesión
-  for (let i = 0; i < 150 && !(await ev(`!window.__paginaVieja && !!document.getElementById('rushJugar')`)); i++) await dormir(200);
-  if (!(await ev(`!!document.getElementById('rushJugar')`))) {
+  for (let i = 0; i < 150 && !(await ev(`!window.__paginaVieja && (document.getElementById('rushJugar')?.disabled === false)`)); i++) await dormir(200);
+  if (!(await ev(`(document.getElementById('rushJugar')?.disabled === false)`))) {
     throw new Error('Sin botón JUGAR: ' + JSON.stringify(await ev(`({ hash: location.hash, activa: document.querySelector('.tab.active')?.dataset.tab,
       oculta: document.querySelector('.tab[data-tab="rush"]').hidden, acceso: localStorage.getItem('RUSH_ACCESO'), jugador: localStorage.getItem('SESSION_PLAYER') })`)));
   }

@@ -133,3 +133,14 @@
 @media (prefers-reduced-motion: reduce) {
   .rush-portada__estado[data-estado="viva"] .rush-portada__punto { animation: none; }
 }
+
+/* Descarga de la app la primera vez (rush-panel.js → rushComprobarDescarga) */
+.rush-descarga { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-top: 22px; }
+.rush-descarga__titulo { font-family: 'Anton', sans-serif; font-weight: 400; font-size: 20px; letter-spacing: .03em; color: #fff; }
+.rush-descarga__barra { position: relative; width: min(320px, 100%); height: 10px; border-radius: 6px; overflow: hidden;
+  background: rgba(255,255,255,.08); border: 1px solid rgba(31,224,101,.3); }
+.rush-descarga__barra i { position: absolute; inset: 0 auto 0 0; width: 0; border-radius: inherit;
+  background: linear-gradient(90deg, #1FE065, #9DEBB8); box-shadow: 0 0 12px rgba(31,224,101,.6); transition: width .25s ease-out; }
+.rush-descarga__texto { font-size: 13px; font-weight: 700; color: #9DC4AD; font-variant-numeric: tabular-nums; }
+.rush-descarga__nota { font-size: 11.5px; color: #6E9D81; max-width: 300px; }
+.rush-portada--descargando .rush-portada__jugar { display: none; }

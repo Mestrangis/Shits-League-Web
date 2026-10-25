@@ -8,6 +8,8 @@
    sesión en silencio con el código guardado y se repite la llamada una vez.
    Si el código ya no vale, sesionPerdida() cierra la sesión de Shits League.
    Sin acceso a la beta (error RUSH0 del servidor), sinAcceso() cierra Rush.
+   Si el servidor ya no entiende la llamada (una función o columna que no
+   existe: el código guardado es viejo), se actualiza la app (js/version.js).
 ═══════════════════════════════════════════════ */
 import { SUPABASE_URL, SUPABASE_KEY } from './config.js';
 import { toast } from './ui.js';
@@ -31,7 +33,14 @@ export function borrarToken() {
 
 async function leerRespuesta(r) {
   const texto = await r.text();
-  try { return texto ? JSON.parse(texto) : null; } catch { return { message: texto }; }
+  let datos;
+  try { datos = texto ? JSON.parse(texto) : null; } catch { datos = { message: texto }; }
+  // Versión vieja: la app se actualiza y se recarga (el error se enseña igual por si no hay versión nueva)
+  if (!r.ok && globalThis.SLVersion?.esErrorDeVersion(r.status, datos)) {
+    globalThis.SLVersion.forzarActualizacion();
+    return { ...datos, message: 'La app se está actualizando a la última versión…' };
+  }
+  return datos;
 }
 
 // 403: nueva sesión silenciosa. true → repetir la llamada; si no, lanza.

@@ -4,3 +4,6 @@ supabase/.branches/
 
 # Secretos locales: códigos de los bots de prueba, claves privadas…
 .env.local
+
+# Dependencias del banco de pruebas (npm install en tests/slr/banco)
+tests/slr/banco/node_modules/

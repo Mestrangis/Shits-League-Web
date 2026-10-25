@@ -54,7 +54,7 @@ try {
   await cdp('Page.navigate', { url: 'http://localhost:3000/#rush' });
   await ev('window.__paginaVieja = true; 0');
   await cdp('Page.reload', {});
-  await esperar(`!window.__paginaVieja && !!document.getElementById('rushJugar')`, 30000);
+  await esperar(`!window.__paginaVieja && (document.getElementById('rushJugar')?.disabled === false)`, 30000);
   await ev(`document.getElementById('rushJugar').click(); 0`);
   await esperar(`!!document.querySelector('.slr-nav:not([hidden])')`);
   await dormir(1000);

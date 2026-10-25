@@ -1495,3 +1495,30 @@ button, [role="button"], .modal__backdrop, .tab, .result-row, .card-wrap, .voto-
 @media (max-width: 899px) {
   body.en-rush .hero-section { display: none !important; }
 }
+
+/* ═══════════════════════════════════════════════
+   VERSIÓN DE LA APP  (js/version.js)
+═══════════════════════════════════════════════ */
+/* «Hay una versión nueva · Actualizar»: discreto, abajo, sin tapar las pestañas de Rush */
+.version-nueva {
+  position: fixed; left: 50%; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); z-index: 2000;
+  display: flex; align-items: center; gap: 12px; max-width: calc(100vw - 32px);
+  padding: 8px 8px 8px 16px; border-radius: 999px; transform: translateX(-50%);
+  background: rgba(6,20,13,.94); border: 1px solid rgba(31,224,101,.4); box-shadow: 0 10px 30px rgba(0,0,0,.45);
+  color: #DCEFE3; font-size: 13px; font-weight: 600; white-space: nowrap;
+  animation: version-entra .3s ease-out;
+}
+.version-nueva button {
+  padding: 7px 14px; border: 0; border-radius: 999px; background: var(--verde); color: #04140A;
+  font: inherit; font-weight: 800; cursor: pointer;
+}
+.version-nueva button:disabled { opacity: .6; }
+html.slr-abierto .version-nueva { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+@keyframes version-entra { from { opacity: 0; transform: translate(-50%, 12px); } }
+/* Actualización forzada (el código guardado era viejo): encima de todo hasta recargar */
+.version-actualizando {
+  position: fixed; inset: 0; z-index: 3000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+  background: rgba(4,16,9,.92); color: #9DC4AD; font-size: 14px; font-weight: 700;
+}
+.version-actualizando__giro { width: 40px; height: 40px; border-radius: 50%; border: 3px solid rgba(31,224,101,.2); border-top-color: var(--verde);
+  animation: ptr-giro .8s linear infinite; }
