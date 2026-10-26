@@ -66,8 +66,8 @@ try {
     const ir = async s => { await page.click(`.slr-nav__item[data-seccion="${s}"]`); };
     const lista = s => page.waitForSelector(`${pantalla(s)}:not(.es-atenuada)`, { timeout: 60000 }).then(() => true, () => false);
 
-    // ── Entrar la primera vez: solo la rueda, y UNA llamada (la que hace la app al arrancar,
-    // que Rush aprovecha: aquí sigue de camino al pulsar JUGAR) ──
+    // ── Entrar la primera vez: solo la rueda, y UNA llamada (la que hace la portada al pulsar
+    // JUGAR, a la vez que carga el código, y que Rush aprovecha: aquí sigue de camino) ──
     llamadas.length = 0;
     cerrar('slr_rush_inicio');
     await page.goto(`${URL_APP}#rush`, { waitUntil: 'domcontentloaded' });

@@ -264,15 +264,8 @@ function initTabs() {
 
 // desde: 'derecha' | 'izquierda' → la pestaña entra deslizándose desde ese lado
 // (solo cuando el cambio viene de un swipe; con click no hay animación)
-// Entrando directo a Rush, lo de la Shits League normal espera (ver init); si antes se va a
-// otra pestaña, se prepara ya con lo guardado para que salga con sus datos
-let soltarPrincipal = null;
 function switchTab(name, { desde } = {}) {
   if (name === STATE.activeTab) return;
-  if (name !== 'rush' && soltarPrincipal) {
-    if (restaurarDatos()) initHero();
-    soltarPrincipal();
-  }
   const anterior = STATE.activeTab;
   const scrollAntes = window.scrollY;   // antes de cambiar de panel (luego puede quedar recortado)
   const saliente = document.getElementById(`panel-${anterior}`);
@@ -702,36 +695,38 @@ function switchSeason(season) {
 
 /* ── Init ────────────────────────────────────────────────────────────────── */
 async function init() {
+  // Una versión nueva ya descargada se aplica antes de arrancar (version.js recarga la página)
+  await window.SLVersion?.alArrancar;
   initBubbles();
   initTabs();
   initSeasonSelector();
   initSession();
-  if (typeof rushVerificarAcceso === 'function') rushVerificarAcceso();
   initSwipeTabs();
   initPullToRefresh();
 
   // Lo guardado de la última vez se pinta ya y lo fresco de Sheets llega detrás. Sin nada
-  // guardado (la primera vez) se espera a Sheets, salvo para ir a Rush, que no lo necesita
+  // guardado (la primera vez) se espera a Sheets. Nada de Rush compite con esto: Rush no
+  // se pide hasta pulsar JUGAR (rush-panel.js)
   const tabInicial = tabDesdeHash();
-  if (tabInicial === 'rush') {
-    switchTab('rush');
-    // Rush primero (pintado y listo para tocar); lo de la Shits League normal (calcular las
-    // estadísticas y pintar Inicio) a los ~3 s, en un rato libre: Rush no lo necesita y no
-    // debe retrasar el toque en JUGAR. Si antes se va a otra pestaña, en ese momento
-    await new Promise(r => {
-      soltarPrincipal = () => { soltarPrincipal = null; r(); };
-      setTimeout(() => (window.requestIdleCallback ?? (f => setTimeout(f, 50)))(() => soltarPrincipal?.(), { timeout: 2000 }), 3000);
-    });
-  }
+  if (tabInicial === 'rush') switchTab('rush');
   const guardados = restaurarDatos();
+  // «sl:cargada»: la Shits League ya tiene sus datos frescos. Entonces (y no antes) se registra
+  // el service worker (version.js), que descarga la app en segundo plano
+  const cargada = () => document.dispatchEvent(new Event('sl:cargada'));
   if (guardados) {
-    recargarDatos();
+    recargarDatos().finally(cargada);
   } else {
     try {
       await loadData();
     } catch (e) {
       console.error('[app] Error cargando datos:', e);
     }
+    cargada();
+  }
+  // El acceso a Rush es el guardado; solo si no se sabe (una sesión de antes de Rush) se
+  // pregunta, y cuando la Shits League ya ha cargado
+  if (typeof rushVerificarAcceso === 'function' && getSessionPlayer() && rushAccesoGuardado() === null) {
+    document.addEventListener('sl:cargada', () => rushVerificarAcceso(), { once: true });
   }
 
   initHero();

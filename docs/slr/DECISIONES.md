@@ -1806,3 +1806,103 @@ Móvil 412 × 915 con la CPU ×4 y «4G lenta» (150 ms, 1,6 / 0,75 Mbit/s); med
 - **En caliente**, en una traza con el toque en cuanto JUGAR está activo, Equipo se ve con lo fresco a los ~0,9 s de abrir la app. Lo que queda es pintar Equipo (~270 ms con la CPU ×4) y, para «se puede usar», la respuesta de `slr_rush_inicio`.
 - **Al día siguiente** es lo que más ha mejorado (de 8,2 a 1,1 s): la web ya no se revalida archivo a archivo.
 - **La medida «al día siguiente» de antes** esperaba mal a que el service worker estuviera activo: `waitForFunction` no espera a una función `async`, porque la promesa ya cuenta como «sí». Ahora es un bucle, igual que en `banco/version.mjs`.
+
+## Rush solo al pulsar JUGAR y versiones sin aviso
+
+### Decisiones de Marcos
+
+- **Hasta que no se pulsa JUGAR, no se descarga nada de Rush.** Ni código, ni llamadas a Supabase, ni fotos. La Shits League normal tiene prioridad absoluta: carga primero, entera y sin competir con nada de Rush.
+- **La precarga se divide en dos.**
+  - La de la Shits League normal se instala con la app.
+  - La de Rush se descarga al pulsar JUGAR por primera vez, o la primera vez tras una versión nueva de Rush. Mientras, «Descargando Shits League Rush…» con el porcentaje real.
+  - Si Rush ya está descargado, JUGAR entra directo. Las fotos de las cartas, después y en segundo plano, como antes.
+- **Fuera el aviso «Hay una versión nueva · Actualizar».** Las versiones nuevas se descargan en segundo plano y se aplican solas la próxima vez que se abre la app, sin preguntar ni avisar. La de Rush, solo si Rush ya estaba descargado y sin competir con lo que esté cargando el usuario.
+- **Excepción, el código guardado es incompatible** (una función de Supabase que ya no existe): pantalla clara «Actualizando la app…» con la rueda, se actualiza y se recarga sola. Si tarda más de unos 15 s, un mensaje con «Reintentar».
+- **Una versión publicada a mitad de la primera descarga:** la descarga en marcha termina bien y la nueva se aplica la próxima vez, sin cortes ni bucles.
+
+### Decisiones mías
+
+#### Dos listas y dos cachés
+
+- **`herramientas/precarga.mjs`** separa `precarga.js` en `archivos` (la Shits League normal, 22 archivos, ~525 KB) y `rush` (84 archivos, ~965 KB).
+  - Es de Rush lo que hay en `js/slr/`, `css/slr.css`, `css/acabados/` e `img/slr/`, y lo de `assets/` que solo cita Rush (la foto del muestrario).
+  - La portada (`js/rush-panel.js` y `css/rush-panel.css`) es de la Shits League normal: se ve sin pulsar JUGAR.
+  - `version` es la de todo y `versionRush` solo la de Rush.
+  - Ya no hay lista de módulos para `modulepreload` ni lista de «lo crítico»: no hacen falta.
+  - Un test comprueba que nada de la Shits League normal importa ni cita nada de Rush.
+- **`sw.js` (CACHE_NAME v40)** usa dos cachés: `…-app-<version>` y `…-rush-<versionRush>`. Cada una tiene su marca de «entera».
+  - La instalación descarga solo la de la app, de cuatro en cuatro y con prioridad baja.
+  - Rush se descarga con el mensaje `descargarRush` de la página, de seis en seis, con su progreso. Si el navegador para el worker a mitad, la página lo vuelve a pedir y sigue por donde iba, sin repetir lo guardado.
+  - Lo que no ha cambiado se copia de cualquier caché anterior que esté entera (también de la de antes de separar Rush, y aunque cambie CACHE_NAME). Así subir CACHE_NAME ya no obliga a descargarlo todo.
+  - Lo de Rush que se pida antes de descargarlo (sin service worker, o JUGAR antes de que se instale) va a la red, sin guardarse.
+  - JUGAR antes de que el service worker mande en la página (la primera visita, si se pulsa enseguida): Rush entra por la red sin esperar y, en cuanto el service worker toma el mando, se guarda en segundo plano. Ya se había pedido, así que la próxima vez JUGAR entra directo, sin pantalla de descarga.
+
+#### Versiones sin aviso
+
+- **Versión nueva con Rush ya descargado:** la instalación lo pone al día también, de dos en dos y con prioridad baja. Al aplicarse, JUGAR entra directo.
+  - Si la página pulsa JUGAR mientras tanto, la misma descarga se acelera (más a la vez y sin prioridad baja).
+- **Versión nueva sin Rush descargado:** no se toca Rush.
+- **Aplicarla al abrir:** `version.js` mira, antes de que arranque `app.js` (que lo espera), si hay una versión esperando. Si la hay, la activa y recarga: es una sola recarga al principio, antes de pintar nada de la app.
+  - Nunca a mitad de una descarga de Rush.
+  - Como mucho una vez por minuto, para que no pueda haber bucles.
+  - Recarga cuando la nueva ya está activa, no a ciegas. El navegador puede tardar un poco en activarla si el worker viejo aún está bajando algo (fotos de cartas); en un banco, una recarga a los 3 s llegó antes y la versión se quedó sin aplicar. Se espera hasta 8 s. Si no, la app arranca con el código que ya tiene (la versión nueva queda activa en cuanto el navegador termina y se usa entera la próxima vez); nunca se recarga a mitad de uso. Riesgo conocido, muy improbable: si en esa sesión se entra en Rush por primera vez, sus archivos ya serían los de la versión nueva.
+  - Si la única página se cierra o navega, el navegador ya la aplica solo y no hace falta ni esa recarga.
+- **Viniendo del service worker de antes**, que no sabe aplicar versiones solo y enseñaría su aviso viejo: la v40 se aplica nada más instalarse. Lo que ya tiene abierto esa página sigue funcionando y lo nuevo se usa a partir de la próxima vez.
+- **El registro del service worker** espera a que la Shits League tenga sus datos frescos (evento `sl:cargada` de `app.js`), y después a un rato libre (como mucho 15 s después de `load`). Antes se registraba al `load`, que con los iframes de YouTube y Spotify llega tarde, y la descarga entera competía con lo que se estaba viendo.
+- **Al volver a la app** se busca versión nueva, salvo con una descarga de Rush en marcha.
+- **Una versión publicada a mitad de la primera descarga:** la nueva se instala y espera sin tocar Rush, porque no estaba entero. La descarga en marcha termina en su versión.
+  - Al aplicarse la nueva, se guarda la Rush vieja para copiar de ella. La página la pone al día en segundo plano y despacio (copiando lo igual y bajando lo cambiado) y después se borra la vieja.
+- **Actualización forzada:** «Actualizando la app…» con la rueda.
+  - A los 15 s sin terminar (o si falla), «Está tardando más de lo normal. Comprueba la conexión.» y «Reintentar». Reintentar vuelve a buscar la versión, espera a que esté y recarga; no es una recarga a ciegas, que podría volver a arrancar con el código viejo.
+  - Sola, una vez cada 2 minutos como mucho, como antes.
+
+#### Nada de Rush antes de JUGAR
+
+- **Fuera de `rush-panel.js`** todo lo que se pedía al arrancar o al ver la portada:
+  - la llamada `slr_rush_inicio` del arranque;
+  - la comprobación de acceso con el servidor;
+  - las lecturas públicas para el estado de la liga;
+  - los `modulepreload` y la carga en un rato libre de `rush.js` y `css/slr.css`.
+- **El acceso a la beta** es el guardado. Se comprueba con el servidor al iniciar sesión (una sola llamada, `slr_login`), y al arrancar solo si no se sabe (una sesión de antes de Rush), cuando la Shits League ya ha cargado. Si se ha perdido, lo descubre Rush al pulsar JUGAR, como ya hacía.
+- **El estado de la portada** («Jornada 3 · domingo…») es el que guarda Rush cada vez que carga la entrada (`RUSH_PORTADA` en localStorage). Si nunca se ha entrado, no hay línea de estado.
+- **Al pulsar JUGAR**, la primera vez en la página, `slr_rush_inicio` se pide a la vez que se carga el código, y Rush la usa sin repetirla.
+- **Al entrar directo en `#rush`**, la Shits League normal ya no espera 3 s: no hay nada de Rush con lo que competir.
+- **Las notificaciones (OneSignal)** son de la Shits League normal. Rush no tiene un OneSignal propio, así que no cambian.
+
+#### Cómo se prueba
+
+- **Unitarios:**
+  - `precarga.test.mjs`: dos partes sin repetir, nada de la Shits League normal tira de Rush, y las versiones.
+  - `sw.test.mjs`: la instalación sin Rush; Rush a petición con su progreso; retomar a mitad; versión nueva con y sin Rush descargado; venir del service worker de antes; versión nueva a mitad de la primera descarga; acelerar una descarga en segundo plano.
+- **`banco/version.mjs`, en el navegador con 4G lenta:**
+  - abrir la app y mirar la portada sin pulsar JUGAR no hace ninguna petición de Rush, ni de la página ni del service worker;
+  - la primera vez, el porcentaje real; después, JUGAR entra directo, todo sale de la caché y la app arranca sin conexión;
+  - la versión nueva se descarga sin aviso ni recarga y se aplica al abrir;
+  - la actualización forzada, y la que se queda colgada con «Reintentar»;
+  - una versión nueva a mitad de la primera descarga.
+- **`red-lenta.mjs`** tiene `red.retener`, para dejar una descarga colgada a voluntad.
+- **`banco/rendimiento-liga.mjs`** (nuevo) mide la Shits League normal:
+  - en frío y en caliente: cuándo se ve Inicio, cuándo llegan los datos frescos y cuándo se queda la red tranquila (incluida la descarga del service worker);
+  - peticiones y MB, separando lo de Rush;
+  - y JUGAR por primera vez.
+
+#### Antes y después
+
+Móvil 412 × 915 con la CPU ×4 y «4G lenta» (150 ms, 1,6 / 0,75 Mbit/s); mediana de 3 pasadas; `tests/slr/banco/rendimiento-liga.mjs`. «Todo cargado» es cuando la red se queda tranquila, con la descarga del service worker incluida. Los MB «del resto» incluyen los iframes de YouTube y Spotify de Inicio, que no son nuestros.
+
+| Shits League (Inicio) | Se ve | Datos frescos | Todo cargado | Peticiones / MB del resto | Peticiones / MB de Rush |
+|---|---|---|---|---|---|
+| En frío, antes | 3,2 s | 3,0 s | 24,8 s | 100 / 2,40 MB | 86 / 0,34 MB |
+| En frío, después | 3,1 s | 2,9 s | 20,2 s | 99 / 2,38 MB | **0 / 0** |
+| En caliente, antes | 0,2 s | 1,7 s | 6,5 s | 85 / 0,22 MB | 1 / 0,00 MB |
+| En caliente, después | 0,2 s | 1,7 s | 5,1 s | 86 / 0,26 MB | **0 / 0** |
+
+| JUGAR por primera vez (app ya abierta y quieta) | Hasta Equipo usable | Peticiones / MB |
+|---|---|---|
+| Antes | 0,4 s | 3 / 0,07 MB (Rush ya se había bajado de fondo al abrir la app) |
+| Después | 7,1 s | 92 / 0,46 MB (aquí se descarga Rush, con el porcentaje en pantalla) |
+
+**Lecturas:**
+- **Nada de Rush antes de JUGAR,** ni en frío ni en caliente. La red de la Shits League normal se queda tranquila 4,6 s antes en frío y 1,4 s antes en caliente.
+- **«Se ve» y «datos frescos» apenas cambian en este banco.** Aquí el service worker viejo ya se registraba al terminar de cargar la página, así que su descarga empezaba después de pintar Inicio. En el móvil, con el service worker viejo ya instalado, al abrir competían con la Shits League la llamada `slr_rush_inicio`, la comprobación de acceso, los `modulepreload` de unos 80 módulos y la carga de `rush.js`. Eso es lo que ya no pasa.
+- **JUGAR la primera vez tarda más (7,1 s),** porque es cuando se descarga Rush, como se pidió. Las siguientes, entra directo, sin descarga: en el banco del repaso de rendimiento, 1,4 s en caliente hasta poder usar Equipo.

@@ -1,7 +1,8 @@
 // Tests de la app «instalada como un juego» (fase 1 del repaso de rendimiento):
 // · la lista de precarga (precarga.js) está al día, la genera herramientas/precarga.mjs,
 //   tiene todo lo que usa la web y nada de tests/, docs/, supabase/…;
-// · los módulos de Rush que se piden de golpe (modulepreload) son el cierre de sus imports;
+// · dos partes: la Shits League normal (se instala con la app) y Rush (se descarga al pulsar
+//   JUGAR), sin repetir nada y sin que la Shits League normal tire de nada de Rush;
 // · el cambio de versión: qué errores de Supabase significan «el código guardado es viejo»
 //   (incluida una función que ya no existe) y que api.js entonces fuerza la actualización.
 import { test } from 'node:test';
@@ -9,11 +10,12 @@ import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import vm from 'node:vm';
-import { generar, archivosDeLaWeb, importsDe, cierreDeImports, RAIZ } from '../../herramientas/precarga.mjs';
+import { generar, archivosDeLaWeb, importsDe, cierreDeImports, esDeRush, RAIZ } from '../../herramientas/precarga.mjs';
+import { createHash } from 'node:crypto';
 
 const leer = r => readFileSync(join(RAIZ, r), 'utf8').replace(/\r\n/g, '\n');
 const PRECARGA = (() => { const self = {}; new Function('self', generar())(self); return self.PRECARGA; })();
-const rutas = new Set(PRECARGA.archivos.map(a => a[0]));
+const rutas = new Set([...PRECARGA.archivos, ...PRECARGA.rush].map(a => a[0]));
 
 test('precarga.js está al día (se genera con herramientas/precarga.mjs, nunca a mano)', () => {
   assert.equal(leer('precarga.js'), generar(), 'ejecuta: node herramientas/precarga.mjs');
@@ -51,7 +53,7 @@ test('la lista tiene todo lo que usa la web y nada que no', () => {
 });
 
 test('cada archivo con su tamaño y su resumen; la versión cambia si cambia cualquiera', () => {
-  for (const [r, bytes, resumen] of PRECARGA.archivos) {
+  for (const [r, bytes, resumen] of [...PRECARGA.archivos, ...PRECARGA.rush]) {
     assert.ok(Number.isInteger(bytes) && bytes > 0, r);
     assert.match(resumen, /^[0-9a-f]{12}$/, r);
   }
@@ -61,21 +63,32 @@ test('cada archivo con su tamaño y su resumen; la versión cambia si cambia cua
   assert.equal(js[1], Buffer.byteLength(leer('js/app.js')));
 });
 
-test('Rush: los módulos que se piden de golpe son todos los que carga al entrar', () => {
-  assert.deepEqual(PRECARGA.rush, cierreDeImports(['js/slr/config.js', 'js/slr/rush.js']));
-  assert.ok(PRECARGA.rush.includes('js/slr/rush.js') && PRECARGA.rush.includes('js/slr/api.js') && PRECARGA.rush.includes('js/slr/pantallas/mercado.js'));
-  for (const r of PRECARGA.rush) assert.ok(rutas.has(r), r);
-  // Los import() dinámicos no cuentan: ajustes.js se carga con un import() protegido (config.js del partido)
-  assert.ok(!PRECARGA.rush.includes('js/slr/partido/ajustes.js') && rutas.has('js/slr/partido/ajustes.js'));
+test('dos partes: la Shits League normal (con la app) y Rush (al pulsar JUGAR), sin repetir nada', () => {
+  const rush = new Set(PRECARGA.rush.map(a => a[0]));
+  const todo = [...PRECARGA.archivos, ...PRECARGA.rush].map(a => a[0]);
+  assert.equal(new Set(todo).size, todo.length, 'ningún archivo en las dos');
+  assert.deepEqual([...todo].sort(), archivosDeLaWeb());
+  // Rush: su código (con todo lo que importa), su CSS con los acabados, sus iconos y lo de assets/ que solo usa Rush
+  for (const r of cierreDeImports(['js/slr/config.js', 'js/slr/rush.js'])) assert.ok(rush.has(r), `${r} (módulo de Rush)`);
+  for (const r of ['css/slr.css', 'js/slr/partido/ajustes.js', 'css/acabados/foil.css', 'assets/slr-muestra-sin-fondo.png']) assert.ok(rush.has(r), r);
+  for (const r of todo) if (esDeRush(r)) assert.ok(rush.has(r), r);
+  // La Shits League normal: nada de Rush (ni lo que se carga antes de JUGAR: la portada es rush-panel.js)
+  for (const [r] of PRECARGA.archivos) assert.ok(!esDeRush(r) && r !== 'assets/slr-muestra-sin-fondo.png', `${r} es de Rush`);
+  for (const r of ['index.html', 'js/app.js', 'js/rush-panel.js', 'js/version.js', 'css/main.css', 'css/rush-panel.css', 'assets/logo-s-green.png']) assert.ok(PRECARGA.archivos.some(a => a[0] === r), r);
+  // Ningún archivo de la Shits League normal importa ni cita nada de Rush
+  for (const [r] of PRECARGA.archivos) {
+    if (r.endsWith('.js')) for (const i of importsDe(r)) assert.ok(!rush.has(i), `${r} importa ${i}`);
+    if (/\.(css|html)$/.test(r)) assert.doesNotMatch(leer(r), /(?:href|src|url\()\s*=?\s*["']?(?:\.\.\/)?(?:js\/slr\/|css\/slr\.css|css\/acabados\/|img\/slr\/)/, r);
+  }
 });
 
-test('lo crítico (lo único a lo que espera JUGAR la primera vez): lo de Rush, y nada de la Shits League normal ni logos', () => {
-  const critico = new Set(PRECARGA.critico);
-  for (const r of critico) assert.ok(rutas.has(r), r);
-  for (const r of PRECARGA.rush) assert.ok(critico.has(r), `${r} (módulo de Rush)`);
-  for (const r of ['css/slr.css', 'js/slr/partido/ajustes.js']) assert.ok(critico.has(r), r);
-  for (const r of rutas) if (r.startsWith('img/slr/') || r.startsWith('css/acabados/')) assert.ok(critico.has(r), r);
-  for (const r of ['index.html', 'js/app.js', 'css/main.css', 'assets/logo-s-green.png']) assert.ok(!critico.has(r), `${r} va después`);
+test('versiones: versionRush solo cambia si cambia algo de Rush', () => {
+  assert.match(PRECARGA.versionRush, /^[0-9a-f]{12}$/);
+  const hash = xs => createHash('sha256').update(JSON.stringify(xs)).digest('hex').slice(0, 12);
+  assert.equal(PRECARGA.versionRush, hash(PRECARGA.rush));
+  // version es la de todo: cambia con cualquier archivo, de las dos partes
+  const todo = [...PRECARGA.archivos, ...PRECARGA.rush].sort((a, b) => (a[0] < b[0] ? -1 : 1));
+  assert.equal(PRECARGA.version, hash(todo));
 });
 
 /* ── Cambio de versión ──────────────────────────────────────────────────── */

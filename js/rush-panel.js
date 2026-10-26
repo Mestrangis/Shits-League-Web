@@ -4,13 +4,14 @@
    sesión de Shits League (session.js). Aquí no hay nada del juego: el modo
    Rush (js/slr/rush.js + css/slr.css) se carga al pulsar JUGAR.
    Rush está en beta: la pestaña solo aparece con sesión y acceso. El acceso lo
-   dice el servidor (slr_yo / slr_login → tiene_acceso) y se guarda en
-   localStorage para que al arrancar no parpadee.
-   · La primera vez, la app se descarga entera en segundo plano (sw.js). Si se
-     entra aquí antes de que acabe, «Descargando Shits League Rush…» con el
-     porcentaje real, hasta que termina.
-   · Al ver la portada se piden de golpe los módulos de Rush (modulepreload): al
-     pulsar JUGAR ya están, en vez de descubrirse uno tras otro.
+   dice el servidor (slr_login → tiene_acceso) al iniciar sesión y se guarda en
+   localStorage; al arrancar se usa lo guardado.
+   · NADA de Rush (código, Supabase, fotos) se pide antes de pulsar JUGAR: la
+     Shits League normal carga sola, sin competir. El estado de la portada es el
+     que guardó Rush la última vez (localStorage).
+   · Al pulsar JUGAR la primera vez (o la primera tras una versión nueva de
+     Rush), «Descargando Shits League Rush…» con el porcentaje real (sw.js lo
+     guarda para las siguientes); si ya está descargado, entra directo.
 ═══════════════════════════════════════════════ */
 
 const RUSH_TOKEN_KEY = 'SLR_TOKEN';
@@ -49,13 +50,6 @@ async function rushRpc(funcion, args) {
   return datos;
 }
 
-async function rushLeer(ruta) {
-  const { SUPABASE_URL, SUPABASE_KEY } = await rushConfig();
-  const r = await fetch(`${SUPABASE_URL}/rest/v1/${ruta}`, { headers: { apikey: SUPABASE_KEY } });
-  if (!r.ok) throw new Error(`Error leyendo ${ruta}`);
-  return r.json();
-}
-
 // Mismo nombre ignorando mayúsculas y tildes ("Nicolás" = "nicolas")
 function rushMismoNombre(a, b) {
   const n = s => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
@@ -86,11 +80,10 @@ function rushGuardarAcceso(acceso) {
   rushMostrarPestana(!!acceso && !!getSessionPlayer());
 }
 
-/* ── Lo de la entrada a Rush, pedido al arrancar ─────────────────────────────
-   slr_rush_inicio es UNA llamada con el jugador (¿tiene acceso?), la liga, el
-   calendario y todo lo que Rush necesita al entrar. Se pide nada más arrancar la
-   app: sirve para comprobar el acceso, para el estado de la portada y, si se
-   pulsa JUGAR antes de 15 s, Rush la usa sin volver a pedirla (rush.js). */
+/* ── Lo de la entrada a Rush, pedido al pulsar JUGAR ─────────────────────────
+   slr_rush_inicio es UNA llamada con el jugador, la liga, el calendario y todo lo
+   que Rush necesita al entrar. Se pide nada más pulsar JUGAR (a la vez que se
+   carga el código) y Rush la usa sin volver a pedirla (rush.js → tomarPrecarga). */
 window.rushPrecarga = null;   // { ambito, t, promesa, llegada }: llegada, cuándo respondió
 const rushAmbito = () => `${getSessionPlayer()}|${RUSH_ES_LOCAL ? 'prueba' : 'principal'}`;
 function rushPedirInicio(token) {
@@ -102,34 +95,16 @@ function rushPedirInicio(token) {
   return promesa;
 }
 
-// Al arrancar y en cada cambio de sesión (app.js): primero lo guardado, sin
-// esperar a la red, y luego lo que diga el servidor
-// La comprobación de acceso en curso; da lo de la entrada a Rush (slr_rush_inicio) si lo ha pedido
-let rushVerificando = null;
-function rushVerificarAcceso() {
-  return (rushVerificando = rushVerificarAccesoAhora());
-}
-async function rushVerificarAccesoAhora() {
+// Al iniciar sesión (app.js → onSessionChange): ¿tiene acceso a la beta? Una sola llamada
+// (slr_login). Al arrancar NO se llama (vale lo guardado), salvo si no se sabe (app.js); si
+// el acceso se ha perdido, lo descubre Rush al pulsar JUGAR
+async function rushVerificarAcceso() {
   const jugador = getSessionPlayer();
   // Sin código guardado es una sesión antigua: session.js la cierra
   if (!jugador || !getSessionCode()) { rushMostrarPestana(false); return; }
   rushMostrarPestana(rushAccesoGuardado() === true);
   try {
-    const token = rushToken();
-    if (token) {
-      try {
-        const b = await rushPedirInicio(token);
-        if (rushMismoNombre(b.yo.usuario?.nombre, jugador)) { rushGuardarAcceso(b.yo.tiene_acceso); return b; }
-        window.rushPrecarga = null;   // de otra persona: no vale
-      } catch (e) {
-        if (e.status !== 403) throw e;
-      }
-      rushGuardarToken(null);
-    }
-    const r = await rushReautenticar();
-    if (r === 'perdida') rushSesionPerdida();
-    // Sesión nueva: también se pide ya lo de la entrada a Rush (portada y JUGAR)
-    else if (r === 'ok' && rushToken()) return await rushPedirInicio(rushToken()).catch(() => null);
+    if (await rushReautenticar() === 'perdida') rushSesionPerdida();
   } catch (e) {
     console.warn('[rush] No se pudo comprobar el acceso:', e.message);   // se queda lo guardado
   }
@@ -207,8 +182,6 @@ function rushCerrarSesion() {
 /* ── Panel ───────────────────────────────────────────────────────────────── */
 function renderRushPanel() {
   const conSesion = !!getSessionPlayer();
-  // Sin service worker al mando (primera vez): JUGAR espera a saber si la app ya está descargada
-  const porComprobar = 'serviceWorker' in navigator && !navigator.serviceWorker.controller;
   return `
     <section class="rush-portada">
       <div class="rush-portada__fondo" aria-hidden="true"></div>
@@ -218,9 +191,9 @@ function renderRushPanel() {
       </div>
       <p class="rush-portada__lema">El juego de cartas de la liga: ficha a los de siempre, monta tu once y cada domingo el motor juega la jornada.</p>
       <div class="rush-portada__estado" id="rushEstado">
-        <span class="rush-portada__punto"></span><span id="rushEstadoTexto">Cargando…</span>
+        <span class="rush-portada__punto"></span><span id="rushEstadoTexto"></span>
       </div>
-      <button class="rush-portada__jugar" id="rushJugar" type="button" ${conSesion && !porComprobar ? '' : 'disabled'}>
+      <button class="rush-portada__jugar" id="rushJugar" type="button" ${conSesion ? '' : 'disabled'}>
         ${conSesion ? 'JUGAR' : 'Inicia sesión para jugar'}
       </button>
       ${conSesion ? '' : '<button class="rush-portada__entrar" id="rushEntrar" type="button">ENTRAR CON MI CÓDIGO</button>'}
@@ -231,33 +204,60 @@ function bindRushPanel(panel) {
   panel.querySelector('#rushJugar')?.addEventListener('click', rushJugar);
   panel.querySelector('#rushEntrar')?.addEventListener('click', () => openSessionModal());
   rushCargarEstado(panel);
-  rushComprobarDescarga(panel);
 }
 
-/* ── Descarga de la app (primera vez) y módulos de Rush por adelantado ─────── */
-const rushMb = b => (b / 1048576).toFixed(1).replace('.', ',');
-async function rushComprobarDescarga(panel) {
-  const v = window.SLVersion;
-  if (!v) return;
-  const e = await v.estado().catch(() => ({ lista: true }));
-  const jugar = panel.querySelector('#rushJugar');
-  if (e.lista) {
-    if (jugar?.isConnected && getSessionPlayer()) jugar.disabled = false;
-    rushPrecargarModulos(e.rush);
-    return;
+/* ── Estado de la portada: el que guardó Rush la última vez (rush.js) ──────── */
+const RUSH_FECHA = new Intl.DateTimeFormat('es-ES', {
+  timeZone: 'Europe/Madrid', weekday: 'long', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+});
+const RUSH_PORTADA_KEY = 'RUSH_PORTADA';   // { ambito, liga: { estado, temporada }, jornada: { numero, estado, cierre_en } | null }
+
+function rushCargarEstado(panel) {
+  const texto = panel.querySelector('#rushEstadoTexto');
+  const caja  = panel.querySelector('#rushEstado');
+  let g = null;
+  try { g = JSON.parse(localStorage.getItem(RUSH_PORTADA_KEY) || 'null'); } catch { /* sin persistencia */ }
+  // Sin nada guardado (aún no se ha entrado nunca), sin línea de estado
+  if (!g || g.ambito !== rushAmbito() || !getSessionPlayer()) { caja.hidden = true; return; }
+  const { liga, jornada: j } = g;
+  let estado = 'Todavía no hay liga', clase = 'apagada';
+  if (liga?.estado === 'preparacion') {
+    estado = 'Liga en preparación: apúntate antes de que empiece'; clase = 'abierta';
+  } else if (liga?.estado === 'pausada') {
+    estado = 'Liga en pausa'; clase = 'pausa';
+  } else if (liga?.estado === 'entre_temporadas') {
+    estado = `Entre temporadas · la temporada ${liga.temporada} ha terminado`; clase = 'abierta';
+  } else if (liga?.estado === 'en_curso') {
+    clase = 'viva';
+    if (!j) estado = `Temporada ${liga.temporada} en marcha`;
+    else if (j.estado !== 'programada' || new Date(j.cierre_en) <= new Date()) estado = `Jornada ${j.numero} en juego · resultados a las 21:00`;
+    else estado = `Jornada ${j.numero} · ${RUSH_FECHA.format(new Date(j.cierre_en))}`;
   }
-  const portada = panel.querySelector('.rush-portada');
-  if (!portada || portada.querySelector('.rush-descarga')) return;
+  texto.textContent = estado;
+  caja.dataset.estado = clase;
+}
+
+/* ── Descarga de Rush (al pulsar JUGAR, la primera vez) ────────────────────── */
+const rushMb = b => (b / 1048576).toFixed(1).replace('.', ',');
+// Resuelve cuando Rush está guardado (o en seguida sin service worker, o si la descarga
+// falla: entonces Rush se carga por la red). Mientras, «Descargando Shits League Rush…» con el %
+async function rushDescargar(panel) {
+  const v = window.SLVersion;
+  if (!v?.descargarRush) return;
+  const e = await v.estado().catch(() => null);
+  // Sin service worker al mando: Rush entra por la red (y version.js lo guarda en cuanto lo haya)
+  if (!e?.rush) { v.descargarRush(); return; }
+  if (e.rush.lista) return;
+  const portada = panel?.querySelector('.rush-portada');
   const caja = document.createElement('div');
   caja.className = 'rush-descarga';
   caja.setAttribute('role', 'status');
   caja.innerHTML = `<b class="rush-descarga__titulo">Descargando Shits League Rush…</b>
     <span class="rush-descarga__barra" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i></i></span>
     <small class="rush-descarga__texto">Preparando…</small>
-    <small class="rush-descarga__nota">Solo la primera vez: lo justo para jugar; el resto, después y sin esperar.</small>`;
-  portada.appendChild(caja);
-  portada.classList.add('rush-portada--descargando');
-  if (jugar) jugar.disabled = true;
+    <small class="rush-descarga__nota">Solo la primera vez (y con cada versión nueva): después, JUGAR entra directo.</small>`;
+  portada?.appendChild(caja);
+  portada?.classList.add('rush-portada--descargando');
   const pintar = d => {
     if (!d || d.totalBytes == null) return;
     const pct = Math.min(100, Math.round(100 * d.bytes / Math.max(1, d.totalBytes)));
@@ -265,84 +265,12 @@ async function rushComprobarDescarga(panel) {
     caja.querySelector('[role="progressbar"]').setAttribute('aria-valuenow', String(pct));
     caja.querySelector('.rush-descarga__texto').textContent = `${pct} % · ${rushMb(d.bytes)} de ${rushMb(d.totalBytes)} MB`;
   };
-  pintar(e.progreso);
-  const dejar = v.alProgreso(pintar);
-  await v.rushListo();
-  dejar();
-  caja.remove();
-  portada.classList.remove('rush-portada--descargando');
-  if (jugar?.isConnected && getSessionPlayer()) jugar.disabled = false;
-  rushPrecargarModulos((await v.estado().catch(() => ({}))).rush);
-}
-
-// Pide de golpe los módulos que carga Rush al entrar (y su CSS), una sola vez
-let rushModulosPedidos = false;
-function rushPrecargarModulos(lista) {
-  if (rushModulosPedidos || !Array.isArray(lista) || !lista.length) return;
-  rushModulosPedidos = true;
-  const frag = document.createDocumentFragment();
-  for (const ruta of lista) frag.appendChild(Object.assign(document.createElement('link'), { rel: 'modulepreload', href: rushRuta(ruta) }));
-  if (!document.getElementById('slrCss')) frag.appendChild(Object.assign(document.createElement('link'), { rel: 'preload', as: 'style', href: rushRuta('css/slr.css') }));
-  document.head.appendChild(frag);
-  // Y en el siguiente rato libre se cargan y ejecutan (con su CSS): al pulsar JUGAR ya están
-  (window.requestIdleCallback ?? (f => setTimeout(f, 300)))(() => {
-    rushModulo ??= import(rushRuta('js/slr/rush.js'));
-    rushModulo.catch(() => { rushModulo = null; });
-    rushCargarCss();
-  }, { timeout: 3000 });
-}
-
-const RUSH_FECHA = new Intl.DateTimeFormat('es-ES', {
-  timeZone: 'Europe/Madrid', weekday: 'long', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
-});
-
-// Liga que verá el usuario (la principal o, en local, la de prueba del bot) y su próxima
-// jornada: de lo pedido al arrancar si lo hay; si no, con lecturas públicas
-async function rushLigaVisible() {
-  // Lo de la entrada a Rush que trae la comprobación de acceso (o lo que haya pedido otra)
-  const b0 = getSessionPlayer() ? await rushVerificando?.catch(() => null) : null;
-  const p = window.rushPrecarga;
-  if (b0 || (p && p.ambito === rushAmbito())) {
-    try {
-      const b = b0 ?? await p.promesa;
-      if (b.liga) {
-        const j = (b.calendario?.jornadas ?? []).find(x => ['programada', 'cerrada', 'simulada'].includes(x.estado));
-        return { liga: b.liga, jornada: j ? { numero: j.numero, estado: j.estado, cierre_en: j.cierre_en } : null };
-      }
-    } catch { /* se cae a la lectura pública */ }
-  }
-  const [liga] = await rushLeer('ligas?select=id,nombre,estado,temporada&es_prueba=eq.false&order=creada_en&limit=1');
-  return { liga: liga || null, jornada: undefined };
-}
-
-async function rushCargarEstado(panel) {
-  const texto = panel.querySelector('#rushEstadoTexto');
-  const caja  = panel.querySelector('#rushEstado');
-  let estado = 'Sin conexión con Rush', clase = 'apagada';
   try {
-    const { liga, jornada } = await rushLigaVisible();
-    if (!liga) {
-      estado = 'Todavía no hay liga';
-    } else if (liga.estado === 'preparacion') {
-      estado = 'Liga en preparación: apúntate antes de que empiece'; clase = 'abierta';
-    } else if (liga.estado === 'pausada') {
-      estado = 'Liga en pausa'; clase = 'pausa';
-    } else if (liga.estado === 'entre_temporadas') {
-      estado = `Entre temporadas · la temporada ${liga.temporada} ha terminado`; clase = 'abierta';
-    } else if (liga.estado === 'en_curso') {
-      const [j] = jornada !== undefined ? [jornada] : await rushLeer(`jornadas?select=numero,estado,cierre_en&liga_id=eq.${liga.id}` +
-        '&estado=in.(programada,cerrada,simulada)&order=cierre_en&limit=1');
-      clase = 'viva';
-      if (!j) estado = `Temporada ${liga.temporada} en marcha`;
-      else if (j.estado !== 'programada' || new Date(j.cierre_en) <= new Date()) estado = `Jornada ${j.numero} en juego · resultados a las 21:00`;
-      else estado = `Jornada ${j.numero} · ${RUSH_FECHA.format(new Date(j.cierre_en))}`;
-    }
-  } catch (e) {
-    console.warn('[rush] Estado de la liga:', e.message);
+    await v.descargarRush(pintar);
+  } finally {
+    caja.remove();
+    portada?.classList.remove('rush-portada--descargando');
   }
-  if (!texto.isConnected) return;
-  texto.textContent = estado;
-  caja.dataset.estado = clase;
 }
 
 /* ── Entrar al modo Rush ─────────────────────────────────────────────────── */
@@ -363,11 +291,16 @@ async function rushJugar() {
   const btn = document.getElementById('rushJugar');
   if (btn) { btn.disabled = true; btn.textContent = 'CARGANDO…'; }
   try {
+    // La primera vez (o tras una versión nueva de Rush), se descarga entero: el %, en la portada
+    await rushDescargar(document.getElementById('panel-rush'));
     if (!rushToken()) {
       const r = await rushReautenticar();
       if (r === 'perdida') { rushSesionPerdida(); return; }
       if (r === 'sin_acceso') return;          // la pestaña ya se ha ocultado
     }
+    // La primera vez en esta página, lo de la entrada (una llamada) a la vez que se carga el
+    // código; después, Rush ya tiene lo suyo guardado y lo pide él si hace falta
+    if (!rushModulo) rushPedirInicio(rushToken()).catch(() => {});
     const [mod] = await Promise.all([
       rushModulo ??= import(rushRuta('js/slr/rush.js')),
       rushCargarCss(),

@@ -1,6 +1,10 @@
 // Tests del service worker (sw.js) en Node, con Cache Storage, fetch y clientes de mentira:
-// · instalación: precarga todos los archivos de la lista, avisa del progreso y, al
-//   actualizar, solo descarga lo que ha cambiado (lo igual lo copia de la versión anterior);
+// · instalación: precarga la Shits League normal (y NADA de Rush), avisa y, la primera vez, se
+//   activa sola; al actualizar solo descarga lo que ha cambiado (lo igual lo copia);
+// · Rush: se descarga solo al pedirlo la página (JUGAR), con su progreso; en una versión nueva
+//   se pone al día en segundo plano solo si ya estaba descargado;
+// · una versión nueva publicada a mitad de la primera descarga de Rush: la descarga termina
+//   bien y la nueva, al activarse, copia lo igual de ella;
 // · la web sale de la caché («primero la caché»), las navegaciones dan index.html y lo que
 //   no está en la lista va a la red; Supabase y Google no se tocan;
 // · fotos de las cartas: caché propia, pedidas con CORS, y solo las 600 más recientes.
@@ -34,10 +38,12 @@ function almacen() {
   };
 }
 
-// Un service worker «arrancado» con su lista; caches puede venir de una versión anterior
-function arrancar(archivos, { caches = almacen(), contenido = r => `contenido de ${r}`, critico = archivos.map(a => a[0]) } = {}) {
+// Un service worker «arrancado» con sus listas; caches puede venir de una versión anterior.
+// retraso(ruta): promesa que hace esperar a esa descarga (para probar cosas a mitad)
+const resumen = xs => createHash('sha256').update(JSON.stringify(xs)).digest('hex').slice(0, 12);
+function arrancar(archivos, { rush = [], caches = almacen(), contenido = r => `contenido de ${r}`, retraso = null, cacheName = 'shits-league-v40' } = {}) {
   const oyentes = {}, mensajes = [], pedidos = [];
-  const PRECARGA = { version: createHash('sha256').update(JSON.stringify(archivos)).digest('hex').slice(0, 12), archivos, rush: [], critico };
+  const PRECARGA = { version: resumen([...archivos, ...rush]), versionRush: resumen(rush), archivos, rush };
   const self = {
     registration: { scope: BASE },
     addEventListener: (t, f) => { oyentes[t] = f; },
@@ -46,64 +52,106 @@ function arrancar(archivos, { caches = almacen(), contenido = r => `contenido de
   };
   const fetchFalso = async (q, op = {}) => {
     const url = typeof q === 'string' ? q : q.url;
-    pedidos.push({ url, mode: op.mode ?? q.mode, cache: op.cache });
+    pedidos.push({ url, mode: op.mode ?? q.mode, cache: op.cache, priority: op.priority });
     if (url.includes('cloudinary')) return new Response('foto', { status: 200 });
     const ruta = url.slice(BASE.length) || 'index.html';
+    await retraso?.(ruta);
     return new Response(contenido(ruta), { status: 200 });
   };
+  const codigo = CODIGO.replace(/const CACHE_NAME = '[^']+'/, `const CACHE_NAME = '${cacheName}'`);
   const ctx = { self, caches, fetch: fetchFalso, Response, Request, URL, Map, Set, Promise, Math, JSON, String, Array, decodeURIComponent, console,
     importScripts: () => { self.PRECARGA = PRECARGA; } };
-  vm.runInNewContext(CODIGO, ctx);
+  vm.runInNewContext(codigo, ctx);
   const evento = (tipo, datos = {}) => {
     let espera = null, respuesta = null;
     const e = { ...datos, waitUntil: p => { espera = p; }, respondWith: p => { respuesta = p; } };
     oyentes[tipo](e);
     return { espera, respuesta: respuesta && Promise.resolve(respuesta) };
   };
-  return { self, caches, mensajes, pedidos, evento, PRECARGA };
+  const estado = () => new Promise(res => evento('message', { data: { tipo: 'estado' }, ports: [{ postMessage: res }] }));
+  const descargarRush = (fondo = false) => evento('message', { data: { tipo: 'descargarRush', fondo } }).espera;
+  const red = () => pedidos.filter(p => p.url.startsWith(BASE)).map(p => p.url.slice(BASE.length));
+  return { self, caches, mensajes, pedidos, evento, estado, descargarRush, red, PRECARGA };
 }
-const LISTA = [['index.html', 10, 'aaaaaaaaaaaa'], ['js/app.js', 20, 'bbbbbbbbbbbb'], ['css/main.css', 30, 'cccccccccccc'], ['img/x.svg', 40, 'dddddddddddd']];
+const cacheDe = (sw, parte) => sw.caches.c.get([...sw.caches.c.keys()].find(k => k.includes(`-${parte}-`)));
+const LISTA = [['index.html', 10, 'aaaaaaaaaaaa'], ['js/app.js', 20, 'bbbbbbbbbbbb'], ['css/main.css', 30, 'cccccccccccc'], ['js/rush-panel.js', 40, 'dddddddddddd']];
+const RUSH = [['js/slr/rush.js', 100, '111111111111'], ['js/slr/api.js', 200, '222222222222'], ['css/slr.css', 300, '333333333333'], ['img/slr/x.svg', 400, '444444444444']];
+const cambiar = (lista, ruta) => lista.map(a => (a[0] === ruta ? [a[0], a[1] + 1, 'eeeeeeeeeeee'] : a));
 const peticion = (url, extra = {}) => ({ url, method: 'GET', mode: 'cors', ...extra });
+const pausa = (ms = 20) => new Promise(r => setTimeout(r, ms));
+function cerrojo() { let soltar; const p = new Promise(r => { soltar = r; }); return { p, soltar }; }
 
-test('instalación: precarga toda la lista, avisa del progreso y, la primera vez, se activa sola', async () => {
-  const sw = arrancar(LISTA);
+test('instalación: la Shits League normal entera y NADA de Rush; la primera vez se activa sola', async () => {
+  const sw = arrancar(LISTA, { rush: RUSH });
   await sw.evento('install').espera;
-  const cache = sw.caches.c.get([...sw.caches.c.keys()].find(k => k.includes('-app-')));
+  const cache = cacheDe(sw, 'app');
   for (const [r] of LISTA) assert.ok(await cache.match(BASE + r), r);
-  assert.equal(sw.pedidos.filter(p => p.url.startsWith(BASE)).length, LISTA.length);
+  assert.deepEqual(sw.red().sort(), LISTA.map(a => a[0]).sort(), 'solo lo de la Shits League normal');
   assert.ok(sw.pedidos.every(p => p.cache === 'no-cache'), 'sin fiarse de la caché HTTP');
-  const prog = sw.mensajes.filter(m => m.bytes != null);
-  assert.equal(prog.at(-1).bytes, 100);
-  assert.equal(prog.at(-1).totalBytes, 100);
-  assert.ok(prog.every((m, i) => i === 0 || m.bytes >= prog[i - 1].bytes));
+  assert.ok(sw.pedidos.every(p => p.priority === 'low'), 'con prioridad baja: no compite con la página');
+  assert.ok(!cacheDe(sw, 'rush'), 'ni siquiera se abre la caché de Rush');
   assert.ok(sw.mensajes.some(m => m.lista && m.espera === false));
   assert.ok(sw.self.salto, 'sin versión anterior: skipWaiting');
+  const e = await sw.estado();
+  assert.equal(e.completa, true);
+  assert.deepEqual({ lista: e.rush.lista, descargando: e.rush.descargando, anterior: e.rush.anterior }, { lista: false, descargando: false, anterior: false });
 });
 
-test('primero lo que necesita Rush (lo crítico); en cuanto está, se avisa, y lo demás sigue después', async () => {
-  const lista = [['index.html', 10, 'a1a1a1a1a1a1'], ['js/app.js', 20, 'b1b1b1b1b1b1'], ['js/slr/rush.js', 30, 'c1c1c1c1c1c1'], ['css/slr.css', 40, 'd1d1d1d1d1d1'], ['assets/logo.png', 50, 'e1e1e1e1e1e1']];
-  const sw = arrancar(lista, { critico: ['js/slr/rush.js', 'css/slr.css'] });
+test('Rush se descarga al pedirlo la página (JUGAR), con su progreso, y después sale de la caché', async () => {
+  const sw = arrancar(LISTA, { rush: RUSH });
   await sw.evento('install').espera;
-  const orden = sw.pedidos.map(p => p.url.slice(BASE.length));
-  assert.deepEqual(orden.slice(0, 2).sort(), ['css/slr.css', 'js/slr/rush.js'], `primero lo crítico (${orden.join(', ')})`);
-  // El progreso es el de lo crítico (lo que bloquea JUGAR) y el aviso llega antes de que acabe lo demás
-  const prog = sw.mensajes.filter(m => m.bytes != null);
-  assert.equal(prog.at(-1).totalBytes, 70);
-  assert.equal(prog.at(-1).bytes, 70);
-  const iCritico = sw.mensajes.findIndex(m => m.critico), iLista = sw.mensajes.findIndex(m => m.lista);
-  assert.ok(iCritico >= 0 && iCritico < iLista, 'el aviso de lo crítico antes que el de la lista entera');
-  // «estado» del worker que instala: lo crítico ya está
-  const e = await new Promise(res => sw.evento('message', { data: { tipo: 'estado' }, ports: [{ postMessage: res }] }));
-  assert.ok(e.critico);
+  await sw.evento('activate').espera;
+  // Antes de descargarlo, lo de Rush va a la red (sin guardarse)
+  sw.pedidos.length = 0;
+  const r0 = await sw.evento('fetch', { request: peticion(BASE + 'js/slr/rush.js') }).respuesta;
+  assert.equal(await r0.text(), 'contenido de js/slr/rush.js');
+  assert.deepEqual(sw.red(), ['js/slr/rush.js']);
+  sw.pedidos.length = 0;
+  sw.mensajes.length = 0;
+  await sw.descargarRush();
+  assert.deepEqual(sw.red().sort(), RUSH.map(a => a[0]).sort());
+  assert.ok(sw.pedidos.every(p => p.priority === 'auto'), 'la ha pedido el usuario: sin frenar');
+  const prog = sw.mensajes.filter(m => m.rush?.bytes != null).map(m => m.rush);
+  assert.equal(prog.length, RUSH.length);
+  assert.equal(prog.at(-1).bytes, 1000);
+  assert.equal(prog.at(-1).totalBytes, 1000);
+  assert.ok(prog.every((m, i) => i === 0 || m.bytes >= prog[i - 1].bytes), 'el progreso solo sube');
+  assert.ok(sw.mensajes.at(-1).rush.lista, 'y al final, «lista»');
+  assert.equal((await sw.estado()).rush.lista, true);
+  sw.pedidos.length = 0;
+  const r1 = await sw.evento('fetch', { request: peticion(BASE + 'css/slr.css') }).respuesta;
+  assert.equal(await r1.text(), 'contenido de css/slr.css');
+  assert.equal(sw.pedidos.length, 0, 'de la caché');
+  // Pedirla otra vez no descarga nada
+  await sw.descargarRush();
+  assert.equal(sw.pedidos.length, 0);
 });
 
-test('versión nueva: solo descarga lo que ha cambiado y espera a la próxima vez', async () => {
-  const v1 = arrancar(LISTA);
+test('a mitad de descarga, «estado» da el progreso; si el worker se para, se retoma sin repetir lo guardado', async () => {
+  const c = cerrojo();
+  const caches = almacen();
+  const sw = arrancar(LISTA, { rush: RUSH, caches, retraso: r => (r === 'img/slr/x.svg' ? c.p : null) });
+  await sw.evento('install').espera;
+  sw.descargarRush();
+  await pausa();
+  const e = await sw.estado();
+  assert.equal(e.rush.descargando, true);
+  assert.equal(e.rush.progreso.bytes, 600, 'tres de cuatro');
+  // El navegador para el worker: uno nuevo (misma versión) retoma lo que falta
+  const otro = arrancar(LISTA, { rush: RUSH, caches });
+  await otro.descargarRush();
+  assert.deepEqual(otro.red(), ['img/slr/x.svg']);
+  assert.equal((await otro.estado()).rush.lista, true);
+  c.soltar();
+});
+
+test('versión nueva: solo lo que ha cambiado; Rush NO se descarga si no se había descargado; espera a la próxima vez', async () => {
+  const v1 = arrancar(LISTA, { rush: RUSH });
   await v1.evento('install').espera;
-  const nueva = LISTA.map(a => (a[0] === 'js/app.js' ? [a[0], 21, 'eeeeeeeeeeee'] : a));
-  const v2 = arrancar(nueva, { caches: v1.caches });
+  await v1.evento('activate').espera;
+  const v2 = arrancar(cambiar(LISTA, 'js/app.js'), { rush: cambiar(RUSH, 'js/slr/api.js'), caches: v1.caches });
   await v2.evento('install').espera;
-  assert.deepEqual(v2.pedidos.map(p => p.url), [BASE + 'js/app.js']);
+  assert.deepEqual(v2.red(), ['js/app.js']);
   assert.ok(!v2.self.salto, 'hay versión anterior: espera');
   assert.ok(v2.mensajes.some(m => m.lista && m.espera === true));
   // Al activarse, fuera la caché de la versión anterior (las fotos se quedan)
@@ -112,15 +160,102 @@ test('versión nueva: solo descarga lo que ha cambiado y espera a la próxima ve
   const nombres = await v2.caches.keys();
   assert.equal(nombres.filter(n => n.includes('-app-')).length, 1);
   assert.ok(nombres.includes('slr-fotos-cartas'));
+  assert.equal((await v2.estado()).rush.anterior, false, 'no había Rush: no hay nada que poner al día');
+});
+
+test('versión nueva con Rush ya descargado: se pone al día en segundo plano (solo lo cambiado, poco a poco)', async () => {
+  const v1 = arrancar(LISTA, { rush: RUSH });
+  await v1.evento('install').espera;
+  await v1.evento('activate').espera;
+  await v1.descargarRush();
+  const v2 = arrancar(LISTA, { rush: cambiar(RUSH, 'js/slr/api.js'), caches: v1.caches });
+  await v2.evento('install').espera;
+  assert.deepEqual(v2.red(), ['js/slr/api.js'], 'lo de la Shits League normal, copiado; de Rush, solo lo cambiado');
+  assert.ok(v2.pedidos.every(p => p.priority === 'low'), 'en segundo plano');
+  assert.ok(!v2.self.salto);
+  // Mientras espera, la versión activa sigue sirviendo su Rush entero
+  const r = await v1.evento('fetch', { request: peticion(BASE + 'js/slr/api.js') }).respuesta;
+  assert.equal(await r.text(), 'contenido de js/slr/api.js');
+  await v2.evento('activate').espera;
+  assert.equal((await v2.estado()).rush.lista, true, 'al aplicarse, Rush ya está: JUGAR entra directo');
+  assert.equal((await v2.caches.keys()).filter(n => n.includes('-rush-')).length, 1, 'la caché vieja de Rush, fuera');
+});
+
+test('viniendo del service worker de antes (una sola caché con todo): se aplica ya y Rush se copia sin descargarlo', async () => {
+  const caches = almacen();
+  const todo = [...LISTA, ...RUSH].sort((a, b) => (a[0] < b[0] ? -1 : 1));
+  const vieja = await caches.open('shits-league-v39-app-0123456789ab');
+  for (const [r] of todo) await vieja.put(BASE + r, new Response(`contenido de ${r}`));
+  await vieja.put('__precarga__.json', new Response(JSON.stringify({ version: '0123456789ab', archivos: todo, rush: ['js/slr/rush.js'], critico: [] })));
+  const sw = arrancar(LISTA, { rush: RUSH, caches });
+  await sw.evento('install').espera;
+  assert.deepEqual(sw.red(), [], 'nada a la red: todo era igual');
+  assert.ok(sw.self.salto, 'el de antes no sabe aplicar versiones solo: esta se aplica ya');
+  await sw.evento('activate').espera;
+  assert.equal((await sw.estado()).rush.lista, true);
+  assert.ok(!(await caches.keys()).includes('shits-league-v39-app-0123456789ab'));
+});
+
+test('una versión nueva publicada a mitad de la primera descarga de Rush: la descarga termina y la nueva copia de ella', async () => {
+  const c = cerrojo();
+  const v1 = arrancar(LISTA, { rush: RUSH, retraso: r => (r === 'img/slr/x.svg' ? c.p : null) });
+  await v1.evento('install').espera;
+  await v1.evento('activate').espera;
+  const descarga = v1.descargarRush();             // JUGAR por primera vez…
+  await pausa();
+  // …y a mitad se publica una versión nueva (cambian app.js y api.js): se instala y espera
+  const v2 = arrancar(cambiar(LISTA, 'js/app.js'), { rush: cambiar(RUSH, 'js/slr/api.js'), caches: v1.caches });
+  await v2.evento('install').espera;
+  assert.deepEqual(v2.red(), ['js/app.js'], 'la nueva no se mete con Rush: no estaba descargado entero');
+  assert.ok(!v2.self.salto, 'y espera a la próxima vez');
+  // La descarga en marcha termina bien, en su versión
+  c.soltar();
+  await descarga;
+  assert.equal((await v1.estado()).rush.lista, true);
+  assert.ok(v1.mensajes.some(m => m.rush?.lista));
+  assert.ok(!v1.mensajes.some(m => m.rush?.error));
+  // Próxima vez: se aplica la nueva. La Rush de la v1 se guarda para copiar de ella
+  await v2.evento('activate').espera;
+  const e = await v2.estado();
+  assert.equal(e.rush.lista, false);
+  assert.equal(e.rush.anterior, true, 'Rush ya estaba descargado: la página lo pone al día en segundo plano');
+  v2.pedidos.length = 0;
+  await v2.descargarRush(true);
+  assert.deepEqual(v2.red(), ['js/slr/api.js'], 'solo lo que ha cambiado');
+  assert.ok(v2.pedidos.every(p => p.priority === 'low'));
+  assert.equal((await v2.estado()).rush.lista, true);
+  assert.equal((await v2.caches.keys()).filter(n => /-(app|rush)-/.test(n)).length, 2, 'y la vieja, fuera');
+});
+
+test('si la página pide Rush mientras se bajaba en segundo plano, se acelera (y es la misma descarga)', async () => {
+  const caches = almacen();
+  const viejo = await caches.open('shits-league-v40-rush-0123456789ab');
+  await viejo.put('__precarga__.json', new Response(JSON.stringify({ versionRush: '0123456789ab', rush: [['js/slr/rush.js', 1, 'zzzzzzzzzzzz']] })));
+  const muchos = Array.from({ length: 12 }, (_, i) => [`js/slr/m${i}.js`, 10, `${i}`.padStart(12, '0')]);
+  const c = cerrojo();
+  const sw = arrancar(LISTA, { rush: muchos, caches, retraso: r => (r.startsWith('js/slr/') ? c.p : null) });
+  const instalacion = sw.evento('install').espera;   // Rush ya estaba (otra versión): la instalación lo pone al día en segundo plano…
+  await pausa();
+  const enFondo = sw.red().filter(r => r.startsWith('js/slr/')).length;
+  assert.equal(enFondo, 2, 'poco a poco: de dos en dos');
+  sw.descargarRush(false);              // …y el usuario pulsa JUGAR
+  await pausa();
+  const ahora = sw.red().filter(r => r.startsWith('js/slr/')).length;
+  assert.ok(ahora > enFondo, `más descargas a la vez (${enFondo} → ${ahora})`);
+  c.soltar();
+  await instalacion;
+  assert.equal(new Set(sw.red()).size, sw.red().length, 'cada archivo una vez');
+  assert.equal((await sw.estado()).rush.lista, true);
 });
 
 test('la web sale de la caché; navegaciones → index.html; lo demás, a la red; Supabase no se toca', async () => {
-  const sw = arrancar(LISTA);
+  const sw = arrancar(LISTA, { rush: RUSH });
   await sw.evento('install').espera;
+  await sw.descargarRush();
   sw.pedidos.length = 0;
-  for (const url of [BASE + 'js/app.js', BASE + 'css/main.css?v=2']) {
+  for (const url of [BASE + 'js/app.js', BASE + 'css/main.css?v=2', BASE + 'js/slr/rush.js']) {
     const r = await sw.evento('fetch', { request: peticion(url) }).respuesta;
-    assert.match(await r.text(), /contenido de (js\/app\.js|css\/main\.css)/);
+    assert.match(await r.text(), /contenido de (js\/app\.js|css\/main\.css|js\/slr\/rush\.js)/);
   }
   const nav = await sw.evento('fetch', { request: peticion(BASE + 'algo#rush', { mode: 'navigate' }) }).respuesta;
   assert.equal(await nav.text(), 'contenido de index.html');
@@ -142,7 +277,7 @@ test('fotos de las cartas: con CORS, de la caché la segunda vez y solo las 600 
   await sw.evento('fetch', { request: peticion(foto(1)) }).respuesta;
   assert.equal(sw.pedidos.length, n, 'la segunda vez, de la caché');
   for (let i = 2; i <= 640; i++) await sw.evento('fetch', { request: peticion(foto(i)) }).respuesta;
-  await new Promise(r => setTimeout(r, 50));   // el recorte va en segundo plano
+  await pausa(50);   // el recorte va en segundo plano
   const keys = await (await sw.caches.open('slr-fotos-cartas')).keys();
   assert.ok(keys.length <= 620 && keys.length >= 600, `recortada (${keys.length})`);
   assert.ok(keys.some(k => k.url === foto(640)) && !keys.some(k => k.url === foto(2)), 'se quedan las más recientes');
@@ -150,12 +285,17 @@ test('fotos de las cartas: con CORS, de la caché la segunda vez y solo las 600 
   assert.equal(sw.evento('fetch', { request: peticion('https://res.cloudinary.com/demo/image/upload/v1/emblema.png') }).respuesta, null);
 });
 
-test('«estado»: la versión y si está entera en la caché', async () => {
-  const sw = arrancar(LISTA);
-  const pedir = () => new Promise(res => sw.evento('message', { data: { tipo: 'estado' }, ports: [{ postMessage: res }] }));
-  assert.equal((await pedir()).completa, false);
+test('«estado»: la versión y si cada parte está entera en la caché', async () => {
+  const sw = arrancar(LISTA, { rush: RUSH });
+  assert.equal((await sw.estado()).completa, false);
   await sw.evento('install').espera;
-  const e = await pedir();
+  const e = await sw.estado();
   assert.equal(e.completa, true);
+  assert.equal(e.rush.lista, false);
   assert.equal(e.version, sw.PRECARGA.version);
+  // Si el navegador borra la caché de Rush, deja de estar lista (JUGAR la vuelve a descargar)
+  await sw.descargarRush();
+  assert.equal((await sw.estado()).rush.lista, true);
+  await sw.caches.delete([...sw.caches.c.keys()].find(k => k.includes('-rush-')));
+  assert.equal((await sw.estado()).rush.lista, false);
 });

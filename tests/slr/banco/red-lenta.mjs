@@ -8,6 +8,8 @@
 // · Lo de localhost (la web) se sirve con las cabeceras de caché de GitHub Pages
 //   (Cache-Control: max-age=600), para que el navegador se porte como en producción.
 // · red.offline = true: rechaza todo (sin conexión).
+// · red.retener = ruta => promesa | null: esa petición de la web espera a la promesa (para
+//   probar descargas que se quedan colgadas o cosas que pasan a mitad).
 // · red.cacheWeb = 'no-cache': lo que se sirva desde ahí, el navegador lo tiene que
 //   revalidar cada vez (como pasados los 10 minutos de GitHub Pages).
 import http from 'node:http';
@@ -19,7 +21,7 @@ export async function redLenta({ rtt = 150, bajada = 1.6e6, subida = 750e3, cach
   const abiertas = new Set();
   let sinRed = false;
   const red = {
-    url: '', cacheWeb,
+    url: '', cacheWeb, retener: null,
     get offline() { return sinRed; },
     set offline(v) { sinRed = !!v; if (sinRed) { for (const s of abiertas) s.destroy(); abiertas.clear(); } },
   };
@@ -56,6 +58,8 @@ export async function redLenta({ rtt = 150, bajada = 1.6e6, subida = 750e3, cach
     if (red.offline) { res.socket.destroy(); return; }
     // Petición normal (la web en localhost): se reenvía y la respuesta baja frenada
     const destino = new URL(pet.url);
+    const espera = red.retener?.(destino.pathname);
+    if (espera) { espera.then(() => servidor.emit('request', pet, res)); return; }
     const salida = http.request({ host: destino.hostname, port: destino.port || 80, path: destino.pathname + destino.search, method: pet.method,
       headers: { ...pet.headers, host: destino.host } }, r => {
       const cab = { ...r.headers };

@@ -101,8 +101,8 @@ function mismoNombre(a, b) {
   return !!a && n(a) === n(b);
 }
 
-// Lo que pidió la app al arrancar (rush-panel.js → rushPrecarga), si es de este jugador y aún
-// viene de camino o llegó hace menos de 15 s: así, al pulsar JUGAR, lo de la entrada ya está
+// Lo que pidió la portada al pulsar JUGAR (rush-panel.js → rushPrecarga), si es de este jugador
+// y aún viene de camino o llegó hace menos de 15 s: así no se pide dos veces
 function tomarPrecarga() {
   const p = window.rushPrecarga;
   window.rushPrecarga = null;
@@ -130,7 +130,20 @@ async function cargarBase(previo = null) {
     opciones.sinAcceso();
     throw new ErrorSesion('Sin acceso a la beta de Rush');
   }
+  guardarPortada(b);
   return b;
+}
+
+// El estado de la liga para la portada (rush-panel.js): la portada no pide nada antes de JUGAR
+function guardarPortada(b) {
+  const j = (b.calendario?.jornadas ?? []).find(x => ['programada', 'cerrada', 'simulada'].includes(x.estado));
+  try {
+    localStorage.setItem('RUSH_PORTADA', JSON.stringify({
+      ambito: `${datos.jugador}|${ES_LOCAL ? 'prueba' : 'principal'}`,
+      liga: b.liga ? { estado: b.liga.estado, temporada: b.liga.temporada } : null,
+      jornada: j ? { numero: j.numero, estado: j.estado, cierre_en: j.cierre_en } : null,
+    }));
+  } catch { /* sin persistencia */ }
 }
 
 // Pone en `datos` lo que llega de slr_rush_inicio (fresco o guardado de la última vez)
@@ -503,7 +516,7 @@ export async function abrir(op) {
   if (!raiz) construir();
   // El índice de la caché de fotos antes de pintar: las guardadas salen sin esqueleto.
   // pintar() enseña lo de la última vez (atenuado) o la rueda, y pide lo fresco
-  // Si lo pedido al arrancar ya ha llegado, cuenta como fresco: se pinta directamente
+  // Si lo pedido al pulsar JUGAR ya ha llegado, cuenta como fresco: se pinta directamente
   const pre = tomarPrecarga();
   const yaLlego = pre?.llegada ? pre.promesa.then(b => pedir('base', () => cargarBase(b))).catch(() => {}) : null;
   if (pre && !yaLlego) window.rushPrecarga = pre;   // aún de camino: la recoge cargarBase
