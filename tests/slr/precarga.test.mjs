@@ -7,7 +7,7 @@
 //   (incluida una función que ya no existe) y que api.js entonces fuerza la actualización.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import vm from 'node:vm';
 import { generar, archivosDeLaWeb, importsDe, cierreDeImports, esDeRush, RAIZ } from '../../herramientas/precarga.mjs';
@@ -86,9 +86,19 @@ test('versiones: versionRush solo cambia si cambia algo de Rush', () => {
   assert.match(PRECARGA.versionRush, /^[0-9a-f]{12}$/);
   const hash = xs => createHash('sha256').update(JSON.stringify(xs)).digest('hex').slice(0, 12);
   assert.equal(PRECARGA.versionRush, hash(PRECARGA.rush));
-  // version es la de todo: cambia con cualquier archivo, de las dos partes
+  // version es la de todo: cambia con cualquier archivo, de las dos partes y de los sonidos
   const todo = [...PRECARGA.archivos, ...PRECARGA.rush].sort((a, b) => (a[0] < b[0] ? -1 : 1));
-  assert.equal(PRECARGA.version, hash(todo));
+  assert.equal(PRECARGA.version, hash([...todo, ...PRECARGA.audio]));
+});
+
+test('sonidos: todos los de audio/, con su resumen, fuera de las dos descargas', () => {
+  const enDisco = readdirSync(join(RAIZ, 'audio/partido')).filter(f => /\.mp3$/.test(f)).map(f => `audio/partido/${f}`).sort();
+  assert.deepEqual(PRECARGA.audio.map(a => a[0]), enDisco);
+  for (const [r, bytes, h] of PRECARGA.audio) {
+    assert.equal(bytes, readFileSync(join(RAIZ, r)).length, r);
+    assert.match(h, /^[0-9a-f]{12}$/, r);
+  }
+  for (const [r] of [...PRECARGA.archivos, ...PRECARGA.rush]) assert.ok(!r.startsWith('audio/'), `${r}: no va ni con la app ni con JUGAR`);
 });
 
 /* ── Cambio de versión ──────────────────────────────────────────────────── */

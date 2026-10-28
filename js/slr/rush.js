@@ -535,6 +535,10 @@ export async function abrir(op) {
   pintarPendiente();
   if (datos.huecoPendiente && !datos.sobrePendiente) abrirHuecoPendiente();
   precargarFotosDeFondo().catch(() => {});
+  // Los sonidos de los partidos, en segundo plano y después (no van en la descarga de JUGAR)
+  (window.requestIdleCallback ?? (f => setTimeout(f, 2000)))(() => {
+    import('./partido/sonido.js').then(m => m.precargarSonidos()).catch(() => {});
+  }, { timeout: 5000 });
 }
 
 /* ── Pendientes que reaparecen en cualquier pantalla: elección de sobre y

@@ -25,7 +25,7 @@ try {
   U.equipo = (await rpcOk('slr_unirse_liga', { token: U.token, codigo_invitacion: liga.codigo_invitacion, nombre_equipo: 'Bot Uno FC' })).equipo.id;
   D.equipo = (await rpcOk('slr_unirse_liga', { token: D.token, codigo_invitacion: liga.codigo_invitacion, nombre_equipo: 'Bot Dos FC' })).equipo.id;
   await rpcOk('slr_iniciar_temporada', { token: U.token, liga_id: L });
-  for (const e of [U, D]) await rpcOk('slr_prueba_dar_dinero', { token: U.token, liga_id: L, equipo_id: e.equipo, importe: 30000 });
+  for (const e of [U, D]) await rpcOk('slr_prueba_dar_dinero', { token: U.token, liga_id: L, equipo_id: e.equipo, importe: 60000 });   // de sobra para las dos pasadas (las pujas de la primera reservan dinero)
   await rpcOk('slr_prueba_tareas', { token: U.token, liga_id: L, ahora: new Date().toISOString(), simular: false });   // subastas de hoy
   red = await redLenta({ rtt: 150, bajada: 1.6e6, subida: 750e3 });
   navegador = await chromium.launch({ args: [`--proxy-server=${red.url}`, '--proxy-bypass-list=<-loopback>'] });

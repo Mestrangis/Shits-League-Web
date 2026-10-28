@@ -7,7 +7,9 @@
 //   bien y la nueva, al activarse, copia lo igual de ella;
 // · la web sale de la caché («primero la caché»), las navegaciones dan index.html y lo que
 //   no está en la lista va a la red; Supabase y Google no se tocan;
-// · fotos de las cartas: caché propia, pedidas con CORS, y solo las 600 más recientes.
+// · fotos de las cartas: caché propia, pedidas con CORS, y solo las 600 más recientes;
+// · sonidos de los partidos: no se precargan; al pedirlos se guardan con su resumen y, si
+//   cambian en una versión nueva, se vuelven a descargar.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -41,9 +43,9 @@ function almacen() {
 // Un service worker «arrancado» con sus listas; caches puede venir de una versión anterior.
 // retraso(ruta): promesa que hace esperar a esa descarga (para probar cosas a mitad)
 const resumen = xs => createHash('sha256').update(JSON.stringify(xs)).digest('hex').slice(0, 12);
-function arrancar(archivos, { rush = [], caches = almacen(), contenido = r => `contenido de ${r}`, retraso = null, cacheName = 'shits-league-v40' } = {}) {
+function arrancar(archivos, { rush = [], audio = [], caches = almacen(), contenido = r => `contenido de ${r}`, retraso = null, cacheName = 'shits-league-v40' } = {}) {
   const oyentes = {}, mensajes = [], pedidos = [];
-  const PRECARGA = { version: resumen([...archivos, ...rush]), versionRush: resumen(rush), archivos, rush };
+  const PRECARGA = { version: resumen([...archivos, ...rush, ...audio]), versionRush: resumen(rush), archivos, rush, audio };
   const self = {
     registration: { scope: BASE },
     addEventListener: (t, f) => { oyentes[t] = f; },
@@ -59,7 +61,7 @@ function arrancar(archivos, { rush = [], caches = almacen(), contenido = r => `c
     return new Response(contenido(ruta), { status: 200 });
   };
   const codigo = CODIGO.replace(/const CACHE_NAME = '[^']+'/, `const CACHE_NAME = '${cacheName}'`);
-  const ctx = { self, caches, fetch: fetchFalso, Response, Request, URL, Map, Set, Promise, Math, JSON, String, Array, decodeURIComponent, console,
+  const ctx = { self, caches, fetch: fetchFalso, Response, Request, Headers, URL, Map, Set, Promise, Math, JSON, String, Array, decodeURIComponent, console,
     importScripts: () => { self.PRECARGA = PRECARGA; } };
   vm.runInNewContext(codigo, ctx);
   const evento = (tipo, datos = {}) => {
@@ -298,4 +300,26 @@ test('«estado»: la versión y si cada parte está entera en la caché', async 
   assert.equal((await sw.estado()).rush.lista, true);
   await sw.caches.delete([...sw.caches.c.keys()].find(k => k.includes('-rush-')));
   assert.equal((await sw.estado()).rush.lista, false);
+});
+
+test('sonidos: no se precargan; al pedirlos se guardan y, si cambian, se vuelven a descargar', async () => {
+  const AUDIO = [['audio/partido/gol_1.mp3', 50, 'a0a0a0a0a0a0'], ['audio/partido/ambiente.mp3', 90, 'b0b0b0b0b0b0']];
+  const v1 = arrancar(LISTA, { rush: RUSH, audio: AUDIO });
+  await v1.evento('install').espera;
+  await v1.evento('activate').espera;
+  await v1.descargarRush();
+  assert.ok(!v1.red().some(r => r.startsWith('audio/')), 'ni al instalar ni al descargar Rush (JUGAR)');
+  v1.pedidos.length = 0;
+  const pedir = sw => sw.evento('fetch', { request: peticion(BASE + 'audio/partido/gol_1.mp3') }).respuesta;
+  assert.equal(await (await pedir(v1)).text(), 'contenido de audio/partido/gol_1.mp3');
+  assert.deepEqual(v1.red(), ['audio/partido/gol_1.mp3'], 'la primera vez, de la red');
+  assert.equal(v1.pedidos[0].priority, 'low', 'y sin quitar red a lo demás');
+  await pedir(v1);
+  assert.equal(v1.red().length, 1, 'la segunda, de su caché');
+  // Versión nueva en la que cambia gol_1 (y ambiente no)
+  const v2 = arrancar(LISTA, { rush: RUSH, audio: [['audio/partido/gol_1.mp3', 51, 'c0c0c0c0c0c0'], AUDIO[1]], caches: v1.caches, contenido: r => `nuevo ${r}` });
+  await v2.evento('install').espera;
+  await v2.evento('activate').espera;
+  assert.ok((await v2.caches.keys()).includes('slr-audio'), 'la caché de sonidos sobrevive a la versión');
+  assert.equal(await (await pedir(v2)).text(), 'nuevo audio/partido/gol_1.mp3', 'el que ha cambiado se vuelve a descargar');
 });

@@ -1973,3 +1973,58 @@ Móvil 412 × 915 con la CPU ×4 y «4G lenta» (150 ms, 1,6 / 0,75 Mbit/s); med
   - completa: sin aviso; la hoja con «Suplentes 3» arriba y «Sin colocar» después; elegir un suplente intercambia con su sitio del banquillo;
   - y lo de siempre (arrastrar con ratón y con el dedo).
 - `banco/partido.mjs`, a 360 y 412 px: sin botón ×1/×2. Con el dedo y con el ratón: a ×1 los primeros 250 ms, a ×2 con el indicador mientras se mantiene, y al soltar vuelve a ×1 sin avanzar de escena. Un toque corto avanza. Sin selección, sin menú y sin vibración.
+
+## Sonido de los partidos
+
+### Decisiones de Marcos
+
+- **Sonidos en `audio/partido/`** (MP3 sintetizados, provisionales), conectados en `sonido.js`. Cada nombre puede tener una lista de archivos (`chut_1`, `chut_2`, `chut_3`…): cada vez suena una variación al azar, sin repetir la misma dos veces seguidas.
+- **Dos nombres nuevos:**
+  - «fuego», en el gol «ardiendo», en `momentos.golpe` de su viñeta (además de «chut»);
+  - «ambiente», la grada: muy bajita y en bucle durante toda la reproducción, con fundido al empezar y al acabar. Se para al pausar, al cerrar y al silenciar.
+- **Web Audio:** cada archivo se decodifica una vez, suena sin retraso y se puede solapar. En iPhone el audio se desbloquea con el primer toque.
+- **`ajustes.js`, sección «sonido»:** volumen general y uno por sonido (0 a 1; 0 = no suena), con el ambiente bajito (0,25) y el saque bajito (0,4).
+- **Los audios no entran en la descarga de JUGAR:** se descargan en segundo plano después de entrar en Rush y se guardan en la caché. Si un partido empieza antes de que estén, no suenan.
+- **El botón de silenciar** sigue igual y se recuerda.
+
+### Decisiones mías
+
+- **`SONIDOS`:** cada nombre con su lista de rutas.
+  - La variación se elige con `Math.random`, no con el azar de la animación: el sonido no tiene que repetirse igual en el mismo partido. Si sale la misma que la última vez, se coge otra.
+  - Hay un test que comprueba que cada archivo de `audio/partido/` lo usa un nombre y que cada aviso de las escenas tiene sonido.
+- **Volumen** = `general` × el del sonido, con un nodo de ganancia por sonido. Los valores pasan por la misma validación que el resto de `ajustes.js` (un número entre 0 y 1; si no, el de por defecto y aviso en la consola).
+- **Descarga:**
+  - `rush.js`, al terminar de abrir Rush y en un rato libre, llama a `precargarSonidos()`: de dos en dos, con prioridad baja, y decodificando cada uno al llegar.
+  - Un sonido que aún no está decodificado no suena: no se encola, para que no suene tarde.
+  - La grada sí empieza en cuanto llega, si el partido sigue abierto.
+- **Service worker (v42):**
+  - `precarga.js` tiene una tercera lista, `audio` (ruta, bytes y resumen), que no se precarga.
+  - Cuando la página pide un sonido, el worker lo sirve de la caché `slr-audio` si tiene el mismo resumen; si no, lo baja (prioridad baja) y lo guarda.
+  - La caché sobrevive a las versiones. Al activarse una versión se quitan los que ya no están o han cambiado: si se sustituye un MP3 provisional por el definitivo con el mismo nombre, se vuelve a descargar.
+  - `version` incluye ahora los sonidos.
+- **Desbloqueo:**
+  - El `AudioContext` se crea parado. El primer `pointerdown`, `touchend`, `click` o `keydown` en la página (y abrir el partido, que es un toque) lo pone en marcha y suena un buffer vacío, que es lo que pide iOS.
+  - Con la app en segundo plano se suspende el contexto, y al volver sigue.
+- **Ambiente:** `empezarAmbiente()` al abrir el reproductor y `pararAmbiente()` al cerrarlo (fundido de 1,5 s al entrar y 0,8 s al salir).
+  - ⏸ lo para y ▶ lo devuelve.
+  - Silenciar corta todo lo que suena, la grada incluida. Quitar el silencio con el partido abierto la devuelve; con el partido cerrado, no.
+- **Sin vibración**, como en todo el juego.
+
+#### Pruebas
+
+- `tests/slr/sonido.test.mjs` (Web Audio y fetch de mentira):
+  - archivos y nombres, y que cada aviso de las escenas tiene sonido (y «fuego» en el gol «ardiendo»);
+  - la sección de `ajustes.js`;
+  - sin descargar, no suena; cada archivo se descarga una vez;
+  - cada aviso suena con un archivo suyo, salen todas las variaciones y nunca la misma dos veces seguidas;
+  - volúmenes (0 = no suena);
+  - el ambiente: bucle, fundidos, pausa, silencio, cierre.
+- `sw.test.mjs`: los sonidos no se precargan (ni con la app ni con JUGAR); se guardan al pedirlos; un sonido cambiado se vuelve a descargar.
+- `precarga.test.mjs`: la lista `audio`.
+- `banco/sonido.mjs` (Chrome, 412 px):
+  - nada antes de JUGAR ni en su descarga; los 37 llegan después, los pide la página y quedan en la caché;
+  - en tu partido, cada aviso suena con lo suyo y la grada suena bajita en bucle; en silencio, todo cortado y nada suena; al quitarlo, vuelve; al cerrar, la grada no se queda sonando;
+  - en el muestrario, el gol «ardiendo» suena con chut, fuego y gol; ⏸ y ▶ con la grada; recorriendo las 25 escenas, los 20 avisos suenan cada uno con lo suyo;
+  - el silencio se recuerda.
+  - Con `--autoplay-policy=no-user-gesture-required`: en headless no hay toques de verdad, y el desbloqueo de iPhone no se puede probar ahí.
+- **`banco/acciones.mjs`:** el fallo intermitente de «comprar» venía de los datos de la prueba. Las pujas de la primera pasada reservan dinero (cuánto depende de las cartas al azar de la subasta del día) y a veces la segunda se quedaba sin saldo. Ahora se les da 60.000 en vez de 30.000.

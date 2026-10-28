@@ -14,6 +14,8 @@
    · Composición vertical: tu equipo (si juegas; si no, el local) abajo, en verde,
      atacando hacia arriba; el rival arriba, en naranja. En el marcador, el de
      abajo a la izquierda. El césped corre en el sentido del ataque.
+   · Sonido (sonido.js): cada aviso con su archivo y, de fondo, la grada en bucle
+     mientras está abierto (se para al pausar, al cerrar y al silenciar).
    · Temblores solo visuales: nada de vibración del dispositivo.
 ═══════════════════════════════════════════════ */
 import { abrirCapa, cerrarHasta, esc } from '../ui.js';
@@ -21,7 +23,7 @@ import { AJUSTES, TIEMPOS, texto } from './config.js';
 import { Linea } from './linea.js';
 import { decorar, prng } from './azar.js';
 import { REGISTRO, VARIANTES } from './escenas/registro.js';
-import { sonar, silenciado, silenciar } from './sonido.js';
+import { sonar, silenciado, silenciar, desbloquear, empezarAmbiente, pararAmbiente, pausarAmbiente } from './sonido.js';
 import { Particulas, sprite } from '../particulas.js';
 import { cargarFotos } from '../imagenes.js';
 import { foto, framesTemblor, ICONOS, urlIcono } from './escenas/comun.js';
@@ -250,6 +252,7 @@ export function reproducir(guion, cartas = {}, opts = {}) {
   // Ni el menú del navegador ni el de «guardar imagen» al mantener pulsado
   el.addEventListener('contextmenu', e => e.preventDefault());
   const pausar = si => {
+    pausarAmbiente(si);
     if (si) { linea?.pausar(); animCesped.pause(); } else { linea?.reanudar(); aplicarCesped(); }
     const b = $('[data-pausa]');
     if (b) b.textContent = linea?.estado === 'pausada' ? '▶' : '⏸';
@@ -293,6 +296,7 @@ export function reproducir(guion, cartas = {}, opts = {}) {
   document.addEventListener('visibilitychange', pedirPantalla);
 
   function limpiar() {
+    pararAmbiente();   // con su fundido: la grada no se queda sonando
     vivo = false;
     document.removeEventListener('visibilitychange', pedirPantalla);
     soltarPantalla();
@@ -309,6 +313,9 @@ export function reproducir(guion, cartas = {}, opts = {}) {
   }
 
   abrirCapa(el, limpiar);
+  // Abrir el partido es un toque del usuario: desbloquea el audio (iPhone) y empieza la grada
+  desbloquear();
+  empezarAmbiente();
   pedirPantalla();
   frame = requestAnimationFrame(bucle);
   siguiente();

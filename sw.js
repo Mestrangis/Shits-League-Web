@@ -11,6 +11,9 @@
    · Una versión nueva se descarga en segundo plano (Rush también, pero solo si
      ya estaba descargado, y poco a poco) y espera: se aplica sola la próxima vez
      que se abra la app (js/version.js), sin preguntar.
+   · Sonidos de los partidos (audio/, PRECARGA.audio): no se precargan; Rush los
+     pide en segundo plano tras entrar y se guardan en su caché, con su resumen:
+     si un archivo cambia, se vuelve a descargar.
    · Fotos de las cartas (Cloudinary): caché propia, «primero la caché», con
      las 600 más recientes (el resto se borra).
    · Supabase, Google y el resto: directos a la red (los datos de Rush los
@@ -18,20 +21,22 @@
    Sube CACHE_NAME para forzar una caché nueva (lo que no ha cambiado se copia).
 ═══════════════════════════════════════════════ */
 
-const CACHE_NAME = 'shits-league-v41';
-importScripts('precarga.js');   // self.PRECARGA = { version, versionRush, archivos, rush }: [ruta, bytes, resumen]
+const CACHE_NAME = 'shits-league-v42';
+importScripts('precarga.js');   // self.PRECARGA = { version, versionRush, archivos, rush, audio }: [ruta, bytes, resumen]
 const P = self.PRECARGA;
 
 const CACHE_APP = `${CACHE_NAME}-app-${P.version}`;
 const CACHE_RUSH = `${CACHE_NAME}-rush-${P.versionRush}`;
 const CACHE_FOTOS = 'slr-fotos-cartas';
 const CACHE_FUENTES = 'sl-fuentes';
+const CACHE_AUDIO = 'slr-audio';
 const MAX_FOTOS = 600;
 const LISTA = '__precarga__.json';    // marca de «esta caché está entera», con su lista
 const VIEJAS = '__viejas__.json';     // en la de Rush: cachés viejas que se borran cuando esté entera
 const BASE = new URL('./', self.registration.scope).href;
 const RUTAS_APP = new Set(P.archivos.map(([r]) => r));
 const RUTAS_RUSH = new Set(P.rush.map(([r]) => r));
+const RESUMEN_AUDIO = new Map((P.audio ?? []).map(([r, , h]) => [r, h]));
 const DE_LA_APP = /^shits-league-v\d+-(app|rush)-/;
 const json = d => new Response(JSON.stringify(d), { headers: { 'Content-Type': 'application/json' } });
 
@@ -121,7 +126,13 @@ self.addEventListener('activate', event => {
     const rushEntero = await entera(CACHE_RUSH);
     const fuente = rushEntero ? null : (await anteriores()).filter(a => a.conRush).at(-1)?.nombre;
     const keys = await caches.keys();
-    await Promise.all(keys.filter(k => ![CACHE_APP, CACHE_RUSH, CACHE_FOTOS, CACHE_FUENTES, fuente].includes(k)).map(k => caches.delete(k)));
+    await Promise.all(keys.filter(k => ![CACHE_APP, CACHE_RUSH, CACHE_FOTOS, CACHE_FUENTES, CACHE_AUDIO, fuente].includes(k)).map(k => caches.delete(k)));
+    // Sonidos que ya no están o han cambiado: fuera
+    const audio = await caches.open(CACHE_AUDIO);
+    for (const q of await audio.keys()) {
+      const r = await audio.match(q);
+      if (RESUMEN_AUDIO.get(q.url.slice(BASE.length)) !== r?.headers.get('x-resumen')) await audio.delete(q);
+    }
     if (fuente) await (await caches.open(CACHE_RUSH)).put(VIEJAS, json([fuente]));
     await self.clients.claim();
   })());
@@ -189,6 +200,7 @@ self.addEventListener('fetch', event => {
         return res || fetch(req);
       })());
     }
+    if (RESUMEN_AUDIO.has(ruta)) event.respondWith(sonidoPartido(req, ruta));
     return;   // lo demás de la web (sw.js, precarga.js, fotos del archivo…): red normal
   }
 
@@ -211,6 +223,22 @@ self.addEventListener('fetch', event => {
   }
   // Supabase, Google Sheets, OneSignal…: directo a la red
 });
+
+/* ── Sonidos de los partidos ──────────────────────────────────────────────── */
+// De su caché si es el de esta versión (mismo resumen); si no, de la red y se guarda
+async function sonidoPartido(req, ruta) {
+  const cache = await caches.open(CACHE_AUDIO);
+  const url = BASE + ruta, h = RESUMEN_AUDIO.get(ruta);
+  const r = await cache.match(url);
+  if (r && r.headers.get('x-resumen') === h) return r;
+  const n = await fetch(url, { cache: 'no-cache', priority: req.priority ?? 'low' });
+  if (!n.ok || n.status !== 200) return n;
+  const cabeceras = new Headers(n.headers);
+  cabeceras.set('x-resumen', h);
+  const guardada = new Response(await n.blob(), { status: 200, statusText: n.statusText, headers: cabeceras });
+  await cache.put(url, guardada.clone());
+  return guardada;
+}
 
 /* ── Fotos de las cartas ──────────────────────────────────────────────────── */
 let nuevasFotos = 0, recortando = null;

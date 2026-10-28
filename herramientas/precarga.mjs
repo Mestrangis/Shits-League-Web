@@ -3,6 +3,8 @@
 //   · archivos: la Shits League normal; se descarga al instalar la app.
 //   · rush: Shits League Rush (js/slr/, css/slr.css, css/acabados/, img/slr/ y lo de
 //     assets/ que solo cita Rush); se descarga al pulsar JUGAR por primera vez.
+//   · audio: los sonidos de los partidos (audio/). NO se precargan: Rush los pide en
+//     segundo plano y el service worker los guarda (con el resumen sabe si han cambiado).
 //   node herramientas/precarga.mjs           → escribe precarga.js
 //   node herramientas/precarga.mjs --comprobar → falla si precarga.js no está al día
 // Lo lanza el despliegue (.github/workflows/static.yml) y lo comprueba un test
@@ -20,6 +22,7 @@ import { fileURLToPath } from 'node:url';
 export const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..');
 const TEXTO = /\.(js|mjs|css|html|json|svg|txt)$/i;
 const IMAGEN = /\.(png|svg|webp|jpg|jpeg|gif|ico)$/i;
+const SONIDO = /\.(mp3|ogg|m4a|wav)$/i;
 
 const leerNormalizado = ruta => {
   const b = readFileSync(join(RAIZ, ruta));
@@ -84,11 +87,16 @@ export function generar() {
   });
   const rush = todo.filter(([r]) => esDeRush(r) || deRush.has(r));
   const archivos = todo.filter(a => !rush.includes(a));
-  // version: la de la app entera (cambia si cambia cualquier archivo); versionRush: solo la de Rush
+  const audio = (existsSync(join(RAIZ, 'audio')) ? todos('audio') : []).filter(f => SONIDO.test(f)).sort().map(ruta => {
+    const b = readFileSync(join(RAIZ, ruta));
+    return [ruta, b.length, createHash('sha256').update(b).digest('hex').slice(0, 12)];
+  });
+  // version: la de la app entera (cambia si cambia cualquier archivo, sonidos incluidos); versionRush: solo la de Rush
   return `// Generado por herramientas/precarga.mjs: NO se edita a mano.\n` +
     `// [ruta, bytes, resumen del contenido] · archivos: la Shits League normal (se descarga al\n` +
     `// instalar la app) · rush: Shits League Rush (se descarga al pulsar JUGAR por primera vez)\n` +
-    `self.PRECARGA = ${JSON.stringify({ version: resumen(todo), versionRush: resumen(rush), archivos, rush }, null, 1).replace(/\n\s+(?=["\d\]])/g, ' ').replace(/\[ /g, '[')};\n`;
+    `// audio: los sonidos de los partidos (no se precargan: se guardan al pedirlos)\n` +
+    `self.PRECARGA = ${JSON.stringify({ version: resumen([...todo, ...audio]), versionRush: resumen(rush), archivos, rush, audio }, null, 1).replace(/\n\s+(?=["\d\]])/g, ' ').replace(/\[ /g, '[')};\n`;
 }
 const resumen = xs => createHash('sha256').update(JSON.stringify(xs)).digest('hex').slice(0, 12);
 

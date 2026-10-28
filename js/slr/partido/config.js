@@ -50,6 +50,7 @@ export const ESQUEMA = {
     toca: t('Toca: avanzar · Mantén: ×2'),
   },
   efectos: { temblor: n(1, 0, 3), particulas: n(1, 0, 3), balon: n(64, 32, 140), microvibracion: n(2, 0, 8) },
+  sonido: { general: n(1, 0, 1), silbato_inicio: n(1, 0, 1), saque: n(0.4, 0, 1), patada: n(1, 0, 1), bote: n(1, 0, 1), choque: n(1, 0, 1), regate: n(1, 0, 1), robo: n(1, 0, 1), contraataque: n(1, 0, 1), corte: n(1, 0, 1), ruleta: n(1, 0, 1), chut: n(1, 0, 1), fuego: n(1, 0, 1), gol: n(1, 0, 1), parada: n(1, 0, 1), sorpresa: n(1, 0, 1), poder: n(1, 0, 1), lesion: n(1, 0, 1), plan_b: n(1, 0, 1), silbato_descanso: n(1, 0, 1), silbato_final: n(1, 0, 1), ambiente: n(0.25, 0, 1) },
   ritmo: { igualado_min: n(0.4, 0, 1), igualado_max: n(0.6, 0, 1), final_desde_jugada: n(8, 1, 10, true), final_diferencia_max: n(1, 0, 5, true), sorpresa: n(0.4, 0, 0.5) },
 };
 

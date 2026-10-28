@@ -151,6 +151,35 @@ export const AJUSTES = {
     microvibracion: 2,         // px de la vibración del balón rodando en el ataque (0–8)
   },
 
+  /* ── SONIDO ──────────────────────────────────────────────────────────────
+     Volumen de 0 a 1 (0 = no suena). Lo que suena es general × el de cada sonido.
+     Los archivos están en audio/partido/ (los que llevan número son variaciones:
+     cada vez suena una al azar). */
+  sonido: {
+    general: 1,               // todo a la vez (0–1)
+    silbato_inicio:    1,
+    saque:             0.4,   // el saque de cada jugada: bajito
+    patada:            1,
+    bote:              1,
+    choque:            1,
+    regate:            1,
+    robo:              1,
+    contraataque:      1,
+    corte:             1,
+    ruleta:            1,
+    chut:              1,
+    fuego:             1,     // en el gol «ardiendo», con el chut
+    gol:               1,
+    parada:            1,
+    sorpresa:          1,
+    poder:             1,
+    lesion:            1,
+    plan_b:            1,
+    silbato_descanso:  1,
+    silbato_final:     1,
+    ambiente:          0.25,  // la grada en bucle, muy bajita
+  },
+
   /* ── RITMO ───────────────────────────────────────────────────────────────
      Probabilidades como fracción (0.4 = 40 %). */
   ritmo: {
