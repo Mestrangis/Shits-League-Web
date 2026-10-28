@@ -18,7 +18,7 @@
    Sube CACHE_NAME para forzar una caché nueva (lo que no ha cambiado se copia).
 ═══════════════════════════════════════════════ */
 
-const CACHE_NAME = 'shits-league-v40';
+const CACHE_NAME = 'shits-league-v41';
 importScripts('precarga.js');   // self.PRECARGA = { version, versionRush, archivos, rush }: [ruta, bytes, resumen]
 const P = self.PRECARGA;
 

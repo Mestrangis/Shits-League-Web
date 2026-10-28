@@ -1,5 +1,6 @@
-// Prueba de la pantalla de Alineación en Chrome headless: arrastrar y soltar con
-// ratón (escritorio) y táctil (móvil 390×844), la hoja de selección y el botón atrás.
+// Prueba de la pantalla de Alineación en Chrome headless: equipo nuevo sin cartas colocadas
+// («Coloca tus cartas») y suplentes en la hoja de un hueco (a 360 y 412 px); arrastrar y soltar
+// con ratón (escritorio) y táctil (móvil 390×844), la hoja de selección y el botón atrás.
 //   node tests/slr/banco/alineacion.mjs      (con el servidor local en :3000 y .env.local)
 // Crea una liga de prueba con Bot Uno y la borra al terminar. SALIDA=carpeta guarda capturas.
 import { spawn } from 'node:child_process';
@@ -16,9 +17,15 @@ const check = (c, que, det = '') => { c ? ok++ : mal++; console.log(`${c ? '  �
 // ── Liga de prueba con Bot Uno (equipo, 11 cartas) ──
 const t = (await rpcOk('slr_login', { codigo: env.SLR_BOT_UNO_CODIGO })).token;
 const liga = await rpcOk('slr_crear_liga_prueba', { token: t, nombre: 'Prueba alineación (banco)' });
-await rpcOk('slr_unirse_liga', { token: t, codigo_invitacion: liga.codigo_invitacion, nombre_equipo: 'Bot Uno FC' });
+const equipo = (await rpcOk('slr_unirse_liga', { token: t, codigo_invitacion: liga.codigo_invitacion, nombre_equipo: 'Bot Uno FC' })).equipo.id;
+// Una alineación completa guardada (7 titulares y 3 en el banquillo; queda 1 sin colocar)
+async function guardarCompleta() {
+  const c = (await rpcOk('slr_rush_inicio', { token: t, prueba: true })).cartas.map(x => x.id);
+  await rpcOk('slr_guardar_alineacion', { token: t, equipo_id: equipo, formacion: '2-2-2', capitan_id: c[3], banquillo: c.slice(7, 10),
+    huecos: { por: c[0], def: c.slice(1, 3), med: c.slice(3, 5), del: c.slice(5, 7) } });
+}
 
-async function navegador(movil) {
+async function navegador(movil, ancho = 390) {
   const puerto = movil ? 9341 : 9340;
   const ch = spawn(process.env.CHROME ?? 'C:/Program Files/Google/Chrome/Application/chrome.exe', [`--remote-debugging-port=${puerto}`,
     `--user-data-dir=${mkdtempSync(join(tmpdir(), 'e2e-'))}`, '--headless=new', '--window-size=1280,900', 'about:blank'], { stdio: 'ignore' });
@@ -34,7 +41,7 @@ async function navegador(movil) {
   const ev = async e => { const r = await cdp('Runtime.evaluate', { expression: e, awaitPromise: true, returnByValue: true }); if (r.result?.exceptionDetails) throw new Error(JSON.stringify(r.result.exceptionDetails).slice(0, 300)); return r.result?.result?.value; };
   if (!movil) await cdp('Emulation.setDeviceMetricsOverride', { width: 1280, height: 1900, deviceScaleFactor: 1, mobile: false });
   if (movil) {
-    await cdp('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
+    await cdp('Emulation.setDeviceMetricsOverride', { width: ancho, height: ancho === 360 ? 740 : 844, deviceScaleFactor: 2, mobile: true });
     await cdp('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
   }
   await cdp('Page.enable');
@@ -76,6 +83,56 @@ const ESTADO = `(() => {
 const centro = sel => `(() => { const el = document.querySelector(${JSON.stringify(sel)}); el.scrollIntoView({ block: 'center' }); const r = el.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`;
 
 try {
+/* ── Equipo nuevo: sin cartas colocadas, y los suplentes en la hoja ─────── */
+for (const ancho of [360, 412]) {
+  console.log(`
+Equipo nuevo (${ancho} px)`);
+  const { ch, ev, foto } = await navegador(true, ancho);
+  const e0 = await ev(ESTADO);
+  const aviso = await ev(`document.querySelector('[data-coloca]')?.textContent.replace(/\\s+/g, ' ').trim() ?? null`);
+  check(Object.values(e0.huecos).every(x => !x) && e0.libres.length === 11, `ninguna carta colocada: las ${e0.libres.length} en «Sin colocar»`);
+  check(/^Coloca tus cartas/.test(aviso ?? ''), `aviso claro: «${(aviso ?? '').slice(0, 60)}…»`);
+  const cabe = await ev(`(() => { const r = document.querySelector('[data-coloca]').getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth + 0.5; })()`);
+  check(cabe, 'el aviso cabe en la pantalla');
+  await foto(`nuevo-${ancho}-vacio`);
+  // Tocar el portero: sin suplentes aún; se elige la primera sin colocar
+  await ev(`document.querySelector('.slr-hueco[data-l="por"]').click(); 0`);
+  await dormir(600);
+  const t1 = await ev(`[...document.querySelectorAll('.slr-hoja .slr-lista-cartas__titulo')].map(h => h.textContent.trim().replace(/\\s+/g, ' '))`);
+  check(/^Suplentes 0/.test(t1[0] ?? '') && /^Sin colocar 11/.test(t1[1] ?? ''), `hoja del hueco: «${t1.join('», «')}»`);
+  await ev(`document.querySelector('.slr-hoja .slr-lista-cartas [data-id]').click(); 0`);
+  await dormir(600);
+  const aviso2 = await ev(`document.querySelector('[data-coloca]')?.textContent.replace(/\\s+/g, ' ').trim() ?? null`);
+  check(/^Te faltan 6 cartas en el once/.test(aviso2 ?? ''), `con una colocada, el aviso dice cuántas faltan («${(aviso2 ?? '').slice(0, 34)}»)`);
+  ch.kill();
+}
+// Con la alineación completa: los suplentes arriba y, al elegir uno, intercambio con el banquillo
+await guardarCompleta();
+for (const ancho of [360, 412]) {
+  console.log(`
+Suplentes en la hoja (${ancho} px)`);
+  const { ch, ev, foto } = await navegador(true, ancho);
+  const e0 = await ev(ESTADO);
+  check(!(await ev(`!!document.querySelector('[data-coloca]')`)), 'completa: sin aviso de «Coloca tus cartas»');
+  await ev(`document.querySelector('.slr-hueco[data-l="med"][data-i="1"]').click(); 0`);
+  await dormir(600);
+  const h = await ev(`({ titulos: [...document.querySelectorAll('.slr-hoja .slr-lista-cartas__titulo')].map(h => h.textContent.trim().replace(/\\s+/g, ' ')),
+    primeros: [...document.querySelectorAll('.slr-hoja .slr-lista-cartas')][0] ? [...[...document.querySelectorAll('.slr-hoja .slr-lista-cartas')][0].querySelectorAll('[data-id]')].map(b => b.dataset.id) : [] })`);
+  check(/^Suplentes 3/.test(h.titulos[0] ?? '') && /^Sin colocar 1/.test(h.titulos[1] ?? ''), `arriba del todo los suplentes, y después las sin colocar («${h.titulos.join('», «')}»)`);
+  const banco = [e0.huecos.banco0, e0.huecos.banco1, e0.huecos.banco2];
+  check(h.primeros.length === 3 && h.primeros.every(id => banco.includes(id)), 'en «Suplentes» están las 3 del banquillo');
+  const fueraHoja = await ev(`(() => { const r = document.querySelector('.slr-hoja').getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth + 0.5; })()`);
+  check(fueraHoja, 'la hoja cabe en la pantalla');
+  await foto(`suplentes-${ancho}-hoja`);
+  const sup = h.primeros[0];
+  const k = banco.indexOf(sup);
+  await ev(`document.querySelector('.slr-hoja .slr-lista-cartas [data-id="${sup}"]').click(); 0`);
+  await dormir(600);
+  const e1 = await ev(ESTADO);
+  check(e1.huecos.med1 === sup && e1.huecos[`banco${k}`] === e0.huecos.med1, `elegir un suplente: entra al hueco y la que había pasa a su sitio del banquillo (banco ${k + 1}º)`);
+  ch.kill();
+}
+
 /* ── Escritorio: ratón ─────────────────────────────────────────────────── */
 console.log('\nEscritorio (ratón)');
 {
@@ -149,7 +206,7 @@ console.log('\nEscritorio (ratón)');
   const hojaInfo = await ev(`({ abierta: !!document.querySelector('.slr-hoja'), titulos: [...document.querySelectorAll('.slr-lista-cartas__titulo')].map(h => h.textContent.trim().replace(/\\s+/g, ' ')),
     donde: [...document.querySelectorAll('.slr-hoja .slr-lista-cartas__texto small')].map(s => s.textContent).slice(0, 12),
     aviso: !!document.querySelector('.slr-hoja .slr-lista-cartas__texto em') })`);
-  check(hojaInfo.abierta && /^Sin colocar/.test(hojaInfo.titulos[0] ?? '') && /^Ya colocadas/.test(hojaInfo.titulos[1] ?? ''), `clic corto: hoja con «${hojaInfo.titulos.join('» y «')}»`);
+  check(hojaInfo.abierta && /^Suplentes/.test(hojaInfo.titulos[0] ?? '') && /^Sin colocar/.test(hojaInfo.titulos[1] ?? '') && /^En el once/.test(hojaInfo.titulos[2] ?? ''), `clic corto: hoja con «${hojaInfo.titulos.join('», «')}»`);
   check(hojaInfo.donde.some(x => /Ahora en (POR|DEF|MED|DEL|Banquillo)/.test(x)), `las colocadas dicen dónde están (${hojaInfo.donde.filter(x => /Ahora/.test(x)).slice(0, 3).join(', ')})`);
   check(hojaInfo.aviso, 'se mantienen los avisos de «rinde mal aquí»');
   await foto('hoja-escritorio');
@@ -236,7 +293,7 @@ console.log('\nMóvil 390×844 (táctil)');
   const q2 = await pos('.slr-hueco[data-l="por"][data-i="0"]');
   await toque('touchStart', q2); await dormir(80); await toque('touchEnd', q2);
   await dormir(700);
-  check(await ev(`!!document.querySelector('.slr-hoja') && document.querySelectorAll('.slr-lista-cartas__titulo').length === 2`), 'toque corto: abre la hoja con los dos bloques');
+  check(await ev(`!!document.querySelector('.slr-hoja') && /^Suplentes/.test(document.querySelector('.slr-lista-cartas__titulo')?.textContent.trim() ?? '')`), 'toque corto: abre la hoja (los suplentes, arriba)');
   await foto('hoja-movil');
   await ev(`history.back(); 0`);
   await dormir(500);

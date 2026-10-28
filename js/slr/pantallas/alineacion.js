@@ -4,11 +4,14 @@
    al cierre, el último resultado y el estado de la alineación, y los avisos de
    pausa, cierre o entre temporadas.
    Campo en vertical con los huecos de la formación (5 formaciones). Se asigna
-   tocando: un hueco abre una hoja con tus cartas (primero las sin colocar,
-   luego las ya colocadas) ordenadas por la stat que usa ese hueco (POR y DEF
+   tocando: un hueco abre una hoja con tus cartas (en un hueco del once, primero
+   los suplentes, que se intercambian; luego las sin colocar y las del resto del
+   once) ordenadas por la stat que usa ese hueco (POR y DEF
    → DEF, MED → CON, DEL → ATA), avisando si rinden mal ahí. También se puede
    arrastrar y soltar entre huecos, banquillo y "Sin colocar".
    Banquillo de 3 con orden manual opcional y capitán.
+   Un equipo nuevo empieza sin cartas colocadas: aviso «Coloca tus cartas» (y,
+   a medias, cuántas faltan). Si llega el cierre así, el servidor la completa.
    Fuerza de cada línea en vivo con las funciones del motor; pronóstico bajo
    demanda (Edge Function) con la alineación guardada.
    Guardar = slr_guardar_alineacion; Confirmar = slr_confirmar_alineacion
@@ -257,9 +260,16 @@ function pintarTodo(cont, ctx) {
   else if (ventanaCierre()) aviso = `<div class="slr-banner slr-banner--cierre"><b>Jornada ${j.numero} en juego</b><span>Las alineaciones están cerradas hasta las ${hora(j.publicacion_en)}.</span></div>`;
   else if (lg.estado === 'entre_temporadas') aviso = `<div class="slr-banner slr-banner--info"><b>Temporada ${lg.temporada} terminada</b><span>El mercado está cerrado. La siguiente empieza cuando el administrador la inicie.</span></div>`;
   else if (lg.estado === 'preparacion') aviso = '<div class="slr-banner slr-banner--info"><b>La temporada aún no ha empezado</b><span>Ve preparando tu once: cuando el administrador la inicie, la jornada 1 será un domingo a las 20:00.</span></div>';
+  // Alineación vacía (equipo nuevo) o a medias: que se vea qué hay que hacer
+  if (!bloqueada && faltan === titulares(borrador).length) {
+    aviso += `<div class="slr-banner slr-banner--coloca" data-coloca><b>Coloca tus cartas</b><span>Tu once está vacío: toca un hueco y elige una carta, o mantén pulsada una carta de «Sin colocar» y suéltala en un hueco. Si llega el cierre sin completarlo, se completa solo con las mejores y te avisamos.</span></div>`;
+  } else if (!bloqueada && faltan) {
+    aviso += `<div class="slr-banner slr-banner--coloca" data-coloca><b>Te ${faltan === 1 ? 'falta 1 carta' : `faltan ${faltan} cartas`} en el once</b><span>Si llega el cierre así, se completa solo con las mejores y te avisamos.</span></div>`;
+  }
 
   let estadoTexto;
   if (esSucio) estadoTexto = '<span class="slr-estado slr-estado--sucio">● Cambios sin guardar</span>';
+  else if (faltan) estadoTexto = '<span class="slr-estado slr-estado--pendiente">Sin completar</span>';
   else if (!j) estadoTexto = '<span class="slr-estado">✓ Guardada</span>';
   else if (confirmada) estadoTexto = `<span class="slr-estado slr-estado--ok">✓ Confirmada (J${j.numero})</span>`;
   else estadoTexto = `<span class="slr-estado slr-estado--pendiente">Sin confirmar (+${configLiga().bonus_participacion ?? 100})</span>`;
@@ -319,7 +329,7 @@ function pintarTodo(cont, ctx) {
       ${esSucio
         ? `<button class="slr-btn slr-btn--grande" type="button" data-guardar ${bloqueada ? 'disabled' : ''}>Guardar${faltan ? ` (faltan ${faltan})` : ''}</button>
            <button class="slr-btn slr-btn--fantasma" type="button" data-deshacer>Deshacer</button>`
-        : `<button class="slr-btn slr-btn--grande" type="button" data-confirmar ${bloqueada || confirmada || !j ? 'disabled' : ''}>
+        : `<button class="slr-btn slr-btn--grande" type="button" data-confirmar ${bloqueada || confirmada || !j || faltan ? 'disabled' : ''}>
              ${confirmada ? '✓ Confirmada' : 'Confirmar alineación'}</button>`}
     </div>`;
 
@@ -397,8 +407,9 @@ async function abrirPronostico(ctx) {
 }
 
 /* ── Hoja de selección ───────────────────────────────────────────────────── */
-// Dos bloques: "Sin colocar" y "Ya colocadas" (indicando dónde están; elegir
-// una de estas intercambia las posiciones), los dos por la stat del hueco
+// Bloques: en un hueco del once, "Suplentes" (arriba), "Sin colocar" y "En el once";
+// en el banquillo, "Sin colocar" y "Ya colocadas". Elegir una carta colocada
+// intercambia las posiciones. Todos por la stat del hueco
 const DONDE = { por: 'POR', def: 'DEF', med: 'MED', del: 'DEL', banco: 'Banquillo' };
 
 function filaCarta(c, l, actual) {
@@ -534,9 +545,13 @@ function elegir(l, i, cont, ctx, porId) {
   const stat = STAT[l];
   const orden = (a, b) => valorEnHueco(b, l) - valorEnHueco(a, l) || b.ovr - a.ovr;
   const todas = [...porId.values()];
-  const sinColocar = todas.filter(c => !posicion(c.id)).sort(orden);
-  const colocadas = todas.filter(c => posicion(c.id)).sort(orden);
   const titular = l !== 'banco';
+  // En un hueco del once, primero los suplentes (elegir uno los intercambia: el suplente
+  // entra y la que había pasa a su sitio en el banquillo), después las sin colocar y
+  // al final las del resto del once
+  const suplentes = titular ? todas.filter(c => posicion(c.id)?.[0] === 'banco').sort(orden) : [];
+  const sinColocar = todas.filter(c => !posicion(c.id)).sort(orden);
+  const colocadas = todas.filter(c => posicion(c.id) && !suplentes.includes(c) && c.id !== actual).sort(orden);
   const bloque = (titulo, lista, vacio) => `
     <h3 class="slr-subtitulo slr-lista-cartas__titulo">${titulo} <small>${lista.length}</small></h3>
     ${lista.length ? `<ul class="slr-lista-cartas">${lista.map(c => filaCarta(c, l, actual)).join('')}</ul>`
@@ -552,8 +567,9 @@ function elegir(l, i, cont, ctx, porId) {
       <button class="slr-btn slr-btn--fantasma" type="button" data-ver>Ver carta</button>
     </div>` : ''}
     <p class="slr-suave">${titular ? `En este hueco cuenta su <b>${stat}</b>${l === 'por' ? ' (el portero para con la DEF)' : ''}.` : 'Ordenadas por OVR.'}</p>
+    ${titular ? bloque('Suplentes', suplentes, 'No tienes suplentes en el banquillo.') : ''}
     ${bloque('Sin colocar', sinColocar, 'Todas tus cartas están colocadas.')}
-    ${bloque('Ya colocadas', colocadas, 'Ninguna carta colocada todavía.')}`,
+    ${colocadas.length ? bloque(titular ? 'En el once' : 'Ya colocadas', colocadas, '') : ''}`,
   { titulo: `Hueco ${NOMBRE_LINEA[l]}`, alCerrar: () => { pintarTodo(cont, ctx); if (avisoCapitan) toast(AVISO_CAPITAN, 'info'); } });
 
   el.querySelectorAll('[data-id]').forEach(b => b.addEventListener('click', () => {

@@ -405,8 +405,56 @@ try {
     vistas.push(await ev(`document.querySelector('[data-partido-reproductor]').dataset.escena`));
   }
   check(new Set(vistas).size >= 3 && vistas.includes('control'), `con taps se recorren las escenas: ${vistas.join(' → ')}`);
-  await clic('[data-velocidad]');
-  check(await ev(`document.querySelector('[data-velocidad]').textContent`) === '×2', 'botón ×1 / ×2');
+  // ×2 manteniendo pulsado (como en TikTok); ya no hay botón. A 412 px en la primera vez y a 360 al volver a verlo
+  const probarMantener = async () => {
+    check(!(await ev(`!!document.querySelector('[data-velocidad]')`)), `${ancho} px · sin botón ×1 / ×2`);
+    const R = `document.querySelector('[data-partido-reproductor]')`;
+    const estadoR = () => ev(`(() => { const r = ${R}; return { i: r.reproductor.indice, vel: r.reproductor.velocidad, rapido: r.classList.contains('es-rapido'),
+      indicador: getComputedStyle(r.querySelector('.slr-pt-rapido')).opacity, texto: r.querySelector('.slr-pt-rapido').textContent }; })()`);
+    await ev(`window.__vib = 0; navigator.vibrate = () => { window.__vib++; return true; }; 0`);
+    const mantener = async (tipo) => {
+      const abajo = tipo === 'dedo'
+        ? () => cdp('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 200, y: 420, id: 1 }] })
+        : () => cdp('Input.dispatchMouseEvent', { type: 'mousePressed', x: 200, y: 420, button: 'left', clickCount: 1 });
+      const arriba = tipo === 'dedo'
+        ? () => cdp('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+        : () => cdp('Input.dispatchMouseEvent', { type: 'mouseReleased', x: 200, y: 420, button: 'left', clickCount: 1 });
+      await dormir(400);
+      await abajo();
+      await dormir(120);
+      const corto = await estadoR();   // antes de los 250 ms: aún ×1
+      await dormir(500);
+      const dentro = await estadoR();
+      if (tipo === 'dedo') await foto('mantener-x2');
+      await arriba();
+      await dormir(150);
+      const fuera = await estadoR();
+      return { corto, dentro, fuera };
+    };
+    for (const tipo of ['dedo', 'raton']) {
+      const m = await mantener(tipo);
+      check(m.corto.vel === 1 && !m.corto.rapido, `${ancho} px · ${tipo}: los primeros ~250 ms sigue a ×1 (puede ser un toque)`);
+      check(m.dentro.vel === 2 && m.dentro.rapido && Number(m.dentro.indicador) > 0.5 && m.dentro.texto === '▶▶ ×2',
+        `${ancho} px · ${tipo}: manteniendo pulsado, ×2 con el indicador «${m.dentro.texto}» arriba`, JSON.stringify(m.dentro));
+      check(m.fuera.vel === 1 && !m.fuera.rapido && m.fuera.i === m.dentro.i, `${ancho} px · ${tipo}: al soltar, vuelve a ×1 y NO avanza de escena (${m.dentro.i} → ${m.fuera.i})`, JSON.stringify(m));
+    }
+    // Un toque corto sigue avanzando
+    const i0 = (await estadoR()).i;
+    await cdp('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 200, y: 420, id: 1 }] });
+    await dormir(60);
+    await cdp('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await dormir(200);
+    check((await estadoR()).i === i0 + 1, `${ancho} px · un toque corto sigue pasando a la siguiente escena`);
+    // Mantener pulsado no selecciona texto ni saca menús, ni en iPhone; sin vibración
+    const protec = await ev(`(() => { const r = ${R}; const n = r.querySelector('.slr-pt-marcador__nombre'); const s = getComputedStyle(n), sr = getComputedStyle(r);
+      const e = new MouseEvent('contextmenu', { bubbles: true, cancelable: true }); n.dispatchEvent(e);
+      return { select: s.userSelect || s.webkitUserSelect, callout: s.webkitTouchCallout ?? sr.webkitTouchCallout, touch: sr.touchAction, menu: e.defaultPrevented,
+        seleccion: String(getSelection()), vib: window.__vib }; })()`);
+    check(protec.select === 'none' && protec.menu && !protec.seleccion && protec.touch === 'none',
+      `${ancho} px · mantener pulsado no selecciona texto ni saca el menú del navegador (user-select ${protec.select}, touch-callout ${protec.callout ?? '—'}, touch-action ${protec.touch})`, JSON.stringify(protec));
+    check(protec.vib === 0, `${ancho} px · y sin vibración del dispositivo`);
+  };
+  await probarMantener();
   await clic('[data-saltar]');
   check(await esperar(`document.querySelector('[data-partido-reproductor]')?.dataset.escena === 'final'`, 3000), '«Saltar» va directamente al final');
   await dormir(1200);
@@ -420,6 +468,16 @@ try {
   const wl3 = await ev(`({ pedidos: window.__wl.pedidos, sueltos: window.__wl.bloqueos.every(b => b.released) })`);
   check(wl3.sueltos && wl3.pedidos === 2, 'pantalla encendida: al cerrar se suelta (y no se vuelve a pedir)');
   check(await esperar(`!!document.querySelector('.slr-cronica [data-ver-partido]')`, 8000), 'y queda la pantalla del partido, con «▶ Ver partido»');
+  // Otra vez, a 360 px: «▶ Ver partido» y lo mismo con el dedo y el ratón
+  await android(360);
+  await clic('.slr-cronica [data-ver-partido]');
+  await esperar(`!!document.querySelector('[data-partido-reproductor]')`, 8000);
+  await dormir(900);
+  await probarMantener();
+  await clic('[data-saltar]');
+  await esperar(`!document.querySelector('[data-partido-reproductor]')`, 15000);
+  await android(412);
+  await esperar(`!!document.querySelector('.slr-cronica [data-ver-partido]')`, 8000);
   // La pantalla del partido, de arriba abajo
   await esperar(`!!document.querySelector('.slr-pp__lista li')`, 5000);
   const leerPP = () => ev(`(() => { const r = document.querySelector('.slr-pp'); if (!r) return null; const q = s => r.querySelector(s);

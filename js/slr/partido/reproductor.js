@@ -5,7 +5,10 @@
    Lleva la línea de tiempo, el marcador (con las fotos y los nombres), el
    reloj, los controles y los avisos de sonido.
    · Tap (o clic) en la pantalla: salta al final de la escena y pasa a la siguiente.
-   · «Saltar»: directo al resultado final. · ×1 / ×2. · Silenciar.
+   · Mantener pulsado (dedo o ratón, desde ~250 ms): ×2 mientras dure, con el
+     indicador «▶▶ ×2» arriba; al soltar vuelve a ×1 y NO avanza de escena (como
+     en TikTok). Sin seleccionar texto ni menú del navegador, y sin vibración.
+   · «Saltar»: directo al resultado final. · Silenciar.
    · Un solo bucle (requestAnimationFrame) para el tiempo, el reloj y las
      partículas (un canvas, DPR ≤ 1,5, calidad adaptativa).
    · Composición vertical: tu equipo (si juegas; si no, el local) abajo, en verde,
@@ -24,6 +27,7 @@ import { cargarFotos } from '../imagenes.js';
 import { foto, framesTemblor, ICONOS, urlIcono } from './escenas/comun.js';
 
 export const COLORES = Object.freeze({ abajo: '#39FF88', arriba: '#FF8A3D' });
+export const PULSACION_MS = 250;   // mantener pulsado más que esto: ×2
 
 /**
  * guion: el de crearGuion (sin decorar: aquí se eligen las variantes)
@@ -56,10 +60,10 @@ export function reproducir(guion, cartas = {}, opts = {}) {
       <div class="slr-pt-marcador__centro">${gol(lados.abajo)}<span class="slr-pt-reloj" data-reloj>0'</span>${gol(lados.arriba)}</div>
       <div class="slr-pt-marcador__eq slr-pt-marcador__eq--der" style="--c:${COLORES.arriba}"><span class="slr-pt-marcador__nombre">${esc(equipo(lados.arriba).nombre ?? '')}</span><span data-foto="${lados.arriba}"></span></div>
     </header>
+    <div class="slr-pt-rapido" data-rapido aria-hidden="true">▶▶ ×2</div>
     <div class="slr-pt-temblor" data-temblor><div class="slr-pt-escenario" data-escenario></div></div>
     <nav class="slr-pt-controles">
       <button type="button" class="slr-pt-boton" data-silencio aria-label="Silenciar"></button>
-      <button type="button" class="slr-pt-boton" data-velocidad>×1</button>
       ${opts.soloEscenas ? '<button type="button" class="slr-pt-boton" data-pausa>⏸</button>' : ''}
       <span class="slr-pt-pista" data-pista>${esc(texto('toca'))}</span>
       <button type="button" class="slr-pt-boton slr-pt-boton--saltar" data-saltar>${opts.soloEscenas ? 'Cerrar' : 'Saltar ⏭'}</button>
@@ -219,13 +223,32 @@ export function reproducir(guion, cartas = {}, opts = {}) {
   const pintarSilencio = () => { const b = $('[data-silencio]'); b.textContent = silenciado() ? '🔇' : '🔊'; b.setAttribute('aria-label', silenciado() ? 'Activar sonido' : 'Silenciar'); };
   pintarSilencio();
   $('[data-silencio]').addEventListener('click', e => { e.stopPropagation(); silenciar(!silenciado()); pintarSilencio(); });
-  $('[data-velocidad]').addEventListener('click', e => {
-    e.stopPropagation();
-    vel = vel === 1 ? 2 : 1;
-    e.currentTarget.textContent = `×${vel}`;
-    linea?.velocidad(vel);
-    aplicarCesped();
+  // Mantener pulsado: ×2 mientras dure; al soltar, la velocidad de antes y sin avanzar
+  const velBase = vel;
+  let pulsado = null, temporizador = 0, rapido = false, sinClic = false;
+  const ponerVelocidad = v => { vel = v; linea?.velocidad(vel); aplicarCesped(); el.classList.toggle('es-rapido', v !== velBase); };
+  el.addEventListener('pointerdown', e => {
+    if (pulsado != null || e.target.closest('.slr-pt-controles') || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    pulsado = e.pointerId;
+    rapido = false;
+    sinClic = false;
+    temporizador = setTimeout(() => { rapido = true; ponerVelocidad(2); }, PULSACION_MS);
   });
+  const soltar = e => {
+    if (pulsado == null || (e?.pointerId != null && e.pointerId !== pulsado)) return;
+    pulsado = null;
+    clearTimeout(temporizador);
+    if (!rapido) return;
+    rapido = false;
+    ponerVelocidad(velBase);
+    sinClic = true;   // el clic que llega al soltar no avanza de escena (solo ese)
+    setTimeout(() => { sinClic = false; }, 600);
+  };
+  addEventListener('pointerup', soltar);
+  addEventListener('pointercancel', soltar);
+  addEventListener('blur', soltar);
+  // Ni el menú del navegador ni el de «guardar imagen» al mantener pulsado
+  el.addEventListener('contextmenu', e => e.preventDefault());
   const pausar = si => {
     if (si) { linea?.pausar(); animCesped.pause(); } else { linea?.reanudar(); aplicarCesped(); }
     const b = $('[data-pausa]');
@@ -243,6 +266,7 @@ export function reproducir(guion, cartas = {}, opts = {}) {
   });
   // Tap: al final de la escena y a la siguiente
   el.addEventListener('click', e => {
+    if (sinClic) { sinClic = false; return; }
     if (e.target.closest('.slr-pt-controles')) return;
     $('[data-pista]').classList.add('es-oculta');
     if (!linea) return;
@@ -276,6 +300,10 @@ export function reproducir(guion, cartas = {}, opts = {}) {
     linea?.pausar();   // se queda quieta mientras la capa se va (cancelar la haría saltar al principio)
     animCesped.pause();
     removeEventListener('resize', medir);
+    removeEventListener('pointerup', soltar);
+    removeEventListener('pointercancel', soltar);
+    removeEventListener('blur', soltar);
+    clearTimeout(temporizador);
     fx.vaciar();
     opts.alTerminar?.({ visto });
   }
@@ -290,6 +318,7 @@ export function reproducir(guion, cartas = {}, opts = {}) {
     get escenas() { return escenas; },
     get indice() { return i; },
     get linea() { return linea; },
+    get velocidad() { return vel; },
     pausar: () => pausar(true),
     reanudar: () => pausar(false),
     saltar: () => $('[data-saltar]').click(),

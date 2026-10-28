@@ -47,7 +47,7 @@ export const ESQUEMA = {
     vs: t('VS'), ataca: t('ATACA'), poder: t('⚡ PODER'), control: t('Control del balón'), robo: t('¡ROBO!'), contraataque: t('CONTRAATAQUE'),
     sorpresa: t('¡SORPRESA!'), cortado: t('¡CORTADO!'), chut: t('Chut'), gol: t('GOL'), puños: t('¡DE PUÑOS!'), atrapada: t('¡A LAS MANOS!'),
     estirada: t('¡PARADÓN!'), lesion: t('🚑 LESIÓN'), descanso: t('DESCANSO'), final: t('FINAL'), mejor_carta: t('Mejor carta del partido'),
-    toca: t('Toca para avanzar'),
+    toca: t('Toca: avanzar · Mantén: ×2'),
   },
   efectos: { temblor: n(1, 0, 3), particulas: n(1, 0, 3), balon: n(64, 32, 140), microvibracion: n(2, 0, 8) },
   ritmo: { igualado_min: n(0.4, 0, 1), igualado_max: n(0.6, 0, 1), final_desde_jugada: n(8, 1, 10, true), final_diferencia_max: n(1, 0, 5, true), sorpresa: n(0.4, 0, 0.5) },

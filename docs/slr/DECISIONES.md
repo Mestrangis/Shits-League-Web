@@ -1906,3 +1906,70 @@ Móvil 412 × 915 con la CPU ×4 y «4G lenta» (150 ms, 1,6 / 0,75 Mbit/s); med
 - **Nada de Rush antes de JUGAR,** ni en frío ni en caliente. La red de la Shits League normal se queda tranquila 4,6 s antes en frío y 1,4 s antes en caliente.
 - **«Se ve» y «datos frescos» apenas cambian en este banco.** Aquí el service worker viejo ya se registraba al terminar de cargar la página, así que su descarga empezaba después de pintar Inicio. En el móvil, con el service worker viejo ya instalado, al abrir competían con la Shits League la llamada `slr_rush_inicio`, la comprobación de acceso, los `modulepreload` de unos 80 módulos y la carga de `rush.js`. Eso es lo que ya no pasa.
 - **JUGAR la primera vez tarda más (7,1 s),** porque es cuando se descarga Rush, como se pidió. Las siguientes, entra directo, sin descarga: en el banco del repaso de rendimiento, 1,4 s en caliente hasta poder usar Equipo.
+
+## Alineación vacía al empezar, suplentes en la hoja y ×2 manteniendo pulsado
+
+### Decisiones de Marcos
+
+- **Equipo nuevo sin cartas colocadas:** al crearse un equipo, todas sus cartas quedan sin colocar, para que cada uno haga la alineación a su gusto.
+- **Si llega el cierre de la jornada con la alineación vacía o incompleta,** el servidor la completa solo, con la misma regla de los bots, y avisa con una notificación: nunca se juega un partido sin cartas.
+- **En la pantalla de alineación vacía,** un aviso claro de «Coloca tus cartas».
+- **Al tocar una carta del once para cambiarla,** salen también los suplentes, arriba del todo y en su propia sección («Suplentes» y después «Sin colocar»). Elegir un suplente los intercambia: el suplente pasa a ese puesto y la carta que había pasa a su sitio en el banquillo.
+- **Reproducción de partidos: fuera el botón ×1 / ×2.** La velocidad ×2 se hace manteniendo pulsada la pantalla, como en TikTok.
+  - A partir de unos 250 ms va a ×2 y arriba sale un indicador discreto «▶▶ ×2». Al soltar vuelve a ×1 y no avanza de escena.
+  - Un toque corto sigue avanzando a la siguiente escena.
+  - Mantener pulsado no selecciona texto ni saca el menú del navegador (tampoco en iPhone), y no hay vibración del dispositivo.
+  - En PC, igual con el ratón.
+
+### Decisiones mías
+
+#### Servidor (migraciones `20261028000000_slr_alineacion_vacia` y `20261028000100_slr_confirmar_completa`)
+
+- **`slr_unirse_liga` usa `crear_alineacion_vacia`:** 2-2-2 sin cartas, sin banquillo ni capitán, marcada como automática (no cuenta como guardada).
+  - Los bots siguen empezando con la suya por defecto; además, se les rehace en cada cierre, como antes.
+  - El reinicio de temporada (`reiniciar_para_temporada`) no se ha tocado: no es un equipo nuevo.
+- **`completar_alineacion(equipo)`** respeta lo que la persona ya ha colocado.
+  - Rellena los huecos vacíos, o con cartas que ya no son del equipo, con la regla de los bots (`crear_alineacion_por_defecto`): la mejor stat del hueco multiplicada por el factor de energía, en el orden POR, DEF, MED, DEL. Primero tira de las sin colocar y, si no quedan, del banquillo.
+  - Completa el banquillo hasta 3 con las mejores que quedan (OVR × energía).
+  - Pone capitán si no lo hay (el mejor titular).
+  - No cambia `guardada_en` ni `automatica`: completarla no da el bonus de participación.
+  - Si con las cartas del equipo no llega para el once, los huecos que quedan los cubre un Canterano al congelar, como siempre.
+- **`cerrar_jornada`** la llama para cada equipo de una persona (no los internos). Lo hace después de vender las cartas de más, que pueden haber dejado huecos, y antes de congelar.
+  - Si ha completado algo, avisa con `alineacion_completada`: «Tu alineación de la jornada N estaba incompleta: se ha completado sola (7 cartas en el once, 3 en el banquillo y capitán). Revísala para la próxima».
+  - Al tocar el aviso se va a la pantalla Equipo (destino nuevo, `equipo`; la restricción de `notificaciones.destino_tipo` lo admite). En la campana sale con el icono 📋.
+- **Guardar** ya exigía el once completo y un capitán (la web no deja guardar a medias), así que «incompleta» al cierre es sobre todo la vacía, o una con cartas vendidas o perdidas. Las dos se completan igual.
+- **Confirmar ahora exige el once completo** con cartas propias (`alineacion_incompleta`). Si no, confirmar una alineación vacía daría el bonus de participación sin haberla hecho. En la web, con huecos vacíos el estado dice «Sin completar» y «Confirmar» está desactivado.
+- **Probado** en una transacción que se deshace, con Bot Uno (vacía) y Bot Dos (un portero, un defensa y un suplente colocados): los dos quedan con 7 titulares, 3 suplentes y capitán; Bot Dos conserva lo suyo en su hueco; el partido se congela sin Canteranos; completar otra vez no cambia nada. Y en la API real, con `tests/slr/api-alineacion-vacia.mjs`.
+
+#### Pantalla Equipo
+
+- **Aviso «Coloca tus cartas»** (verde) con el once vacío. Explica cómo colocarlas y que, si llega el cierre así, se completa solo con las mejores y se avisa.
+  - A medias, «Te faltan N cartas en el once».
+  - No sale con las alineaciones cerradas (entre el cierre y la publicación).
+- **La hoja de un hueco del once:** «Suplentes» (aunque esté vacío, con «No tienes suplentes en el banquillo»), «Sin colocar» y, al final, «En el once» (las del resto del once, para cambiar dos titulares de sitio tocando, como antes).
+  - La del banquillo sigue con «Sin colocar» y «Ya colocadas».
+  - Elegir una carta colocada intercambia los sitios, igual que antes; con un suplente, la del hueco pasa a ese mismo sitio del banquillo.
+
+#### Reproducción
+
+- **Pointer events** sobre toda la pantalla del partido (dedo y ratón, solo el botón izquierdo y un dedo).
+  - A los 250 ms pulsado pasa a ×2 (la escena, el reloj y el césped).
+  - Al soltar, o si se cancela el gesto o la ventana pierde el foco, vuelve a la velocidad de antes. Se ignora solo el clic que llega justo al soltar (el siguiente toque ya cuenta), así que no avanza de escena.
+- **Contra la selección y los menús:**
+  - `user-select: none`, `-webkit-touch-callout: none` y `-webkit-user-drag: none` en todo el reproductor;
+  - `touch-action: none` (un mantener pulsado que se moviera un poco ya no se convierte en un gesto del navegador que cancela la pulsación);
+  - `contextmenu` cancelado.
+  - Sin `navigator.vibrate`, como en todo el juego.
+- **Dos arreglos que salieron al repasar las pruebas de versión:**
+  - Si al entrar en Rush lo guardado ya era fresco, lo pedido al pulsar JUGAR (`rushPrecarga`) no se usaba y se quedaba: en la siguiente entrada, si había llegado hacía menos de 15 s, valía como fresco. Ahora, si no se usa, se descarta.
+  - Aplicar una versión al abrir: en el banco, abriendo justo después de salir de Rush (con el worker viejo aún bajando fotos de cartas), el navegador tarda unos 5 s en activarla. Abriendo la app de forma normal no hay nada a medias y es inmediato. Se deja el límite de 8 s: esperar más sería más rato con la pantalla sin arrancar.
+- **La pista de abajo** dice «Toca: avanzar · Mantén: ×2» (`ajustes.js`); la frase larga no cabía a 360 px.
+
+#### Pruebas
+
+- `tests/slr/api-alineacion-vacia.mjs`: alineación vacía al unirse; confirmarla vacía no se puede; al cierre, el servidor la completa (7 + 3 + capitán, sin bonus), con el aviso y su destino; el partido se juega sin Canteranos; una completa guardada no se toca ni recibe aviso.
+- `banco/alineacion.mjs`, a 360 y 412 px:
+  - equipo nuevo: todas sin colocar y «Coloca tus cartas» (cabe en la pantalla); la hoja con «Suplentes 0» y «Sin colocar 11»; con una colocada, «Te faltan 6 cartas»;
+  - completa: sin aviso; la hoja con «Suplentes 3» arriba y «Sin colocar» después; elegir un suplente intercambia con su sitio del banquillo;
+  - y lo de siempre (arrastrar con ratón y con el dedo).
+- `banco/partido.mjs`, a 360 y 412 px: sin botón ×1/×2. Con el dedo y con el ratón: a ×1 los primeros 250 ms, a ×2 con el indicador mientras se mantiene, y al soltar vuelve a ×1 sin avanzar de escena. Un toque corto avanza. Sin selección, sin menú y sin vibración.

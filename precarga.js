@@ -1,7 +1,7 @@
 // Generado por herramientas/precarga.mjs: NO se edita a mano.
 // [ruta, bytes, resumen del contenido] · archivos: la Shits League normal (se descarga al
 // instalar la app) · rush: Shits League Rush (se descarga al pulsar JUGAR por primera vez)
-self.PRECARGA = { "version": "eeb37a78424f", "versionRush": "f60bcec65234", "archivos": [
+self.PRECARGA = { "version": "2b2b897c1d6f", "versionRush": "0563210b4a03", "archivos": [
   ["assets/apple-touch-icon.png", 18995, "52a8d73f0141" ],
   ["assets/clasificación23-24.png", 96637, "ea0b1bd62d14" ],
   ["assets/goles23-24.png", 58943, "71377552d927" ],
@@ -28,7 +28,7 @@ self.PRECARGA = { "version": "eeb37a78424f", "versionRush": "f60bcec65234", "arc
   ["css/acabados/brillante.css", 2519, "f0c2286bec3e" ],
   ["css/acabados/foil.css", 2403, "a001b4fa81f9" ],
   ["css/acabados/plateada.css", 2187, "38072b45c155" ],
-  ["css/slr.css", 170933, "9f7fe27b7f1c" ],
+  ["css/slr.css", 171846, "e1b6365f5dfe" ],
   ["img/slr/partido/balon.svg", 376, "b31ad4f5e252" ],
   ["img/slr/partido/bota.svg", 7901, "22cb1af72a1e" ],
   ["img/slr/tacticas/tactica-contraataque.svg", 2960, "0717e2d9a127" ],
@@ -55,7 +55,7 @@ self.PRECARGA = { "version": "eeb37a78424f", "versionRush": "f60bcec65234", "arc
   ["js/slr/motor-v2.0.0.js", 37219, "1fd3be69b747" ],
   ["js/slr/motores.js", 1162, "40c2752c2e48" ],
   ["js/slr/pantallas/album.js", 7210, "5210fcc5b10e" ],
-  ["js/slr/pantallas/alineacion.js", 49107, "1efad3e7daf7" ],
+  ["js/slr/pantallas/alineacion.js", 50741, "51efed5c132d" ],
   ["js/slr/pantallas/apertura.js", 29428, "b583cfe357db" ],
   ["js/slr/pantallas/catalogo.js", 12608, "614757f6bd52" ],
   ["js/slr/pantallas/colecciones-admin.js", 16084, "dc90d33227f3" ],
@@ -76,9 +76,9 @@ self.PRECARGA = { "version": "eeb37a78424f", "versionRush": "f60bcec65234", "arc
   ["js/slr/pantallas/tienda.js", 11742, "06a121271848" ],
   ["js/slr/particulas.js", 5245, "0eb90538a4a0" ],
   ["js/slr/partido/abrir.js", 3205, "a61f4b3d2e2f" ],
-  ["js/slr/partido/ajustes.js", 10305, "412507fbb510" ],
+  ["js/slr/partido/ajustes.js", 10308, "5e2a581c6ef6" ],
   ["js/slr/partido/azar.js", 3078, "b59e7cac8864" ],
-  ["js/slr/partido/config.js", 7928, "4d766d408692" ],
+  ["js/slr/partido/config.js", 7940, "f88ab05239d3" ],
   ["js/slr/partido/escenas/ataque.js", 2852, "8f9e961ac5f4" ],
   ["js/slr/partido/escenas/chut.js", 1385, "d3bc6f715f89" ],
   ["js/slr/partido/escenas/comun.js", 13418, "b70bf0374419" ],
@@ -98,11 +98,11 @@ self.PRECARGA = { "version": "eeb37a78424f", "versionRush": "f60bcec65234", "arc
   ["js/slr/partido/estadisticas.js", 7341, "fb8ebdd6fcc5" ],
   ["js/slr/partido/guion.js", 11405, "79c57288a73a" ],
   ["js/slr/partido/linea.js", 4505, "ace827cda9b1" ],
-  ["js/slr/partido/reproductor.js", 15354, "8636322d13df" ],
+  ["js/slr/partido/reproductor.js", 16995, "dc1833097e2c" ],
   ["js/slr/partido/sonido.js", 1820, "ad4f200bcccc" ],
   ["js/slr/partido/vinetas.js", 86186, "d4f35ff5e50c" ],
   ["js/slr/precarga-fotos.js", 4583, "792a17b355e5" ],
-  ["js/slr/rush.js", 29555, "e120466beac1" ],
+  ["js/slr/rush.js", 30115, "7beb157c69a1" ],
   ["js/slr/seleccion.js", 8164, "66a1fe6f23bf" ],
   ["js/slr/sobre-arte.js", 4779, "5a4243797e3f" ],
   ["js/slr/tactica.js", 7434, "4360ecd84f31" ],

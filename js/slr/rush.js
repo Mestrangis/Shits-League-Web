@@ -219,7 +219,8 @@ export async function recargar() {
 /* ── Avisos (campana) ────────────────────────────────────────────────────── */
 // Cada aviso es una tarjeta con icono según el tipo. Si el servidor le ha
 // guardado destino (destino_tipo + destino_id), al tocarla lleva a su sitio:
-// carta → detalle · partido → crónica · movimientos → Perfil · liga → Liga.
+// carta → detalle · partido → crónica · movimientos → Perfil · liga → Liga ·
+// equipo → Equipo (alineación completada sola al cierre).
 let avisos = [];
 const ICONOS_AVISO = {
   jornada_publicada: '⚽', venta_completada: '💰', clausula_recibida: '💰',
@@ -228,7 +229,7 @@ const ICONOS_AVISO = {
   oferta_caducada: '🤝', oferta_cancelada: '🤝', venta_cancelada: '🏷️',
   intercambio_recibido: '🔁', intercambio_aceptado: '🔁', intercambio_rechazado: '🔁',
   intercambio_caducado: '🔁', intercambio_cancelado: '🔁',
-  eleccion_automatica: '🃏', admin_carta: '🃏',
+  eleccion_automatica: '🃏', admin_carta: '🃏', alineacion_completada: '📋',
   liga_pausada: '⏸️', liga_reanudada: '▶️', temporada_iniciada: '🏁', temporada_terminada: '🏆', jornada_aplazada: '📅',
 };
 async function cargarAvisos() {
@@ -295,6 +296,10 @@ async function irAlAviso(n) {
   if (n.destino_tipo === 'mercado') {
     // Ofertas e intercambios por responder, subastas perdidas: su sub-pestaña del Mercado
     return trasCerrarAvisos(async () => { mercado.irA(n.destino_id); await navegar('mercado'); });
+  }
+  if (n.destino_tipo === 'equipo') {
+    // Alineación completada sola al cierre: Equipo, con la alineación al día
+    return trasCerrarAvisos(async () => { await recargar('alineacion').catch(() => {}); await navegar('equipo'); });
   }
   if (n.destino_tipo === 'movimientos' || n.destino_tipo === 'liga') {
     trasCerrarAvisos(async () => {
@@ -522,6 +527,9 @@ export async function abrir(op) {
   if (pre && !yaLlego) window.rushPrecarga = pre;   // aún de camino: la recoge cargarBase
   await Promise.all([yaLlego, cargarIndice()]);
   await navegar(seccion);
+  // Si lo guardado ya era fresco, lo pedido al pulsar JUGAR no se ha usado: fuera (no puede
+  // quedarse para la próxima entrada como si fuera de ahora)
+  if (pre && window.rushPrecarga === pre) window.rushPrecarga = null;
   if (!raiz || !datos.equipo) return;
   pintarCampana();
   pintarPendiente();

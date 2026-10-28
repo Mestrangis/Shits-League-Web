@@ -140,7 +140,7 @@ export const AJUSTES = {
     descanso: ['DESCANSO'],
     final: ['FINAL'],
     mejor_carta: ['MVP'],
-    toca: ['Toca para avanzar'],              // la pista de abajo
+    toca: ['Toca: avanzar · Mantén: ×2'],     // la pista de abajo
   },
 
   /* ── EFECTOS ─────────────────────────────────────────────────────────── */

@@ -335,6 +335,8 @@ html.slr-abierto, html.slr-abierto body { overflow: hidden; }
 .slr-banner--cierre b { color: var(--slr-oro); }
 .slr-banner--info { border-color: #6FB6FF; background: rgba(111,182,255,.08); }
 .slr-banner--info b { color: #A9CCFF; }
+.slr-banner--coloca { border-color: var(--slr-verde, #1FE065); background: rgba(31,224,101,.08); }
+.slr-banner--coloca b { color: var(--slr-verde, #1FE065); }
 
 .slr-saldo {
   display: flex;
@@ -2211,8 +2213,15 @@ html.slr-sin-seleccion input, html.slr-sin-seleccion textarea { -webkit-user-sel
    para aprovechar la pantalla también en PC. */
 .slr-partido { --pt-vineta: min(94vw, 54vh, 560px); --pt-carta: min(26vw, 17vh, 150px); --pt-porteria: min(80vw, 62vh, 520px); --pt-franja: 64px; --pt-balon-max: 64px;
   position: absolute; inset: 0; z-index: 30; overflow: hidden; display: grid; grid-template-rows: auto minmax(0, 1fr) auto;
-  grid-template-columns: minmax(0, 1fr); user-select: none; -webkit-user-select: none; touch-action: manipulation; color: #fff;
+  grid-template-columns: minmax(0, 1fr); user-select: none; -webkit-user-select: none; touch-action: none; color: #fff;
+  -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
   background: #06180d; animation: slr-ap-entrar .25s ease-out; }
+/* Mantener pulsado (×2): ni selección, ni menú de «guardar imagen», ni arrastrar imágenes (iPhone incluido) */
+.slr-partido * { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; -webkit-user-drag: none; }
+.slr-pt-rapido { position: absolute; top: calc(64px + env(safe-area-inset-top, 0px)); left: 50%; z-index: 6; transform: translate(-50%, -4px);
+  padding: 4px 10px; border-radius: 999px; background: rgba(0,0,0,.45); color: #fff; font-size: 12px; font-weight: 800; letter-spacing: .04em;
+  opacity: 0; pointer-events: none; transition: opacity .15s, transform .15s; }
+.slr-partido.es-rapido .slr-pt-rapido { opacity: .9; transform: translate(-50%, 0); }
 .slr-partido__lienzo { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 6; }
 .slr-pt-marcador { position: relative; z-index: 7; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 6px;
   padding: calc(10px + var(--slr-top)) 10px 8px; background: linear-gradient(rgba(2,8,5,.88), rgba(2,8,5,.55)); border-bottom: 1px solid var(--slr-borde); }
