@@ -127,7 +127,7 @@ try {
   await uno.page.waitForSelector('.slr-perfil__version [data-version-app]');
   await esperar(async () => /aaa1234/.test(await uno.page.$eval('.slr-perfil__version [data-version-app]', e => e.textContent)), 5000);
   const etiqueta = await uno.page.$eval('.slr-perfil__version [data-version-app]', e => e.textContent);
-  check(/^Versión aaa1234 · \d+ \w+\.? \d{4}/.test(etiqueta) && !!await uno.page.$('.slr-perfil__version [data-reparar-app]'), `Perfil: «${etiqueta}» y «Reparar la app»`);
+  check(/^Versión aaa1234 · (\p{L}+, )?\d+ (de )?\p{L}+\.? (de )?\d{4}/u.test(etiqueta) && !!await uno.page.$('.slr-perfil__version [data-reparar-app]'), `Perfil: «${etiqueta}» y «Reparar la app»`);
   await foto(uno.page, 'perfil');
   await salirDeRush(uno.page);
 

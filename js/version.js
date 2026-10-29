@@ -304,7 +304,7 @@
   }
 
   /* ── La versión instalada, a la vista (pie y Perfil de Rush) ─────────────── */
-  const FECHA = new Intl.DateTimeFormat('es-ES', { timeZone: 'Europe/Madrid', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const FECHA = new Intl.DateTimeFormat('es-ES', { timeZone: 'Europe/Madrid', weekday: 'long', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   // raiz: donde buscar, además de la página (Rush pinta cada pantalla antes de ponerla)
   async function pintarEtiqueta(raiz) {
     if (!instalada && navigator.serviceWorker.controller) await estado();
