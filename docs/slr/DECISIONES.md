@@ -2054,6 +2054,11 @@ Móvil 412 × 915 con la CPU ×4 y «4G lenta» (150 ms, 1,6 / 0,75 Mbit/s); med
   - La lista (`precarga.js`) y los archivos podían llegar de momentos distintos del despliegue: una versión «nueva» con archivos viejos dentro, marcada como entera.
   - Esa marca no se volvía a comprobar nunca. Rush, marcado como entero, entraba directo (sin barra) con el código guardado. Solo borrando los datos se salía de ahí.
 - **Además, una versión nueva solo se aplicaba al abrir la app de cero.** En el móvil, volver a una app que estaba en segundo plano no es abrirla de cero, y JUGAR no miraba nada. Se podía seguir días con la versión de antes.
+- **Medido en el despliegue de este arreglo** (`f75812c`, consultando la CDN cada 10 s desde que acabó):
+  - La primera petición fue un `X-Cache: MISS` que ya daba lo nuevo, y desde ahí `HIT` con lo nuevo: GitHub Pages purgó la CDN al desplegar, al menos en el nodo de Madrid.
+  - La caché del navegador (`max-age=600`) sí guarda lo de antes 10 minutos, pero el worker anterior revalidaba (`no-cache`), así que no se quedaba con eso.
+  - Lo más probable, por tanto: la causa fue que la versión nueva no se aplicaba hasta abrir la app de cero (y JUGAR entraba con el Rush guardado, sin barra). Que no se comprobara nada hizo que no hubiera forma de salir sin borrar datos.
+  - Que la CDN dé lo de antes en otros nodos o en otros despliegues no se puede descartar. Por eso las descargas se saltan todas las cachés y se comprueban contra su huella en cualquier caso.
 
 ### Decisiones mías
 
