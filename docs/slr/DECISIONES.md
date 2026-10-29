@@ -2028,3 +2028,114 @@ Móvil 412 × 915 con la CPU ×4 y «4G lenta» (150 ms, 1,6 / 0,75 Mbit/s); med
   - el silencio se recuerda.
   - Con `--autoplay-policy=no-user-gesture-required`: en headless no hay toques de verdad, y el desbloqueo de iPhone no se puede probar ahí.
 - **`banco/acciones.mjs`:** el fallo intermitente de «comprar» venía de los datos de la prueba. Las pujas de la primera pasada reservan dinero (cuánto depende de las cartas al azar de la subasta del día) y a veces la segunda se quedaba sin saldo. Ahora se les da 60.000 en vez de 30.000.
+
+## Actualizaciones que llegan siempre (version.json, huellas y red de seguridad)
+
+### Decisiones de Marcos
+
+- **Nadie debe tener que borrar los datos para actualizar.** Con la versión anterior se entró en Rush, no salió la barra de descarga y se siguió con la versión vieja; solo se arregló borrando los datos de la app.
+- **Etiqueta de versión:** al desplegar, el workflow genera `version.json` con la versión (el commit), la fecha y la huella de cada archivo de las dos precargas. La app lo pide siempre sin caché (`no-store` y un parámetro) al abrir, al pulsar JUGAR y al volver tras un rato en segundo plano.
+- **Descargas sin archivos viejos:** todas con `cache: 'reload'` (o equivalente) y cada archivo comprobado contra su huella. Si no coincide, se vuelve a pedir; si sigue sin coincidir, la versión no se da por instalada. Solo se baja lo que ha cambiado.
+- **Cuándo se aplica:**
+  - la Shits League, al abrir, con una recarga rápida antes de pintar nada (la rueda si tarda). Sin red o si tarda más de ~4 s, la que había, y la nueva la próxima vez;
+  - Rush, al pulsar JUGAR, con «Descargando Shits League Rush…» y el porcentaje de lo que ha cambiado. Nunca se entra en Rush con otra versión que la de `version.json` mientras haya red;
+  - la Shits League y Rush, siempre de la misma versión.
+- **Red de seguridad:**
+  - si algo no cuadra, la app borra sus cachés y lo descarga todo ella sola;
+  - un botón discreto «Reparar la app» (Perfil de Rush y pie de la Shits League);
+  - la versión instalada (commit corto y fecha) a la vista en Perfil.
+- **Tests del caso real** (A instalada, B desplegada con las cabeceras de GitHub Pages), DECISIONES, CACHE_NAME, y desplegar una segunda versión de prueba para comprobarlo en el móvil.
+
+### Qué pasaba (la investigación)
+
+- **GitHub Pages sirve todo con `Cache-Control: max-age=600` detrás de una CDN** (Fastly: `Via: 1.1 varnish`, `X-Cache`, `Age`). Durante unos 10 minutos tras un despliegue, la CDN y la caché del navegador pueden dar los archivos de antes por la URL de siempre.
+- **El service worker anterior no comprobaba nada de lo que descargaba.**
+  - Pedía cada archivo por su URL normal con `cache: 'no-cache'`, que revalida contra la caché del navegador pero no evita que la CDN conteste con lo viejo.
+  - La lista (`precarga.js`) y los archivos podían llegar de momentos distintos del despliegue: una versión «nueva» con archivos viejos dentro, marcada como entera.
+  - Esa marca no se volvía a comprobar nunca. Rush, marcado como entero, entraba directo (sin barra) con el código guardado. Solo borrando los datos se salía de ahí.
+- **Además, una versión nueva solo se aplicaba al abrir la app de cero.** En el móvil, volver a una app que estaba en segundo plano no es abrirla de cero, y JUGAR no miraba nada. Se podía seguir días con la versión de antes.
+
+### Decisiones mías
+
+#### La etiqueta: `version.json`
+
+- **La genera `herramientas/precarga.mjs`** (antes generaba `precarga.js`, que desaparece) en el despliegue, con el commit y la fecha de git. No está en el repo (`.gitignore`); cada banco de pruebas la genera antes de empezar.
+- **Contenido:** `version`, `commit`, `fecha` y, por parte (`app`, `rush`, `audio`), `{ ruta: [huella, bytes] }`.
+  - La huella son 12 caracteres del sha-256 del contenido, con los textos en LF: igual en Windows que en el despliegue, y `sw.js` los cuenta igual.
+  - `version` es la huella del contenido de todo. Un despliegue que no cambia la web (solo docs o tests) no obliga a actualizar nada: solo se cambia la etiqueta (commit y fecha) de la versión instalada.
+- **La app la pide** con `cache: 'no-store'` y `?t=<ahora>`, que es otra URL para la CDN, así que llega siempre la del último despliegue:
+  - al abrir;
+  - al pulsar JUGAR;
+  - al volver tras más de 1 minuto en segundo plano.
+
+#### El service worker (`sw.js`, CACHE_NAME v43)
+
+- **Ya no lleva la lista dentro:** instala lo que le pide la página (`instalar`, con la etiqueta y las partes) y sirve la versión activa (`activar`). Cada versión va en dos cachés, `…-app-<versión>` y `…-rush-<versión>`, con su marca de entera; la activa está en `…-estado`.
+- **Descargas:** `fetch(ruta?v=<huella>, { cache: 'reload' })`. Es una URL que no ha cacheado nadie (ni el navegador ni la CDN), pedida saltándose la caché del navegador. Se comprueba la huella del contenido.
+  - Si no coincide, se pide otra vez con otro parámetro más.
+  - Si sigue sin coincidir, error: la parte no se marca como entera y no se puede activar.
+  - Solo se baja lo que ha cambiado: lo demás se copia de cualquier otra caché, también de las del worker anterior, pero solo si su huella coincide. Un archivo rancio guardado no se copia: se descarga.
+  - El porcentaje es solo de lo que se descarga.
+- **Una sola versión activa.** La app y Rush se sirven de la caché de esa versión. Si Rush aún no está descargado, de la red con la huella de esa versión; si la red ya tiene otra, un error, nunca un archivo de otra versión (la página instala la nueva).
+  - Al activar, fuera las cachés de otras versiones. La de Rush vieja se queda hasta tener la de la nueva, para copiar de ella lo que no ha cambiado, y se borra en cuanto está.
+- **`verificar`:** después de cada arranque, se vuelve a calcular la huella de todo lo guardado de la versión activa, y lo que no cuadra se descarga otra vez. **`reparar`:** borra todas las cachés de código.
+- **Sonidos:** con la huella de la etiqueta (cabecera `x-huella` en su caché), descargados igual.
+- **Paso desde el worker anterior:**
+  - El nuevo se aplica nada más instalarse y recarga una vez las páginas abiertas (`client.navigate`): el código de antes solo aplicaba versiones al abrir la app de cero.
+  - Lo que había guardado se aprovecha solo si su huella coincide.
+  - A partir de aquí, un cambio de `sw.js` espera y lo aplica `version.js` al abrir.
+
+#### La página (`js/version.js`)
+
+- **Al abrir** (`app.js` espera a `SLVersion.alArrancar` antes de arrancar), se miran la etiqueta remota y la instalada:
+  - Si son la misma, se arranca. Si la Shits League está a medias, se repara.
+  - Si hay una nueva, se instala la parte de la Shits League (solo lo cambiado), se activa y se recarga: una recarga rápida antes de pintar nada, con «Actualizando la app…» y la rueda si pasa de 0,4 s.
+  - Todo con un límite de 4 s desde que se abre. Si no da tiempo (o no hay red), se abre la que había; la descarga sigue y la próxima vez es inmediata.
+- **Al pulsar JUGAR** (`prepararRush`):
+  - Si la versión de `version.json` no es la instalada (la Shits League también es vieja), se instalan las dos partes con la barra, se activa, se recarga y se entra sola en Rush (`SL_ENTRAR_RUSH`).
+  - Si es la misma pero falta Rush, se descarga con la barra.
+  - Si a mitad se publica otra versión (una huella no cuadra porque ya hay otra), se va a por la nueva.
+  - Sin red, se entra si Rush está entero; si no, un mensaje.
+- **Al volver tras un rato:**
+  - en la Shits League, como al abrir (con hasta 8 s);
+  - dentro de Rush no se recarga: se deja descargando y se aplica al salir y pulsar JUGAR.
+- **La primera vez,** sin worker, todo de la red. Al registrarse (cuando la Shits League ya ha cargado), se instala la versión de `version.json` y se activa, sin recargar.
+  - Fallo que salió en el banco: se esperaba al evento `controllerchange`, que a veces llega antes de escucharlo. Ahora se mira si ya manda.
+- **Red de seguridad:**
+  - Se repara sola si: la versión está a medias; una huella sigue sin cuadrar sin que haya versión nueva; hay un error al arrancar un archivo propio (antes de que la Shits League termine de cargar); o el código de Rush no carga.
+  - Reparar es borrar las cachés de código, instalar la versión de `version.json` (con Rush si estaba), activar y recargar.
+  - Sola, como mucho una vez cada 5 minutos.
+  - «Reparar la app» está en el pie de la Shits League y en Perfil de Rush, y pide confirmación: la sesión y los datos no se tocan.
+- **La versión instalada,** «Versión <commit> · <fecha>», en Perfil de Rush y en el pie. Rush pinta cada pantalla antes de ponerla en la página, así que `pintarEtiqueta(cont)` también busca dentro de la pantalla.
+- **La actualización forzada** (una función de Supabase que ya no existe) instala la versión de `version.json` (con Rush si estaba), la activa y recarga. A los 15 s, «Reintentar».
+
+#### Pruebas
+
+- `precarga.test.mjs`: la etiqueta.
+  - Todo lo que usa la web, en dos partes sin repetir, y los sonidos aparte.
+  - La huella de cada archivo es la de su contenido.
+  - La genera el despliegue y la app la pide sin caché.
+- `sw.test.mjs`:
+  - instalar se salta las cachés y comprueba cada archivo;
+  - un archivo viejo de la caché intermedia se vuelve a pedir, y si sigue, la versión no se instala ni se activa;
+  - de A a B solo baja lo cambiado (el progreso, de eso) y no sobrevive nada de A;
+  - Rush siempre de la versión activa;
+  - una copia rancia no se copia;
+  - `verificar` repara un archivo roto; `reparar` lo borra todo; la etiqueta cambia sin descargar nada;
+  - instalaciones a la vez;
+  - el paso desde el worker anterior;
+  - sonidos y fotos.
+- `banco/version.mjs`, el caso real:
+  - Móvil de 412 px con 4G lenta y las cabeceras de GitHub Pages. El proxy (`red-lenta.mjs`, `red.cdnViejo`) hace de CDN que, tras desplegar, sigue dando lo de antes a las URL sin parámetros.
+  - Se instala A (la primera vez sola; JUGAR con la barra), se despliega B y se comprueba que:
+    - sin red se abre A y entra en su Rush;
+    - al abrir con red se aplica B (como mucho una recarga);
+    - al pulsar JUGAR sale la barra y se entra en B;
+    - no sobrevive ningún archivo de A;
+    - el otro móvil, al volver la red, también pasa a B.
+  - Con la app abierta, una versión C al pulsar JUGAR: una recarga y dentro de C.
+  - `js/app.js` roto en la caché: se repara sola y arranca. Un CSS roto: lo arregla la comprobación de después de arrancar.
+  - «Reparar la app» desde el pie; la actualización forzada con una versión D; la versión en Perfil.
+- **JUGAR antes de que mande el worker** (la primera visita): Rush entra por la red y, en cuanto el worker ha instalado la Shits League, también Rush en segundo plano. Se había perdido en la reescritura y lo detectó `banco/datos.mjs`.
+- **La comprobación de lo guardado (`verificar`)** espera 30 s después de arrancar y a un rato libre: no compite con lo primero que se hace en la app.
+- **`banco/listas.mjs`** falla hoy dos comprobaciones de rendimiento: una tarea larga de ~420–460 ms con 656 cartas (el límite es 400) y las fotos de la página siguiente aún sin precargar. Fallan igual con el commit anterior (servido desde un worktree en el mismo puerto), así que no vienen de este cambio: la liga de prueba tiene hoy muchas más cartas. Queda pendiente de revisar aparte.

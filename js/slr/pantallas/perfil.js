@@ -310,7 +310,12 @@ export async function pintar(cont, ctx) {
           <div><b>${esc(tipoMov(m.tipo))}</b><time>${esc(fechaHora(m.creado_en))}</time></div>
           <div class="${m.importe >= 0 ? 'es-ingreso' : 'es-gasto'}"><b>${conSigno(m.importe)}</b><small>${miles(m.saldo_despues)}</small></div>
         </li>`).join('')}</ul>
+    </section>
+    <section class="slr-perfil__version">
+      <span data-version-app>Versión …</span>
+      <button class="slr-btn slr-btn--fantasma" type="button" data-reparar-app>Reparar la app</button>
     </section>`;
+  window.SLVersion?.pintarEtiqueta?.(cont);
 
   cont.querySelector('[data-renombrar]').addEventListener('click', () => renombrar(ctx));
   cont.querySelector('[data-album]').addEventListener('click', () => abrirAlbum(ctx).catch(() => {}));

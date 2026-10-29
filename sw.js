@@ -1,184 +1,235 @@
 /* ═══════════════════════════════════════════════
    SHITS LEAGUE — Service Worker
-   La app se instala como un juego, en dos partes (lista generada en precarga.js
-   por herramientas/precarga.mjs):
-   · La Shits League normal (PRECARGA.archivos): se descarga al instalar la app.
-   · Shits League Rush (PRECARGA.rush): NO se descarga hasta que se pulsa JUGAR
-     por primera vez (la página manda «descargarRush» y enseña el progreso). Nada
-     de Rush compite con la Shits League normal.
-   Las dos se sirven desde su caché («primero la caché»). Al actualizar solo se
-   descarga lo que ha cambiado (lo igual se copia de la versión anterior).
-   · Una versión nueva se descarga en segundo plano (Rush también, pero solo si
-     ya estaba descargado, y poco a poco) y espera: se aplica sola la próxima vez
-     que se abra la app (js/version.js), sin preguntar.
-   · Sonidos de los partidos (audio/, PRECARGA.audio): no se precargan; Rush los
-     pide en segundo plano tras entrar y se guardan en su caché, con su resumen:
-     si un archivo cambia, se vuelve a descargar.
+   La app se instala como un juego, por versiones. Quien decide qué versión toca
+   es la página (js/version.js), con la etiqueta version.json (que pide siempre
+   sin caché): aquí se instala lo que se pide y se sirve la versión activa.
+   · Cada versión, en dos cachés: la Shits League normal (app) y Rush (rush).
+     Se instala parte a parte («instalar»): lo que ya estaba igual en otra caché
+     se copia; lo demás se descarga saltándose TODAS las cachés intermedias
+     (cache: 'reload' y ?v=<huella>: ni la del navegador ni la de GitHub Pages,
+     max-age=600) y cada archivo se comprueba contra su huella de version.json.
+     Si no coincide, se pide otra vez; si sigue sin coincidir, la parte no se da
+     por instalada.
+   · Una sola versión activa («activar»): la app y Rush se sirven SIEMPRE de la
+     misma versión (Rush de su caché o, si aún no está descargado, de la red con
+     la huella de esa versión): nunca se mezclan archivos de dos versiones.
+   · «verificar»: vuelve a comprobar lo guardado de la versión activa y repara lo
+     que no cuadre. «reparar»: borra todas las cachés de código (la página lo
+     vuelve a instalar todo).
+   · Sonidos de los partidos (audio/): no se precargan; al pedirlos se guardan
+     en su caché, comprobados contra su huella.
    · Fotos de las cartas (Cloudinary): caché propia, «primero la caché», con
      las 600 más recientes (el resto se borra).
-   · Supabase, Google y el resto: directos a la red (los datos de Rush los
-     guarda la propia app).
-   Sube CACHE_NAME para forzar una caché nueva (lo que no ha cambiado se copia).
+   · Supabase, Google y el resto: directos a la red.
+   Sube CACHE_NAME para empezar con cachés nuevas (lo igual se copia, comprobado).
 ═══════════════════════════════════════════════ */
 
-const CACHE_NAME = 'shits-league-v42';
-importScripts('precarga.js');   // self.PRECARGA = { version, versionRush, archivos, rush, audio }: [ruta, bytes, resumen]
-const P = self.PRECARGA;
-
-const CACHE_APP = `${CACHE_NAME}-app-${P.version}`;
-const CACHE_RUSH = `${CACHE_NAME}-rush-${P.versionRush}`;
+const CACHE_NAME = 'shits-league-v43';
+const CACHE_ESTADO = `${CACHE_NAME}-estado`;   // ACTIVA: la etiqueta de la versión que manda
 const CACHE_FOTOS = 'slr-fotos-cartas';
 const CACHE_FUENTES = 'sl-fuentes';
 const CACHE_AUDIO = 'slr-audio';
 const MAX_FOTOS = 600;
-const LISTA = '__precarga__.json';    // marca de «esta caché está entera», con su lista
-const VIEJAS = '__viejas__.json';     // en la de Rush: cachés viejas que se borran cuando esté entera
+const ACTIVA = '__activa__.json';
+const ENTERA = '__entera__.json';                   // marca de «esta parte está entera», con la etiqueta
 const BASE = new URL('./', self.registration.scope).href;
-const RUTAS_APP = new Set(P.archivos.map(([r]) => r));
-const RUTAS_RUSH = new Set(P.rush.map(([r]) => r));
-const RESUMEN_AUDIO = new Map((P.audio ?? []).map(([r, , h]) => [r, h]));
-const DE_LA_APP = /^shits-league-v\d+-(app|rush)-/;
+const DE_CODIGO = /^shits-league-v\d+-(app|rush)-/;   // de este worker y de los de antes
+const TEXTO = /\.(js|mjs|css|html|json|svg|txt)$/i;
+const cacheDe = (parte, version) => `${CACHE_NAME}-${parte}-${version}`;
 const json = d => new Response(JSON.stringify(d), { headers: { 'Content-Type': 'application/json' } });
 
 async function avisar(datos) {
   const ps = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-  for (const p of ps) p.postMessage({ tipo: 'precarga', version: P.version, ...datos });
+  for (const p of ps) p.postMessage({ tipo: 'version', ...datos });
 }
 
-/* ── Cachés de otras versiones ────────────────────────────────────────────── */
-// Las enteras (con su lista): de dónde copiar lo que no ha cambiado
-async function anteriores() {
-  const out = [];
-  for (const nombre of await caches.keys()) {
-    if (!DE_LA_APP.test(nombre) || nombre === CACHE_APP || nombre === CACHE_RUSH) continue;
-    const cache = await caches.open(nombre);
-    const l = await cache.match(LISTA).then(r => r?.json()).catch(() => null);
-    if (!l) continue;
-    // [ruta, bytes, resumen] (las de antes de separar Rush lo tenían todo en archivos)
-    const entradas = [...(l.archivos ?? []), ...(l.rush ?? [])].filter(Array.isArray);
-    out.push({ nombre, cache, entradas, nueva: !!l.versionRush, conRush: entradas.some(a => a[0] === 'js/slr/rush.js') });
-  }
-  return out;
+/* ── Huella: sha-256 del contenido (los textos, con saltos de línea LF) ─────── */
+async function huella(buf, ruta) {
+  let b = buf;
+  if (TEXTO.test(ruta)) b = new TextEncoder().encode(new TextDecoder().decode(buf).replace(/\r\n/g, '\n'));
+  const h = new Uint8Array(await crypto.subtle.digest('SHA-256', b));
+  return [...h.slice(0, 6)].map(x => x.toString(16).padStart(2, '0')).join('');
 }
-const entera = nombre => caches.open(nombre).then(c => c.match(LISTA)).then(r => !!r);
-
-/* ── Llenar una caché con su lista ────────────────────────────────────────── */
-// Copia lo igual de una versión anterior y descarga lo demás. ritmo: { trabajadores, prioridad }
-// (se puede acelerar a mitad: ritmo.acelerar()). alArchivo(bytes) por cada uno que queda guardado.
-async function llenar(nombre, lista, ritmo, alArchivo) {
-  const cache = await caches.open(nombre);
-  const iguales = new Map();   // `${ruta}|${resumen}` → caché anterior con ese contenido
-  for (const a of await anteriores()) for (const [r, , h] of a.entradas) if (!iguales.has(`${r}|${h}`)) iguales.set(`${r}|${h}`, a.cache);
-  const pendientes = [];
-  for (const a of lista) {
-    if (await cache.match(BASE + a[0])) alArchivo?.(a[1]);    // reintento: ya estaba
-    else pendientes.push(a);
+// Una respuesta limpia para guardar (sin redirecciones, con su tipo)
+const guardable = (buf, res) => new Response(buf, { status: 200, headers: { 'Content-Type': res.headers.get('Content-Type') || 'application/octet-stream' } });
+// De la red, saltándose las cachés intermedias, y comprobada; si no cuadra, otra vez
+async function descargar(ruta, h, prioridad = 'auto') {
+  for (let intento = 0; intento < 2; intento++) {
+    const res = await fetch(`${BASE}${ruta}?v=${h}${intento ? `&r=${Date.now()}` : ''}`, { cache: 'reload', priority: prioridad });
+    if (!res.ok) throw new Error(`${ruta}: ${res.status}`);
+    const buf = await res.arrayBuffer();
+    if (await huella(buf, ruta) === h) return guardable(buf, res);
   }
-  let i = 0;
-  const trabajador = async () => {
-    while (i < pendientes.length) {
-      const [ruta, bytes, h] = pendientes[i++];
-      const url = BASE + ruta;
-      let res = await iguales.get(`${ruta}|${h}`)?.match(url);
-      if (!res) {
-        res = await fetch(url, { cache: 'no-cache', priority: ritmo.prioridad });
-        if (!res.ok) throw new Error(`${ruta}: ${res.status}`);
-        // Una respuesta que viene de una redirección (p. ej. /index.html → /) no se puede
-        // servir a una navegación: se guarda una copia limpia
-        if (res.redirected) res = new Response(await res.blob(), { status: res.status, statusText: res.statusText, headers: res.headers });
+  throw Object.assign(new Error(`${ruta}: no coincide con su huella`), { huella: true });
+}
+
+/* ── La versión activa ────────────────────────────────────────────────────── */
+let activa = null;   // promesa de la etiqueta activa (o null)
+const leerActiva = () => (activa ??= caches.open(CACHE_ESTADO).then(c => c.match(ACTIVA)).then(r => r?.json() ?? null).catch(() => null));
+// (sin abrirla si no existe: abrir una caché la crea)
+const entera = async (parte, version) => (await caches.has(cacheDe(parte, version))) && !!(await (await caches.open(cacheDe(parte, version))).match(ENTERA));
+
+/* ── Instalar una versión (partes: ['app'] y/o ['rush']) ──────────────────── */
+const instalaciones = new Map();   // `${version}|${partes}` → { promesa, ritmo, progreso }
+function instalar(m, partes, { fondo = false } = {}) {
+  const clave = `${m.version}|${partes.join(',')}`;
+  const ya = instalaciones.get(clave);
+  if (ya) { if (!fondo && ya.ritmo.fondo) { ya.ritmo.fondo = false; ya.ritmo.acelerar?.(4); } return ya.promesa; }
+  const ritmo = { fondo, acelerar: null };
+  const progreso = { hechos: 0, total: 0, bytes: 0, totalBytes: 0 };
+  const t = { ritmo, progreso };
+  instalaciones.set(clave, t);
+  t.promesa = (async () => {
+    // Lo que falta en cada parte
+    const tareas = [];
+    for (const parte of partes) {
+      if (await entera(parte, m.version)) continue;
+      const cache = await caches.open(cacheDe(parte, m.version));
+      for (const [ruta, [h, bytes]] of Object.entries(m[parte] ?? {})) {
+        if (await cache.match(BASE + ruta)) continue;   // reintento: ya estaba (se comprobó al guardarlo)
+        tareas.push({ parte, cache, ruta, h, bytes });
       }
-      await cache.put(url, res);
-      alArchivo?.(bytes);
     }
-  };
-  const trabajando = Array.from({ length: ritmo.trabajadores }, trabajador);
-  ritmo.acelerar = n => { ritmo.prioridad = 'auto'; for (let k = 0; k < n; k++) trabajando.push(trabajador()); };
-  // Promise.all de una lista que puede crecer
-  for (let k = 0; k < trabajando.length; k++) await trabajando[k];
+    // Lo igual en otra caché (de otra versión, o de un worker anterior): se copia si su huella cuadra
+    const otras = (await caches.keys()).filter(k => DE_CODIGO.test(k) && !partes.some(p => k === cacheDe(p, m.version)));
+    for (const k of otras) {
+      const c = await caches.open(k);
+      for (const x of tareas) {
+        if (x.copiada) continue;
+        const r = await c.match(BASE + x.ruta);
+        if (!r) continue;
+        const buf = await r.arrayBuffer();
+        if (await huella(buf, x.ruta) === x.h) { await x.cache.put(BASE + x.ruta, guardable(buf, r)); x.copiada = true; }
+      }
+    }
+    // Lo demás, de la red: el progreso es solo de esto (lo que ha cambiado)
+    const pendientes = tareas.filter(x => !x.copiada);
+    progreso.total = pendientes.length;
+    progreso.totalBytes = pendientes.reduce((s, x) => s + x.bytes, 0);
+    avisar({ evento: 'progreso', version: m.version, partes: clave, ...progreso });
+    let i = 0;
+    const trabajador = async () => {
+      while (i < pendientes.length) {
+        const x = pendientes[i++];
+        await x.cache.put(BASE + x.ruta, await descargar(x.ruta, x.h, ritmo.fondo ? 'low' : 'auto'));
+        progreso.hechos++;
+        progreso.bytes += x.bytes;
+        avisar({ evento: 'progreso', version: m.version, partes: clave, ...progreso });
+      }
+    };
+    const trabajando = Array.from({ length: fondo ? 2 : 6 }, trabajador);
+    ritmo.acelerar = n => { for (let k = 0; k < n; k++) trabajando.push(trabajador()); };
+    for (let k = 0; k < trabajando.length; k++) await trabajando[k];
+    // Entera: con la etiqueta (sin las otras partes, que no hacen falta para servir esta)
+    for (const parte of partes) await (await caches.open(cacheDe(parte, m.version))).put(ENTERA, json(m));
+    // Si es la versión activa (Rush al pulsar JUGAR), ya sobran las cachés de otras versiones
+    const a = await leerActiva();
+    if (a?.version === m.version) await limpiar(a);
+    await avisar({ evento: 'lista', version: m.version, partes: clave });
+  })().catch(async e => { await avisar({ evento: 'error', version: m.version, partes: clave, error: String(e.message || e), huella: !!e.huella }); throw e; })
+    .finally(() => instalaciones.delete(clave));
+  return t.promesa;
 }
 
-/* ── Instalación: la Shits League normal (y Rush, si ya estaba descargado) ── */
+/* ── Activar una versión ya instalada (al menos la parte app) ─────────────── */
+async function activar(version) {
+  const r = await (await caches.open(cacheDe('app', version))).match(ENTERA);
+  if (!r) throw new Error(`La versión ${version} no está instalada`);
+  const m = await r.json();
+  await (await caches.open(CACHE_ESTADO)).put(ACTIVA, json(m));
+  activa = Promise.resolve(m);
+  await limpiar(m);
+}
+// Fuera las cachés de código de otras versiones. Las de Rush se quedan mientras la de la
+// versión activa no esté entera: de ahí se copia lo que no ha cambiado al pulsar JUGAR
+async function limpiar(m) {
+  const rushEntera = await entera('rush', m.version);
+  for (const k of await caches.keys()) {
+    if (!DE_CODIGO.test(k) || k === cacheDe('app', m.version) || k === cacheDe('rush', m.version)) continue;
+    if (/-rush-/.test(k) && !rushEntera) continue;
+    await caches.delete(k);
+  }
+}
+
+/* ── Verificar lo guardado de la versión activa (y reparar lo que no cuadre) ── */
+async function verificar() {
+  const m = await leerActiva();
+  if (!m) return { reparados: [] };
+  const reparados = [];
+  for (const parte of ['app', 'rush']) {
+    if (!(await entera(parte, m.version))) continue;
+    const cache = await caches.open(cacheDe(parte, m.version));
+    for (const [ruta, [h]] of Object.entries(m[parte])) {
+      const r = await cache.match(BASE + ruta);
+      if (r && await huella(await r.arrayBuffer(), ruta) === h) continue;
+      await cache.put(BASE + ruta, await descargar(ruta, h, 'low'));
+      reparados.push(ruta);
+    }
+  }
+  return { reparados };
+}
+
+/* ── Ciclo de vida ────────────────────────────────────────────────────────── */
 self.addEventListener('install', event => {
   event.waitUntil((async () => {
-    const antes = await anteriores();
-    try {
-      // Con prioridad baja: no quita ancho de banda a lo que esté cargando la página
-      await llenar(CACHE_APP, P.archivos, { trabajadores: 4, prioridad: 'low' });
-      await (await caches.open(CACHE_APP)).put(LISTA, json({ version: P.version, versionRush: P.versionRush, archivos: P.archivos }));
-      // Rush ya estaba descargado (en otra versión): la nueva también, en segundo plano y poco a poco
-      if (antes.some(a => a.conRush) && !(await entera(CACHE_RUSH))) await bajarRush({ fondo: true }).catch(() => {});
-    } catch (e) {
-      await avisar({ error: String(e.message || e) });
-      throw e;   // la instalación falla: el navegador lo reintentará
-    }
-    // La primera vez (o viniendo del service worker de antes de separar Rush, que no sabe
-    // aplicar versiones solo) se usa ya; si no, espera a la próxima vez que se abra la app
-    const espera = antes.some(a => a.nueva);
-    if (!espera) self.skipWaiting();
-    await avisar({ lista: true, espera });
+    // Viniendo de un worker de antes de version.json (o la primera vez): se aplica ya. Los de antes
+    // solo aplicaban versiones al abrir la app de cero, y en el móvil eso puede tardar días
+    const previo = (await caches.keys()).some(k => /^shits-league-v\d+-estado$/.test(k));
+    if (!previo) self.skipWaiting();
   })());
 });
 
 self.addEventListener('activate', event => {
   event.waitUntil((async () => {
-    // Fuera las cachés de otras versiones (menos las fotos y las fuentes). Si Rush aún no
-    // está entero en esta versión, se queda la última Rush entera: de ahí se copiará lo igual
-    const rushEntero = await entera(CACHE_RUSH);
-    const fuente = rushEntero ? null : (await anteriores()).filter(a => a.conRush).at(-1)?.nombre;
     const keys = await caches.keys();
-    await Promise.all(keys.filter(k => ![CACHE_APP, CACHE_RUSH, CACHE_FOTOS, CACHE_FUENTES, CACHE_AUDIO, fuente].includes(k)).map(k => caches.delete(k)));
-    // Sonidos que ya no están o han cambiado: fuera
-    const audio = await caches.open(CACHE_AUDIO);
-    for (const q of await audio.keys()) {
-      const r = await audio.match(q);
-      if (RESUMEN_AUDIO.get(q.url.slice(BASE.length)) !== r?.headers.get('x-resumen')) await audio.delete(q);
-    }
-    if (fuente) await (await caches.open(CACHE_RUSH)).put(VIEJAS, json([fuente]));
+    const heredadas = keys.some(k => DE_CODIGO.test(k)) && !keys.some(k => /^shits-league-v\d+-estado$/.test(k));
+    // Fuera lo que no es de ahora (las de código se limpian al activar una versión)
+    const quedan = k => k === CACHE_ESTADO || [CACHE_FOTOS, CACHE_FUENTES, CACHE_AUDIO].includes(k) || DE_CODIGO.test(k);
+    await Promise.all(keys.filter(k => !quedan(k)).map(k => caches.delete(k)));
     await self.clients.claim();
+    // Las páginas abiertas con el código de antes de version.json: se recargan una vez para
+    // pasar a este (si no, seguirían con el viejo hasta cerrar la app del todo)
+    if (heredadas) for (const c of await self.clients.matchAll({ type: 'window' })) c.navigate?.(c.url).catch(() => {});
   })());
 });
 
-/* ── Rush: se descarga al pulsar JUGAR por primera vez ────────────────────── */
-let descarga = null;   // { promesa, ritmo, progreso } mientras se descarga
-function bajarRush({ fondo = false } = {}) {
-  if (descarga) {
-    // Ya se estaba bajando en segundo plano y ahora la quiere la página: a toda prisa
-    if (!fondo && descarga.ritmo.trabajadores < 6) { descarga.ritmo.trabajadores = 6; descarga.ritmo.acelerar?.(4); }
-    return descarga.promesa;
-  }
-  const ritmo = { trabajadores: fondo ? 2 : 6, prioridad: fondo ? 'low' : 'auto' };
-  const progreso = { hechos: 0, total: P.rush.length, bytes: 0, totalBytes: P.rush.reduce((s, a) => s + a[1], 0) };
-  const d = descarga = { ritmo, progreso };
-  d.promesa = (async () => {
-    const cache = await caches.open(CACHE_RUSH);
-    if (await cache.match(LISTA)) return;
-    await llenar(CACHE_RUSH, P.rush, ritmo, bytes => { progreso.hechos++; progreso.bytes += bytes; avisar({ rush: { ...progreso } }); });
-    await cache.put(LISTA, json({ versionRush: P.versionRush, rush: P.rush }));
-    // Las viejas que se guardaban para copiar, ya sobran
-    const viejas = await cache.match(VIEJAS).then(r => r?.json()).catch(() => null);
-    for (const n of viejas ?? []) await caches.delete(n);
-    await cache.delete(VIEJAS);
-    await avisar({ rush: { lista: true } });
-  })().catch(async e => { await avisar({ rush: { error: String(e.message || e) } }); throw e; })
-    .finally(() => { if (descarga === d) descarga = null; });
-  return d.promesa;
-}
-
 self.addEventListener('message', event => {
   const m = event.data || {};
-  if (m.tipo === 'activar') self.skipWaiting();
-  if (m.tipo === 'descargarRush') event.waitUntil(bajarRush({ fondo: !!m.fondo }).catch(() => {}));
+  const responder = d => event.ports[0]?.postMessage(d);
+  const tarea = async f => { try { responder({ ok: true, ...(await f()) }); } catch (e) { responder({ ok: false, error: String(e.message || e) }); } };
+  if (m.tipo === 'activar_worker') self.skipWaiting();
   if (m.tipo === 'estado') {
-    // ¿Está cada parte entera en la caché? (el navegador puede haber borrado algo)
-    event.waitUntil((async () => {
-      const rushLista = await entera(CACHE_RUSH);
-      event.ports[0]?.postMessage({
-        version: P.version, completa: await entera(CACHE_APP),
-        rush: { lista: rushLista, descargando: !!descarga, progreso: descarga ? { ...descarga.progreso } : null,
-          // Rush ya estaba descargado en una versión anterior (se pone al día en segundo plano)
-          anterior: !rushLista && (await anteriores()).some(a => a.conRush) },
-      });
-    })());
+    event.waitUntil(tarea(async () => {
+      const a = await leerActiva();
+      const enCurso = [...instalaciones.entries()].map(([k, v]) => ({ partes: k, ...v.progreso }));
+      return {
+        activa: a ? { version: a.version, commit: a.commit, fecha: a.fecha } : null,
+        app: a ? await entera('app', a.version) : false,
+        rush: a ? await entera('rush', a.version) : false,
+        instalando: enCurso, worker: CACHE_NAME,
+      };
+    }));
+  }
+  if (m.tipo === 'instalar') event.waitUntil(instalar(m.manifiesto, m.partes, { fondo: !!m.fondo }).catch(() => {}));
+  if (m.tipo === 'activar') event.waitUntil(tarea(async () => { await activar(m.version); return {}; }));
+  // La misma versión con otro commit (un despliegue sin cambios en la web): solo la etiqueta
+  if (m.tipo === 'etiqueta') {
+    event.waitUntil(tarea(async () => {
+      const a = await leerActiva();
+      if (!a || a.version !== m.version) return {};
+      const n = { ...a, commit: m.commit, fecha: m.fecha };
+      await (await caches.open(CACHE_ESTADO)).put(ACTIVA, json(n));
+      activa = Promise.resolve(n);
+      return {};
+    }));
+  }
+  if (m.tipo === 'verificar') event.waitUntil(tarea(verificar));
+  if (m.tipo === 'reparar') {
+    event.waitUntil(tarea(async () => {
+      for (const k of await caches.keys()) if (DE_CODIGO.test(k) || /^shits-league-v\d+-estado$/.test(k)) await caches.delete(k);
+      activa = null;
+      return {};
+    }));
   }
 });
 
@@ -190,18 +241,12 @@ self.addEventListener('fetch', event => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
 
-  // La web: desde la caché de su parte (Rush, si aún no está descargado, de la red)
+  // La web: de la versión activa
   if (url.href.startsWith(BASE)) {
     const ruta = req.mode === 'navigate' ? 'index.html' : decodeURIComponent(url.pathname.slice(new URL(BASE).pathname.length));
-    const cacheName = req.mode === 'navigate' || RUTAS_APP.has(ruta) ? CACHE_APP : RUTAS_RUSH.has(ruta) ? CACHE_RUSH : null;
-    if (cacheName) {
-      event.respondWith((async () => {
-        const res = await caches.match(BASE + (ruta || 'index.html'), { cacheName, ignoreSearch: true });
-        return res || fetch(req);
-      })());
-    }
-    if (RESUMEN_AUDIO.has(ruta)) event.respondWith(sonidoPartido(req, ruta));
-    return;   // lo demás de la web (sw.js, precarga.js, fotos del archivo…): red normal
+    if (ruta === 'version.json' || ruta === 'sw.js' || url.searchParams.has('v')) return;   // siempre de la red
+    event.respondWith(servir(req, ruta));
+    return;
   }
 
   // Fotos de las cartas: caché propia con las más recientes
@@ -224,18 +269,32 @@ self.addEventListener('fetch', event => {
   // Supabase, Google Sheets, OneSignal…: directo a la red
 });
 
+async function servir(req, ruta) {
+  const m = await leerActiva();
+  if (!m) return fetch(req);                       // sin versión instalada todavía: la red
+  if (m.audio?.[ruta]) return sonidoPartido(ruta, m.audio[ruta][0]);
+  const parte = m.app[ruta] ? 'app' : m.rush[ruta] ? 'rush' : null;
+  if (!parte) return fetch(req);                   // lo demás de la web (fotos del archivo…)
+  const r = await caches.match(BASE + ruta, { cacheName: cacheDe(parte, m.version), ignoreSearch: true });
+  if (r) return r;
+  // Aún no está (Rush sin descargar): de la red, pero de ESTA versión. Si la red ya tiene otra
+  // (o no hay red), un error: nunca un archivo de otra versión (la página instala la nueva)
+  try {
+    return await descargar(ruta, m[parte][ruta][0]);
+  } catch {
+    return new Response('Este archivo no es de la versión instalada', { status: 503, headers: { 'Content-Type': 'text/plain' } });
+  }
+}
+
 /* ── Sonidos de los partidos ──────────────────────────────────────────────── */
-// De su caché si es el de esta versión (mismo resumen); si no, de la red y se guarda
-async function sonidoPartido(req, ruta) {
+// De su caché si es el de esta versión (misma huella); si no, de la red, comprobado, y se guarda
+async function sonidoPartido(ruta, h) {
   const cache = await caches.open(CACHE_AUDIO);
-  const url = BASE + ruta, h = RESUMEN_AUDIO.get(ruta);
+  const url = BASE + ruta;
   const r = await cache.match(url);
-  if (r && r.headers.get('x-resumen') === h) return r;
-  const n = await fetch(url, { cache: 'no-cache', priority: req.priority ?? 'low' });
-  if (!n.ok || n.status !== 200) return n;
-  const cabeceras = new Headers(n.headers);
-  cabeceras.set('x-resumen', h);
-  const guardada = new Response(await n.blob(), { status: 200, statusText: n.statusText, headers: cabeceras });
+  if (r && r.headers.get('x-huella') === h) return r;
+  const res = await descargar(ruta, h, 'low');
+  const guardada = new Response(await res.arrayBuffer(), { status: 200, headers: { 'Content-Type': res.headers.get('Content-Type'), 'x-huella': h } });
   await cache.put(url, guardada.clone());
   return guardada;
 }

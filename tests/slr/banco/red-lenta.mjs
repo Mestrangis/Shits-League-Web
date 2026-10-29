@@ -10,10 +10,15 @@
 // · red.offline = true: rechaza todo (sin conexión).
 // · red.retener = ruta => promesa | null: esa petición de la web espera a la promesa (para
 //   probar descargas que se quedan colgadas o cosas que pasan a mitad).
+// · red.cdnViejo = Map(ruta → contenido): como la caché de GitHub Pages (Fastly) justo después
+//   de un despliegue: una URL SIN parámetros de esas rutas devuelve lo de antes (con
+//   parámetros, como ?v=… o ?t=…, es otra URL para la caché: llega lo nuevo).
 // · red.cacheWeb = 'no-cache': lo que se sirva desde ahí, el navegador lo tiene que
 //   revalidar cada vez (como pasados los 10 minutos de GitHub Pages).
 import http from 'node:http';
 import net from 'node:net';
+
+const tipoDe = p => ({ js: 'text/javascript', css: 'text/css', html: 'text/html', json: 'application/json', svg: 'image/svg+xml', png: 'image/png' })[p.split('.').pop()] ?? 'application/octet-stream';
 
 export async function redLenta({ rtt = 150, bajada = 1.6e6, subida = 750e3, cacheWeb = 'max-age=600' } = {}) {
   const libre = { bajada: 0, subida: 0 };
@@ -21,7 +26,7 @@ export async function redLenta({ rtt = 150, bajada = 1.6e6, subida = 750e3, cach
   const abiertas = new Set();
   let sinRed = false;
   const red = {
-    url: '', cacheWeb, retener: null,
+    url: '', cacheWeb, retener: null, cdnViejo: new Map(),
     get offline() { return sinRed; },
     set offline(v) { sinRed = !!v; if (sinRed) { for (const s of abiertas) s.destroy(); abiertas.clear(); } },
   };
@@ -58,6 +63,11 @@ export async function redLenta({ rtt = 150, bajada = 1.6e6, subida = 750e3, cach
     if (red.offline) { res.socket.destroy(); return; }
     // Petición normal (la web en localhost): se reenvía y la respuesta baja frenada
     const destino = new URL(pet.url);
+    const viejo = destino.search ? undefined : red.cdnViejo.get(decodeURIComponent(destino.pathname));
+    if (viejo !== undefined && ['localhost', '127.0.0.1'].includes(destino.hostname)) {
+      setTimeout(() => { res.writeHead(200, { 'content-type': tipoDe(destino.pathname), 'cache-control': red.cacheWeb, 'x-cache': 'HIT (viejo)' }); res.end(viejo); }, rtt);
+      return;
+    }
     const espera = red.retener?.(destino.pathname);
     if (espera) { espera.then(() => servidor.emit('request', pet, res)); return; }
     const salida = http.request({ host: destino.hostname, port: destino.port || 80, path: destino.pathname + destino.search, method: pet.method,

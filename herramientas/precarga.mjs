@@ -1,21 +1,24 @@
-// Genera precarga.js: la lista de TODOS los archivos de la web que guarda el service
-// worker (sw.js), con su tamaño y un resumen de su contenido, en dos partes:
-//   · archivos: la Shits League normal; se descarga al instalar la app.
+// Genera version.json, la etiqueta de versión de la app: la versión, el commit y la fecha del
+// despliegue y la huella (resumen del contenido y tamaño) de cada archivo, en tres partes:
+//   · app: la Shits League normal; se instala con la app.
 //   · rush: Shits League Rush (js/slr/, css/slr.css, css/acabados/, img/slr/ y lo de
-//     assets/ que solo cita Rush); se descarga al pulsar JUGAR por primera vez.
-//   · audio: los sonidos de los partidos (audio/). NO se precargan: Rush los pide en
-//     segundo plano y el service worker los guarda (con el resumen sabe si han cambiado).
-//   node herramientas/precarga.mjs           → escribe precarga.js
-//   node herramientas/precarga.mjs --comprobar → falla si precarga.js no está al día
-// Lo lanza el despliegue (.github/workflows/static.yml) y lo comprueba un test
-// (tests/slr/precarga.test.mjs). Nunca se edita a mano.
+//     assets/ que solo cita Rush); se descarga al pulsar JUGAR.
+//   · audio: los sonidos de los partidos (audio/); no se precargan, se guardan al pedirlos.
+// La app lo pide siempre sin caché (js/version.js) y el service worker comprueba cada
+// archivo que descarga contra su huella (sw.js).
+//   node herramientas/precarga.mjs   → escribe version.json (no está en el repo: lo genera
+//   el despliegue, .github/workflows/static.yml, y cada banco de pruebas antes de empezar)
 //
 // Qué entra: index.html, manifest.json, todo js/ (.js), css/ (.css), img/ y las imágenes
 // PNG/SVG de assets/ que cita la web (index.html, manifest.json, CSS o JS: logos, iconos…)
-// de hasta 300 KB (las que solo cita Rush van con Rush). Qué no: tests/, docs/, supabase/, push/ (el worker de OneSignal),
-// herramientas/, sw.js y precarga.js, ni las fotos JPG y los PDF de assets/ (se piden al verlos).
+// de hasta 300 KB (las que solo cita Rush van con Rush). Qué no: tests/, docs/, supabase/, push/
+// (el worker de OneSignal), herramientas/, sw.js y version.json, ni las fotos JPG y los PDF de
+// assets/ (se piden al verlos).
+// Huella de los textos con saltos de línea LF (igual en Windows que en el despliegue: sw.js
+// también los cuenta así).
 import { readFileSync, writeFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { join, relative, dirname, posix } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -79,39 +82,35 @@ export function cierreDeImports(desde) {
   return [...vistos].sort();
 }
 
-export function generar() {
+// La etiqueta de versión (version.json): la huella [resumen, bytes] de cada archivo de
+// cada parte. version: la del contenido de todo (dos despliegues con lo mismo, la misma
+// versión); commit y fecha: los del despliegue (git, o SL_COMMIT / SL_FECHA).
+const huellas = rutas => Object.fromEntries(rutas.map(ruta => {
+  const b = TEXTO.test(ruta) ? leerNormalizado(ruta) : readFileSync(join(RAIZ, ruta));
+  return [ruta, [createHash('sha256').update(b).digest('hex').slice(0, 12), b.length]];
+}));
+function git(args) {
+  try { return execFileSync('git', args, { cwd: RAIZ, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim(); } catch { return ''; }
+}
+export function generar({ commit, fecha } = {}) {
   const deRush = assetsDeRush();
-  const todo = archivosDeLaWeb().map(ruta => {
-    const b = leerNormalizado(ruta);
-    return [ruta, b.length, createHash('sha256').update(b).digest('hex').slice(0, 12)];
-  });
-  const rush = todo.filter(([r]) => esDeRush(r) || deRush.has(r));
-  const archivos = todo.filter(a => !rush.includes(a));
-  const audio = (existsSync(join(RAIZ, 'audio')) ? todos('audio') : []).filter(f => SONIDO.test(f)).sort().map(ruta => {
-    const b = readFileSync(join(RAIZ, ruta));
-    return [ruta, b.length, createHash('sha256').update(b).digest('hex').slice(0, 12)];
-  });
-  // version: la de la app entera (cambia si cambia cualquier archivo, sonidos incluidos); versionRush: solo la de Rush
-  return `// Generado por herramientas/precarga.mjs: NO se edita a mano.\n` +
-    `// [ruta, bytes, resumen del contenido] · archivos: la Shits League normal (se descarga al\n` +
-    `// instalar la app) · rush: Shits League Rush (se descarga al pulsar JUGAR por primera vez)\n` +
-    `// audio: los sonidos de los partidos (no se precargan: se guardan al pedirlos)\n` +
-    `self.PRECARGA = ${JSON.stringify({ version: resumen([...todo, ...audio]), versionRush: resumen(rush), archivos, rush, audio }, null, 1).replace(/\n\s+(?=["\d\]])/g, ' ').replace(/\[ /g, '[')};\n`;
+  const todas = archivosDeLaWeb();
+  const rush = todas.filter(r => esDeRush(r) || deRush.has(r));
+  const app = todas.filter(r => !rush.includes(r));
+  const audio = (existsSync(join(RAIZ, 'audio')) ? todos('audio') : []).filter(f => SONIDO.test(f)).sort();
+  const m = { app: huellas(app), rush: huellas(rush), audio: huellas(audio) };
+  return {
+    version: resumen([m.app, m.rush, m.audio]),
+    commit: commit ?? process.env.SL_COMMIT ?? (git(['rev-parse', '--short=7', 'HEAD']) || 'local'),
+    fecha: fecha ?? process.env.SL_FECHA ?? (git(['log', '-1', '--format=%cI']) || new Date().toISOString()),
+    ...m,
+  };
 }
 const resumen = xs => createHash('sha256').update(JSON.stringify(xs)).digest('hex').slice(0, 12);
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
-  const texto = generar();
-  const destino = join(RAIZ, 'precarga.js');
-  if (process.argv.includes('--comprobar')) {
-    const actual = existsSync(destino) ? readFileSync(destino, 'utf8').replace(/\r\n/g, '\n') : '';
-    if (actual !== texto) { console.error('precarga.js no está al día: node herramientas/precarga.mjs'); process.exit(1); }
-    console.log('precarga.js al día');
-  } else {
-    writeFileSync(destino, texto);
-    const p = {};
-    new Function('self', texto)(p);
-    const kb = xs => Math.round(xs.reduce((s, a) => s + a[1], 0) / 1024);
-    console.log(`precarga.js: Shits League ${p.PRECARGA.archivos.length} archivos (${kb(p.PRECARGA.archivos)} KB) · Rush ${p.PRECARGA.rush.length} archivos (${kb(p.PRECARGA.rush)} KB) · versión ${p.PRECARGA.version}`);
-  }
+  const v = generar();
+  writeFileSync(join(RAIZ, 'version.json'), JSON.stringify(v) + '\n');
+  const kb = o => Math.round(Object.values(o).reduce((s, a) => s + a[1], 0) / 1024);
+  console.log(`version.json: ${v.version} (${v.commit}, ${v.fecha}) · Shits League ${Object.keys(v.app).length} archivos (${kb(v.app)} KB) · Rush ${Object.keys(v.rush).length} (${kb(v.rush)} KB) · sonidos ${Object.keys(v.audio).length}`);
 }

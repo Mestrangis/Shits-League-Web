@@ -37,8 +37,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-      # La lista de archivos que precarga el service worker (precarga.js), siempre al día
-      - name: Lista de precarga
+      # La etiqueta de versión (version.json): versión, commit, fecha y la huella de cada
+      # archivo. La app la pide siempre sin caché para saber si hay versión nueva
+      - name: Etiqueta de versión
         run: node herramientas/precarga.mjs
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

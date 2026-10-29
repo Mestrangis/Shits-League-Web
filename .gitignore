@@ -7,3 +7,6 @@ supabase/.branches/
 
 # Dependencias del banco de pruebas (npm install en tests/slr/banco)
 tests/slr/banco/node_modules/
+
+# La etiqueta de versión: la genera el despliegue (herramientas/precarga.mjs)
+version.json

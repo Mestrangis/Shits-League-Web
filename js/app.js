@@ -752,6 +752,8 @@ async function init() {
   });
   actualizarRefrescoVotaciones();
   initPush();
+  // Recargada para aplicar una versión nueva al pulsar JUGAR: se entra en Rush sola
+  if (typeof rushTrasRecarga === 'function') rushTrasRecarga();
 }
 
 /* ── Cambio de sesión (login / logout) ───────────────────────────────────── */

@@ -1512,3 +1512,11 @@ button, [role="button"], .modal__backdrop, .tab, .result-row, .card-wrap, .voto-
   padding: 10px 22px; border: 0; border-radius: 999px; background: var(--verde); color: #04140A;
   font: inherit; font-weight: 800; cursor: pointer;
 }
+
+/* Pie: versión instalada y «Reparar la app» (discreto) */
+.pie-app { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px 14px;
+  padding: 26px 16px calc(28px + env(safe-area-inset-bottom, 0px)); color: #6E8F7C; font-size: 12px; }
+.pie-app__reparar { padding: 4px 10px; border: 1px solid rgba(110,143,124,.4); border-radius: 999px; background: none;
+  color: inherit; font: inherit; cursor: pointer; }
+body.en-rush .pie-app { display: none; }
+.version-actualizando__pct { min-height: 1em; color: #DCEFE3; font-variant-numeric: tabular-nums; }

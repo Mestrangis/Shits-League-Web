@@ -9,9 +9,10 @@
    · NADA de Rush (código, Supabase, fotos) se pide antes de pulsar JUGAR: la
      Shits League normal carga sola, sin competir. El estado de la portada es el
      que guardó Rush la última vez (localStorage).
-   · Al pulsar JUGAR la primera vez (o la primera tras una versión nueva de
-     Rush), «Descargando Shits League Rush…» con el porcentaje real (sw.js lo
-     guarda para las siguientes); si ya está descargado, entra directo.
+   · Al pulsar JUGAR se comprueba version.json (js/version.js): si Rush no es de
+     esa versión, «Descargando Shits League Rush…» con el porcentaje (solo de lo
+     que ha cambiado); si ya está, entra directo. Si la Shits League también era
+     vieja, se recarga y se entra sola (rushTrasRecarga).
 ═══════════════════════════════════════════════ */
 
 const RUSH_TOKEN_KEY = 'SLR_TOKEN';
@@ -237,40 +238,50 @@ function rushCargarEstado(panel) {
   caja.dataset.estado = clase;
 }
 
-/* ── Descarga de Rush (al pulsar JUGAR, la primera vez) ────────────────────── */
+/* ── Rush de la versión de version.json (al pulsar JUGAR) ──────────────────── */
 const rushMb = b => (b / 1048576).toFixed(1).replace('.', ',');
-// Resuelve cuando Rush está guardado (o en seguida sin service worker, o si la descarga
-// falla: entonces Rush se carga por la red). Mientras, «Descargando Shits League Rush…» con el %
-async function rushDescargar(panel) {
+// Resuelve { ok } cuando Rush está guardado en la versión de version.json. Si hay algo que
+// descargar (la primera vez o con una versión nueva: solo lo que ha cambiado), «Descargando
+// Shits League Rush…» con el %. Si la Shits League también era vieja, version.js recarga y
+// se entra después (SL_ENTRAR_RUSH)
+async function rushPreparar(panel) {
   const v = window.SLVersion;
-  if (!v?.descargarRush) return;
-  const e = await v.estado().catch(() => null);
-  // Sin service worker al mando: Rush entra por la red (y version.js lo guarda en cuanto lo haya)
-  if (!e?.rush) { v.descargarRush(); return; }
-  if (e.rush.lista) return;
+  if (!v?.prepararRush) return { ok: true };
   const portada = panel?.querySelector('.rush-portada');
-  const caja = document.createElement('div');
-  caja.className = 'rush-descarga';
-  caja.setAttribute('role', 'status');
-  caja.innerHTML = `<b class="rush-descarga__titulo">Descargando Shits League Rush…</b>
-    <span class="rush-descarga__barra" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i></i></span>
-    <small class="rush-descarga__texto">Preparando…</small>
-    <small class="rush-descarga__nota">Solo la primera vez (y con cada versión nueva): después, JUGAR entra directo.</small>`;
-  portada?.appendChild(caja);
-  portada?.classList.add('rush-portada--descargando');
+  let caja = null;
   const pintar = d => {
-    if (!d || d.totalBytes == null) return;
+    if (!d?.totalBytes) return;
+    if (!caja) {
+      caja = document.createElement('div');
+      caja.className = 'rush-descarga';
+      caja.setAttribute('role', 'status');
+      caja.innerHTML = `<b class="rush-descarga__titulo">Descargando Shits League Rush…</b>
+        <span class="rush-descarga__barra" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i></i></span>
+        <small class="rush-descarga__texto">Preparando…</small>
+        <small class="rush-descarga__nota">Solo la primera vez y con cada versión nueva (solo lo que ha cambiado).</small>`;
+      portada?.appendChild(caja);
+      portada?.classList.add('rush-portada--descargando');
+    }
     const pct = Math.min(100, Math.round(100 * d.bytes / Math.max(1, d.totalBytes)));
     caja.querySelector('i').style.width = `${pct}%`;
     caja.querySelector('[role="progressbar"]').setAttribute('aria-valuenow', String(pct));
     caja.querySelector('.rush-descarga__texto').textContent = `${pct} % · ${rushMb(d.bytes)} de ${rushMb(d.totalBytes)} MB`;
   };
   try {
-    await v.descargarRush(pintar);
+    return await v.prepararRush(pintar);
   } finally {
-    caja.remove();
+    caja?.remove();
     portada?.classList.remove('rush-portada--descargando');
   }
+}
+
+// Tras una recarga para aplicar una versión nueva al pulsar JUGAR: se entra sola
+function rushTrasRecarga() {
+  let entrar = false;
+  try { entrar = sessionStorage.getItem('SL_ENTRAR_RUSH') === '1'; sessionStorage.removeItem('SL_ENTRAR_RUSH'); } catch { /* */ }
+  if (!entrar || !getSessionPlayer()) return;
+  if (typeof switchTab === 'function') switchTab('rush');
+  rushJugar();
 }
 
 /* ── Entrar al modo Rush ─────────────────────────────────────────────────── */
@@ -291,8 +302,14 @@ async function rushJugar() {
   const btn = document.getElementById('rushJugar');
   if (btn) { btn.disabled = true; btn.textContent = 'CARGANDO…'; }
   try {
-    // La primera vez (o tras una versión nueva de Rush), se descarga entero: el %, en la portada
-    await rushDescargar(document.getElementById('panel-rush'));
+    // Rush de la versión de version.json: si falta algo, se descarga (el %, en la portada)
+    const listo = await rushPreparar(document.getElementById('panel-rush'));
+    if (!listo.ok) {
+      if (btn?.isConnected) { btn.textContent = 'REINTENTAR'; btn.disabled = false; }
+      const est = document.getElementById('rushEstado');
+      if (est) { est.hidden = false; est.dataset.estado = 'apagada'; est.querySelector('#rushEstadoTexto').textContent = listo.mensaje; }
+      return;
+    }
     if (!rushToken()) {
       const r = await rushReautenticar();
       if (r === 'perdida') { rushSesionPerdida(); return; }
@@ -314,6 +331,10 @@ async function rushJugar() {
     });
   } catch (e) {
     console.error('[rush] No se pudo abrir Rush:', e);
+    // El código guardado no arranca (un archivo roto, a medias…) y hay red: se repara solo
+    if (navigator.onLine && /SyntaxError|import|module/i.test(`${e?.name} ${e?.message}`)) {
+      window.SLVersion?.reparar({ auto: true, entrarRush: true });
+    }
     if (btn?.isConnected) { btn.textContent = 'SIN CONEXIÓN · REINTENTAR'; btn.disabled = false; }
     return;
   }

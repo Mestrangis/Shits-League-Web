@@ -63,15 +63,16 @@ try {
   await page.waitForSelector('.slr-nav:not([hidden])', { timeout: 60000 });
   const tDentro = await page.evaluate(() => window.__rushAbierto);
   const enJugar = await page.evaluate(() => new Promise(res => { const c = new MessageChannel(); c.port1.onmessage = e => res(e.data); navigator.serviceWorker.controller?.postMessage({ tipo: 'estado' }, [c.port2]); setTimeout(() => res(null), 3000); }));
-  check(enJugar?.rush?.lista && pedidos.filter(p => p.t < tDentro).length === 0, `la descarga de JUGAR no lleva sonidos (Rush descargado; ${pedidos.filter(p => p.t < tDentro).length} sonidos pedidos antes de abrirse Rush)`);
+  check(enJugar?.rush === true && pedidos.filter(p => p.t < tDentro).length === 0, `la descarga de JUGAR no lleva sonidos (Rush descargado; ${pedidos.filter(p => p.t < tDentro).length} sonidos pedidos antes de abrirse Rush)`);
   let e;
   for (let k = 0; k < 120; k++) { e = await estado(); if (e.cargados === total) break; await dormir(500); }
   check(e.cargados === total && total === 37, `después de entrar, en segundo plano, los ${e.cargados}/${total} sonidos descargados y decodificados`);
   const enCache = await page.evaluate(async () => (await (await caches.open('slr-audio')).keys()).length);
   check(enCache === total, `y guardados en la caché del service worker (${enCache})`);
   check(pedidos.every(p => p.t >= tJugar), 'ninguno antes de JUGAR');
-  const dePagina = new Set(pedidos.filter(p => !p.sw).map(p => p.url));
-  check(dePagina.size === total && pedidos.filter(p => p.sw).every(p => dePagina.has(p.url)),
+  const sinV = u => u.split('?')[0];
+  const dePagina = new Set(pedidos.filter(p => !p.sw).map(p => sinV(p.url)));
+  check(dePagina.size === total && pedidos.filter(p => p.sw).every(p => dePagina.has(sinV(p.url))),
     `los pide la página (en segundo plano, después de abrirse Rush: a los ${((Math.min(...pedidos.map(p => p.t)) - tDentro) / 1000).toFixed(1)} s), no la descarga de JUGAR`);
 
   await page.evaluate(`${S}.then(m => { window.__avisos = []; window.__sonados = [];
