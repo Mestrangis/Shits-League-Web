@@ -5,12 +5,15 @@
    y acabado, progreso por colección («Dormidito 3/5», que filtra al tocarlo),
    orden por fecha o valor, y en cada carta cómo y cuándo la
    conseguiste y quién la tiene ahora. Tocar una carta abre su detalle.
+   Buscador por nombre o persona (sin mayúsculas ni tildes; se puede abrir ya
+   filtrado, desde el chip de una persona en el detalle) y la marca «Descubierta
+   por ti» en las que fuiste el primero de la liga en tener (esta temporada).
    Hasta TODAS_DE_GOLPE cartas se pintan todas; con más, por bloques al hacer
    scroll, y las fotos del bloque siguiente se precargan antes de llegar.
 ═══════════════════════════════════════════════ */
 import { leer } from '../api.js';
 import { esc, hoja, fechaCorta, miles, scrollDeHoja } from '../ui.js';
-import { cartaHTML, normalizarCarta, TIPOS, ACABADOS } from '../carta.js';
+import { cartaHTML, normalizarCarta, TIPOS, ACABADOS, claveBusqueda, coincideBusqueda } from '../carta.js';
 import { listaColecciones, urlEmblema } from '../colecciones.js';
 import { rejillaPorBloques } from '../bloques.js';
 import { abrirDetalle } from './detalle.js';
@@ -23,15 +26,21 @@ const VIAS = {
   subasta: 'Subasta', compra: 'Compra', clausula: 'Cláusula', intercambio: 'Intercambio', admin: 'Modo pruebas',
 };
 
-export async function abrirAlbum(ctx) {
+// buscar: el texto con el que se abre (p. ej. una persona, desde el detalle de una carta)
+export async function abrirAlbum(ctx, { buscar = '' } = {}) {
   const { datos } = ctx;
   const liga = datos.liga.id, yo = datos.yo.usuario.id, miEquipo = datos.equipo?.id;
-  const [entradas, total, equipos] = await Promise.all([
+  const [entradas, total, equipos, mias, temporadas] = await Promise.all([
     leer(`album?select=diseno_id,via_adquisicion,primera_vez_en&usuario_id=eq.${yo}&liga_id=eq.${liga}`),
     // Las activas del catálogo común y, en una liga de prueba, las creadas en ella (nacen inactivas)
     leer(`disenos_carta?select=id,coleccion_id&or=(and(activo.eq.true,liga_prueba_id.is.null),liga_prueba_id.eq.${liga})&limit=5000`),
     leer(`equipos?select=id,nombre&liga_id=eq.${liga}`),
+    // Las que descubrí yo (el primero de la liga en tenerlas), de la ronda de ahora: la última temporada
+    leer(`descubrimientos?select=diseno_id,ronda&liga_id=eq.${liga}&usuario_id=eq.${yo}`),
+    leer(`temporadas?select=numero&liga_id=eq.${liga}&order=numero.desc&limit=1`),
   ]);
+  const ronda = Math.max(1, temporadas[0]?.numero ?? 1);
+  const descubiertas = new Set(mias.filter(x => x.ronda === ronda).map(x => x.diseno_id));
   // Los ejemplares de la liga (uno por diseño) y se quedan los del álbum: con
   // cientos de entradas, una lista de ids en la URL sería demasiado larga
   const porDiseno = new Map(entradas.map(e => [e.diseno_id, e]));
@@ -41,11 +50,12 @@ export async function abrirAlbum(ctx) {
     : [];
   const items = cartas.map(f => {
     const e = porDiseno.get(f.diseno_id);
-    return { ...normalizarCarta(f), via: e.via_adquisicion, fecha: e.primera_vez_en, dueno: f.equipo_id };
+    const c = normalizarCarta(f);
+    return { ...c, clave: claveBusqueda(c), via: e.via_adquisicion, fecha: e.primera_vez_en, dueno: f.equipo_id, descubierta: descubiertas.has(f.diseno_id) };
   });
   const quien = id => (!id ? 'Libre' : id === miEquipo ? 'Tuya' : equipos.find(e => e.id === id)?.nombre ?? 'Otro equipo');
 
-  const filtro = { tipo: '', acabado: '', coleccion: '', orden: 'fecha' };
+  const filtro = { texto: buscar ?? '', tipo: '', acabado: '', coleccion: '', orden: 'fecha' };
   // Progreso por colección: las del álbum de cada una sobre las activas que tiene
   const progreso = listaColecciones().map(k => ({
     ...k, tengo: items.filter(c => c.coleccion_id === k.id).length, de: total.filter(d => d.coleccion_id === k.id).length,
@@ -71,6 +81,7 @@ export async function abrirAlbum(ctx) {
       <p class="slr-album__contador"><b>${items.length}</b> de <b>${total.length}</b> desbloqueadas
         <span><i style="width:${total.length ? Math.round(100 * items.length / total.length) : 0}%"></i></span></p>
       ${items.length ? `
+        <input class="slr-input slr-album__buscar" type="search" data-buscar placeholder="Buscar por nombre o persona" autocomplete="off" value="${esc(filtro.texto)}">
         ${colecciones}
         ${chips('tipo', tipos, TIPOS)}
         ${acabados.length > 1 ? chips('acabado', acabados, ACABADOS) : ''}
@@ -86,6 +97,7 @@ export async function abrirAlbum(ctx) {
       <button class="slr-ficha" type="button" data-id="${esc(c.id)}">
         ${cartaHTML(c, { tam: 's' })}
         <span class="slr-ficha__album">
+          ${c.descubierta ? '<span class="slr-ficha__descubierta">★ Descubierta por ti</span>' : ''}
           <span>${esc(VIAS[c.via] ?? c.via)} · ${esc(fechaCorta(c.fecha))}</span>
           <span class="${c.dueno === miEquipo ? 'slr-propio' : ''}">${c.dueno === miEquipo ? '✓ Tuya' : `Ahora: ${esc(quien(c.dueno))}`} · ${miles(c.valor)}</span>
         </span>
@@ -94,11 +106,12 @@ export async function abrirAlbum(ctx) {
   function pintarRejilla() {
     if (!rejilla) return;
     bloques.poner(items
-      .filter(c => (!filtro.tipo || c.tipo === filtro.tipo) && (!filtro.acabado || c.acabado === filtro.acabado) &&
+      .filter(c => coincideBusqueda(c, filtro.texto) && (!filtro.tipo || c.tipo === filtro.tipo) && (!filtro.acabado || c.acabado === filtro.acabado) &&
         (!filtro.coleccion || c.coleccion_id === filtro.coleccion))
       .sort((a, b) => (filtro.orden === 'valor' ? b.valor - a.valor : new Date(b.fecha) - new Date(a.fecha)) || a.nombre.localeCompare(b.nombre)),
       '<p class="slr-suave">Ninguna carta con esos filtros.</p>');
   }
+  el.querySelector('[data-buscar]')?.addEventListener('input', e => { filtro.texto = e.target.value; pintarRejilla(); });
   rejilla?.addEventListener('click', e => {
     const b = e.target.closest('[data-id]');
     if (b) abrirDetalle(b.dataset.id, ctx).catch(() => {});

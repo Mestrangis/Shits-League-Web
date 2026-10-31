@@ -51,6 +51,15 @@ export const rarezaDeTier = t => ({ S: 'legendaria', A: 'epica', B: 'rara', C: '
 // Nombres de los acabados registrados ({ foil: 'Foil', … })
 export const ACABADOS = Object.fromEntries(listaAcabados().map(a => [a.id, a.nombre]));
 
+// Búsqueda de cartas (todos los buscadores): por el nombre y por las personas que salen en
+// ella, sin distinguir mayúsculas ni tildes («nico» encuentra a Nicolás)
+export const sinAcentos = s => String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+export const claveBusqueda = c => sinAcentos([c.nombre, ...(c.personas ?? [])].join(' · '));
+export const coincideBusqueda = (c, texto) => {
+  const t = sinAcentos(String(texto ?? '').trim());
+  return !t || (c.clave ?? claveBusqueda(c)).includes(t);
+};
+
 // OVR: 60 % la mejor stat, 25 % la media, 15 % la peor (igual que ovr() en la base de datos)
 export function ovr(ata, def, con) {
   const v = [ata, def, con].sort((a, b) => b - a);

@@ -104,6 +104,9 @@ try {
     await page.waitForSelector('.slr-confirmar [data-si]');
     acciones.length = 0;
     frenar = 2000;
+    // (la hoja de confirmar sube con una animación: se pulsa cuando ya está quieta)
+    await page.waitForSelector('.slr-confirmar.abierta', { timeout: 5000 });
+    await dormir(400);
     await page.click('.slr-confirmar [data-si]');
     await dormir(80);
     const compra = await page.evaluate(() => { const b = document.querySelector('[data-comprar]'); return b ? { desactivado: b.disabled, spinner: b.classList.contains('slr-esperando') } : null; });

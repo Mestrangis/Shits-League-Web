@@ -2128,8 +2128,15 @@ html.slr-sin-seleccion input, html.slr-sin-seleccion textarea { -webkit-user-sel
 .slr-revela__cara { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; transform: rotateY(0deg); }
 .slr-revela__cara--frente { transform: rotateY(180deg); }
 .slr-revela__cara--frente .slr-carta, .slr-revela__cara--dorso .slr-dorso { width: 100%; }
-.slr-revela__nueva { position: absolute; left: 50%; top: -14px; transform: translateX(-50%) scale(0); z-index: 3; transition: transform .35s cubic-bezier(.3,1.7,.5,1) .1s; }
-.slr-revela.revelada .slr-revela__nueva { transform: translateX(-50%) scale(1); }
+/* «¡NUEVA!» arriba de la carta y «¡DESCUBRIMIENTO!» abajo (sin tapar el OVR ni las stats) */
+.slr-revela__etiquetas { position: absolute; left: 50%; top: -14px; white-space: nowrap; transform: translateX(-50%) scale(0); z-index: 3;
+  transition: transform .35s cubic-bezier(.3,1.7,.5,1) .1s; }
+.slr-revela.revelada .slr-revela__etiquetas { transform: translateX(-50%) scale(1); }
+/* Descubrimiento: nadie de la liga la había tenido (eres el primero) */
+.slr-revela__etiquetas--abajo { top: auto; bottom: -12px; }
+.slr-revela__etiquetas .slr-descubrimiento { padding: 2px 5px; font-size: clamp(7px, 2.05vw, 9.5px); letter-spacing: .02em; }
+.slr-descubrimiento { display: inline-block; padding: 2px 8px; border-radius: 99px; background: linear-gradient(90deg, #39FF88, #7FE7FF); color: #032013;
+  font-size: 11px; font-weight: 900; letter-spacing: .06em; }
 .slr-revela__elegir { position: absolute; left: 50%; bottom: -54px; transform: translateX(-50%); }
 .slr-revela.descartada { opacity: 0; scale: .85; pointer-events: none; }
 .slr-apertura__cuenta { position: absolute; top: calc(70px + var(--slr-top)); left: 0; right: 0; text-align: center; margin: 0; z-index: 4; font-size: 14px; }
@@ -2419,3 +2426,15 @@ html.slr-sin-seleccion input, html.slr-sin-seleccion textarea { -webkit-user-sel
 .slr-perfil__version { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px;
   margin: 18px 0 8px; padding: 0 2px; color: var(--slr-suave); font-size: 12.5px; }
 .slr-perfil__version .slr-btn { padding: 8px 14px; font-size: 13px; }
+
+/* Detalle: quién la descubrió y las personas que salen (tocar una: álbum filtrado) */
+.slr-detalle__descubierta { margin: 4px 0 0; font-size: 13px; }
+.slr-detalle__personas { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 8px 0 2px; }
+.slr-detalle__personas small { color: var(--slr-suave); font-size: 12px; }
+.slr-chip-persona { padding: 4px 10px; border: 1px solid rgba(57,255,136,.35); border-radius: 999px; background: rgba(57,255,136,.08);
+  color: var(--slr-texto, #fff); font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+.slr-chip-persona:active { transform: scale(.96); }
+/* Álbum: «Descubierta por ti» */
+.slr-ficha__descubierta { color: #7FE7FF; font-weight: 800; }
+/* Buscadores por nombre o persona */
+.slr-album__buscar, .slr-plantilla__buscar, .slr-mercado__buscar { width: 100%; margin: 4px 0 10px; }

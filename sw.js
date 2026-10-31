@@ -24,7 +24,7 @@
    Sube CACHE_NAME para empezar con cachés nuevas (lo igual se copia, comprobado).
 ═══════════════════════════════════════════════ */
 
-const CACHE_NAME = 'shits-league-v43';
+const CACHE_NAME = 'shits-league-v44';
 const CACHE_ESTADO = `${CACHE_NAME}-estado`;   // ACTIVA: la etiqueta de la versión que manda
 const CACHE_FOTOS = 'slr-fotos-cartas';
 const CACHE_FUENTES = 'sl-fuentes';

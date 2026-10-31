@@ -132,6 +132,9 @@ export async function abrirEditorCarta(ctx, { disenoId = null } = {}) {
         </div>
         <label class="slr-campo"><span>Frase (opcional)</span>
           <input class="slr-input" name="texto" maxlength="140" value="${esc(f.texto)}" autocomplete="off"></label>
+        <label class="slr-campo"><span>Personas que salen (separadas por comas)</span>
+          <input class="slr-input" name="personas" maxlength="300" value="${esc(f.personas.join(', '))}" placeholder="Mateo, Nicolás" autocomplete="off"
+            data-personas-editor></label>
       </fieldset>
 
       <fieldset class="slr-editor__bloque">
@@ -235,6 +238,8 @@ export async function abrirEditorCarta(ctx, { disenoId = null } = {}) {
   form.addEventListener('input', e => {
     const t = e.target;
     if (t.name === 'nombre' || t.name === 'texto') { f[t.name] = t.value; pintarVista(); }
+    // Las personas: una lista sin vacíos ni repetidas (se busca por ellas en todos los buscadores)
+    if (t.name === 'personas') f.personas = [...new Set(t.value.split(',').map(x => x.trim()).filter(Boolean))];
     if (t.name === 'imagen_url') { f.imagen_url = t.value.trim(); fotoLocal = null; pintarVista(); }
     if (t.dataset.stat) {
       const v = Math.max(1, Math.min(101, Math.round(Number(t.value) || 1)));

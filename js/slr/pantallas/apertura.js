@@ -15,7 +15,9 @@
       mejor rareza; las dos piezas del sobre salen despedidas.
    5. Revelado: las cartas boca abajo en abanico, el dorso con el color de su
       rareza; al tocar cada una se gira (épicas y legendarias: más lento, más
-      luz y más partículas). «¡NUEVA!» si es nueva en tu álbum.
+      luz y más partículas). «¡NUEVA!» si es nueva en tu álbum y, al lado,
+      «¡DESCUBRIMIENTO!» si nadie de la liga la había tenido (eres el primero;
+      en un sobre de elección, si la eliges).
    6. Resumen: las cartas, cuáles son nuevas, su colección y progreso, y el valor.
    · Sobre de elección: las 3 candidatas se giran y se elige una (con la cuenta
      atrás). Si se cierra, la elección pendiente reaparece en Rush.
@@ -382,7 +384,8 @@ async function crearApertura(ctx, o) {
           <div class="slr-revela__cara slr-revela__cara--dorso">${dorsoHTML(c.rareza, o.dorso)}</div>
           <div class="slr-revela__cara slr-revela__cara--frente">${cartaHTML(c, { tam: 'l', energia: false })}</div>
         </div>
-        ${j.nueva ? '<b class="slr-nueva slr-revela__nueva">¡NUEVA!</b>' : ''}
+        ${j.nueva ? '<span class="slr-revela__etiquetas"><b class="slr-nueva slr-revela__nueva">¡NUEVA!</b></span>' : ''}
+        ${j.descubrimiento ? '<span class="slr-revela__etiquetas slr-revela__etiquetas--abajo"><b class="slr-descubrimiento" data-descubrimiento>¡DESCUBRIMIENTO!</b></span>' : ''}
         ${o.eleccion ? `<button class="slr-btn slr-revela__elegir" type="button" data-elegir="${esc(j.id)}" hidden>Elegir</button>` : ''}
       </div>`;
     }).join('');
@@ -485,6 +488,7 @@ async function crearApertura(ctx, o) {
         const tengo = j.coleccion ? j.coleccion.tengo + (o.eleccion && j.nueva ? 1 : 0) : 0;
         return `<li>${cartaHTML(c, { tam: 's', energia: false })}
           <span class="slr-apertura__datos">${j.nueva ? '<b class="slr-nueva">¡NUEVA!</b>' : '<small class="slr-suave">Repetida en tu álbum</small>'}
+            ${j.descubrimiento ? '<b class="slr-descubrimiento">¡DESCUBRIMIENTO!</b>' : ''}
             <span class="slr-chip-rareza slr-chip-rareza--${esc(c.rareza)}">${esc(RAREZAS[c.rareza])}</span>
             ${j.coleccion ? `<small class="slr-col-${esc(j.coleccion.color ?? '')} slr-apertura__col">◆ ${esc(j.coleccion.nombre)} ${Math.min(tengo, j.coleccion.total)}/${j.coleccion.total}</small>` : ''}
             <small>Valor ${miles(c.valor)}</small></span></li>`;

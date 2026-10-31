@@ -12,7 +12,7 @@
 ═══════════════════════════════════════════════ */
 import { rpc, accion } from '../api.js';
 import { esc, hoja, cerrarCapa, conEspera, toast, monedas, miles, scrollDeHoja } from '../ui.js';
-import { cartaHTML, normalizarCarta, TIPOS, ACABADOS, RAREZAS } from '../carta.js';
+import { cartaHTML, normalizarCarta, TIPOS, ACABADOS, RAREZAS, sinAcentos, claveBusqueda } from '../carta.js';
 import { listaColecciones } from '../colecciones.js';
 import { precargar, urlFoto } from '../imagenes.js';
 import { seleccionMultiple } from '../seleccion.js';
@@ -33,7 +33,6 @@ const ORDENES = {
   nombre: { texto: 'Nombre', cmp: (a, b) => a.nombre.localeCompare(b.nombre, 'es') },
   tipo:   { texto: 'Tipo',   cmp: (a, b) => ORDEN_TIPO[a.tipo] - ORDEN_TIPO[b.tipo] || b.valor - a.valor },
 };
-const sinAcentos = s => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 // Estado de la herramienta entre aperturas (dentro de la misma sesión)
 const filtros = { texto: '', tipo: '', rareza: '', coleccion: '', acabado: '', estado: '', orden: 'valor' };
@@ -50,7 +49,7 @@ export async function abrirPlantillas(ctx) {
     porEquipo = new Map(equipos.map(e => [e.id, e]));
     cartas = datos.cartas.map(c => {
       const n = normalizarCarta(c);
-      return { ...n, equipo_id: c.equipo_id, clave: sinAcentos(c.nombre) };
+      return { ...n, equipo_id: c.equipo_id, clave: claveBusqueda(n) };
     });
     if (filtros.estado.startsWith('eq:') && !porEquipo.has(filtros.estado.slice(3))) filtros.estado = '';
   }
@@ -62,7 +61,7 @@ export async function abrirPlantillas(ctx) {
 
   const el = hoja(`
     <div class="slr-plantillas-admin">
-      <input class="slr-input" type="search" data-f="texto" placeholder="Buscar carta por nombre" autocomplete="off" value="${esc(filtros.texto)}">
+      <input class="slr-input" type="search" data-f="texto" placeholder="Buscar por nombre o persona" autocomplete="off" value="${esc(filtros.texto)}">
       <div class="slr-filtros">
         <label><span>Tipo</span><select class="slr-input" data-f="tipo">${opciones([['', 'Todos'], ...Object.entries(TIPOS)], filtros.tipo)}</select></label>
         <label><span>Rareza</span><select class="slr-input" data-f="rareza">${opciones([['', 'Todas'], ...Object.entries(RAREZAS)], filtros.rareza)}</select></label>

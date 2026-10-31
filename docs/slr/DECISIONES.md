@@ -2145,3 +2145,85 @@ Móvil 412 × 915 con la CPU ×4 y «4G lenta» (150 ms, 1,6 / 0,75 Mbit/s); med
 - **La comprobación de lo guardado (`verificar`)** espera 30 s después de arrancar y a un rato libre: no compite con lo primero que se hace en la app.
 - **`banco/listas.mjs`** falla hoy dos comprobaciones de rendimiento: una tarea larga de ~420–460 ms con 656 cartas (el límite es 400) y las fotos de la página siguiente aún sin precargar. Fallan igual con el commit anterior (servido desde un worktree en el mismo puerto), así que no vienen de este cambio: la liga de prueba tiene hoy muchas más cartas. Queda pendiente de revisar aparte.
 - **Versión de prueba para el móvil:** justo después de este arreglo, se despliega una segunda versión con un cambio mínimo y visible: la fecha de la versión, en Perfil y en el pie, lleva también el día de la semana («Versión xxxxxxx · jueves, 29 de oct de 2026, 20:30»). Sirve para comprobar en el móvil que llega sola, sin borrar nada.
+
+## Personas de cada carta y quién la descubre
+
+### Decisiones de Marcos
+
+- **Personas que salen en cada carta** (`disenos_carta.personas`, ya relleno):
+  - en el detalle, «Salen: …» con un chip por persona; tocarlo abre el álbum (el catálogo, para el admin) filtrado por esa persona;
+  - buscar por persona en todos los buscadores de cartas, sin distinguir mayúsculas ni tildes («nico» encuentra a Nicolás, además de las que lo llevan en el nombre);
+  - en el editor de cartas, editar la lista de personas.
+- **Descubrir una carta** es ser el primero de la liga en tenerla en su plantilla, sea como sea (sobre, subasta, compra, cláusula, intercambio o reparto inicial). Es por liga: en una temporada nueva se puede volver a descubrir.
+  - Se guarda en el servidor; las que ya están repartidas, del álbum (el primero por `primera_vez_en`).
+  - Sobres: todas sus cartas cuentan y entran en el álbum de quien lo abre, aunque luego las suelte con «Haz hueco».
+  - Sobre de Elección: solo la elegida (aunque luego la suelte); las candidatas no elegidas ni se descubren ni entran en el álbum.
+  - En el detalle, «Descubierta por X · fecha» (o «Sin descubrir»), y en el historial «X la descubrió» como primer movimiento.
+  - En el álbum, «Descubierta por ti».
+  - Al abrir un sobre, «¡DESCUBRIMIENTO!» junto a «¡NUEVA!».
+
+### Decisiones mías
+
+#### Servidor (migraciones `20261031000000_slr_descubrimientos` y `…0100_slr_descubrimientos_lectura`)
+
+- **Tabla `descubrimientos`** (liga, ronda, diseño → usuario, equipo y fecha), con lectura pública como las demás.
+  - La primera migración se olvidó del `grant select` (la política de lectura sola no basta). Lo detectó la prueba de la API y va en una segunda migración: las aplicadas no se editan.
+- **«Ronda»:** el número de la última temporada creada, como mínimo 1. Así:
+  - la preparación (cuando se reparten las plantillas al unirse) cuenta como la 1.ª temporada;
+  - al empezar la 2.ª, la temporada se crea antes de repartir las cartas desde el álbum, y esos repartos ya son de la ronda 2;
+  - `ligas.temporada` no vale para esto: se actualiza después de repartir.
+- **Un trigger en `cartas`** (al pasar a un equipo: alta o cambio de `equipo_id`) apunta el descubrimiento si no lo había: cubre todas las vías a la vez, también las que no pasan por `adquirir_carta`.
+  - Las candidatas de un sobre de elección solo se reservan (`reservada_por`, sin dueño): no se descubren hasta elegirlas. Eso ya funcionaba así, y también que no entraran en el álbum: se ha comprobado y no hacía falta corregir nada.
+  - Soltar una carta («Haz hueco», vender al banco…) no quita ni el descubrimiento ni la entrada del álbum.
+- **Relleno:** desde el álbum, el primero de cada liga y diseño por `primera_vez_en`, en la ronda actual de su liga.
+  - En la liga principal (en preparación) han salido 37, las mismas que su álbum.
+  - En una liga que ya estuviera en la 2.ª temporada o más, el álbum no dice de qué temporada es cada entrada: se apuntarían a la actual. Hoy no hay ninguna liga así.
+- **`carta_sobre`** (cada carta de la respuesta de un sobre) lleva `descubrimiento`: true si la ha descubierto este usuario en esta misma compra o si nadie la tiene todavía.
+  - Lo segundo es para las candidatas de un sobre de elección: si la eliges, la descubres tú.
+- **`slr_carta`** (el detalle) lleva `descubrimiento` (`usuario`, `equipo`, `fecha`, `tuyo`) y, en el historial, «X la descubrió» como primer movimiento.
+
+#### Pantallas
+
+- **Búsqueda** (`carta.js`: `sinAcentos`, `claveBusqueda`, `coincideBusqueda`): nombre y personas juntos, sin tildes ni mayúsculas.
+  - Está en todos los buscadores: catálogo, plantillas y colecciones del admin, y nuevo en el álbum, en Plantilla y en el Mercado (antes ninguno de los tres tenía buscador de texto).
+  - En Plantilla, al escribir solo se ocultan las que no coinciden, sin repintar.
+  - En el Mercado se repinta la lista y el buscador conserva el foco y el cursor.
+- **Detalle:**
+  - debajo del tipo, «🔎 Descubierta por <b>X</b> · fecha» («por ti» si es tuya) o «Sin descubrir»;
+  - «Salen:» con un chip por persona, que abre encima el álbum o, para el admin, el catálogo, ya filtrado por esa persona (los dos se pueden abrir con el buscador relleno).
+- **Álbum:** «★ Descubierta por ti» en las que descubrió el usuario en la ronda actual.
+- **Editor de cartas:** campo «Personas que salen (separadas por comas)», sin vacíos ni repetidas. El servidor ya las guardaba.
+- **Apertura:**
+  - «¡NUEVA!» sigue arriba de la carta y «¡DESCUBRIMIENTO!» va debajo, sin tapar el OVR ni las stats, con la letra un poco más pequeña según el ancho;
+  - las dos juntas arriba (una al lado de la otra, o una sobre otra) se pisaban con las cartas de al lado del abanico a 360 px y tapaban el OVR;
+  - en el resumen, las dos juntas.
+
+#### Pruebas
+
+- **En una transacción que se deshace** (con Bot Uno y Bot Dos):
+  - reparto inicial;
+  - sobre básico, y soltar sus cartas;
+  - sobre de elección (candidatas, la elegida, soltarla);
+  - subasta, cláusula, intercambio, compra y modo pruebas (siempre el primero que la tiene);
+  - una comprada después por otro (no cambia);
+  - el detalle y una sin descubrir;
+  - temporada 2 (otra ronda: se vuelve a descubrir);
+  - el relleno desde el álbum (el primero por `primera_vez_en`).
+- **`tests/slr/api-descubrimientos.mjs`** (API real, 22 comprobaciones):
+  - reparto;
+  - dos sobres básicos con «Haz hueco» de verdad;
+  - elección con y sin «Haz hueco»;
+  - compra entre equipos;
+  - el detalle con «X la descubrió» el primero.
+- **`tests/slr/busqueda.test.mjs`:** «nico» → Nicolás, tildes y mayúsculas en los dos sentidos, por nombre, vacío, y que todos los buscadores usan esta búsqueda.
+- **`banco/descubrimientos.mjs`** (360 y 412 px, 27 comprobaciones):
+  - Plantilla: buscar «PABLI» → las de Pablín;
+  - detalle: descubierta por ti, el chip y el historial;
+  - el chip abre el catálogo filtrado;
+  - álbum: marcas y buscador;
+  - Mercado: buscador sin perder el foco;
+  - un sobre: «¡DESCUBRIMIENTO!» al revelar (sin pisarse con las cartas vecinas) y en el resumen.
+- **Bancos con fallos que no vienen de este cambio:**
+  - `banco/acciones.mjs` falla a veces en «comprar» (la hoja de confirmar sigue abierta tras pulsar «Comprar»). Con el commit anterior, servido desde un worktree, falla igual una de cada dos veces. Ahora espera a que la hoja esté quieta antes de pulsar, pero sigue fallando de vez en cuando.
+  - `banco/listas.mjs` sigue con su tarea larga de ~425 ms con 658 cartas.
+  - Los dos quedan pendientes de revisar aparte.

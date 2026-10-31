@@ -9,13 +9,14 @@
    · Sobres: la tienda (tienda.js).
    Cada carta enseña lo que importa para decidir (rareza, tier, OVR, stats,
    perfil, estamina, táctica favorita, colección y sinergia, energía si tiene
-   dueño). Filtros por rareza, colección, perfil y táctica, y orden por precio.
+   dueño). Buscador por nombre o persona (sin mayúsculas ni tildes), filtros por
+   rareza, colección, perfil y táctica, y orden por precio.
    Con el mercado cerrado, banner con el motivo y todo deshabilitado.
    Toda adquisición pasa antes por «Haz hueco» (hueco.js).
 ═══════════════════════════════════════════════ */
 import { rpc, accion } from '../api.js';
 import { esc, miles, monedas, hoja, cerrarCapa, cerrarHasta, confirmar, conEspera, toast, faltan, diaHora } from '../ui.js';
-import { cartaHTML, normalizarCarta, RAREZAS } from '../carta.js';
+import { cartaHTML, normalizarCarta, RAREZAS, coincideBusqueda } from '../carta.js';
 import { listaColecciones, coleccion } from '../colecciones.js';
 import { PERFILES } from '../generador.js';
 import { TACTICA, ESTAMINA, barraEnergia } from '../tactica.js';
@@ -33,7 +34,7 @@ const CIERRE = {
   entre_temporadas: ['Temporada terminada', 'El mercado abre cuando empiece la siguiente.'],
 };
 let sub = 'subastas';
-const filtros = { rareza: '', coleccion: '', perfil: '', tactica: '', orden: 'tiempo' };
+const filtros = { texto: '', rareza: '', coleccion: '', perfil: '', tactica: '', orden: 'tiempo' };
 let reloj = null;
 let filtrosAbiertos = null;   // null: abiertos en PC y plegados en el móvil
 
@@ -91,7 +92,8 @@ function filtrosHTML() {
   const op = (obj, sel, todos) => `<option value="">${todos}</option>` +
     Object.entries(obj).map(([k, v]) => `<option value="${esc(k)}" ${k === sel ? 'selected' : ''}>${esc(v)}</option>`).join('');
   const activos = ['rareza', 'coleccion', 'perfil', 'tactica'].filter(k => filtros[k]).length;
-  return `<details class="slr-mfiltros-plegable" ${filtrosAbiertos ?? (matchMedia('(min-width: 900px)').matches) ? 'open' : ''} data-filtros-plegable>
+  return `<input class="slr-input slr-mercado__buscar" type="search" data-buscar placeholder="Buscar por nombre o persona" autocomplete="off" value="${esc(filtros.texto)}">
+  <details class="slr-mfiltros-plegable" ${filtrosAbiertos ?? (matchMedia('(min-width: 900px)').matches) ? 'open' : ''} data-filtros-plegable>
     <summary>Filtros y orden${activos ? ` <i class="slr-insignia">${activos}</i>` : ''}</summary>
     <div class="slr-filtros slr-mfiltros" data-filtros>
     <label><span>Rareza</span><select class="slr-input" data-f="rareza">${op(RAREZAS, filtros.rareza, 'Todas')}</select></label>
@@ -104,7 +106,7 @@ function filtrosHTML() {
   </div></details>`;
 }
 function filtrar(lista, precio) {
-  const r = lista.filter(({ c }) => (!filtros.rareza || c.rareza === filtros.rareza)
+  const r = lista.filter(({ c }) => coincideBusqueda(c, filtros.texto) && (!filtros.rareza || c.rareza === filtros.rareza)
     && (!filtros.coleccion || c.coleccion_id === filtros.coleccion)
     && (!filtros.perfil || c.perfil === filtros.perfil || (c.perfil === 'equilibrado' && filtros.perfil !== 'equilibrado'))
     && (!filtros.tactica || c.tactica_favorita === filtros.tactica));
@@ -312,6 +314,14 @@ export async function pintar(cont, ctx) {
     cont.querySelectorAll('[data-sub]').forEach(b => b.addEventListener('click', () => { sub = b.dataset.sub; dibujar(); }));
     cont.querySelectorAll('[data-f]').forEach(s => s.addEventListener('change', () => { filtros[s.dataset.f] = s.value; dibujar(); }));
     cont.querySelector('[data-filtros-plegable]')?.addEventListener('toggle', e => { filtrosAbiertos = e.currentTarget.open; });
+    // Al escribir se repinta la lista: el buscador conserva el foco y el cursor
+    cont.querySelector('[data-buscar]')?.addEventListener('input', e => {
+      filtros.texto = e.target.value;
+      const pos = e.target.selectionStart;
+      dibujar();
+      const b = cont.querySelector('[data-buscar]');
+      if (b) { b.focus(); b.setSelectionRange(pos, pos); }
+    });
     cont.querySelectorAll('[data-detalle]').forEach(b => b.addEventListener('click', () => abrirDetalle(b.dataset.detalle, { ...ctx, alCambiarMercado: repintar }).catch(() => {})));
     cont.querySelectorAll('[data-pujar]').forEach(b => b.addEventListener('click', () => hojaPuja(buscar(m.subastas, b.dataset.pujar), m, ctx, repintar)));
     cont.querySelectorAll('[data-comprar]').forEach(b => b.addEventListener('click', () => comprarVenta(buscar(m.ventas, b.dataset.comprar), m, ctx, repintar, b)));

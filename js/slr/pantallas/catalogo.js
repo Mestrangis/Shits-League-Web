@@ -16,7 +16,7 @@
 ═══════════════════════════════════════════════ */
 import { leer } from '../api.js';
 import { esc, hoja, miles, monedas, scrollDeHoja, toast } from '../ui.js';
-import { cartaHTML, normalizarCarta, lineaCarta, TIPOS, ACABADOS, RAREZAS } from '../carta.js';
+import { cartaHTML, normalizarCarta, lineaCarta, TIPOS, ACABADOS, RAREZAS, sinAcentos, claveBusqueda } from '../carta.js';
 import { listaColecciones, coleccion } from '../colecciones.js';
 import { PERFILES, COLORES } from '../generador.js';
 import { configLiga } from '../rush.js';
@@ -37,12 +37,13 @@ const ORDENES = {
   tier:   ['Tier', (a, b) => TIERS.indexOf(a.tier) - TIERS.indexOf(b.tier) || b.valor - a.valor],
   fecha:  ['Más recientes', (a, b) => new Date(b.creado_en) - new Date(a.creado_en)],
 };
-const sinAcentos = s => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 // Se recuerdan mientras dura la sesión
 const filtro = { texto: '', tipo: '', rareza: '', tier: '', coleccion: '', perfil: '', acabado: '', color: '', estado: '', orden: 'valor', inactivas: false };
 
-export async function abrirCatalogo(ctx) {
+// buscar: el texto con el que se abre (p. ej. una persona, desde el detalle de una carta)
+export async function abrirCatalogo(ctx, { buscar = null } = {}) {
+  if (buscar != null) filtro.texto = buscar;
   const { datos } = ctx;
   const liga = datos.liga.id, miEquipo = datos.equipo?.id;
   const CAMPOS = 'id,nombre,tipo,acabado,color,tier,rareza,coleccion_id,perfil,personas,ata,def,con,valor,poderes,imagen_url,texto,activo,liga_prueba_id,creado_en';
@@ -60,7 +61,7 @@ export async function abrirCatalogo(ctx) {
       const ej = ejemplarDe.get(d.id);
       // Las creadas en esta liga de prueba nacen inactivas (no llegan a las ligas reales), pero aquí juegan
       return { ...normalizarCarta(d), id: ej?.id ?? `diseno-${d.id}`, diseno_id: d.id, activo: d.activo || !!d.liga_prueba_id, creado_en: d.creado_en,
-               ejemplar: !!ej, dueno: ej?.equipo_id ?? null, clave: sinAcentos(d.nombre) };
+               ejemplar: !!ej, dueno: ej?.equipo_id ?? null, clave: claveBusqueda(normalizarCarta(d)) };
     });
   }
   await cargarDatos();
@@ -69,7 +70,7 @@ export async function abrirCatalogo(ctx) {
   const el = hoja(`
     <div class="slr-catalogo">
       <div class="slr-catalogo__resumen" data-resumen></div>
-      <input class="slr-input" type="search" data-f="texto" placeholder="Buscar carta por nombre" autocomplete="off" value="${esc(filtro.texto)}">
+      <input class="slr-input" type="search" data-f="texto" placeholder="Buscar por nombre o persona" autocomplete="off" value="${esc(filtro.texto)}">
       <div class="slr-filtros slr-filtros--catalogo">
         <label><span>Tipo</span><select class="slr-input" data-f="tipo">${opciones([['', 'Todos'], ...Object.entries(TIPOS)], filtro.tipo)}</select></label>
         <label><span>Rareza</span><select class="slr-input" data-f="rareza">${opciones([['', 'Todas'], ...Object.entries(RAREZAS)], filtro.rareza)}</select></label>

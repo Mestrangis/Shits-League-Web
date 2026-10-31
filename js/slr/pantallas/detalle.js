@@ -6,6 +6,9 @@
    vender al banco. Si es de otro: hacer una oferta, proponer un intercambio
    y pagar su cláusula (si no está blindada; si lo está, cuánto le queda).
    Toda adquisición pasa antes por «Haz hueco».
+   Arriba, quién la descubrió (el primero de la liga en tenerla) y las personas
+   que salen en ella: tocar una abre el álbum (el catálogo, para el admin)
+   filtrado por esa persona. El historial empieza por «X la descubrió».
 ═══════════════════════════════════════════════ */
 import { rpc, leer, accion } from '../api.js';
 import { esc, miles, monedas, hoja, cerrarCapa, confirmar, conEspera, toast, fechaCorta, diaHora, faltan } from '../ui.js';
@@ -61,6 +64,11 @@ export async function abrirDetalle(cartaId, ctx) {
       <div class="slr-detalle__carta">${cartaHTML(c, { tam: 'l', ancho: 300, tocada: propia && estaTocada(propia) })}</div>
       <div class="slr-detalle__info">
         <p class="slr-detalle__tipo">${lineaCarta(c)}</p>
+        ${info.descubrimiento
+          ? `<p class="slr-detalle__descubierta" data-descubierta>🔎 Descubierta por <b class="${info.descubrimiento.tuyo ? 'slr-propio' : ''}">${info.descubrimiento.tuyo ? 'ti' : esc(info.descubrimiento.usuario)}</b> · ${esc(fechaCorta(info.descubrimiento.fecha))}</p>`
+          : '<p class="slr-detalle__descubierta slr-suave" data-descubierta>Sin descubrir</p>'}
+        ${c.personas.length ? `<div class="slr-detalle__personas" data-personas><small>Salen:</small>
+          ${c.personas.map(p => `<button type="button" class="slr-chip-persona" data-persona="${esc(p)}">${esc(p)}</button>`).join('')}</div>` : ''}
         ${propia ? `<div class="slr-ficha__chips">${chipsEstado(propia)}</div>` : ''}
         <div class="slr-stats">${barras(c)}</div>
         ${rasgosCarta(c)}
@@ -121,6 +129,12 @@ export async function abrirDetalle(cartaId, ctx) {
 
   el.querySelector('[data-editar-carta]')?.addEventListener('click', () =>
     abrirEditorCarta(ctx, { disenoId: info.diseno_id }).catch(e => toast(e.message, 'error')));
+  // Una persona: el álbum (o el catálogo, para el admin) filtrado por ella, encima del detalle
+  el.querySelectorAll('[data-persona]').forEach(b => b.addEventListener('click', async () => {
+    const buscar = b.dataset.persona;
+    if (datos.liga?.es_admin) (await import('./catalogo.js')).abrirCatalogo(ctx, { buscar }).catch(() => {});
+    else (await import('./album.js')).abrirAlbum(ctx, { buscar }).catch(() => {});
+  }));
 
   const tras = async () => { await ctx.recargar('yo', 'cartas', 'alineacion'); cerrarCapa(); ctx.pintar(); await ctx.alCambiarMercado?.(); };
   if (!esMia) {

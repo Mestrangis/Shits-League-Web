@@ -14,7 +14,7 @@
 ═══════════════════════════════════════════════ */
 import { rpc, leer } from '../api.js';
 import { esc, hoja, cerrarCapa, conEspera, toast, confirmar } from '../ui.js';
-import { cartaHTML, normalizarCarta } from '../carta.js';
+import { cartaHTML, normalizarCarta, coincideBusqueda } from '../carta.js';
 import { COLORES } from '../generador.js';
 import { cargarColecciones, listaColecciones, urlEmblema } from '../colecciones.js';
 import { subirFoto } from './editor-carta.js';
@@ -175,16 +175,15 @@ export async function formularioColeccion(ctx, k, { alGuardar } = {}) {
     const marcadas = new Set();
     const h = hoja(`
       <div class="slr-buscador-cartas">
-        <input class="slr-input" type="search" data-texto placeholder="Buscar carta por nombre" autocomplete="off">
+        <input class="slr-input" type="search" data-texto placeholder="Buscar por nombre o persona" autocomplete="off">
         <p class="slr-suave" data-aviso></p>
         <div class="slr-rejilla slr-rejilla--compacta" data-resultados></div>
         <div class="slr-botones slr-buscador-cartas__pie"><button class="slr-btn slr-btn--grande" type="button" data-confirmar disabled>Añadir</button></div>
       </div>`, { titulo: `Añadir a ${f.nombre}`, completa: true });
     const res = h.querySelector('[data-resultados]');
-    const sinAcentos = t => (t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
     function pintar() {
-      const t = sinAcentos(h.querySelector('[data-texto]').value.trim());
-      const lista = disenos.filter(d => d.coleccion_id !== f.id && (!t || sinAcentos(d.nombre).includes(t))).slice(0, 60);
+      const t = h.querySelector('[data-texto]').value;
+      const lista = disenos.filter(d => d.coleccion_id !== f.id && coincideBusqueda(d, t)).slice(0, 60);
       res.innerHTML = lista.map(d => {
         const otra = d.coleccion_id ? coleccionDe(d.coleccion_id)?.nombre ?? 'otra colección' : '';
         return `<button class="slr-ficha slr-buscador-cartas__carta${marcadas.has(d.id) ? ' es-seleccionada' : ''}" type="button" data-diseno="${esc(d.id)}">
