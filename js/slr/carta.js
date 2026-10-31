@@ -39,7 +39,7 @@
 ═══════════════════════════════════════════════ */
 import { esc, iniciales, bloquearSeleccion, desbloquearSeleccion } from './ui.js';
 import { acabado, listaAcabados } from './acabados/index.js';
-import { urlFoto, cargarFotos } from './imagenes.js';
+import { urlFoto, cargarFotos, cargarFotoCarta } from './imagenes.js';
 import { coleccion, urlEmblema } from './colecciones.js';
 import { TACTICA } from './tactica.js';
 import { tramoEnergia } from './energia.js';
@@ -367,6 +367,7 @@ function alVisibilidad(entradas) {
     c.classList.toggle('is-visible', e.isIntersecting);
     if (e.isIntersecting) {
       visibles.add(c);
+      cargarFotoCarta(c, e.boundingClientRect);   // en las listas enormes aún no la ha pedido nadie
       precalentar(c);
       if (giro) activar(c);
     } else {

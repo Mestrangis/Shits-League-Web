@@ -37,6 +37,7 @@ let sub = 'subastas';
 const filtros = { texto: '', rareza: '', coleccion: '', perfil: '', tactica: '', orden: 'tiempo' };
 let reloj = null;
 let filtrosAbiertos = null;   // null: abiertos en PC y plegados en el móvil
+let vista = null;             // el contenedor del Mercado pintado ahora
 
 /* ── Piezas comunes ─────────────────────────────────────────────────────── */
 export function bannerCierre(motivo) {
@@ -117,6 +118,35 @@ function filtrar(lista, precio) {
 }
 const carta = j => normalizarCarta(j);
 const deshab = m => (m.cerrado ? 'disabled' : '');
+
+// Acciones de la lista en marcha, por el selector de su botón. Si el Mercado se
+// repinta a mitad (al acabar la puja de antes mientras confirmas una compra, p. ej.),
+// el botón nuevo sale también en «cargando» y no admite otro toque.
+const enCurso = new Set();
+const selectorDe = b => { const a = [...b.attributes].find(x => x.name.startsWith('data-')); return `[${a.name}="${CSS.escape(a.value)}"]`; };
+function marcarEnCurso() {
+  for (const sel of enCurso) vista?.querySelectorAll(sel).forEach(b => {
+    if ('estabaDesactivado' in b.dataset) return;
+    b.dataset.estabaDesactivado = b.disabled ? '1' : '';
+    b.disabled = true;
+    b.classList.add('slr-esperando');
+  });
+}
+async function esperar(b, accion) {
+  const sel = selectorDe(b);
+  if (enCurso.has(sel)) return;
+  enCurso.add(sel);
+  marcarEnCurso();
+  try { return await accion(); } finally {
+    enCurso.delete(sel);
+    vista?.querySelectorAll(sel).forEach(x => {
+      if (!('estabaDesactivado' in x.dataset)) return;
+      x.disabled = x.dataset.estabaDesactivado === '1';
+      delete x.dataset.estabaDesactivado;
+      x.classList.remove('slr-esperando');
+    });
+  }
+}
 
 /* ── Subastas ───────────────────────────────────────────────────────────── */
 function vistaSubastas(m, ctx) {
@@ -199,7 +229,7 @@ async function comprarVenta(v, m, ctx, repintar, boton) {
     texto: `Compras a <b>${esc(c.nombre)}</b> a ${esc(v.vendedor.usuario ?? 'su dueño')} por <b>${miles(v.precio)}</b>.
       Te quedarán ${miles(m.saldo - v.precio)}.`, ok: `Comprar por ${miles(v.precio)}` });
   if (!ok || !(await asegurarHueco(ctx, 1, { que: 'comprarla' }))) return;
-  await conEspera(boton, async () => {
+  await esperar(boton, async () => {
     await accion('slr_comprar_venta', { venta_id: v.id });
     toast(`${c.nombre} es tuya`, 'ok');
     await ctx.recargar('yo', 'cartas');
@@ -279,6 +309,7 @@ export function hojaImporte({ titulo, texto, valor, minimo = 1, ok, impuesto = n
 export const cargar = ({ datos }) => rpc('slr_mercado', { liga_id: datos.liga.id }, { silencioso: true });
 
 export async function pintar(cont, ctx) {
+  vista = cont;
   clearInterval(reloj);
   reloj = setInterval(() => {
     if (!cont.isConnected) { clearInterval(reloj); return; }
@@ -307,6 +338,7 @@ export async function pintar(cont, ctx) {
         ${sub === 'subastas' ? vistaSubastas(m, ctx) : sub === 'venta' ? vistaVenta(m, ctx) : sub === 'ofertas' ? vistaOfertas(m, ctx) : '<div data-tienda></div>'}
       </div>`;
     enlazar();
+    marcarEnCurso();
     if (sub === 'sobres') pintarTienda(cont.querySelector('[data-tienda]'), ctx, { mercado: m, alCambiar: repintar }).catch(e => toast(e.message, 'error'));
   }
   function enlazar() {
@@ -325,7 +357,7 @@ export async function pintar(cont, ctx) {
     cont.querySelectorAll('[data-detalle]').forEach(b => b.addEventListener('click', () => abrirDetalle(b.dataset.detalle, { ...ctx, alCambiarMercado: repintar }).catch(() => {})));
     cont.querySelectorAll('[data-pujar]').forEach(b => b.addEventListener('click', () => hojaPuja(buscar(m.subastas, b.dataset.pujar), m, ctx, repintar)));
     cont.querySelectorAll('[data-comprar]').forEach(b => b.addEventListener('click', () => comprarVenta(buscar(m.ventas, b.dataset.comprar), m, ctx, repintar, b)));
-    cont.querySelectorAll('[data-retirar-venta]').forEach(b => b.addEventListener('click', () => conEspera(b, async () => {
+    cont.querySelectorAll('[data-retirar-venta]').forEach(b => b.addEventListener('click', () => esperar(b, async () => {
       await accion('slr_retirar_venta', { venta_id: b.dataset.retirarVenta });
       toast('Carta retirada de la venta', 'ok');
       await ctx.recargar('cartas'); await repintar();
@@ -336,17 +368,17 @@ export async function pintar(cont, ctx) {
       const ok = await confirmar({ titulo: 'Aceptar oferta', texto: `Vendes a <b>${esc(c.nombre)}</b> a ${esc(o.de)} por <b>${miles(o.importe)}</b>
         (recibes ${miles(Math.round(o.importe * (1 - (m.impuesto ?? 0.05))))} tras el impuesto).`, ok: 'Aceptar' });
       if (!ok) return;
-      await conEspera(b, async () => {
+      await esperar(b, async () => {
         await accion('slr_aceptar_oferta', { oferta_id: o.id });
         toast(`${c.nombre} vendida a ${o.de}`, 'ok');
         await ctx.recargar('yo', 'cartas', 'alineacion'); await repintar();
       }).catch(() => {});
     }));
-    cont.querySelectorAll('[data-rechazar-oferta]').forEach(b => b.addEventListener('click', () => conEspera(b, async () => {
+    cont.querySelectorAll('[data-rechazar-oferta]').forEach(b => b.addEventListener('click', () => esperar(b, async () => {
       await accion('slr_rechazar_oferta', { oferta_id: b.dataset.rechazarOferta });
       toast('Oferta rechazada', 'ok'); await repintar();
     }).catch(() => {})));
-    cont.querySelectorAll('[data-retirar-oferta]').forEach(b => b.addEventListener('click', () => conEspera(b, async () => {
+    cont.querySelectorAll('[data-retirar-oferta]').forEach(b => b.addEventListener('click', () => esperar(b, async () => {
       await accion('slr_retirar_oferta', { oferta_id: b.dataset.retirarOferta });
       toast('Oferta retirada', 'ok'); await repintar();
     }).catch(() => {})));
@@ -357,7 +389,7 @@ export async function pintar(cont, ctx) {
         valor: Math.ceil((o.importe * 1.2) / 10) * 10, minimo: o.importe + 1, ok: 'Enviar contraoferta',
         impuesto: x => `Si la acepta, recibes ${miles(Math.round(x * (1 - imp)))} (−${Math.round(imp * 100)} % de impuesto).` });
       if (v == null) return;
-      await conEspera(b, async () => {
+      await esperar(b, async () => {
         await accion('slr_contraofertar', { oferta_id: o.id, importe: v });
         toast('Contraoferta enviada', 'ok'); await repintar();
       }).catch(() => {});
@@ -367,17 +399,17 @@ export async function pintar(cont, ctx) {
       const neto = Number(b.dataset.neto);
       const ok = await confirmar({ titulo: 'Aceptar intercambio', texto: 'Las cartas y las monedas cambian de manos ahora mismo. No se puede deshacer.', ok: 'Aceptar' });
       if (!ok || (neto > 0 && !(await asegurarHueco(ctx, neto, { que: 'aceptar el intercambio' })))) return;
-      await conEspera(b, async () => {
+      await esperar(b, async () => {
         await accion('slr_aceptar_intercambio', { intercambio_id: b.dataset.aceptarIntercambio });
         toast('Intercambio hecho', 'ok');
         await ctx.recargar('yo', 'cartas', 'alineacion'); await repintar();
       }).catch(() => {});
     }));
-    cont.querySelectorAll('[data-rechazar-intercambio]').forEach(b => b.addEventListener('click', () => conEspera(b, async () => {
+    cont.querySelectorAll('[data-rechazar-intercambio]').forEach(b => b.addEventListener('click', () => esperar(b, async () => {
       await accion('slr_rechazar_intercambio', { intercambio_id: b.dataset.rechazarIntercambio });
       toast('Intercambio rechazado', 'ok'); await repintar();
     }).catch(() => {})));
-    cont.querySelectorAll('[data-retirar-intercambio]').forEach(b => b.addEventListener('click', () => conEspera(b, async () => {
+    cont.querySelectorAll('[data-retirar-intercambio]').forEach(b => b.addEventListener('click', () => esperar(b, async () => {
       await accion('slr_retirar_intercambio', { intercambio_id: b.dataset.retirarIntercambio });
       toast('Intercambio retirado', 'ok'); await repintar();
     }).catch(() => {})));

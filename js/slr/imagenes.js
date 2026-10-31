@@ -113,14 +113,20 @@ const enPantalla = r => r.width > 0 && r.bottom > -40 && r.top < innerHeight + 4
 
 // Varias cartas a la vez: primero se miden todas y luego se tocan (medir después
 // de escribir obligaría a recalcular la maquetación una vez por carta)
-// En las listas de hasta 60 cartas, todas las ya guardadas salen al momento; en las enormes
-// (la herramienta de admin entera), las que no se ven, en los ratos libres siguientes
+// En las listas de hasta 60 cartas, todas las ya guardadas salen al momento. Las enormes
+// (la herramienta de admin entera) no se miden: medirlas obliga a maquetar cientos de
+// filas de golpe (unos 340 ms con 658). Las que se ven las adelanta el IntersectionObserver
+// de carta.js (cargarFotoCarta al aparecer); el resto, en los ratos libres siguientes.
 export const AL_MOMENTO_HASTA = 60;
+const FUERA = { width: 0 };   // un rectángulo que no está en pantalla
 export function cargarFotos(cartas) {
   const con = [...cartas].filter(c => c.querySelector('img.slr-carta__img[data-foto]'));
+  if (con.length > AL_MOMENTO_HASTA) {
+    for (const c of con) enCola(false, () => cargarFotoCarta(c, FUERA, false));
+    return;
+  }
   const rects = con.map(c => c.getBoundingClientRect());
-  const todas = con.length <= AL_MOMENTO_HASTA;
-  con.forEach((c, i) => cargarFotoCarta(c, rects[i], todas));
+  con.forEach((c, i) => cargarFotoCarta(c, rects[i]));
 }
 
 // Estados de la carta (clases): sin nada → esqueleto con brillo; con-foto → la foto
