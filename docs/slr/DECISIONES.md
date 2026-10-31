@@ -2143,7 +2143,7 @@ Móvil 412 × 915 con la CPU ×4 y «4G lenta» (150 ms, 1,6 / 0,75 Mbit/s); med
   - «Reparar la app» desde el pie; la actualización forzada con una versión D; la versión en Perfil.
 - **JUGAR antes de que mande el worker** (la primera visita): Rush entra por la red y, en cuanto el worker ha instalado la Shits League, también Rush en segundo plano. Se había perdido en la reescritura y lo detectó `banco/datos.mjs`.
 - **La comprobación de lo guardado (`verificar`)** espera 30 s después de arrancar y a un rato libre: no compite con lo primero que se hace en la app.
-- **`banco/listas.mjs`** falla hoy dos comprobaciones de rendimiento: una tarea larga de ~420–460 ms con 656 cartas (el límite es 400) y las fotos de la página siguiente aún sin precargar. Fallan igual con el commit anterior (servido desde un worktree en el mismo puerto), así que no vienen de este cambio: la liga de prueba tiene hoy muchas más cartas. Queda pendiente de revisar aparte.
+- **`banco/listas.mjs`** falla hoy dos comprobaciones de rendimiento: una tarea larga de ~420–460 ms con 656 cartas (el límite es 400) y las fotos de la página siguiente aún sin precargar. Fallan igual con el commit anterior (servido desde un worktree en el mismo puerto), así que no vienen de este cambio: la liga de prueba tiene hoy muchas más cartas. Resuelto en «Dos bancos que fallaban a veces».
 - **Versión de prueba para el móvil:** justo después de este arreglo, se despliega una segunda versión con un cambio mínimo y visible: la fecha de la versión, en Perfil y en el pie, lleva también el día de la semana («Versión xxxxxxx · jueves, 29 de oct de 2026, 20:30»). Sirve para comprobar en el móvil que llega sola, sin borrar nada.
 
 ## Personas de cada carta y quién la descubre
@@ -2226,4 +2226,34 @@ Móvil 412 × 915 con la CPU ×4 y «4G lenta» (150 ms, 1,6 / 0,75 Mbit/s); med
 - **Bancos con fallos que no vienen de este cambio:**
   - `banco/acciones.mjs` falla a veces en «comprar» (la hoja de confirmar sigue abierta tras pulsar «Comprar»). Con el commit anterior, servido desde un worktree, falla igual una de cada dos veces. Ahora espera a que la hoja esté quieta antes de pulsar, pero sigue fallando de vez en cuando.
   - `banco/listas.mjs` sigue con su tarea larga de ~425 ms con 658 cartas.
-  - Los dos quedan pendientes de revisar aparte.
+  - Los dos, resueltos en «Dos bancos que fallaban a veces».
+
+## Dos bancos que fallaban a veces: «Comprar» en acciones y «Todas» en listas
+
+### Qué pasaba (la investigación)
+
+- **`banco/acciones.mjs`, «Comprar»** (fallaba una de cada dos veces):
+  - Con un registro de los toques y del historial en el navegador se ve que el toque en «Comprar por N» **sí llega**: `pointerdown`, `click`, `history.back()` y `popstate` en el mismo milisegundo. No era la animación de la hoja ni el toast.
+  - Lo que pasa: la puja anterior termina su `repintar()` (frenada 2 s y luego `slr_mercado` con la red lenta) **con la hoja de confirmar ya abierta**, y vuelve a dibujar la lista. La compra se hace sobre el botón viejo, que ya no está en la página: el nuevo queda activo. El doble toque del test abría entonces otras dos hojas de confirmar, y la compra (frenada) aún no había terminado al mirar de quién era la carta.
+  - Es un fallo de la app, no solo del test: con un repintado a destiempo, el jugador ve «Comprar» activo mientras la compra está en marcha y puede volver a pulsarlo.
+- **`banco/listas.mjs`, «Todas» con 658 cartas** (tarea larga de 380-450 ms; el límite es 400):
+  - Perfil de CPU de la tarea: unos 40 ms son el `innerHTML` de `pintarPagina` y unos **340 ms son `getBoundingClientRect`** en `cargarFotos`. El `MutationObserver` de `carta.js` medía las 658 cartas para saber cuáles se ven, y eso obligaba a maquetar la lista entera de golpe. Detrás venían otras tres tareas largas de 110-250 ms (estilos, maquetación y pintado).
+  - «Sus fotos ya estaban precargadas» no falla en ninguna de mis pasadas (24 de 24). El test esperaba 1,5 s fijos a una precarga de prioridad baja que compite con las fotos de la página 1 y con la precarga del catálogo del admin: depende de lo que tarde Cloudinary.
+
+### Decisiones mías
+
+- **Mercado (`js/slr/pantallas/mercado.js`):** las acciones de la lista (comprar, retirar, ofertas, intercambios) se apuntan por el selector de su botón (`[data-comprar="id"]`) mientras están en marcha. Cada repintado vuelve a poner en «cargando» el botón nuevo, y al terminar se le devuelve su estado de antes (desactivado por saldo o mercado cerrado, o no). La misma acción no se lanza dos veces aunque el botón sea otro. Los botones de la hoja de puja siguen con `conEspera`: la hoja no se repinta.
+- **Fotos de las listas enormes (`js/slr/imagenes.js`, `carta.js`):** con más de 60 cartas a la vez ya no se mide ninguna. Todas van a la cola de baja prioridad (en los ratos libres), y las que se ven las adelanta el `IntersectionObserver` que ya tenían los acabados (`cargarFotoCarta` al aparecer en pantalla). Las listas de hasta 60 siguen igual (se miden y las ya guardadas salen al momento).
+- **`content-visibility: auto`** en las filas de la herramienta de plantillas (`contain-intrinsic-size: auto 136px`, lo que mide una fila a 390 px). Antes se descartó porque medir las cartas de una fila «saltada» obliga a maquetarla. Ahora que no se miden, solo se maquetan las filas que se ven.
+- **El límite del test (400 ms) se queda:** con el arreglo, «Todas» no hace ninguna tarea larga, y si vuelve a aparecer una es que algo ha empeorado.
+
+### Medido
+
+- «Todas» con 658 cartas (Chrome headless a 390×844, cuatro repeticiones): antes, una tarea de 377-454 ms y detrás otras de 110-260 ms; el fotograma, entre 590 y 680 ms. Ahora, ninguna tarea larga (alguna vez una de ~70 ms); el fotograma, 60-100 ms. El `innerHTML` sigue en ~40 ms.
+- Con «Todas», las fotos que se ven están puestas antes de 150 ms en cualquier punto del scroll (arriba, y a 4.000, 30.000 y 60.000 px).
+
+### Pruebas
+
+- **`banco/acciones.mjs`** ahora provoca la carrera siempre: retiene la respuesta de `slr_mercado` de la puja hasta que la hoja de comprar está abierta, la suelta, espera a que la lista se repinte y comprueba «el Mercado se repinta con la hoja de comprar abierta». Con el `mercado.js` anterior falla siempre, igual que fallaba a veces: «cargando», «una sola compra» y el timeout.
+- **`banco/listas.mjs`:** para comprobar la precarga de la página 2, espera a que no quede ninguna foto de Cloudinary bajando (por CDP; mínimo 1,5 s como antes y máximo 10 s). Se sigue comprobando que estén antes de ir a la página, sin depender de lo que tarde la red.
+- **Pasadas finales** (con `version.json` regenerado antes de cada una): `acciones` 3 de 3 (19/19), `fotos` 12/12 y `listas` 5 de 6 limpias (la mayor tarea larga con «Todas», entre 0 y 68 ms; fotos de la página 2, 24 de 24). En la otra falló «al volver a abrirla recuerda «Todas»»: la herramienta no se volvió a abrir en 15 s. No se ha repetido. `abrirPlantillas` pide `slr_admin_cartas` antes de crear la hoja y se traga el error (`.catch(() => {})` en `perfil.js`), así que lo más probable es que esa petición fallara o tardara. Queda apuntado por si vuelve.

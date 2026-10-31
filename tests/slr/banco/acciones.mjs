@@ -5,6 +5,8 @@
 //   hace UNA sola acción (pujar, comprar, «Haz hueco», cambiar el nombre).
 // · Las que mueven dinero o cartas van con su identificador de intento (slr_con_intento).
 // · Si falla, un mensaje claro y el botón vuelve a poder usarse.
+// · Si el Mercado se repinta mientras confirmas (al acabar la puja de antes), el botón
+//   nuevo sale también en «cargando» (antes se quedaba activo y admitía otro toque).
 import { chromium } from 'playwright';
 import { env, rpc, rpcOk, leer } from '../api-util.mjs';
 import { redLenta } from './red-lenta.mjs';
@@ -56,9 +58,10 @@ try {
     const foto = async n => { if (SALIDA) await page.screenshot({ path: `${SALIDA}/acciones-${ancho}-${n}.png` }); };
     // Peticiones de acciones, y la respuesta frenada (para ver el «cargando»)
     const acciones = [];
-    let frenar = 0, fallar = null;
+    let frenar = 0, fallar = null, retenerMercado = null;
     await ctx.route('**/rest/v1/rpc/*', async r => {
       const n = r.request().url().split('/rpc/')[1];
+      if (n === 'slr_mercado' && retenerMercado) await retenerMercado.promesa;
       if (n === 'slr_con_intento' || n === 'slr_renombrar_equipo') {
         acciones.push({ n, cuerpo: JSON.parse(r.request().postData() ?? '{}') });
         if (frenar) await dormir(frenar);
@@ -88,6 +91,9 @@ try {
     await page.waitForSelector('[data-confirmar-puja]');
     acciones.length = 0;
     frenar = 2000;
+    // Los datos nuevos del Mercado tras la puja llegan cuando ya está abierta la hoja de comprar
+    // (con la red lenta pasaba una de cada dos veces): se retienen hasta entonces
+    retenerMercado = {}; retenerMercado.promesa = new Promise(r => { retenerMercado.soltar = r; });
     const puja = await tocarYMirar('[data-confirmar-puja]');
     await otraVez('[data-confirmar-puja]');
     await foto('1-pujando');
@@ -107,6 +113,11 @@ try {
     // (la hoja de confirmar sube con una animación: se pulsa cuando ya está quieta)
     await page.waitForSelector('.slr-confirmar.abierta', { timeout: 5000 });
     await dormir(400);
+    // Se repinta la lista debajo de la hoja: el botón «Comprar» es otro
+    await page.$eval('[data-comprar]', b => { b.__viejo = true; });
+    retenerMercado.soltar(); retenerMercado = null;
+    const repintado = await page.waitForFunction(() => document.querySelector('[data-comprar]') && !document.querySelector('[data-comprar]').__viejo, null, { timeout: 30000 }).then(() => true, () => false);
+    check(repintado, 'el Mercado se repinta con la hoja de comprar abierta');
     await page.click('.slr-confirmar [data-si]');
     await dormir(80);
     const compra = await page.evaluate(() => { const b = document.querySelector('[data-comprar]'); return b ? { desactivado: b.disabled, spinner: b.classList.contains('slr-esperando') } : null; });

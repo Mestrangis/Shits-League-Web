@@ -1438,6 +1438,8 @@ button.slr-aviso:active { background: rgba(57,255,136,.08) !important; }
 .slr-plantillas__fila {
   display: grid; grid-template-columns: 54px 1fr; gap: 10px; align-items: center;
   padding: 8px; border-radius: 12px; background: rgba(3,12,7,.45); border: 1px solid rgba(31,224,101,.1);
+  /* Con «Todas» (cientos de filas) solo se maquetan las que se ven */
+  content-visibility: auto; contain-intrinsic-size: auto 136px;
 }
 .slr-plantillas__acciones { grid-column: 1 / -1; display: flex; gap: 8px; justify-content: flex-end; }
 .slr-plantillas-admin { display: flex; flex-direction: column; gap: 10px; }

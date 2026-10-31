@@ -67,9 +67,12 @@ try {
   }
   await new Promise(r => ws.addEventListener('open', r, { once: true }));
   let id = 0; const pend = new Map(); const errores = []; let marcos = null;
+  const fotosEnCurso = new Set();   // peticiones a Cloudinary sin terminar
   ws.addEventListener('message', m => {
     const x = JSON.parse(m.data);
     if (x.id && pend.has(x.id)) { pend.get(x.id)(x); pend.delete(x.id); }
+    else if (x.method === 'Network.requestWillBeSent') { if (x.params.request.url.includes('res.cloudinary.com')) fotosEnCurso.add(x.params.requestId); }
+    else if (x.method === 'Network.loadingFinished' || x.method === 'Network.loadingFailed') fotosEnCurso.delete(x.params.requestId);
     else if (x.method === 'Runtime.exceptionThrown') errores.push(x.params.exceptionDetails?.exception?.description?.slice(0, 200));
     else if (x.method === 'Page.screencastFrame') {
       marcos?.push({ t: x.params.metadata.timestamp, data: x.params.data });
@@ -202,15 +205,19 @@ try {
   const paginas = Math.ceil(nCartas / 24);
   check(h0.filas === 24 && h0.sel === '24' && h0.texto === `Página 1 de ${paginas}`, `24 por página: ${h0.total} · ${h0.texto} · [${h0.botones.join(' ')}] (abre en ${tHerr} ms)`);
   await foto('admin-paginas');
-  // Página siguiente precargada
-  await dormir(1500);
+  // Página siguiente precargada: se espera a que no quede ninguna foto bajando (su precarga
+  // va con prioridad baja, detrás de las de la página 1: con 1,5 s fijos a veces faltaban 2-4)
+  const tQuietas = Date.now();
+  for (let quietas = 0; quietas < 4 && Date.now() - tQuietas < 10000; quietas = fotosEnCurso.size ? 0 : quietas + 1) await dormir(100);
+  await dormir(1500 - Math.min(1500, Date.now() - tQuietas));   // como mínimo lo de antes
+  const espera = Date.now() - tQuietas;
   const sig = await ev(`(() => { const urls = performance.getEntriesByType('resource').map(e => e.name).filter(u => u.includes('res.cloudinary.com')); return urls.length; })()`);
   await clic('[data-paginas] [data-pag="2"]');
   await dormir(300);
   const h1 = await ev(`({ primera: document.querySelector('.slr-plantillas__texto b').textContent, texto: document.querySelector('.slr-paginas__texto').textContent,
     listas: document.querySelectorAll('.slr-plantillas .slr-carta.con-foto.sin-fundido').length, total: document.querySelectorAll('.slr-plantillas .slr-carta--con-imagen').length })`);
   check(h1.texto === `Página 2 de ${paginas}`, `página 2: «${h1.primera}»…`);
-  check(h1.listas >= h1.total - 2, `sus fotos ya estaban precargadas: ${h1.listas} de ${h1.total} al momento (${sig} fotos pedidas hasta entonces)`);
+  check(h1.listas >= h1.total - 2, `sus fotos ya estaban precargadas: ${h1.listas} de ${h1.total} al momento (${sig} fotos pedidas hasta entonces tras esperar ${espera} ms)`);
   // «Todas» y que se recuerde
   await ev('window.__largas.length = 0; 0');
   const t2 = await ev(`(() => { const s = document.querySelector('[data-por-pagina]'); const t = performance.now(); s.value = '0'; s.dispatchEvent(new Event('change')); return performance.now() - t; })()`);
