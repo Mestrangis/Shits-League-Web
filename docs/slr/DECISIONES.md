@@ -2257,3 +2257,46 @@ Móvil 412 × 915 con la CPU ×4 y «4G lenta» (150 ms, 1,6 / 0,75 Mbit/s); med
 - **`banco/acciones.mjs`** ahora provoca la carrera siempre: retiene la respuesta de `slr_mercado` de la puja hasta que la hoja de comprar está abierta, la suelta, espera a que la lista se repinte y comprueba «el Mercado se repinta con la hoja de comprar abierta». Con el `mercado.js` anterior falla siempre, igual que fallaba a veces: «cargando», «una sola compra» y el timeout.
 - **`banco/listas.mjs`:** para comprobar la precarga de la página 2, espera a que no quede ninguna foto de Cloudinary bajando (por CDP; mínimo 1,5 s como antes y máximo 10 s). Se sigue comprobando que estén antes de ir a la página, sin depender de lo que tarde la red.
 - **Pasadas finales** (con `version.json` regenerado antes de cada una): `acciones` 3 de 3 (19/19), `fotos` 12/12 y `listas` 5 de 6 limpias (la mayor tarea larga con «Todas», entre 0 y 68 ms; fotos de la página 2, 24 de 24). En la otra falló «al volver a abrirla recuerda «Todas»»: la herramienta no se volvió a abrir en 15 s. No se ha repetido. `abrirPlantillas` pide `slr_admin_cartas` antes de crear la hoja y se traga el error (`.catch(() => {})` en `perfil.js`), así que lo más probable es que esa petición fallara o tardara. Queda apuntado por si vuelve.
+
+## Shits League: votación del MVP, pendientes en Inicio y bloques clicables
+
+No es de Rush, pero las decisiones se apuntan aquí como las demás.
+
+### Decisiones de Marcos
+
+- **Hoja `MVPs`**, una fila por voto. Candidatos y votantes salen de Jornadas. Los amistosos no tienen MVP. La columna `mvp` de Jornadas manda sobre los votos.
+- **Abierta** desde que hay resultado hasta 3 días después del partido o hasta que haya una oficial posterior con resultado.
+- **Ganador:** puntos → votantes distintos → veces con los 3 puntos de un mismo votante → «MVP por decidir» hasta escribirlo a mano. Nunca compartido.
+- **Sin `no-cors`:** la web lee la respuesta del Apps Script, también en el «votar» de siempre; si falla, avisa y deja reintentar.
+- Pestaña MVP con sus estados, «Pendientes» en Inicio y bloques de Inicio que llevan a su sitio.
+
+### Decisiones mías
+
+- **`apps-script/votos.gs`** no estaba en el repo: se ha creado a partir del script publicado. La clave privada de OneSignal **no va en el archivo**: se lee de las propiedades del script (`ONESIGNAL_API_KEY`).
+- **Nombres:** el login, Jugadores y Jornadas no siempre coinciden (Marcos → Markis por alias; «De la Mano 🏆» en Jugadores y «De la Mano» en Jornadas; Carlos, Luis y Víctor sin ficha). Web y script comparan sin tildes, mayúsculas ni emojis y resuelven alias, y en la hoja se guarda el nombre canónico. Los jugadores sin ficha también votan y se les vota; salen con su inicial en lugar de la foto.
+- **«Posterior» es por número de jornada, no por fecha:** en la hoja real, la J9 tiene una fecha posterior a la J10.
+- **El plazo acaba al terminar el tercer día** después del partido, en hora de Madrid en el script. La web usa la hora del móvil solo para pintar: el que decide es el script.
+- **«Tiene resultado»:** `con_resultado`, las dos celdas de goles escritas (`goles_local` convierte el vacío en 0). Los datos guardados de antes no lo llevan y cuentan como con resultado.
+- **Valores tal como se ven** (`getDisplayValues`) en el script: los mismos que lee la web con la API, sin objetos `Date`.
+- **Hoja sin crear:** la lectura da HTTP 400 y se trata como «sin votos»; el script la crea con su cabecera con el primer voto. Si la lectura falla de otro modo, `STATE.mvps` es `null`: la pestaña lo dice y deja reintentar, y no se ofrece votar ni se afirma «No hubo votación».
+- **`mvp_votado_<jornada>`** guarda el voto entero (para pintar «Tu voto» al momento) con su hora. Lo enviado que la hoja aún no devuelve se mantiene 60 s; pasado ese rato, si la hoja no lo tiene, se olvida. Si la hoja tiene un voto de otro dispositivo, se apunta.
+- **Con MVP escrito a mano y la votación abierta,** la votación sigue y arriba se ve el MVP: la regla de cierre no cambia.
+- **Otros estados:** sin sesión, «en curso» con «Iniciar sesión»; jornada sin resultado, «Este partido aún no tiene resultado».
+- **Pendientes** está dentro de la cabecera (entre el último partido y los contadores), que se ve en todas las pestañas: solo se pinta con Inicio activa. Si queda por encima de la pantalla, se compensa el scroll para que la página no salte. Las votaciones de fechas pasadas no cuentan.
+- **La pila** enseña la primera carta y asoma la siguiente. La carta pasa de 4:5 a 4:3 (el 60 % de alto) y conserva los botones ✓/✗.
+- **Los contadores y el último partido** llevan además a la zona de pestañas: en el móvil la pestaña queda por debajo de la cabecera y no se vería el cambio. No hay bloque de asistencias.
+- **La pestaña MVP se repinta en cada visita:** así abre siempre la jornada que toca.
+
+### Lo que no protege
+
+- **El script no sabe quién vota de verdad:** recibe un nombre y un secreto que está en el JS público, igual que el «votar» de siempre. Un voto falso es posible para quien se lo proponga; se hace en una liga de amigos sabiéndolo.
+- **La hoja es de lectura pública:** ocultar quién votó a quién mientras está abierta es cosa de la pantalla, no del servidor.
+
+### Pruebas
+
+- **`tests/slr/votos-gs.test.mjs`:** el `votos.gs` de verdad sobre una hoja de mentira (`gas-falso.mjs`): cada comprobación de `votarMVP`, plazos, «votar» sin romper, y que la clave no está en el archivo.
+- **`tests/slr/mvp-reglas.test.mjs`:** plazo, estados, cada desempate, a mano, nombres, lo guardado en el dispositivo.
+- **`banco/mvp.mjs`** (360 y 412 px, 200 comprobaciones): hojas de mentira y el script de verdad; la hoja real ni se lee ni se escribe.
+  - El test usa un código de sesión inventado: Rush lo comprobaba contra Supabase y cerraba la sesión a veces. Supabase va cortado en este banco.
+- **Con la hoja real, solo mirando (sin votar):** sin la hoja `MVPs` todavía, la J16 sale «No hubo votación» y los 15 MVP de la columna siguen contando.
+- **Con el script publicado hoy:** la respuesta se lee sin `no-cors` (probado con un secreto incorrecto: `Unauthorized`, sin escribir nada).

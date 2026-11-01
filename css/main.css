@@ -854,8 +854,9 @@ button, [role="button"], .modal__backdrop, .tab, .result-row, .card-wrap, .voto-
     display: block;
   }
 
+  .pendientes { order: 5; }
   .hero__counters {
-    order: 5;
+    order: 6;
     flex-wrap: nowrap;
     gap: 6px;
   }
@@ -1520,3 +1521,280 @@ button, [role="button"], .modal__backdrop, .tab, .result-row, .card-wrap, .voto-
   color: inherit; font: inherit; cursor: pointer; }
 body.en-rush .pie-app { display: none; }
 .version-actualizando__pct { min-height: 1em; color: #DCEFE3; font-variant-numeric: tabular-nums; }
+
+/* ═══════════════════════════════════════════════
+   BLOQUES DE INICIO QUE LLEVAN A OTRA PARTE
+═══════════════════════════════════════════════ */
+.hero__counter, .last-match {
+  cursor: pointer;
+  transition: transform .12s ease, filter .12s ease;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.hero__counter:active, .last-match:active:not(:has(.last-match__mvp:active)) { transform: scale(.97); filter: brightness(.92); }
+.last-match__mvp, .modal__mvp {
+  display: block;
+  width: 100%;
+  position: relative;
+  font: inherit;
+  font-size: .85rem;
+  text-align: center;
+  color: #6E9D81;
+  margin-top: .75rem;
+  cursor: pointer;
+  background: none;
+  border: 0;
+}
+.last-match__mvp span { color: var(--verde); font-weight: 700; }
+
+/* Veces MVP en Plantilla */
+.card-wrap__mvp {
+  position: absolute;
+  top: 6%;
+  right: 4%;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: rgba(6,20,13,.88);
+  border: 1px solid rgba(31,224,101,.35);
+  font-size: 11px;
+  font-weight: 700;
+  color: #E8FBEF;
+  white-space: nowrap;
+}
+
+/* ═══════════════════════════════════════════════
+   PENDIENTES (Inicio)
+═══════════════════════════════════════════════ */
+.pendientes {
+  grid-column: 1 / -1;
+  width: 100%;
+  max-width: 460px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.pendientes .sh { margin-bottom: 0; }
+.pendientes__pila { position: relative; }
+/* La misma carta de Votación, con el 60 % de su altura (4:5 → 4:3) */
+.pendientes .voto { content-visibility: visible; gap: 8px; }
+.pendientes .voto-card { aspect-ratio: 4 / 3; padding: 14px 14px 46px; }
+.pendientes .voto-card__lugar { font-size: clamp(15px, 6.5cqw, 22px); }
+.pendientes .voto-card__dia { font-size: clamp(30px, 13cqw, 52px); }
+.pendientes .voto-card__fecha { font-size: 13px; }
+.pendientes .voto-card__count { bottom: 10px; }
+.pendientes .voto__actions { gap: 16px; }
+.pendientes .voto-btn { width: 40px; height: 40px; font-size: 16px; }
+.voto--compacta { position: relative; z-index: 1; }
+.voto--detras {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 0;
+  transform: translateY(16px) scale(.95);
+  opacity: .55;
+  pointer-events: none;
+}
+.pendientes__cuenta { font-size: 12px; color: #6E9D81; text-align: center; }
+.pendiente-mvp {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(14,32,22,.7);
+  border: 1px solid rgba(31,224,101,.28);
+  font-size: 14px;
+  font-weight: 600;
+}
+.pendiente-mvp__btn {
+  flex-shrink: 0;
+  padding: 8px 14px;
+  border-radius: 10px;
+  background: var(--verde);
+  color: #06140D;
+  font-family: 'Anton', sans-serif;
+  font-size: 13px;
+  letter-spacing: .06em;
+  cursor: pointer;
+}
+
+/* Aviso breve */
+.aviso-app {
+  position: fixed;
+  left: 50%;
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  z-index: 2000;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  padding: 11px 16px;
+  border-radius: 12px;
+  background: #3a1414;
+  border: 1px solid rgba(255,90,90,.5);
+  color: #fff;
+  font-size: 13px;
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 10px);
+  transition: opacity .2s, transform .2s;
+}
+.aviso-app--ok { background: #0E3320; border-color: rgba(31,224,101,.5); }
+.aviso-app.visible { opacity: 1; transform: translate(-50%, 0); }
+
+/* ═══════════════════════════════════════════════
+   PESTAÑA MVP
+═══════════════════════════════════════════════ */
+.mvp-nav { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 18px; }
+.mvp-nav__centro { text-align: center; min-width: 0; }
+.mvp-nav__titulo { font-family: 'Anton', sans-serif; font-size: 22px; letter-spacing: .04em; color: #fff; }
+.mvp-nav__fecha { font-size: 12px; color: #6E9D81; margin-top: 2px; }
+.mvp-nav__flecha {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  font-size: 18px;
+  color: var(--verde);
+  background: rgba(14,32,22,.8);
+  border: 1px solid rgba(31,224,101,.28);
+  cursor: pointer;
+}
+.mvp-nav__flecha:disabled { opacity: .25; cursor: default; }
+.mvp-falta, .mvp-pista { font-size: 12px; color: #6E9D81; text-align: center; }
+.mvp-pista { margin: 12px 0; }
+.mvp-quedan { font-family: 'Anton', sans-serif; font-size: 20px; color: var(--verde); text-align: center; margin: 4px 0 14px; letter-spacing: .03em; }
+.mvp-cartas { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; }
+.mvp-carta {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 6px;
+  border-radius: 14px;
+  background: rgba(14,32,22,.7);
+  border: 1px solid rgba(31,224,101,.18);
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  transition: opacity .15s, border-color .15s, transform .1s;
+}
+.mvp-carta:active { transform: scale(.97); }
+.mvp-carta--con { border-color: var(--verde); }
+.mvp-carta--apagada { opacity: .35; }
+.mvp-carta__foto { width: 100%; aspect-ratio: 300 / 343; object-fit: contain; pointer-events: none; display: block; }
+.mvp-carta__foto--vacia, .mvp-fila__foto--vacia, .mvp-quien__foto--vacia, .mvp-banner__foto--vacia {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: rgba(31,224,101,.1);
+  color: var(--verde);
+  font-family: 'Anton', sans-serif;
+}
+.mvp-carta__foto--vacia { font-size: 32px; }
+.mvp-carta__nombre { font-size: 12px; font-weight: 600; text-align: center; overflow-wrap: anywhere; }
+.mvp-carta__puntos {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 1;
+  min-width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-family: 'Anton', sans-serif;
+  font-size: 20px;
+  color: #6E9D81;
+  background: rgba(6,20,13,.9);
+  border: 1px solid rgba(31,224,101,.25);
+}
+.mvp-carta--con .mvp-carta__puntos { background: var(--verde); color: #06140D; }
+.mvp-carta__menos {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  z-index: 1;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  font-size: 18px;
+  line-height: 1;
+  color: #E8FBEF;
+  background: rgba(6,20,13,.9);
+  border: 1px solid rgba(232,251,239,.3);
+  cursor: pointer;
+  visibility: hidden;
+}
+.mvp-carta--con .mvp-carta__menos { visibility: visible; }
+.mvp-enviar { display: block; width: 100%; max-width: 360px; margin: 0 auto; }
+.mvp-enviar:disabled { opacity: .4; cursor: default; }
+.mvp-aviso {
+  padding: 22px 16px;
+  border-radius: 14px;
+  background: rgba(14,32,22,.7);
+  text-align: center;
+  font-size: 14px;
+  color: #9DC4AD;
+  margin-bottom: 12px;
+}
+.mvp-aviso b { color: #fff; }
+.mvp-aviso small { display: block; margin-top: 6px; color: #6E9D81; font-size: 12px; }
+.mvp-login { margin-top: 12px; }
+.mvp-enlace { color: var(--verde); font: inherit; font-weight: 700; background: none; border: 0; cursor: pointer; text-decoration: underline; }
+.mvp-cuenta { font-size: 13px; color: #9DC4AD; text-align: center; margin-bottom: 10px; }
+.mvp-cuenta b { color: #fff; }
+.mvp-tuvoto {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(31,224,101,.08);
+  font-size: 13px;
+  color: #9DC4AD;
+  text-align: center;
+  margin-bottom: 12px;
+}
+.mvp-tuvoto b { color: #E8FBEF; }
+.mvp-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 14px;
+  background: linear-gradient(160deg, rgba(31,224,101,.2), rgba(14,32,22,.8));
+  border: 1px solid rgba(31,224,101,.4);
+  font-family: 'Anton', sans-serif;
+  font-size: 22px;
+  letter-spacing: .03em;
+  color: #fff;
+  margin-bottom: 12px;
+}
+.mvp-banner small { flex-basis: 100%; text-align: center; font-family: 'Sora', sans-serif; font-size: 11px; letter-spacing: 0; color: #6E9D81; }
+.mvp-banner--decidir { flex-direction: column; gap: 4px; }
+.mvp-banner__foto { width: 44px; height: 50px; object-fit: contain; }
+.mvp-ranking, .mvp-votos { display: flex; flex-direction: column; gap: 6px; }
+.mvp-fila { border-radius: 12px; background: rgba(14,32,22,.7); border: 1px solid rgba(31,224,101,.12); }
+.mvp-fila--ganador { border-color: var(--verde); }
+.mvp-fila__linea { display: flex; align-items: center; gap: 10px; padding: 8px 12px; list-style: none; }
+.mvp-fila__linea::-webkit-details-marker { display: none; }
+details.mvp-fila > summary { cursor: pointer; }
+details.mvp-fila > summary .mvp-fila__puntos::after { content: ' ▾'; font-size: 11px; color: #6E9D81; }
+details.mvp-fila[open] > summary .mvp-fila__puntos::after { content: ' ▴'; }
+.mvp-fila__pos { width: 16px; font-size: 12px; color: #6E9D81; text-align: center; flex-shrink: 0; }
+.mvp-fila__foto { width: 30px; height: 34px; object-fit: contain; flex-shrink: 0; }
+.mvp-fila__nombre { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.mvp-fila__puntos { font-family: 'Anton', sans-serif; font-size: 18px; color: var(--verde); white-space: nowrap; }
+.mvp-fila__puntos small { font-family: 'Sora', sans-serif; font-size: 10px; color: #6E9D81; margin-left: 3px; }
+.mvp-fila__desglose { padding: 2px 12px 10px 38px; display: flex; flex-direction: column; gap: 4px; }
+.mvp-quien { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #9DC4AD; }
+.mvp-quien b { margin-left: auto; color: #fff; }
+.mvp-quien em { margin-left: auto; font-style: normal; color: #E8FBEF; text-align: right; }
+.mvp-quien__foto { width: 22px; height: 25px; object-fit: contain; flex-shrink: 0; font-size: 12px; }
+.mvp-sub { margin-top: 1.5rem; }
+.mvp-votos .mvp-quien { padding: 7px 12px; border-radius: 10px; background: rgba(14,32,22,.5); }

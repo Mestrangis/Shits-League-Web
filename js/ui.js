@@ -247,15 +247,15 @@ function renderHeroSection(jugadores, jornadas) {
       </h1>
       <p class="hero__desc">Es una mierda! Es la mayor mierda que he visto en toda mi vida.</p>
       <div class="hero__counters">
-        <div class="hero__counter">
+        <div class="hero__counter" data-ir="resumen" role="button" tabindex="0">
           <span class="hero__counter-num">${ligas.length}</span>
           <span class="hero__counter-lbl">JORNADAS</span>
         </div>
-        <div class="hero__counter">
+        <div class="hero__counter" data-ir="plantilla" role="button" tabindex="0">
           <span class="hero__counter-num">${jugadores.length}</span>
           <span class="hero__counter-lbl">JUGADORES</span>
         </div>
-        <div class="hero__counter">
+        <div class="hero__counter" data-ir="goleadores" role="button" tabindex="0">
           <span class="hero__counter-num">${totalGoles}</span>
           <span class="hero__counter-lbl">GOLES</span>
         </div>
@@ -281,8 +281,10 @@ function renderLastMatch(j) {
   const vtClass  = lw ? 'last-match__team--loser' : 'last-match__team--winner';
   const tag      = j.amistoso ? 'AMISTOSO · FINAL' : `JORNADA ${j.numero} · FINAL`;
 
+  const mvp = nombreMVP(j);
+
   return `
-    <div class="last-match">
+    <div class="last-match" data-abrir-partido="${j.numero ?? 'ami'}" data-fecha="${j.fecha}" role="button" tabindex="0" aria-label="Ver el detalle del partido">
       <div class="last-match__glow"></div>
       <div class="last-match__header">
         <span class="last-match__tag">${tag}</span>
@@ -304,6 +306,7 @@ function renderLastMatch(j) {
         </div>
       </div>
       ${j.mensaje ? `<div class="last-match__msg">${fmtMsg(j.mensaje)}</div>` : ''}
+      ${mvp ? `<button class="last-match__mvp" type="button" data-abrir-mvp="${j.numero}">🏆 MVP: <span>${mvp}</span></button>` : ''}
     </div>
   `;
 }
@@ -319,7 +322,7 @@ function renderResumen(jugadores, jornadas) {
   const goleador   = [...jugadores].sort((a,b) => b.stats.goles - a.stats.goles)[0];
   const asistente  = [...jugadores].sort((a,b) => b.stats.asistencias - a.stats.asistencias)[0];
   const lastLiga   = ligas[0];
-  const lastMvp    = lastLiga?.mvp ? nombreCanonico(lastLiga.mvp) : '';
+  const lastMvp    = lastLiga ? nombreMVP(lastLiga) : '';
 
   const tiles = `
     <div class="stat-tile">
@@ -509,6 +512,7 @@ function renderPlantilla(jugadores) {
       <div class="card-wrap card-wrap--cargando" data-nombre="${j.nombre}" role="button" tabindex="0" aria-label="Ver ficha de ${j.nombre}">
         ${skeleton}
         ${j.img ? `<img class="card-wrap__img" ${attrsImagen(j.img)} alt="${j.nombre}" loading="lazy" width="300" height="343">` : ''}
+        ${j.stats.mvp ? `<span class="card-wrap__mvp" aria-label="${j.stats.mvp} veces MVP">🏆 ×${j.stats.mvp}</span>` : ''}
       </div>
     `).join('')
     : Array.from({ length: SKELETONS_DEFAULT }, () => `
@@ -550,7 +554,7 @@ function buildModalPartido(j) {
         <div class="modal__teams">${nombreCanonico(j.local)} <span style="color:rgba(31,224,101,.3)">·vs·</span> ${nombreCanonico(j.visitante)}</div>
         <div class="modal__score">${j.goles_local} – ${j.goles_visitante}</div>
       </div>
-      ${j.mvp ? `<div class="modal__mvp">🏆 MVP: <span>${nombreCanonico(j.mvp)}</span></div>` : ''}
+      ${nombreMVP(j) ? `<button class="modal__mvp" type="button" data-abrir-mvp="${j.numero}">🏆 MVP: <span>${nombreMVP(j)}</span></button>` : ''}
       ${buildGoleadoresAsistentes(j)}
       ${j.mensaje ? `<div class="modal__msg">${fmtMsg(j.mensaje)}</div>` : ''}
       ${videoHtml}

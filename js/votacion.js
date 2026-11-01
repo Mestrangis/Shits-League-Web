@@ -151,8 +151,11 @@ function abrirDesglose(id) {
 // elemento, la card que vuelve al centro tras el swipe aparecería de golpe sin
 // su transición de rebote.
 function refrescarVoto(v) {
-  const article = document.querySelector(`.voto[data-id="${CSS.escape(v.id)}"]`);
-  if (!article) return;
+  // Puede estar en la pestaña y en «Pendientes» de Inicio a la vez
+  document.querySelectorAll(`.voto[data-id="${CSS.escape(v.id)}"]`).forEach(article => refrescarVotoEn(article, v));
+}
+
+function refrescarVotoEn(article, v) {
   const voto = votoDe(v, getSessionPlayer());
   const nSi = v.jugadores_si.length, nNo = v.jugadores_no.length;
 
@@ -196,15 +199,18 @@ async function votar(id, voto) {
   ultimoVotoEnviado = Date.now();
   aplicarVoto(v, nombre, voto);
   refrescarVoto(v);
+  actualizarPendientes();
 
   try {
     await postVoto(id, nombre, voto);
   } catch (e) {
-    // Solo falla si la petición ni siquiera salió (sin conexión): deshacemos
+    // No se ha guardado: se deshace y se avisa, y se puede volver a votar
     console.warn('[votacion] No se pudo enviar el voto:', e);
     v.jugadores_si = antes.si;
     v.jugadores_no = antes.no;
     refrescarVoto(v);
+    actualizarPendientes();
+    avisoApp(e.message);
   }
 }
 

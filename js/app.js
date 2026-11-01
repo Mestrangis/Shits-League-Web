@@ -8,6 +8,7 @@ let STATE = {
   activeTab:        'inicio',
   proximosPartidos: [],
   votaciones:       [],
+  mvps:             null, // filas de la hoja MVPs; null: aún no se han podido leer
   season:           '25-26',
   alias:            {}, // nombre normalizado (propio o alias) → nombre canónico
   jugadoresBase:    [], // jugadores tal cual vienen de la hoja (sin stats)
@@ -22,7 +23,7 @@ function guardarDatos() {
   try {
     localStorage.setItem(DATOS_GUARDADOS_KEY, JSON.stringify({
       t: Date.now(), jugadores: STATE.jugadoresBase, jornadas: STATE.jornadas,
-      proximos: STATE.proximosPartidos, votaciones: STATE.votaciones,
+      proximos: STATE.proximosPartidos, votaciones: STATE.votaciones, mvps: STATE.mvps,
     }));
   } catch { /* sin espacio o sin almacenamiento: la próxima vez, por la red */ }
 }
@@ -38,6 +39,7 @@ function restaurarDatosAhora() {
     STATE.jugadoresBase = d.jugadores;
     STATE.jornadas = d.jornadas;
     STATE.alias = construirAlias(STATE.jugadoresBase);
+    STATE.mvps = d.mvps ? combinarMVPs(d.mvps) : null;
     STATE.jugadores = calcularStats(STATE.jugadoresBase, STATE.jornadas);
     STATE.proximosPartidos = d.proximos ?? [];
     STATE.votaciones = d.votaciones ?? [];
@@ -47,11 +49,12 @@ function restaurarDatosAhora() {
 
 async function loadData() {
   // Todo desde Sheets en paralelo — cero archivos locales de datos
-  const [jugadores, jornadas, proximos, votaciones] = await Promise.all([
+  const [jugadores, jornadas, proximos, votaciones, mvps] = await Promise.all([
     fetchJugadores(),
     fetchJornadas(),
     fetchProximosPartidos(5),
     fetchVotaciones(),
+    fetchMVPs(),
   ]);
 
   // Si una lectura falla (null) se conservan los datos que ya había: un
@@ -59,6 +62,7 @@ async function loadData() {
   if (jornadas)  STATE.jornadas      = jornadas;
   if (jugadores) STATE.jugadoresBase = jugadores;
   STATE.alias     = construirAlias(STATE.jugadoresBase);
+  if (mvps) STATE.mvps = combinarMVPs(mvps, true);
   STATE.jugadores = calcularStats(STATE.jugadoresBase, STATE.jornadas);
   if (proximos)  STATE.proximosPartidos = proximos;
   // No pisar un voto optimista que el Apps Script quizá aún no ha escrito
@@ -118,13 +122,13 @@ async function refrescarVotaciones() {
   rerenderPanel('votacion');
 }
 
-// Intervalo de 30 s solo con la pestaña Votación activa y la página visible
+// Intervalo de 30 s solo con la pestaña Votación o MVP activa y la página visible
 function actualizarRefrescoVotaciones() {
-  const toca = STATE.activeTab === 'votacion'
+  const toca = (STATE.activeTab === 'votacion' || STATE.activeTab === 'mvp')
     && STATE.season === '25-26'
     && document.visibilityState === 'visible';
   if (toca && !timerVotaciones) {
-    timerVotaciones = setInterval(refrescarVotaciones, VOTACIONES_REFRESCO_MS);
+    timerVotaciones = setInterval(() => (STATE.activeTab === 'mvp' ? refrescarMVPs() : refrescarVotaciones()), VOTACIONES_REFRESCO_MS);
   } else if (!toca && timerVotaciones) {
     clearInterval(timerVotaciones);
     timerVotaciones = null;
@@ -207,8 +211,8 @@ function calcularStats(jugadores, jornadas) {
     aplicarResultado(j.jugadores_local,     j.capitan_local,     resultLocal);
     aplicarResultado(j.jugadores_visitante, j.capitan_visitante, resultVisitante);
 
-    const mvp = resolverNombre(j.mvp);
-    if (mvp) stats[mvp].mvp++;
+    const mvp = nombreMVP(j);
+    if (stats[mvp]) stats[mvp].mvp++;
 
     j.goleadores.forEach(g => { const n = resolverNombre(g.nombre); if (n) stats[n].goles += g.cantidad; });
     j.asistentes.forEach(a => { const n = resolverNombre(a.nombre); if (n) stats[n].asistencias += a.cantidad; });
@@ -221,12 +225,56 @@ function calcularStats(jugadores, jornadas) {
 function initHero() {
   const el = document.getElementById('hero-section');
   if (!el) return;
+  // Un arrastre en «Pendientes» no se corta: lo nuevo se pinta con el siguiente refresco
+  if (el.querySelector('.voto-card.is-dragging')) return;
   el.innerHTML = renderHeroSection(STATE.jugadores, STATE.jornadas);
+  pendientesHtml = null;
+  actualizarPendientes();
+}
+
+// Bloques de Inicio que llevan a otra parte, con el mismo aspecto: abren su pestaña o el partido
+function initBloquesInicio() {
+  const activar = el => {
+    if (el.dataset.abrirMvp) {
+      closeModal('modal');
+      abrirMVP(Number(el.dataset.abrirMvp));
+    } else if (el.dataset.abrirPartido) {
+      openModalPartido(el.dataset.abrirPartido, el.dataset.fecha);
+    } else if (el.dataset.ir) {
+      switchTab(el.dataset.ir);
+      document.querySelector('.main').scrollIntoView({ block: 'start', behavior: 'instant' });
+    }
+  };
+  const SELECTOR = '[data-abrir-mvp], [data-abrir-partido], [data-ir]';
+  document.addEventListener('click', e => {
+    const el = e.target.closest(SELECTOR);
+    if (el) activar(el);
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    if (e.target.matches?.(SELECTOR) && e.target.tagName !== 'BUTTON') { e.preventDefault(); activar(e.target); }
+  });
+}
+
+// Aviso breve abajo de la pantalla
+let avisoTimer = 0;
+function avisoApp(texto, tipo = 'error') {
+  let el = document.getElementById('avisoApp');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'avisoApp';
+    el.setAttribute('role', 'status');
+    document.body.appendChild(el);
+  }
+  el.textContent = texto;
+  el.className = `aviso-app aviso-app--${tipo} visible`;
+  clearTimeout(avisoTimer);
+  avisoTimer = setTimeout(() => el.classList.remove('visible'), 4000);
 }
 
 /* ── Tabs ────────────────────────────────────────────────────────────────── */
 // Rush va la primera (a la izquierda de Inicio); la app sigue abriéndose en Inicio
-const TABS = ['rush', 'inicio', 'votacion', 'resumen', 'clasificacion', 'goleadores', 'asistentes', 'plantilla'];
+const TABS = ['rush', 'inicio', 'votacion', 'mvp', 'resumen', 'clasificacion', 'goleadores', 'asistentes', 'plantilla'];
 
 // Móvil: en la pestaña Rush se oculta la cabecera grande (hero). Se guarda el
 // scroll de las demás pestañas para devolverlo igual al salir de Rush.
@@ -270,6 +318,9 @@ function switchTab(name, { desde } = {}) {
   const scrollAntes = window.scrollY;   // antes de cambiar de panel (luego puede quedar recortado)
   const saliente = document.getElementById(`panel-${anterior}`);
   STATE.activeTab = name;
+  if (anterior === 'mvp') mvpElegida = null;   // al volver, la jornada de por defecto
+  if (name === 'mvp') document.getElementById('panel-mvp').dataset.rendered = '';   // siempre con la jornada que toca
+  actualizarPendientes();
 
   document.querySelectorAll('.tab').forEach(t => {
     const activa = t.dataset.tab === name;
@@ -450,6 +501,10 @@ function renderTabIfNeeded(name) {
     case 'votacion':
       panel.innerHTML = renderVotacion(STATE.votaciones, getSessionPlayer());
       break;
+    case 'mvp':
+      panel.innerHTML = renderMVP(jugadorSesionMVP());
+      pintarReparto(panel);
+      break;
     case 'resumen':
       panel.innerHTML = renderResumen(STATE.jugadores, STATE.jornadas);
       break;
@@ -488,6 +543,10 @@ function bindPanel(panel, name) {
       bindVotacion(panel);
       panel.dataset.bound = '1';
     }
+  }
+  if (name === 'mvp' && !panel.dataset.bound) {
+    bindMVP(panel);
+    panel.dataset.bound = '1';
   }
   if (name === 'resumen') {
     panel.querySelectorAll('.result-row').forEach(row => {
@@ -703,6 +762,8 @@ async function init() {
   initSession();
   initSwipeTabs();
   initPullToRefresh();
+  initBloquesInicio();
+  bindVotacion(document.getElementById('hero-section'));   // las cartas de «Pendientes»
 
   // Lo guardado de la última vez se pinta ya y lo fresco de Sheets llega detrás. Sin nada
   // guardado (la primera vez) se espera a Sheets. Nada de Rush compite con esto: Rush no
@@ -748,6 +809,7 @@ async function init() {
     if (document.visibilityState !== 'visible') return;
     // Al volver a la app: votaciones al día y stats si llevan más de 5 min
     if (STATE.activeTab === 'votacion') refrescarVotaciones();
+    if (STATE.activeTab === 'mvp') refrescarMVPs();
     recargarSiCaducado();
   });
   actualizarRefrescoVotaciones();
@@ -760,7 +822,9 @@ async function init() {
 // Lo llama session.js; re-renderiza lo que depende del jugador logueado
 function onSessionChange() {
   rerenderPanel('votacion');
+  rerenderPanel('mvp');
   rerenderPanel('rush');
+  actualizarPendientes();
   if (typeof rushVerificarAcceso === 'function') rushVerificarAcceso();
 }
 

@@ -11,8 +11,9 @@ const SHEETS_KEY = 'AIzaSyC5TLnk-zGTAia4HZNvv77PgY2FtXYfhdc';
 const SHEET_JUGADORES = 'Jugadores';
 const SHEET_JORNADAS  = 'Jornadas';
 const SHEET_VOTACIONES = 'Votaciones';
+const SHEET_MVPS = 'MVPs';
 
-// Apps Script de votaciones (solo escritura de votos)
+// Apps Script de votaciones (solo escritura de votos; apps-script/votos.gs)
 const VOTOS_GAS_URL    = 'https://script.google.com/macros/s/AKfycbyEujGUhTzs9F9a-5sLUr47yUMmMLBUL8wTnUxk8aRoPlyR_0ukfgSXtUjm8M-MWadkSA/exec';
 const VOTOS_GAS_SECRET = 'pissleague';
 
@@ -72,6 +73,7 @@ async function fetchJornadas() {
       goles_local:     parseInt(r.goles_local)     || 0,
       visitante:       r.visitante    || '',
       goles_visitante: parseInt(r.goles_visitante) || 0,
+      con_resultado:   r.goles_local !== '' && r.goles_visitante !== '',
       jugadores_local:     splitNombres(r.jugadores_local),
       capitan_local:       r.capitan_local     || '',
       jugadores_visitante: splitNombres(r.jugadores_visitante),
@@ -110,15 +112,52 @@ async function fetchVotaciones() {
   }
 }
 
-// voto: 'si' | 'no'. Con no-cors la respuesta es opaca: no sabemos si el
-// Apps Script lo guardó, solo si la petición salió. La UI actualiza en optimista.
-async function postVoto(id, nombre, voto) {
-  await fetch(VOTOS_GAS_URL, {
-    method: 'POST',
-    mode: 'no-cors',
-    headers: { 'Content-Type': 'text/plain' },
-    body: JSON.stringify({ secret: VOTOS_GAS_SECRET, action: 'votar', id, nombre, voto }),
-  });
+// ── MVPs ──────────────────────────────────────────────────────────────────
+// Pestaña: jornada | votante | voto_1 | puntos_1 | voto_2 | puntos_2 | voto_3 | puntos_3 | fecha_voto
+// Devuelve null si no se ha podido leer. Sin la hoja todavía (HTTP 400): aún no hay votos.
+async function fetchMVPs() {
+  try {
+    const rows = await sheetsFetch(SHEET_MVPS);
+    return rows.filter(r => r.jornada && r.votante).map(r => ({
+      jornada: parseInt(r.jornada),
+      votante: r.votante,
+      votos:   [1, 2, 3].filter(i => r[`voto_${i}`]).map(i => ({ nombre: r[`voto_${i}`], puntos: parseInt(r[`puntos_${i}`]) || 0 })),
+      fecha:   r.fecha_voto || '',
+    }));
+  } catch (e) {
+    if (String(e.message).includes('HTTP 400')) return [];
+    console.warn('[sheets] fetchMVPs:', e);
+    return null;
+  }
+}
+
+// Texto plano: no necesita preflight y el Apps Script deja leer su respuesta.
+// Lanza un error con un mensaje para el jugador si no se ha guardado; delServidor: lo ha rechazado él
+async function postScript(datos) {
+  let res;
+  try {
+    res = await fetch(VOTOS_GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ secret: VOTOS_GAS_SECRET, ...datos }),
+    });
+  } catch {
+    throw new Error('No se ha podido enviar. Revisa la conexión e inténtalo otra vez.');
+  }
+  const r = await res.json().catch(() => null);
+  if (!r) throw new Error('No se ha podido confirmar el voto. Inténtalo otra vez.');
+  if (!r.ok) throw Object.assign(new Error(r.error || 'No se ha podido guardar el voto.'), { delServidor: true });
+  return r;
+}
+
+// voto: 'si' | 'no'
+function postVoto(id, nombre, voto) {
+  return postScript({ action: 'votar', id, nombre, voto });
+}
+
+// votos: [{ nombre, puntos }]
+function postVotoMVP(jornada, votante, votos) {
+  return postScript({ action: 'votarMVP', jornada, votante, votos });
 }
 
 function splitNombres(str) {
