@@ -39,7 +39,7 @@ function restaurarDatosAhora() {
     STATE.jugadoresBase = d.jugadores;
     STATE.jornadas = d.jornadas;
     STATE.alias = construirAlias(STATE.jugadoresBase);
-    STATE.mvps = d.mvps ? combinarMVPs(d.mvps) : null;
+    STATE.mvps = d.mvps ?? null;
     STATE.jugadores = calcularStats(STATE.jugadoresBase, STATE.jornadas);
     STATE.proximosPartidos = d.proximos ?? [];
     STATE.votaciones = d.votaciones ?? [];
@@ -48,13 +48,14 @@ function restaurarDatosAhora() {
 }
 
 async function loadData() {
+  mvpLeyendo++;
   // Todo desde Sheets en paralelo — cero archivos locales de datos
   const [jugadores, jornadas, proximos, votaciones, mvps] = await Promise.all([
     fetchJugadores(),
     fetchJornadas(),
     fetchProximosPartidos(5),
     fetchVotaciones(),
-    fetchMVPs(),
+    leerMVPs(),
   ]);
 
   // Si una lectura falla (null) se conservan los datos que ya había: un
@@ -62,7 +63,8 @@ async function loadData() {
   if (jornadas)  STATE.jornadas      = jornadas;
   if (jugadores) STATE.jugadoresBase = jugadores;
   STATE.alias     = construirAlias(STATE.jugadoresBase);
-  if (mvps) STATE.mvps = combinarMVPs(mvps, true);
+  mvpLeyendo--;
+  if (mvps) STATE.mvps = mvps;
   STATE.jugadores = calcularStats(STATE.jugadoresBase, STATE.jornadas);
   if (proximos)  STATE.proximosPartidos = proximos;
   // No pisar un voto optimista que el Apps Script quizá aún no ha escrito
@@ -228,7 +230,7 @@ function initHero() {
   // Un arrastre en «Pendientes» no se corta: lo nuevo se pinta con el siguiente refresco
   if (el.querySelector('.voto-card.is-dragging')) return;
   el.innerHTML = renderHeroSection(STATE.jugadores, STATE.jornadas);
-  pendientesHtml = null;
+  pendientesPila = pendientesMvp = null;
   actualizarPendientes();
 }
 
@@ -237,7 +239,7 @@ function initBloquesInicio() {
   const activar = el => {
     if (el.dataset.abrirMvp) {
       closeModal('modal');
-      abrirMVP(Number(el.dataset.abrirMvp));
+      abrirMVP(el.dataset.abrirMvp);
     } else if (el.dataset.abrirPartido) {
       openModalPartido(el.dataset.abrirPartido, el.dataset.fecha);
     } else if (el.dataset.ir) {
@@ -319,7 +321,9 @@ function switchTab(name, { desde } = {}) {
   const saliente = document.getElementById(`panel-${anterior}`);
   STATE.activeTab = name;
   if (anterior === 'mvp') mvpElegida = null;   // al volver, la jornada de por defecto
-  if (name === 'mvp') document.getElementById('panel-mvp').dataset.rendered = '';   // siempre con la jornada que toca
+  if (name === 'mvp') document.getElementById('panel-mvp').dataset.rendered = '';   // siempre con el partido que toca
+  // La pestaña MVP y el aviso de Inicio, con la hoja recién leída
+  if (name === 'mvp' || (name === 'inicio' && getSessionPlayer())) leerHojaMVP();
   actualizarPendientes();
 
   document.querySelectorAll('.tab').forEach(t => {
@@ -610,10 +614,9 @@ function startCountdown(fechaIso) {
 }
 
 /* ── Modal partido ───────────────────────────────────────────────────────── */
+// Por la fecha: los números de jornada se repiten entre temporadas
 function openModalPartido(jornadaKey, fecha) {
-  const j = jornadaKey === 'ami'
-    ? STATE.jornadas.find(x => x.amistoso && x.fecha === fecha)
-    : STATE.jornadas.find(x => String(x.numero) === String(jornadaKey));
+  const j = STATE.jornadas.find(x => x.fecha === fecha && !!x.amistoso === (jornadaKey === 'ami'));
   if (!j) return;
   const box = document.getElementById('modalBox');
   box.innerHTML = buildModalPartido(j);
@@ -809,7 +812,7 @@ async function init() {
     if (document.visibilityState !== 'visible') return;
     // Al volver a la app: votaciones al día y stats si llevan más de 5 min
     if (STATE.activeTab === 'votacion') refrescarVotaciones();
-    if (STATE.activeTab === 'mvp') refrescarMVPs();
+    if (STATE.activeTab === 'mvp' || (STATE.activeTab === 'inicio' && getSessionPlayer())) leerHojaMVP();
     recargarSiCaducado();
   });
   actualizarRefrescoVotaciones();

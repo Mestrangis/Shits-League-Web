@@ -236,7 +236,7 @@ function renderSpotifyCard() {
 function renderHeroSection(jugadores, jornadas) {
   const ligas      = jornadas.filter(j => !j.amistoso);
   const totalGoles = jornadas.reduce((s,j) => s + j.goles_local + j.goles_visitante, 0);
-  const lastMatch  = [...ligas].sort((a,b) => b.numero - a.numero)[0] || jornadas[0];
+  const lastMatch  = [...ligas].sort((a,b) => b.fecha.localeCompare(a.fecha))[0] || jornadas[0];
 
   return `
     <div class="hero__left">
@@ -284,7 +284,7 @@ function renderLastMatch(j) {
   const mvp = nombreMVP(j);
 
   return `
-    <div class="last-match" data-abrir-partido="${j.numero ?? 'ami'}" data-fecha="${j.fecha}" role="button" tabindex="0" aria-label="Ver el detalle del partido">
+    <div class="last-match" data-abrir-partido="${j.amistoso ? 'ami' : 'oficial'}" data-fecha="${j.fecha}" role="button" tabindex="0" aria-label="Ver el detalle del partido">
       <div class="last-match__glow"></div>
       <div class="last-match__header">
         <span class="last-match__tag">${tag}</span>
@@ -306,7 +306,7 @@ function renderLastMatch(j) {
         </div>
       </div>
       ${j.mensaje ? `<div class="last-match__msg">${fmtMsg(j.mensaje)}</div>` : ''}
-      ${mvp ? `<button class="last-match__mvp" type="button" data-abrir-mvp="${j.numero}">🏆 MVP: <span>${mvp}</span></button>` : ''}
+      ${mvp ? `<button class="last-match__mvp" type="button" data-abrir-mvp="${j.fecha}">🏆 MVP: <span>${mvp}</span></button>` : ''}
     </div>
   `;
 }
@@ -315,7 +315,7 @@ function renderLastMatch(j) {
    RESUMEN TAB
 ═══════════════════════════════════════════════ */
 function renderResumen(jugadores, jornadas) {
-  const ligas     = jornadas.filter(j => !j.amistoso).sort((a,b) => b.numero - a.numero);
+  const ligas     = jornadas.filter(j => !j.amistoso).sort((a,b) => b.fecha.localeCompare(a.fecha));
   const amistosos = jornadas.filter(j =>  j.amistoso).sort((a,b) => new Date(b.fecha) - new Date(a.fecha));
 
   const totalGoles = jornadas.reduce((s,j) => s + j.goles_local + j.goles_visitante, 0);
@@ -392,7 +392,7 @@ function resultRow(j) {
   };
 
   return `
-    <article class="result-row" data-jornada="${j.numero ?? 'ami'}" data-fecha="${j.fecha}" role="button" tabindex="0">
+    <article class="result-row" data-jornada="${j.amistoso ? 'ami' : j.numero}" data-fecha="${j.fecha}" role="button" tabindex="0">
       <div class="result-row__meta">
         ${jLabel}
         <span class="result-row__date">${fmtFechaCorta(j.fecha)}</span>
@@ -554,7 +554,7 @@ function buildModalPartido(j) {
         <div class="modal__teams">${nombreCanonico(j.local)} <span style="color:rgba(31,224,101,.3)">·vs·</span> ${nombreCanonico(j.visitante)}</div>
         <div class="modal__score">${j.goles_local} – ${j.goles_visitante}</div>
       </div>
-      ${nombreMVP(j) ? `<button class="modal__mvp" type="button" data-abrir-mvp="${j.numero}">🏆 MVP: <span>${nombreMVP(j)}</span></button>` : ''}
+      ${nombreMVP(j) ? `<button class="modal__mvp" type="button" data-abrir-mvp="${j.fecha}">🏆 MVP: <span>${nombreMVP(j)}</span></button>` : ''}
       ${buildGoleadoresAsistentes(j)}
       ${j.mensaje ? `<div class="modal__msg">${fmtMsg(j.mensaje)}</div>` : ''}
       ${videoHtml}

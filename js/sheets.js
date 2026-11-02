@@ -68,7 +68,7 @@ async function fetchJornadas() {
     const rows = await sheetsFetch(SHEET_JORNADAS);
     return rows.map(r => ({
       numero:          r.numero ? parseInt(r.numero) : null,
-      fecha:           r.fecha        || '',
+      fecha:           normalizarFecha(r.fecha),
       local:           r.local        || '',
       goles_local:     parseInt(r.goles_local)     || 0,
       visitante:       r.visitante    || '',
@@ -113,16 +113,18 @@ async function fetchVotaciones() {
 }
 
 // ── MVPs ──────────────────────────────────────────────────────────────────
-// Pestaña: jornada | votante | voto_1 | puntos_1 | voto_2 | puntos_2 | voto_3 | puntos_3 | fecha_voto
-// Devuelve null si no se ha podido leer. Sin la hoja todavía (HTTP 400): aún no hay votos.
+// Pestaña: fecha_partido | jornada | votante | voto_1 | puntos_1 | voto_2 | puntos_2 | voto_3 | puntos_3 | fecha_voto
+// Devuelve null si no se ha podido leer. Sin la hoja (HTTP 400): no hay votos. El número de jornada
+// es solo informativo: las filas de antes de fecha_partido solo lo llevan a él (mvp.js → fechaDeFila).
 async function fetchMVPs() {
   try {
     const rows = await sheetsFetch(SHEET_MVPS);
-    return rows.filter(r => r.jornada && r.votante).map(r => ({
-      jornada: parseInt(r.jornada),
+    return rows.filter(r => (r.fecha_partido || r.jornada) && r.votante).map(r => ({
+      fecha_partido: normalizarFecha(r.fecha_partido),
+      jornada: r.jornada ? parseInt(r.jornada) : null,
       votante: r.votante,
       votos:   [1, 2, 3].filter(i => r[`voto_${i}`]).map(i => ({ nombre: r[`voto_${i}`], puntos: parseInt(r[`puntos_${i}`]) || 0 })),
-      fecha:   r.fecha_voto || '',
+      fecha_voto: r.fecha_voto || '',
     }));
   } catch (e) {
     if (String(e.message).includes('HTTP 400')) return [];
@@ -155,9 +157,20 @@ function postVoto(id, nombre, voto) {
   return postScript({ action: 'votar', id, nombre, voto });
 }
 
-// votos: [{ nombre, puntos }]
-function postVotoMVP(jornada, votante, votos) {
-  return postScript({ action: 'votarMVP', jornada, votante, votos });
+// votos: [{ nombre, puntos }]. La jornada, informativa: con ella aún responde un script sin publicar
+function postVotoMVP(fecha, jornada, votante, votos) {
+  return postScript({ action: 'votarMVP', fecha, jornada, votante, votos });
+}
+
+// AAAA-MM-DD a partir de AAAA-M-D o D/M/AAAA, con hora detrás o sin ella. Sin objetos Date: una
+// fecha de partido no tiene zona horaria. Lo que no se entiende se queda como está.
+function normalizarFecha(valor) {
+  const s = String(valor ?? '').trim();
+  const dos = n => n.padStart(2, '0');
+  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) return `${m[1]}-${dos(m[2])}-${dos(m[3])}`;
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  return m ? `${m[3]}-${dos(m[2])}-${dos(m[1])}` : s;
 }
 
 function splitNombres(str) {

@@ -1607,6 +1607,19 @@ body.en-rush .pie-app { display: none; }
   font-size: 14px;
   font-weight: 600;
 }
+.pendientes__mvp:empty { display: none; }
+.pendiente-mvp--rueda { justify-content: center; }
+.mvp-rueda {
+  display: block;
+  width: 40px;
+  height: 40px;
+  margin: 3rem auto;
+  border-radius: 50%;
+  border: 3px solid rgba(31,224,101,.2);
+  border-top-color: var(--verde);
+  animation: ptr-giro .8s linear infinite;
+}
+.mvp-rueda--mini { width: 24px; height: 24px; margin: 4px auto; border-width: 2px; }
 .pendiente-mvp__btn {
   flex-shrink: 0;
   padding: 8px 14px;
@@ -1749,6 +1762,7 @@ body.en-rush .pie-app { display: none; }
 .mvp-enlace { color: var(--verde); font: inherit; font-weight: 700; background: none; border: 0; cursor: pointer; text-decoration: underline; }
 .mvp-cuenta { font-size: 13px; color: #9DC4AD; text-align: center; margin-bottom: 10px; }
 .mvp-cuenta b { color: #fff; }
+.mvp-cuenta small { display: block; margin-top: 4px; font-size: 12px; color: #6E9D81; }
 .mvp-tuvoto {
   padding: 10px 12px;
   border-radius: 12px;

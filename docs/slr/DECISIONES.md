@@ -2300,3 +2300,34 @@ No es de Rush, pero las decisiones se apuntan aquí como las demás.
   - El test usa un código de sesión inventado: Rush lo comprobaba contra Supabase y cerraba la sesión a veces. Supabase va cortado en este banco.
 - **Con la hoja real, solo mirando (sin votar):** sin la hoja `MVPs` todavía, la J16 sale «No hubo votación» y los 15 MVP de la columna siguen contando.
 - **Con el script publicado hoy:** la respuesta se lee sin `no-cors` (probado con un secreto incorrecto: `Unauthorized`, sin escribir nada).
+
+### Cambios tras probarla: por fecha, solo con ficha y la verdad en la hoja
+
+Sustituyen a lo anterior donde no coincidan: el plazo de 3 días, la identificación por número, los jugadores sin ficha y `mvp_votado_<jornada>` ya no existen.
+
+#### Decisiones de Marcos
+
+- **Cada votación es la de la fecha de un partido oficial:** los números se repiten entre temporadas. En la hoja, `fecha_partido`, y la jornada solo como dato.
+- **Abierta:** la del último partido oficial por fecha, hasta que voten todos los que pueden o se juegue otro posterior. Sin plazo de días.
+- **Solo jugadores con ficha** en Jugadores (por nombre o alias) votan, reciben votos y cuentan.
+- **La verdad es el Excel:** la pestaña y el aviso de Inicio leen la hoja al abrirse, con la rueda. Sin la hoja, como si no hubiera votos.
+
+#### Decisiones mías
+
+- **Sin relojes:** ni la web ni el script miran la hora para decidir. Las fechas se pasan a texto `AAAA-MM-DD` (`normalizarFecha`, igual en los dos, sin objetos `Date`) y se comparan como texto: sin zonas horarias de por medio.
+- **«Solo se puede votar el mismo día»:** no se ha podido reproducir. En la hoja real hay un voto guardado el 2 de noviembre para el partido del 1, así que ese día el servidor no lo impedía. Sin plazo, ese fallo ya no puede depender de la fecha.
+- **«Se juega el siguiente» es tener resultado:** un partido apuntado con fecha futura y sin goles no cierra la votación ni pasa a ser el último.
+- **El número tampoco servía fuera de la votación:** el último partido de Inicio, el orden de Resumen y el detalle del partido iban por número y fallarían con la temporada nueva. Ahora van por fecha. Por eso, en Resumen, la J10 sale antes que la J9 en la hoja actual (sus fechas están cambiadas).
+- **Filas viejas:** en una hoja sin `fecha_partido`, la web reconoce cada fila por su número. Con el siguiente voto, el script añade la columna y la rellena. La fecha se escribe como texto para que Sheets no la cambie según el idioma de la hoja.
+- **Filas que no valen** (votante sin ficha o que no jugó, votos a un sin ficha): no cuentan. Si una fila se queda sin votos válidos, ese jugador sigue constando como votado («Tu voto: —»), igual que para el script, hasta que se borre de la hoja.
+- **Sin nada guardado para decidir:** lo votado se suma en memoria con la respuesta del script hasta la siguiente lectura. Una lectura empezada antes de votar se descarta (`mvpEpoca`). Las marcas antiguas se borran al arrancar. Lo guardado de la última vez (`SL_DATOS`) solo pinta la cabecera; el aviso y la pestaña esperan a la hoja.
+- **El aviso de Inicio** enseña la rueda solo a quien jugó el último partido; al resto no le aparece nada. Solo cambia esa parte: las cartas de asistencia no se repintan.
+- **Si no se puede leer la hoja:** con datos de antes se muestran y se avisa; sin ninguno, «No se han podido leer los votos» y «Reintentar». Lo que se envíe lo sigue comprobando el script.
+- **Durante la transición,** la web manda también la jornada, para que un script aún sin publicar siga respondiendo.
+
+#### Pruebas
+
+- **`votos-gs.test.mjs` y `mvp-reglas.test.mjs`:** rehechos para la fecha. Números repetidos, sin plazo, cierre por todos y por un partido posterior, sustitutos, hoja borrada, vacía o antigua, formatos de fecha.
+- **`banco/mvp.mjs`** (360 y 412 px, 240 comprobaciones): dos temporadas con la J1 repetida, cierre al votar el último y por un partido posterior con la pestaña abierta, sustituto con sesión, rueda, borrar una fila y la hoja entera con un voto hecho (vuelve a dejar votar y el script la crea).
+- **Con la hoja real, solo mirando:** J17 abierta, 10 que pueden votar (sin Borja ni Carlos). La fila de prueba de Nico a Borja cuenta como su voto, sin puntos.
+- **`banco/version.mjs` no se puede cortar a medias:** deja sus marcas de prueba en `js/ui.js` y `js/slr/ui.js`. Pasó al limitarle el tiempo; se vio antes del commit y se quitaron.

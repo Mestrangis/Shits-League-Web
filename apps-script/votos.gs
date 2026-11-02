@@ -3,8 +3,7 @@
 const SECRET   = 'pissleague';
 const SHEET_ID = '1EHGrFt2Y3QDCOdSV3fVgWvspzXYcir4SmDxOezdSLRY';
 const ZONA     = 'Europe/Madrid';
-const MVP_DIAS = 3;   // la votación del MVP dura hasta 3 días después de la fecha del partido
-const CABECERA_MVPS = ['jornada', 'votante', 'voto_1', 'puntos_1', 'voto_2', 'puntos_2', 'voto_3', 'puntos_3', 'fecha_voto'];
+const CABECERA_MVPS = ['fecha_partido', 'jornada', 'votante', 'voto_1', 'puntos_1', 'voto_2', 'puntos_2', 'voto_3', 'puntos_3', 'fecha_voto'];
 
 function doPost(e) {
   try {
@@ -50,10 +49,23 @@ function votar(body) {
 }
 
 /* ── MVP ─────────────────────────────────────────────────────────────────── */
+// Cada votación es la de la FECHA de un partido oficial: los números de jornada se repiten
+// entre temporadas. No hay relojes: solo se comparan fechas como texto AAAA-MM-DD.
+
 // Sin tildes, mayúsculas ni emojis: «De la Mano 🏆» y «De la Mano» son el mismo jugador
 function claveNombre(s) {
   return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
     .replace(/[^\p{L}\p{N} ]/gu, '').replace(/\s+/g, ' ').trim();
+}
+
+// AAAA-MM-DD a partir de AAAA-M-D o D/M/AAAA, con hora detrás o sin ella; '' si no es una fecha
+function normalizarFecha(valor) {
+  const s = String(valor || '').trim();
+  const dos = n => String(n).padStart(2, '0');
+  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) return `${m[1]}-${dos(m[2])}-${dos(m[3])}`;
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  return m ? `${m[3]}-${dos(m[2])}-${dos(m[1])}` : '';
 }
 
 // Filas de una hoja como objetos, con los valores tal como se ven (los mismos que lee la web)
@@ -66,9 +78,26 @@ function filasDe(sh) {
 const conResultado = j => j.goles_local !== '' && j.goles_visitante !== '';
 const nombresDe = j => (j.jugadores_local + ',' + j.jugadores_visitante).split(',').map(s => s.trim()).filter(Boolean);
 
-function sumarDias(iso, dias) {
-  const [y, m, d] = iso.split('-').map(Number);
-  return new Date(Date.UTC(y, m - 1, d + dias)).toISOString().slice(0, 10);
+// La hoja MVPs lista para escribir: la crea si no está y le pone la cabecera si está vacía. La de
+// antes (sin fecha_partido) gana esa columna, rellena por el número de jornada de cada fila.
+// La fecha va como texto: si no, Sheets la convierte y la enseña según el idioma de la hoja.
+function hojaMVPs(libro, oficiales) {
+  const sh = libro.getSheetByName('MVPs') || libro.insertSheet('MVPs');
+  const valores = sh.getDataRange().getDisplayValues();
+  const vacia = !valores.length || valores[0].every(c => String(c).trim() === '');
+  if (vacia) {
+    sh.getRange(1, 1, sh.getMaxRows(), 1).setNumberFormat('@');
+    sh.appendRow(CABECERA_MVPS);
+  } else if (String(valores[0][0]).trim() !== 'fecha_partido') {
+    sh.insertColumnBefore(1);
+    sh.getRange(1, 1, sh.getMaxRows(), 1).setNumberFormat('@');
+    sh.getRange(1, 1).setValue('fecha_partido');
+    valores.slice(1).forEach((f, i) => {
+      const j = oficiales.find(x => x.numero === String(f[0]).trim());
+      sh.getRange(i + 2, 1).setValue(j ? j.fecha : '');
+    });
+  }
+  return sh;
 }
 
 function votarMVP(body) {
@@ -77,52 +106,48 @@ function votarMVP(body) {
   try {
     const libro = SpreadsheetApp.openById(SHEET_ID);
 
-    // Nombre canónico de cualquier nombre o alias de la hoja Jugadores
-    const alias = {};
+    // Los que tienen ficha en Jugadores, por nombre o alias → su nombre canónico
+    const fichas = {};
     filasDe(libro.getSheetByName('Jugadores')).forEach(p => {
-      [p.nombre, ...String(p.alias || '').split(',')].forEach(a => { if (claveNombre(a)) alias[claveNombre(a)] = p.nombre; });
+      [p.nombre, ...String(p.alias || '').split(',')].forEach(a => { if (claveNombre(a)) fichas[claveNombre(a)] = p.nombre; });
     });
-    const canonico = n => alias[claveNombre(n)] || String(n || '').trim();
+    const ficha = n => fichas[claveNombre(n)] || null;
 
-    const jornadas = filasDe(libro.getSheetByName('Jornadas'));
-    const numero = String(body.jornada ?? '').trim();
-    const j = jornadas.find(x => x.numero !== '' && x.numero === numero);
-    if (!j) return { ok: false, error: 'Esa jornada no existe' };
-    if (j.amistoso === 'TRUE') return { ok: false, error: 'Los amistosos no tienen MVP' };
-
-    // Abierta: con resultado, hasta 3 días después del partido y sin otra oficial posterior con resultado
-    if (!conResultado(j)) return { ok: false, error: 'Ese partido aún no tiene resultado' };
-    const hoy = Utilities.formatDate(new Date(), ZONA, 'yyyy-MM-dd');
-    const posterior = jornadas.some(x => x.amistoso !== 'TRUE' && Number(x.numero) > Number(numero) && conResultado(x));
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(j.fecha) || hoy > sumarDias(j.fecha, MVP_DIAS) || posterior) {
-      return { ok: false, error: 'La votación de esa jornada ya está cerrada' };
+    const jornadas = filasDe(libro.getSheetByName('Jornadas')).map(x => ({ ...x, fecha: normalizarFecha(x.fecha) }));
+    const oficiales = jornadas.filter(x => x.amistoso !== 'TRUE' && x.fecha);
+    const fecha = normalizarFecha(body.fecha);
+    const j = fecha && oficiales.find(x => x.fecha === fecha);
+    if (!j) {
+      const amistoso = fecha && jornadas.some(x => x.amistoso === 'TRUE' && x.fecha === fecha);
+      return { ok: false, error: amistoso ? 'Los amistosos no tienen MVP' : 'Ese partido no existe' };
     }
 
-    const jugaron = new Set(nombresDe(j).map(n => claveNombre(canonico(n))));
-    const votante = canonico(body.votante);
-    const claveVotante = claveNombre(votante);
-    if (!claveVotante || !jugaron.has(claveVotante)) return { ok: false, error: 'Solo votan los que jugaron ese partido' };
+    // Abierta: el último partido oficial jugado. Si todos han votado, el votante ya es uno de ellos
+    if (!conResultado(j)) return { ok: false, error: 'Ese partido aún no tiene resultado' };
+    if (oficiales.some(x => x.fecha > fecha && conResultado(x))) return { ok: false, error: 'La votación de ese partido ya está cerrada' };
+
+    // Solo los jugadores del partido con ficha
+    const jugaron = new Set(nombresDe(j).map(ficha).filter(Boolean).map(claveNombre));
+    const votante = ficha(body.votante);
+    if (!votante || !jugaron.has(claveNombre(votante))) return { ok: false, error: 'Solo votan los jugadores con ficha que jugaron ese partido' };
 
     const votos = Array.isArray(body.votos) ? body.votos : [];
     if (!votos.length || votos.length > 3) return { ok: false, error: 'Hay que votar a entre uno y tres jugadores' };
-    const claves = votos.map(v => claveNombre(canonico(v.nombre)));
+    const votados = votos.map(v => ficha(v.nombre));
+    const claves = votados.map(claveNombre);
     if (new Set(claves).size !== claves.length) return { ok: false, error: 'No se puede votar dos veces al mismo jugador' };
-    if (claves.includes(claveVotante)) return { ok: false, error: 'No puedes votarte a ti mismo' };
-    if (claves.some(c => !c || !jugaron.has(c))) return { ok: false, error: 'Solo se puede votar a los que jugaron ese partido' };
+    if (claves.includes(claveNombre(votante))) return { ok: false, error: 'No puedes votarte a ti mismo' };
+    if (votados.some(n => !n || !jugaron.has(claveNombre(n)))) return { ok: false, error: 'Solo se puede votar a jugadores con ficha que jugaron ese partido' };
     if (votos.some(v => ![1, 2, 3].includes(v.puntos))) return { ok: false, error: 'Cada votado lleva 1, 2 o 3 puntos' };
     if (votos.reduce((s, v) => s + v.puntos, 0) !== 3) return { ok: false, error: 'Los puntos tienen que sumar exactamente 3' };
 
-    let sh = libro.getSheetByName('MVPs');
-    if (!sh) {
-      sh = libro.insertSheet('MVPs');
-      sh.appendRow(CABECERA_MVPS);
-    }
-    const repetido = filasDe(sh).some(f => f.jornada === numero && claveNombre(canonico(f.votante)) === claveVotante);
-    if (repetido) return { ok: false, error: 'Ya has votado en esta jornada' };
+    const sh = hojaMVPs(libro, oficiales);
+    const repetido = filasDe(sh).some(f => normalizarFecha(f.fecha_partido) === fecha && claveNombre(ficha(f.votante) || f.votante) === claveNombre(votante));
+    if (repetido) return { ok: false, error: 'Ya has votado en este partido' };
 
-    const ordenados = votos.map(v => [canonico(v.nombre), v.puntos]).sort((a, b) => b[1] - a[1]);
+    const ordenados = votos.map((v, i) => [votados[i], v.puntos]).sort((a, b) => b[1] - a[1]);
     const celdas = [0, 1, 2].flatMap(i => ordenados[i] || ['', '']);
-    sh.appendRow([Number(numero), votante, ...celdas, Utilities.formatDate(new Date(), ZONA, 'yyyy-MM-dd HH:mm:ss')]);
+    sh.appendRow([fecha, j.numero, votante, ...celdas, Utilities.formatDate(new Date(), ZONA, 'yyyy-MM-dd HH:mm:ss')]);
     return { ok: true, mensaje: 'Voto guardado' };
   } finally {
     lock.releaseLock();

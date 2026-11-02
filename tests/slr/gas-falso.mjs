@@ -9,7 +9,7 @@ export const CAB_JUGADORES = ['nombre', 'rating', 'pos', 'bandera', 'carta_url',
 export const CAB_JORNADAS = ['numero', 'fecha', 'local', 'goles_local', 'visitante', 'goles_visitante', 'jugadores_local', 'capitan_local',
   'jugadores_visitante', 'capitan_visitante', 'goleadores', 'asistentes', 'mensaje', 'video_url', 'amistoso', 'imagen_url', 'mvp'];
 export const CAB_VOTACIONES = ['id', 'fecha', 'hora', 'lugar', 'imagen_url', 'jugadores_si', 'jugadores_no'];
-export const CAB_MVPS = ['jornada', 'votante', 'voto_1', 'puntos_1', 'voto_2', 'puntos_2', 'voto_3', 'puntos_3', 'fecha_voto'];
+export const CAB_MVPS = ['fecha_partido', 'jornada', 'votante', 'voto_1', 'puntos_1', 'voto_2', 'puntos_2', 'voto_3', 'puntos_3', 'fecha_voto'];
 
 export const fila = (cabecera, datos) => cabecera.map(c => String(datos[c] ?? ''));
 
@@ -27,7 +27,15 @@ export function crearGas(hojas) {
       getValues: () => hojas[nombre].map(f => [...f]),
       getDisplayValues: () => hojas[nombre].map(f => f.map(String)),
     }),
-    getRange: (f, c) => ({ setValue: v => { hojas[nombre][f - 1][c - 1] = String(v); } }),
+    getMaxRows: () => 1000,
+    getRange: (f, c) => ({
+      setValue: v => {
+        while (hojas[nombre].length < f) hojas[nombre].push([]);
+        hojas[nombre][f - 1][c - 1] = String(v);
+      },
+      setNumberFormat() {},
+    }),
+    insertColumnBefore: () => { hojas[nombre].forEach(f => f.unshift('')); },
     appendRow: valores => { hojas[nombre].push(valores.map(String)); },
   });
   const libro = {

@@ -1,21 +1,28 @@
 /* ═══════════════════════════════════════════════
    SHITS LEAGUE — mvp.js
-   Votación del MVP de cada jornada oficial: reglas (quién vota, cuándo está
+   Votación del MVP de cada partido oficial: reglas (quién vota, cuándo está
    abierta, quién gana), pestaña MVP y bloque «Pendientes» de Inicio.
-   Los votos están en la hoja MVPs y se escriben con el Apps Script (votarMVP),
-   que comprueba todo otra vez. La columna «mvp» de Jornadas manda sobre los votos.
+   Cada votación es la de la FECHA de un partido (los números de jornada se repiten
+   entre temporadas). La verdad es la hoja MVPs: se lee fresca al abrir la pestaña y
+   el aviso de Inicio, y se escribe con el Apps Script (votarMVP), que comprueba todo
+   otra vez. La columna «mvp» de Jornadas manda sobre los votos.
 ═══════════════════════════════════════════════ */
 
-const MVP_DIAS       = 3;              // días después del partido que sigue abierta
-const MVP_FLAG       = 'mvp_votado_';  // localStorage: voto enviado, para pintar rápido
-const MVP_ESPERA_MS  = 60000;          // lo enviado que la hoja aún no devuelve se mantiene este rato
 const MVP_PUNTOS     = 3;
-const MVP_PULSADO_MS = 450;            // mantener pulsada una carta quita un punto
+const MVP_PULSADO_MS = 450;   // mantener pulsada una carta quita un punto
+const MVP_CIERRE     = 'Se cierra cuando voten todos o cuando se juegue el siguiente partido';
 
-let mvpElegida  = null;    // jornada que se está viendo; null: la de por defecto
-let mvpReparto  = { jornada: null, puntos: {} };   // clave del candidato → puntos
-let mvpEnviando = null;    // jornada cuyo voto se está enviando
-let pendientesHtml = null; // lo último pintado en «Pendientes» (no repintar si es igual)
+let mvpElegida  = null;    // fecha del partido que se está viendo; null: el de por defecto
+let mvpReparto  = { fecha: null, puntos: {} };   // clave del candidato → puntos
+let mvpEnviando = null;    // fecha del partido cuyo voto se está enviando
+let mvpLeyendo  = 0;       // lecturas de la hoja en marcha: mientras tanto, la rueda
+let mvpEpoca    = 0;       // sube al votar: una lectura empezada antes ya no vale
+let pendientesPila = null, pendientesMvp = null;   // lo último pintado en «Pendientes»
+
+// El «ya he votado» que se guardaba en el móvil: ya no se usa, la verdad es la hoja
+try {
+  Object.keys(localStorage).filter(k => k.startsWith('mvp_votado_')).forEach(k => localStorage.removeItem(k));
+} catch { /* sin almacenamiento */ }
 
 /* ── Nombres ─────────────────────────────────────────────────────────────── */
 // Sin tildes, mayúsculas ni emojis: «De la Mano 🏆» y «De la Mano» son el mismo jugador
@@ -23,72 +30,80 @@ function claveMVP(nombre) {
   return normalizarNombre(String(nombre ?? '')).replace(/[^\p{L}\p{N} ]/gu, '').replace(/\s+/g, ' ').trim();
 }
 
-function canonMVP(nombre) {
+// Nombre canónico de quien tiene ficha en Jugadores (por nombre o alias); null si no la tiene
+function fichaMVP(nombre) {
   const r = resolverNombre(nombre);
   if (r) return r;
   const k = claveMVP(nombre);
-  return STATE.jugadoresBase.find(j => claveMVP(j.nombre) === k)?.nombre || String(nombre ?? '').trim();
+  return STATE.jugadoresBase.find(j => claveMVP(j.nombre) === k)?.nombre || null;
 }
 
-const jugadorSesionMVP = () => { const n = getSessionPlayer(); return n ? canonMVP(n) : null; };
-const fichaMVP = nombre => STATE.jugadoresBase.find(j => j.nombre === nombre);
+const jugadorSesionMVP = () => { const n = getSessionPlayer(); return n ? fichaMVP(n) : null; };
+const fotoDeFicha = nombre => STATE.jugadoresBase.find(j => j.nombre === nombre)?.img;
 
 /* ── Reglas ──────────────────────────────────────────────────────────────── */
-const jornadasOficiales = () => STATE.jornadas
-  .filter(j => !j.amistoso && j.numero != null)
-  .sort((a, b) => a.numero - b.numero);
+const fechaValida = f => /^\d{4}-\d{2}-\d{2}$/.test(f ?? '');
 
-// Los datos guardados de antes de esta versión no llevan con_resultado: tenían resultado
+// Los partidos oficiales por orden de fecha (las fechas AAAA-MM-DD se comparan como texto:
+// sin horas ni zonas horarias de por medio)
+const partidosOficiales = () => STATE.jornadas
+  .filter(j => !j.amistoso && fechaValida(j.fecha))
+  .sort((a, b) => a.fecha.localeCompare(b.fecha));
+
+// Los datos guardados de antes no llevan con_resultado: tenían resultado
 const tieneResultado = j => j.con_resultado !== false;
 
-// Los que jugaron, sin repetir y con el nombre canónico
+// Los que pueden votar y ser votados: los del partido con ficha, sin repetir
 function plantillaMVP(j) {
   const vistos = new Map();
   [...j.jugadores_local, ...j.jugadores_visitante].forEach(n => {
-    const c = canonMVP(n);
-    if (!vistos.has(claveMVP(c))) vistos.set(claveMVP(c), c);
+    const c = fichaMVP(n);
+    if (c && !vistos.has(claveMVP(c))) vistos.set(claveMVP(c), c);
   });
   return [...vistos.values()];
 }
 
-// El primer momento en que ya está cerrada por la fecha: acaba el tercer día después del partido
-function finPlazoMVP(j) {
-  const f = parseFechaVoto(j.fecha);
-  return f ? new Date(f.getFullYear(), f.getMonth(), f.getDate() + MVP_DIAS + 1) : null;
+const enPlantilla = (j, nombre) => plantillaMVP(j).some(n => claveMVP(n) === claveMVP(nombre));
+
+// Fecha del partido de una fila. Las filas de antes de la columna fecha_partido solo llevan el
+// número: valen mientras la hoja no se ha convertido (el script lo hace con el siguiente voto)
+function fechaDeFila(f) {
+  if (f.fecha_partido) return f.fecha_partido;
+  return partidosOficiales().find(j => j.numero === f.jornada)?.fecha ?? '';
 }
 
-function mvpAbierta(j, ahora = new Date()) {
-  if (j.amistoso || !tieneResultado(j)) return false;
-  const fin = finPlazoMVP(j);
-  if (!fin || ahora >= fin) return false;
-  // Por número: las fechas de la hoja no siempre van en orden
-  return !jornadasOficiales().some(o => o.numero > j.numero && tieneResultado(o));
-}
-
-// Una fila por votante (si se repite en la hoja, vale la primera)
+// Una fila por votante con ficha que jugó (si se repite en la hoja, vale la primera),
+// y solo los votos a jugadores con ficha que jugaron
 function votosDe(j) {
   const vistos = new Set();
-  return (STATE.mvps || []).filter(f => {
-    if (f.jornada !== j.numero) return false;
-    const k = claveMVP(canonMVP(f.votante));
-    if (vistos.has(k)) return false;
-    vistos.add(k);
-    return true;
-  }).map(f => ({ ...f, votante: canonMVP(f.votante), votos: f.votos.map(v => ({ nombre: canonMVP(v.nombre), puntos: v.puntos })) }));
+  const validas = [];
+  (STATE.mvps || []).forEach(f => {
+    if (fechaDeFila(f) !== j.fecha) return;
+    const votante = fichaMVP(f.votante);
+    if (!votante || !enPlantilla(j, votante) || vistos.has(claveMVP(votante))) return;
+    vistos.add(claveMVP(votante));
+    validas.push({ ...f, votante, votos: f.votos
+      .map(v => ({ nombre: fichaMVP(v.nombre), puntos: v.puntos }))
+      .filter(v => v.nombre && enPlantilla(j, v.nombre)) });
+  });
+  return validas;
+}
+
+const hanVotadoTodos = j => votosDe(j).length >= plantillaMVP(j).length;
+
+// Abierta: el último partido oficial jugado, hasta que voten todos o se juegue el siguiente
+function mvpAbierta(j) {
+  if (j.amistoso || !tieneResultado(j) || !fechaValida(j.fecha)) return false;
+  if (partidosOficiales().some(o => o.fecha > j.fecha && tieneResultado(o))) return false;
+  return !hanVotadoTodos(j);
 }
 
 // Todos los candidatos con sus puntos, ya en orden de desempate:
 // puntos → votantes distintos → veces con los 3 puntos de un mismo votante
 function rankingMVP(j) {
-  const filas = new Map();
-  const fila = nombre => {
-    const k = claveMVP(nombre);
-    if (!filas.has(k)) filas.set(k, { nombre, puntos: 0, votantes: [], tres: 0 });
-    return filas.get(k);
-  };
-  plantillaMVP(j).forEach(fila);
+  const filas = new Map(plantillaMVP(j).map(nombre => [claveMVP(nombre), { nombre, puntos: 0, votantes: [], tres: 0 }]));
   votosDe(j).forEach(v => v.votos.forEach(x => {
-    const f = fila(x.nombre);
+    const f = filas.get(claveMVP(x.nombre));
     f.puntos += x.puntos;
     f.votantes.push({ nombre: v.votante, puntos: x.puntos });
     if (x.puntos === 3) f.tres++;
@@ -100,10 +115,10 @@ function rankingMVP(j) {
 const empatanMVP = (a, b) => a.puntos === b.puntos && a.votantes.length === b.votantes.length && a.tres === b.tres;
 
 // { nombre, manual } | { porDecidir: [nombres] } | null
-function resultadoMVP(j, ahora = new Date()) {
+function resultadoMVP(j) {
   if (j.amistoso) return null;
-  if (j.mvp) return { nombre: canonMVP(j.mvp), manual: true };
-  if (mvpAbierta(j, ahora)) return null;
+  if (j.mvp) return { nombre: fichaMVP(j.mvp) || j.mvp, manual: true };
+  if (mvpAbierta(j)) return null;
   const r = rankingMVP(j);
   if (!r[0]?.puntos) return null;
   if (r[1] && empatanMVP(r[0], r[1])) return { porDecidir: r.filter(x => empatanMVP(x, r[0])).map(x => x.nombre) };
@@ -113,104 +128,93 @@ function resultadoMVP(j, ahora = new Date()) {
 const nombreMVP = j => resultadoMVP(j)?.nombre || '';
 
 const miVoto = (j, jugador) => votosDe(j).find(v => claveMVP(v.votante) === claveMVP(jugador)) || null;
-const jugoMVP = (j, jugador) => !!jugador && plantillaMVP(j).some(n => claveMVP(n) === claveMVP(jugador));
 
 // sin-datos | sin-resultado | votar | votado | en-curso | cerrada | sin-votos
-function estadoMVP(j, jugador, ahora = new Date()) {
+function estadoMVP(j, jugador) {
   if (!tieneResultado(j)) return 'sin-resultado';
   if (STATE.mvps === null) return 'sin-datos';
-  if (mvpAbierta(j, ahora)) {
-    if (!jugoMVP(j, jugador)) return 'en-curso';
+  if (mvpAbierta(j)) {
+    if (!jugador || !enPlantilla(j, jugador)) return 'en-curso';
     return miVoto(j, jugador) ? 'votado' : 'votar';
   }
   return votosDe(j).length ? 'cerrada' : 'sin-votos';
 }
 
-const pendienteMVP = jugador => jornadasOficiales().filter(j => estadoMVP(j, jugador) === 'votar');
+const pendienteMVP = jugador => partidosOficiales().filter(j => estadoMVP(j, jugador) === 'votar');
 
-/* ── Lo votado en este dispositivo ───────────────────────────────────────── */
-function leerVotados() {
-  const lista = [];
-  try {
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (!k.startsWith(MVP_FLAG)) continue;
-      try { lista.push({ clave: k, ...JSON.parse(localStorage.getItem(k)) }); } catch { /* una marca rota no cuenta */ }
-    }
-  } catch { /* sin almacenamiento */ }
-  return lista;
+/* ── Leer la hoja ────────────────────────────────────────────────────────── */
+// null: no se ha podido leer, o se ha votado mientras tanto (lo leído ya no vale)
+async function leerMVPs() {
+  const epoca = mvpEpoca;
+  const filas = await fetchMVPs();
+  return epoca === mvpEpoca ? filas : null;
 }
 
-// Suma a las filas lo enviado desde aquí que aún no devuelven. La verdad es la hoja: con filas
-// recién leídas (frescas), lo que no aparece pasado un rato se olvida, y lo que sí, se apunta
-function combinarMVPs(filas, frescas = false) {
-  const hay = (jornada, votante) => filas.some(f => f.jornada === jornada && claveMVP(f.votante) === claveMVP(votante));
-  const resultado = [...filas];
-  leerVotados().forEach(v => {
-    if (hay(v.jornada, v.votante)) return;
-    if (frescas && Date.now() - v.t > MVP_ESPERA_MS) {
-      try { localStorage.removeItem(v.clave); } catch { /* nada */ }
-      return;
-    }
-    resultado.push({ jornada: v.jornada, votante: v.votante, votos: v.votos, fecha: '' });
-  });
-  const yo = frescas && jugadorSesionMVP();
-  if (yo) filas.filter(f => claveMVP(f.votante) === claveMVP(yo)).forEach(f => {
-    try {
-      if (!localStorage.getItem(MVP_FLAG + f.jornada)) {
-        localStorage.setItem(MVP_FLAG + f.jornada, JSON.stringify({ jornada: f.jornada, votante: f.votante, votos: f.votos, t: 0 }));
-      }
-    } catch { /* nada */ }
-  });
-  return resultado;
+// Al abrir la pestaña o el aviso de Inicio: con la rueda hasta que llega la hoja
+async function leerHojaMVP() {
+  if (mvpEnviando != null) return;
+  mvpLeyendo++;
+  repintarMVP();
+  actualizarPendientes();
+  const filas = await leerMVPs();
+  mvpLeyendo--;
+  if (filas && JSON.stringify(filas) !== JSON.stringify(STATE.mvps)) { aplicarMVPs(filas); return; }
+  if (!filas && mvpEnviando == null && !mvpLeyendo && STATE.activeTab === 'mvp') avisoApp('No se han podido actualizar los votos.');
+  repintarMVP();
+  actualizarPendientes();
+}
+
+function aplicarMVPs(filas) {
+  STATE.mvps = filas;
+  STATE.jugadores = calcularStats(STATE.jugadoresBase, STATE.jornadas);
+  guardarDatos();
+  initHero();
+  document.querySelectorAll('.tab-panel:not(#panel-rush)').forEach(p => { p.dataset.rendered = ''; });
+  renderTabIfNeeded(STATE.activeTab);
+}
+
+// Cada 30 s con la pestaña abierta, sin rueda: solo repinta si algo ha cambiado (los puntos repartidos se conservan)
+async function refrescarMVPs() {
+  if (mvpEnviando != null) return;
+  const filas = await leerMVPs();
+  if (filas && mvpEnviando == null && JSON.stringify(filas) !== JSON.stringify(STATE.mvps)) aplicarMVPs(filas);
 }
 
 /* ── Textos ──────────────────────────────────────────────────────────────── */
-function faltaMVP(j, ahora = new Date()) {
-  const fin = finPlazoMVP(j);
-  const min = fin ? Math.max(1, Math.ceil((fin - ahora) / 60000)) : 0;
-  if (min >= 1440) {
-    const d = Math.floor(min / 1440), h = Math.floor((min % 1440) / 60);
-    return `Se cierra en ${d} ${d === 1 ? 'día' : 'días'}${h ? ` y ${h} h` : ''}`;
-  }
-  if (min >= 60) return `Se cierra en ${Math.floor(min / 60)} h ${min % 60} min`;
-  return `Se cierra en ${min} min`;
-}
-
-const textoVoto = votos => votos.map(v => `${v.nombre} ${v.puntos}`).join(' · ');
+const textoVoto = votos => votos.map(v => `${v.nombre} ${v.puntos}`).join(' · ') || '—';
 
 function fotoMVP(nombre, clase) {
-  const img = fichaMVP(nombre)?.img;
+  const img = fotoDeFicha(nombre);
   return img
     ? `<img class="${clase}" ${attrsImagen(img)} alt="" draggable="false" decoding="async">`
     : `<span class="${clase} ${clase}--vacia" aria-hidden="true">${nombre.slice(0, 1).toUpperCase()}</span>`;
 }
 
 /* ── Pestaña MVP ─────────────────────────────────────────────────────────── */
-function jornadaVistaMVP(jugador) {
-  const lista = jornadasOficiales();
-  const elegida = mvpElegida != null && lista.find(j => j.numero === mvpElegida);
-  return elegida || pendienteMVP(jugador)[0] || lista[lista.length - 1] || null;
+function partidoVistoMVP(jugador) {
+  const lista = partidosOficiales();
+  return lista.find(j => j.fecha === mvpElegida) || pendienteMVP(jugador)[0] || lista[lista.length - 1] || null;
 }
 
 function renderMVP(jugador) {
-  const j = jornadaVistaMVP(jugador);
+  if (mvpLeyendo) return `<div class="mvp-rueda" role="status" aria-label="Cargando los votos"></div>`;
+  const j = partidoVistoMVP(jugador);
   if (!j) return `<div class="sh"><span class="sh__title">MVP</span><span class="sh__line"></span></div>
     <div class="empty">Todavía no hay partidos.</div>`;
 
-  const lista = jornadasOficiales();
+  const lista = partidosOficiales();
   const i = lista.indexOf(j);
-  const flecha = (dir, destino, texto) => `<button class="mvp-nav__flecha" type="button" data-mvp-ir="${destino?.numero ?? ''}"
+  const flecha = (dir, destino, texto) => `<button class="mvp-nav__flecha" type="button" data-mvp-ir="${destino?.fecha ?? ''}"
     aria-label="${texto}" ${destino ? '' : 'disabled'}>${dir}</button>`;
 
   return `
     <div class="mvp-nav">
-      ${flecha('←', lista[i - 1], 'Jornada anterior')}
+      ${flecha('←', lista[i - 1], 'Partido anterior')}
       <div class="mvp-nav__centro">
-        <div class="mvp-nav__titulo">JORNADA ${j.numero} · MVP</div>
+        <div class="mvp-nav__titulo">JORNADA ${j.numero ?? '—'} · MVP</div>
         <div class="mvp-nav__fecha">${fmtFechaLarga(j.fecha)}</div>
       </div>
-      ${flecha('→', lista[i + 1], 'Jornada siguiente')}
+      ${flecha('→', lista[i + 1], 'Partido siguiente')}
     </div>
     <div class="mvp-vista" data-estado="${estadoMVP(j, jugador)}">${renderEstadoMVP(j, jugador)}</div>
   `;
@@ -250,12 +254,12 @@ function bannerMVP(j) {
 const puntosUsados = () => Object.values(mvpReparto.puntos).reduce((s, p) => s + p, 0);
 
 function renderVotarMVP(j, jugador) {
-  if (mvpReparto.jornada !== j.numero) mvpReparto = { jornada: j.numero, puntos: {} };
+  if (mvpReparto.fecha !== j.fecha) mvpReparto = { fecha: j.fecha, puntos: {} };
   const candidatos = plantillaMVP(j).filter(n => claveMVP(n) !== claveMVP(jugador));
-  const enviando = mvpEnviando === j.numero;
+  const enviando = mvpEnviando === j.fecha;
   return `
     <div class="mvp-reparto">
-      <div class="mvp-falta" data-falta>${faltaMVP(j)}</div>
+      <div class="mvp-falta">${MVP_CIERRE}</div>
       <div class="mvp-quedan" data-quedan></div>
       <div class="mvp-cartas">
         ${candidatos.map(n => `
@@ -283,7 +287,7 @@ function pintarReparto(root) {
     c.classList.toggle('mvp-carta--con', p > 0);
     c.classList.toggle('mvp-carta--apagada', !quedan && !p);
   });
-  if (mvpEnviando !== mvpReparto.jornada) zona.querySelector('[data-enviar]').disabled = quedan !== 0;
+  if (mvpEnviando !== mvpReparto.fecha) zona.querySelector('[data-enviar]').disabled = quedan !== 0;
 }
 
 function filaRanking(f, i, { abierta, ganador }) {
@@ -306,7 +310,7 @@ function filaRanking(f, i, { abierta, ganador }) {
 function renderVotadoMVP(j, jugador) {
   const v = votosDe(j), total = plantillaMVP(j).length;
   return `
-    <div class="mvp-cuenta"><b>${v.length} de ${total}</b> han votado · <span data-falta>${faltaMVP(j)}</span></div>
+    <div class="mvp-cuenta"><b>${v.length} de ${total}</b> han votado<small>${MVP_CIERRE}</small></div>
     <div class="mvp-tuvoto">Tu voto: <b>${textoVoto(miVoto(j, jugador).votos)}</b></div>
     <div class="mvp-ranking">${rankingMVP(j).map((f, i) => filaRanking(f, i, { abierta: true })).join('')}</div>`;
 }
@@ -316,8 +320,8 @@ function renderEnCursoMVP(j, jugador) {
   return `
     <div class="mvp-aviso">
       Votación en curso · <b>${v.length} de ${total}</b> han votado
-      <small data-falta>${faltaMVP(j)}</small>
-      ${jugador ? '' : '<button class="votacion-login__btn mvp-login" type="button" data-mvp-login>INICIAR SESIÓN</button>'}
+      <small>${MVP_CIERRE}</small>
+      ${jugador || getSessionPlayer() ? '' : '<button class="votacion-login__btn mvp-login" type="button" data-mvp-login>INICIAR SESIÓN</button>'}
     </div>`;
 }
 
@@ -342,8 +346,8 @@ function repintarMVP() {
   if (panel?.dataset.rendered) { panel.dataset.rendered = ''; renderTabIfNeeded('mvp'); }
 }
 
-function abrirMVP(numero) {
-  mvpElegida = numero;
+function abrirMVP(fecha) {
+  mvpElegida = fecha;
   if (STATE.activeTab === 'mvp') repintarMVP();
   else switchTab('mvp');
   document.querySelector('.main').scrollIntoView({ block: 'start', behavior: 'instant' });
@@ -356,60 +360,34 @@ function confirmarVotoMVP() {
   const nombres = Object.fromEntries([...zona.querySelectorAll('.mvp-carta')].map(c => [c.dataset.candidato, c.dataset.nombre]));
   const votos = Object.entries(mvpReparto.puntos)
     .map(([k, p]) => ({ nombre: nombres[k], puntos: p })).sort((a, b) => b.puntos - a.puntos);
-  const jornada = mvpReparto.jornada;
+  const fecha = mvpReparto.fecha;
   document.getElementById('mvpConfirmarTexto').textContent = `${textoVoto(votos)}. Una vez enviado no se puede cambiar.`;
-  document.getElementById('mvpConfirmarSi').onclick = () => { closeModal('mvpModal'); enviarVotoMVP(jornada, votos); };
+  document.getElementById('mvpConfirmarSi').onclick = () => { closeModal('mvpModal'); enviarVotoMVP(fecha, votos); };
   openModal('mvpModal');
 }
 
-async function enviarVotoMVP(jornada, votos) {
+async function enviarVotoMVP(fecha, votos) {
   const votante = jugadorSesionMVP();
   if (!votante) return;
-  mvpEnviando = jornada;
+  mvpEnviando = fecha;
   const boton = document.querySelector('.mvp-enviar');
   if (boton) { boton.disabled = true; boton.textContent = 'enviando…'; }
   try {
-    await postVotoMVP(jornada, votante, votos);
-    try {
-      localStorage.setItem(MVP_FLAG + jornada, JSON.stringify({ jornada, votante, votos, t: Date.now() }));
-    } catch { /* la hoja lo dirá la próxima vez */ }
+    const j = partidosOficiales().find(x => x.fecha === fecha);
+    await postVotoMVP(fecha, j?.numero, votante, votos);
     mvpEnviando = null;
-    mvpReparto = { jornada: null, puntos: {} };
-    aplicarMVPs(combinarMVPs(STATE.mvps || []));
+    mvpEpoca++;
+    mvpReparto = { fecha: null, puntos: {} };
+    // Lo que ha confirmado el script, hasta la siguiente lectura de la hoja
+    aplicarMVPs([...(STATE.mvps || []), { fecha_partido: fecha, jornada: j?.numero ?? null, votante, votos, fecha_voto: '' }]);
     avisoApp('Voto guardado', 'ok');
   } catch (e) {
     mvpEnviando = null;
     avisoApp(e.message);
     repintarMVP();
-    // Si el servidor lo ha rechazado (ya votado, ya cerrada…), lo que hay que ver es lo de la hoja
-    if (e.delServidor) refrescarMVPs();
+    // Si el script lo ha rechazado (ya votado, ya cerrada…), lo que hay que ver es lo de la hoja
+    if (e.delServidor) leerHojaMVP();
   }
-}
-
-/* ── Datos nuevos ────────────────────────────────────────────────────────── */
-function aplicarMVPs(filas) {
-  STATE.mvps = filas;
-  STATE.jugadores = calcularStats(STATE.jugadoresBase, STATE.jornadas);
-  guardarDatos();
-  initHero();
-  document.querySelectorAll('.tab-panel:not(#panel-rush)').forEach(p => { p.dataset.rendered = ''; });
-  renderTabIfNeeded(STATE.activeTab);
-}
-
-// Cada 30 s con la pestaña abierta: solo repinta si algo ha cambiado (los puntos repartidos se conservan)
-async function refrescarMVPs() {
-  if (mvpEnviando != null) return;
-  const leidas = await fetchMVPs();
-  if (leidas === null || mvpEnviando != null) return;
-  const filas = combinarMVPs(leidas, true);
-  if (JSON.stringify(filas) !== JSON.stringify(STATE.mvps)) { aplicarMVPs(filas); return; }
-  const panel = document.getElementById('panel-mvp');
-  const yo = jugadorSesionMVP();
-  const j = jornadaVistaMVP(yo);
-  if (!j || !panel) return;
-  const pintado = panel.querySelector('.mvp-vista')?.dataset.estado;
-  if (pintado && pintado !== estadoMVP(j, yo)) { aplicarMVPs(filas); return; }
-  panel.querySelectorAll('[data-falta]').forEach(el => { el.textContent = faltaMVP(j); });
 }
 
 /* ── Eventos (delegados en el panel) ─────────────────────────────────────── */
@@ -443,8 +421,8 @@ function bindMVP(panel) {
 
   panel.addEventListener('click', e => {
     const ir = e.target.closest('[data-mvp-ir]');
-    if (ir) { if (ir.dataset.mvpIr) { mvpElegida = Number(ir.dataset.mvpIr); repintarMVP(); } return; }
-    if (e.target.closest('[data-mvp-reintentar]')) { refrescarMVPs(); return; }
+    if (ir) { if (ir.dataset.mvpIr) { mvpElegida = ir.dataset.mvpIr; repintarMVP(); } return; }
+    if (e.target.closest('[data-mvp-reintentar]')) { leerHojaMVP(); return; }
     if (e.target.closest('[data-mvp-login]')) { openSessionModal(); return; }
     if (e.target.closest('[data-enviar]')) { confirmarVotoMVP(); return; }
     const carta = e.target.closest('.mvp-carta');
@@ -467,30 +445,30 @@ function votacionesPendientes(jugador) {
     .sort((a, b) => parseFechaVoto(a.fecha) - parseFechaVoto(b.fecha));
 }
 
-function renderPendientes() {
-  const sesion = getSessionPlayer();
-  if (!sesion || STATE.activeTab !== 'inicio') return '';
+function pilaPendientes(sesion) {
   const votos = votacionesPendientes(sesion);
-  const mvps = pendienteMVP(canonMVP(sesion));
-  if (!votos.length && !mvps.length) return '';
-
-  const pila = votos.length ? `
+  if (!votos.length) return '';
+  return `
     <div class="pendientes__pila">
       ${votos.length > 1 ? `<article class="voto voto--detras" aria-hidden="true">${renderVotoInner(votos[1], null)}</article>` : ''}
       <article class="voto voto--compacta" data-id="${votos[0].id}">${renderVotoInner(votos[0], sesion)}</article>
     </div>
-    <p class="pendientes__cuenta">¿Puedes? Desliza → sí · ← no${votos.length > 1 ? ` · quedan ${votos.length}` : ''}</p>` : '';
+    <p class="pendientes__cuenta">¿Puedes? Desliza → sí · ← no${votos.length > 1 ? ` · quedan ${votos.length}` : ''}</p>`;
+}
 
-  const tarjetas = mvps.map(j => `
+function mvpPendientes(sesion) {
+  const yo = fichaMVP(sesion);
+  if (!yo) return '';
+  // Leyendo la hoja: la rueda solo a quien puede tener el voto pendiente
+  if (mvpLeyendo) {
+    const ultimo = partidosOficiales().filter(tieneResultado).pop();
+    return ultimo && enPlantilla(ultimo, yo) ? `<div class="pendiente-mvp pendiente-mvp--rueda"><span class="mvp-rueda mvp-rueda--mini" role="status" aria-label="Comprobando el voto del MVP"></span></div>` : '';
+  }
+  return pendienteMVP(yo).map(j => `
     <div class="pendiente-mvp">
-      <span>Vota el MVP de la Jornada ${j.numero}</span>
-      <button class="pendiente-mvp__btn" type="button" data-abrir-mvp="${j.numero}">Votar →</button>
+      <span>Vota el MVP de la Jornada ${j.numero ?? '—'}</span>
+      <button class="pendiente-mvp__btn" type="button" data-abrir-mvp="${j.fecha}">Votar →</button>
     </div>`).join('');
-
-  return `<section class="pendientes" id="pendientes">
-    <div class="sh"><span class="sh__title">PENDIENTES</span><span class="sh__line"></span></div>
-    ${pila}${tarjetas}
-  </section>`;
 }
 
 // Solo se ve en Inicio y solo si hay algo: sin nada no queda ni el contenedor. Está por encima
@@ -498,22 +476,34 @@ function renderPendientes() {
 function actualizarPendientes() {
   const hero = document.getElementById('hero-section');
   if (!hero || hero.querySelector('.voto-card.is-dragging')) return;
-  const html = renderPendientes();
-  if (html === pendientesHtml) return;
-  pendientesHtml = html;
+  const sesion = getSessionPlayer();
+  const enInicio = sesion && STATE.activeTab === 'inicio';
+  const pila = enInicio ? pilaPendientes(sesion) : '';
+  const mvp = enInicio ? mvpPendientes(sesion) : '';
+  if (pila === pendientesPila && mvp === pendientesMvp) return;
 
-  const actual = hero.querySelector('#pendientes');
   const main = document.querySelector('.main');
+  const actual = hero.querySelector('#pendientes');
   const referencia = actual || hero.querySelector('.last-match');
   const fuera = referencia && referencia.getBoundingClientRect().bottom <= 0;
   const antes = main.getBoundingClientRect().top;
 
-  actual?.remove();
-  if (html) {
-    hero.insertAdjacentHTML('beforeend', html);
-    const nuevo = hero.querySelector('#pendientes');
-    ajustarImagenes(nuevo);
-    predecodificarImagenes(nuevo);
+  if (actual && pila === pendientesPila && (pila || mvp)) {
+    // Solo cambia el aviso del MVP: las cartas no se vuelven a pintar
+    actual.querySelector('[data-pendiente-mvp]').innerHTML = mvp;
+  } else {
+    actual?.remove();
+    if (pila || mvp) {
+      hero.insertAdjacentHTML('beforeend', `<section class="pendientes" id="pendientes">
+        <div class="sh"><span class="sh__title">PENDIENTES</span><span class="sh__line"></span></div>
+        ${pila}<div class="pendientes__mvp" data-pendiente-mvp>${mvp}</div>
+      </section>`);
+      const nuevo = hero.querySelector('#pendientes');
+      ajustarImagenes(nuevo);
+      predecodificarImagenes(nuevo);
+    }
   }
+  pendientesPila = pila;
+  pendientesMvp = mvp;
   if (fuera) window.scrollBy({ top: main.getBoundingClientRect().top - antes, behavior: 'instant' });
 }
