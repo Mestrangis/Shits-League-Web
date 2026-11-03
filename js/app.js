@@ -87,9 +87,11 @@ function recargarDatos() {
   recargaEnCurso = (async () => {
     try {
       await loadData();
+      aplicarOrdenTabs();
       initHero();
       document.querySelectorAll('.tab-panel:not(#panel-rush)').forEach(p => { p.dataset.rendered = ''; });
       renderTabIfNeeded(STATE.activeTab);
+      prepararVecinas();
     } catch (e) {
       console.warn('[app] No se pudieron recargar los datos:', e);
     } finally {
@@ -121,6 +123,7 @@ async function refrescarVotaciones() {
   if (!nuevas || ocupado()) return;
   if (JSON.stringify(nuevas) === JSON.stringify(STATE.votaciones)) return;
   STATE.votaciones = nuevas;
+  aplicarOrdenTabs();
   rerenderPanel('votacion');
 }
 
@@ -244,7 +247,6 @@ function initBloquesInicio() {
       openModalPartido(el.dataset.abrirPartido, el.dataset.fecha);
     } else if (el.dataset.ir) {
       switchTab(el.dataset.ir);
-      document.querySelector('.main').scrollIntoView({ block: 'start', behavior: 'instant' });
     }
   };
   const SELECTOR = '[data-abrir-mvp], [data-abrir-partido], [data-ir]';
@@ -275,32 +277,11 @@ function avisoApp(texto, tipo = 'error') {
 }
 
 /* ── Tabs ────────────────────────────────────────────────────────────────── */
-// Rush va la primera (a la izquierda de Inicio); la app sigue abriéndose en Inicio
-const TABS = ['rush', 'inicio', 'votacion', 'mvp', 'resumen', 'clasificacion', 'goleadores', 'asistentes', 'plantilla'];
-
-// Móvil: en la pestaña Rush se oculta la cabecera grande (hero). Se guarda el
-// scroll de las demás pestañas para devolverlo igual al salir de Rush.
-const MQ_MOVIL = window.matchMedia('(max-width: 899px)');
-let scrollAntesDeRush = null;
-function ajustarCabeceraRush(nueva, anterior, scrollAntes) {
-  const enRush = nueva === 'rush';
-  if (enRush && anterior !== 'rush') scrollAntesDeRush = scrollAntes;
-  document.body.classList.toggle('en-rush', enRush);
-  if (!MQ_MOVIL.matches) return;
-  if (enRush) window.scrollTo({ top: 0, behavior: 'instant' });
-  else if (anterior === 'rush' && scrollAntesDeRush != null) window.scrollTo({ top: scrollAntesDeRush, behavior: 'instant' });
-}
-
 // '#votacion' → 'votacion'; null si el hash no es una pestaña.
 // Permite que las notificaciones enlacen a una pestaña concreta.
 function tabDesdeHash() {
   const name = decodeURIComponent(location.hash.slice(1)).toLowerCase();
   return tabsVisibles().includes(name) ? name : null;
-}
-
-// Pestañas que se ven ahora (la de Rush depende de la sesión y del acceso a la beta)
-function tabsVisibles() {
-  return TABS.filter(t => !document.querySelector(`.tab[data-tab="${t}"]`)?.hidden);
 }
 
 function initTabs() {
@@ -312,88 +293,34 @@ function initTabs() {
   });
 }
 
-// desde: 'derecha' | 'izquierda' → la pestaña entra deslizándose desde ese lado
-// (solo cuando el cambio viene de un swipe; con click no hay animación)
-function switchTab(name, { desde } = {}) {
+// animar: se desliza hasta la página nueva (paginas.js); desdeX: dónde la ha dejado el dedo
+function switchTab(name, { animar = true, desdeX = 0 } = {}) {
   if (name === STATE.activeTab) return;
   const anterior = STATE.activeTab;
-  const scrollAntes = window.scrollY;   // antes de cambiar de panel (luego puede quedar recortado)
-  const saliente = document.getElementById(`panel-${anterior}`);
   STATE.activeTab = name;
   if (anterior === 'mvp') mvpElegida = null;   // al volver, la jornada de por defecto
   if (name === 'mvp') document.getElementById('panel-mvp').dataset.rendered = '';   // siempre con el partido que toca
   // La pestaña MVP y el aviso de Inicio, con la hoja recién leída
   if (name === 'mvp' || (name === 'inicio' && getSessionPlayer())) leerHojaMVP();
-  actualizarPendientes();
 
-  document.querySelectorAll('.tab').forEach(t => {
-    const activa = t.dataset.tab === name;
-    t.classList.toggle('active', activa);
-    t.setAttribute('aria-selected', String(activa));
-  });
+  marcarTab(name);
   document.querySelectorAll('.tab-panel').forEach(p =>
     p.classList.toggle('active', p.id === `panel-${name}`)
   );
 
+  // Rush sigue con el scroll de la ventana; el resto, cada página con el suyo
+  if (name === 'rush' || anterior === 'rush') cambiarARush(name === 'rush');
   renderTabIfNeeded(name);
-  ajustarCabeceraRush(name, anterior, scrollAntes);   // con el panel nuevo ya visible (su altura cuenta para el scroll)
-  if (desde) deslizarPaneles(saliente, document.getElementById(`panel-${name}`), desde);
+  moverPaginas(anterior, name, { animar, desdeX });
   history.replaceState(null, '', `#${name}`);
   actualizarRefrescoVotaciones();
   recargarSiCaducado();
-
-  // scroll tab into view on mobile
-  document.querySelector(`.tab[data-tab="${name}"]`)
-    ?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-}
-
-/* ── Swipe entre pestañas (solo pantallas táctiles) ──────────────────────── */
-const SWIPE_TAB_UMBRAL  = 60; // px horizontales mínimos
-// Zonas donde el gesto horizontal ya tiene otro dueño o es para escribir:
-// - .voto-card--swipe: la card arrastrable en sí (mismo selector con el que
-//   votacion.js arranca el arrastre). Sus botones ✓/✗ y el resto sí navegan.
-// - nav con scroll horizontal, modales, embeds y campos de texto
-// - .slr: el modo Rush a pantalla completa (tiene su propia navegación)
-const SWIPE_TAB_EXCLUIR = '.voto-card--swipe, .tabs, .topbar, .modal, iframe, input, textarea, .slr';
-
-// Touch events y no pointer events: en cuanto el navegador empieza a hacer
-// scroll manda pointercancel y no llegaría el pointerup. Pasivos: no bloquean el scroll.
-function initSwipeTabs() {
-  if (!window.matchMedia('(pointer: coarse)').matches) return;
-
-  let x0 = 0, y0 = 0, activo = false;
-
-  document.addEventListener('touchstart', e => {
-    activo = e.touches.length === 1
-      && STATE.season === '25-26'             // en temporadas archivadas no hay pestañas
-      && !e.target.closest(SWIPE_TAB_EXCLUIR);
-    if (!activo) return;
-    x0 = e.touches[0].clientX;
-    y0 = e.touches[0].clientY;
-  }, { passive: true });
-
-  document.addEventListener('touchmove', e => {
-    if (e.touches.length > 1) activo = false; // zoom con dos dedos
-  }, { passive: true });
-
-  document.addEventListener('touchcancel', () => { activo = false; }, { passive: true });
-
-  document.addEventListener('touchend', e => {
-    if (!activo) return;
-    activo = false;
-    const t  = e.changedTouches[0];
-    const dx = t.clientX - x0, dy = t.clientY - y0;
-    if (Math.abs(dx) <= SWIPE_TAB_UMBRAL || Math.abs(dx) <= Math.abs(dy)) return;
-
-    // Dedo hacia la izquierda → siguiente pestaña, que entra por la derecha
-    const tabs = tabsVisibles();
-    const i = tabs.indexOf(STATE.activeTab) + (dx < 0 ? 1 : -1);
-    if (i < 0 || i >= tabs.length) return;
-    switchTab(tabs[i], { desde: dx < 0 ? 'derecha' : 'izquierda' });
-  }, { passive: true });
 }
 
 /* ── Pull-to-refresh (solo pantallas táctiles) ───────────────────────────── */
+// ¿Está arriba del todo lo que se ve?
+const enLoAlto = () => (estaEnRush() ? window.scrollY : paginaDe(STATE.activeTab)?.scrollTop ?? 0) <= 0;
+
 // En la PWA de iOS no existe el gesto nativo; en Chrome Android el nativo está
 // desactivado con overscroll-behavior-y (recargaría la página entera).
 const PTR_UMBRAL = 70;  // px hacia abajo
@@ -420,7 +347,7 @@ function initPullToRefresh() {
 
   document.addEventListener('touchstart', e => {
     activo = e.touches.length === 1
-      && window.scrollY <= 0                      // ya en lo alto de la página
+      && enLoAlto()                               // ya en lo alto de la página
       && STATE.season === '25-26'
       && !document.querySelector('.modal.open')
       && !e.target.closest('.slr');               // el modo Rush no recarga la app
@@ -433,7 +360,7 @@ function initPullToRefresh() {
     if (e.touches.length > 1) { activo = false; ptrSoltar(); return; }
     if (!activo || document.getElementById('ptrSpinner').classList.contains('visible')) return;
     const dy = e.touches[0].clientY - y0, dx = e.touches[0].clientX - x0;
-    if (dy > 0 && dy > Math.abs(dx) && window.scrollY <= 0) ptrArrastre(dy);
+    if (dy > 0 && dy > Math.abs(dx) && enLoAlto()) ptrArrastre(dy);
     else ptrSoltar();
   }, { passive: true });
 
@@ -444,7 +371,7 @@ function initPullToRefresh() {
     activo = false;
     const t  = e.changedTouches[0];
     const dx = t.clientX - x0, dy = t.clientY - y0;
-    if (dy > PTR_UMBRAL && dy > Math.abs(dx) && window.scrollY <= 0) refrescarPorGesto();
+    if (dy > PTR_UMBRAL && dy > Math.abs(dx) && enLoAlto()) refrescarPorGesto();
     else ptrSoltar();
   }, { passive: true });
 }
@@ -458,42 +385,6 @@ async function refrescarPorGesto() {
   spinner.classList.remove('visible');
 }
 
-let terminarDeslizamiento = null;
-
-// La saliente se queda superpuesta (position absolute) y se va hacia un lado
-// mientras la entrante llega desde el contrario. Al acabar se limpian los
-// transforms para no interferir con el scroll de la pestaña.
-function deslizarPaneles(saliente, entrante, desde) {
-  terminarDeslizamiento?.(); // si había otro deslizamiento a medias, se cierra ya
-
-  const signo = desde === 'derecha' ? 1 : -1;
-  saliente.classList.add('tab-panel--saliendo');
-  entrante.style.transform = `translateX(${signo * 100}%)`;
-  entrante.getBoundingClientRect(); // fija el punto de partida antes de animar
-
-  saliente.classList.add('tab-panel--deslizando');
-  entrante.classList.add('tab-panel--deslizando');
-  saliente.style.transform = `translateX(${-signo * 100}%)`;
-  entrante.style.transform = '';
-
-  function limpiar() {
-    clearTimeout(timer);
-    entrante.removeEventListener('transitionend', alTerminar);
-    saliente.classList.remove('tab-panel--saliendo', 'tab-panel--deslizando');
-    entrante.classList.remove('tab-panel--deslizando');
-    saliente.style.transform = '';
-    entrante.style.transform = '';
-    terminarDeslizamiento = null;
-  }
-  function alTerminar(e) {
-    if (e.target === entrante && e.propertyName === 'transform') limpiar();
-  }
-
-  entrante.addEventListener('transitionend', alTerminar);
-  const timer = setTimeout(limpiar, 450); // por si transitionend no llega
-  terminarDeslizamiento = limpiar;
-}
-
 function renderTabIfNeeded(name) {
   const panel = document.getElementById(`panel-${name}`);
   if (!panel || panel.dataset.rendered) return;
@@ -503,7 +394,7 @@ function renderTabIfNeeded(name) {
       panel.innerHTML = renderInicio(STATE.proximosPartidos);
       break;
     case 'votacion':
-      panel.innerHTML = renderVotacion(STATE.votaciones, getSessionPlayer());
+      panel.innerHTML = renderVotacion(getSessionPlayer());
       break;
     case 'mvp':
       panel.innerHTML = renderMVP(jugadorSesionMVP());
@@ -715,6 +606,7 @@ function switchSeason(season) {
   const label = document.getElementById('seasonLabel');
   const tabs = document.getElementById('tabs');
   const main = document.querySelector('.main');
+  document.body.classList.toggle('archivo', !!archive);
   const hero = document.getElementById('hero-section');
   const archiveEl = document.getElementById('archiveSeason');
   const dropdown = document.getElementById('seasonDropdown');
@@ -763,7 +655,7 @@ async function init() {
   initTabs();
   initSeasonSelector();
   initSession();
-  initSwipeTabs();
+  initPaginas();
   initPullToRefresh();
   initBloquesInicio();
   bindVotacion(document.getElementById('hero-section'));   // las cartas de «Pendientes»
@@ -771,9 +663,9 @@ async function init() {
   // Lo guardado de la última vez se pinta ya y lo fresco de Sheets llega detrás. Sin nada
   // guardado (la primera vez) se espera a Sheets. Nada de Rush compite con esto: Rush no
   // se pide hasta pulsar JUGAR (rush-panel.js)
-  const tabInicial = tabDesdeHash();
-  if (tabInicial === 'rush') switchTab('rush');
+  if (tabDesdeHash() === 'rush') switchTab('rush', { animar: false });
   const guardados = restaurarDatos();
+  if (guardados) aplicarOrdenTabs();
   // «sl:cargada»: la Shits League ya tiene sus datos frescos. Entonces (y no antes) se registra
   // el service worker (version.js), que descarga la app en segundo plano
   const cargada = () => document.dispatchEvent(new Event('sl:cargada'));
@@ -795,14 +687,11 @@ async function init() {
 
   initHero();
   renderTabIfNeeded('inicio');
-  if (tabInicial && tabInicial !== 'rush') {
-    switchTab(tabInicial);
-    // Si se entra con hash (p. ej. desde una notificación), saltamos el hero
-    // (en Rush, en móvil, el hero ya está oculto)
-    document.querySelector('.main').scrollIntoView({ block: 'start', behavior: 'instant' });
-  } else if (tabInicial === 'rush' && !MQ_MOVIL.matches) {
-    document.querySelector('.main').scrollIntoView({ block: 'start', behavior: 'instant' });
-  }
+  aplicarOrdenTabs();
+  // Con hash (p. ej. desde una notificación), después de saber qué pestañas hay
+  const tabInicial = tabDesdeHash();
+  if (tabInicial) switchTab(tabInicial, { animar: false });
+  else colocarPaginas();
   window.addEventListener('hashchange', () => {
     const tab = tabDesdeHash();
     if (tab) switchTab(tab);

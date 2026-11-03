@@ -27,9 +27,13 @@ body {
   font-family: 'Sora', sans-serif;
   color: #E8FBEF;
   background: radial-gradient(125% 75% at 50% -12%, #0E3320 0%, #08190F 48%, #06140D 100%);
-  min-height: 100vh;
+  /* La app llena la pantalla: quien hace scroll es cada página (js/paginas.js) */
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   position: relative;
-  overflow-x: hidden;
   overscroll-behavior-x: none;
   overscroll-behavior-y: contain;
   /* Con viewport-fit=cover, en horizontal el contenido no se mete bajo el notch */
@@ -85,8 +89,6 @@ button, [role="button"], .modal__backdrop, .tab, .result-row, .card-wrap, .voto-
   padding: 13px clamp(16px, 4vw, 40px);
   padding-top: calc(13px + var(--safe-top));
   background: rgba(6, 20, 13, 0.72);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
   border-bottom: 1px solid rgba(31, 224, 101, 0.16);
 }
 .topbar__logo {
@@ -357,18 +359,21 @@ button, [role="button"], .modal__backdrop, .tab, .result-row, .card-wrap, .voto-
 }
 
 /* ═══════════════════════════════════════════════
-   TABS BAR  (sticky, below topbar)
+   TABS BAR  (flota sobre las páginas; js/paginas.js la coloca)
 ═══════════════════════════════════════════════ */
 .tabs {
-  position: sticky;
-  top: calc(var(--topbar-h) + var(--safe-top));
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
   z-index: 30;
-  background: rgba(6, 20, 13, 0.82);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  /* Casi opaca y sin desenfoque: desenfocar lo que pasa por debajo obligaría a repintar en cada
+     fotograma del deslizamiento */
+  background: rgba(6, 20, 13, 0.96);
   border-top: 1px solid rgba(31, 224, 101, 0.12);
   border-bottom: 1px solid rgba(31, 224, 101, 0.12);
   overflow-x: auto;
+  will-change: transform;
   /* custom scrollbar */
   scrollbar-width: thin;
   scrollbar-color: rgba(31,224,101,.28) transparent;
@@ -377,11 +382,15 @@ button, [role="button"], .modal__backdrop, .tab, .result-row, .card-wrap, .voto-
 .tabs::-webkit-scrollbar-track { background: transparent; }
 .tabs::-webkit-scrollbar-thumb { background: rgba(31,224,101,.28); border-radius: 20px; }
 .tabs__inner {
-  max-width: 1180px;
+  position: relative;
+  width: max-content;
+  min-width: 100%;
+  max-width: none;
   margin: 0 auto;
   display: flex;
   gap: 4px;
-  padding: 0 clamp(10px, 4vw, 40px);
+  /* Alineada con el contenido, que llega como mucho a 1180px */
+  padding: 0 max(clamp(10px, 4vw, 40px), calc((100vw - 1180px) / 2));
 }
 .tab {
   font-family: 'Sora', sans-serif;
@@ -403,38 +412,77 @@ button, [role="button"], .modal__backdrop, .tab, .result-row, .card-wrap, .voto-
 @media (hover: hover) {
   .tab:hover { color: #E8FBEF; }
 }
-.tab.active { color: var(--verde); box-shadow: inset 0 -3px 0 var(--verde); }
+.tab.active { color: var(--verde); }
+/* Una sola raya que viaja de una pestaña a otra: 1px de ancho y scaleX el ancho de la pestaña */
+.tabs__indicador {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 1px;
+  height: 3px;
+  background: var(--verde);
+  transform-origin: left;
+  pointer-events: none;
+}
+.asentando .tabs, .asentando .tabs__indicador { transition: transform .22s ease-out; }
 
 /* ═══════════════════════════════════════════════
-   MAIN / TAB PANELS
+   APP: LA BARRA Y LAS PÁGINAS LLENAN LA PANTALLA
 ═══════════════════════════════════════════════ */
-.main {
+.topbar { flex: none; }
+.app-zona {
   position: relative;
   z-index: 1;
-  scroll-margin-top: calc(var(--topbar-h) + var(--tabs-h) + var(--safe-top));
-  /* Una card de votación arrastrada a la derecha ensanchaba el área desplazable
-     de toda la página en cada frame (a la izquierda no cuenta). clip la recorta
-     sin crear un contenedor de scroll. */
-  overflow-x: clip;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
+.main { position: absolute; inset: 0; }
+.paginas { position: absolute; inset: 0; overflow: hidden; }
+.paginas__pista { position: absolute; inset: 0; will-change: transform; }
+.pagina {
+  position: absolute;
+  inset: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  /* El scroll vertical es del navegador y el gesto horizontal, de paginas.js */
+  touch-action: pan-y;
+  padding-top: var(--tabs-h);
+  visibility: hidden;
+}
+.pagina--inicio { padding-top: 0; visibility: visible; }
+.pagina__hueco { height: var(--tabs-h); }
+/* Una carta arrastrada a la derecha ensanchaba el área desplazable en cada fotograma
+   (a la izquierda no cuenta). clip la recorta sin crear otro contenedor de scroll. */
+.hero-section, .tab-panel { overflow-x: clip; }
+
 .tab-panel {
   display: none;
   max-width: 1180px;
   margin: 0 auto;
   padding: clamp(26px,4vw,44px) clamp(16px,4vw,40px) 80px;
 }
-.tab-panel.active { display: block; }
+.tab-panel.active, .pagina .tab-panel { display: block; }
 
-/* Slide entre pestañas por swipe (app.js → deslizarPaneles) */
-.tab-panel--deslizando { transition: transform .3s ease; }
-.tab-panel--saliendo {
-  display: block;
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  pointer-events: none;
+/* Rush y las temporadas archivadas, como una página normal: con el scroll de la ventana */
+body.en-rush, body.archivo { display: block; height: auto; min-height: 100vh; overflow-x: hidden; overflow-y: visible; }
+body.en-rush .app-zona { overflow: visible; }
+body.en-rush .main { position: relative; inset: auto; overflow-x: clip; }
+body.en-rush .tabs {
+  position: sticky;
+  top: calc(var(--topbar-h) + var(--safe-top));
+  transform: none !important;
+  will-change: auto;
+  background: rgba(6, 20, 13, 0.82);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
+body.en-rush .topbar, body.archivo .topbar { backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+/* Fuera del todo, no solo invisibles: si no, sus vídeos e imágenes se descargarían estando en Rush */
+body.en-rush .paginas { display: none; }
+body.archivo .app-zona { display: none; }
 
 /* ── Section heading (used in all tabs) ── */
 .sh {
@@ -854,7 +902,7 @@ button, [role="button"], .modal__backdrop, .tab, .result-row, .card-wrap, .voto-
     display: block;
   }
 
-  .pendientes { order: 5; }
+  .pendientes, .hero-section--cartas .pendientes { order: 5; }
   .hero__counters {
     order: 6;
     flex-wrap: nowrap;
@@ -1491,11 +1539,6 @@ button, [role="button"], .modal__backdrop, .tab, .result-row, .card-wrap, .voto-
    animar transform de scale(1) a rotate(360deg) se interpola como matriz y no gira */
 @keyframes ptr-giro { from { rotate: 0deg; } to { rotate: 360deg; } }
 
-/* Móvil: en la pestaña Rush no se ve la cabecera grande (hero); quedan la barra
-   superior y las pestañas para volver (app.js añade body.en-rush) */
-@media (max-width: 899px) {
-  body.en-rush .hero-section { display: none !important; }
-}
 
 /* ═══════════════════════════════════════════════
    VERSIÓN DE LA APP  (js/version.js)
@@ -1547,21 +1590,6 @@ body.en-rush .pie-app { display: none; }
 }
 .last-match__mvp span { color: var(--verde); font-weight: 700; }
 
-/* Veces MVP en Plantilla */
-.card-wrap__mvp {
-  position: absolute;
-  top: 6%;
-  right: 4%;
-  padding: 3px 7px;
-  border-radius: 999px;
-  background: rgba(6,20,13,.88);
-  border: 1px solid rgba(31,224,101,.35);
-  font-size: 11px;
-  font-weight: 700;
-  color: #E8FBEF;
-  white-space: nowrap;
-}
-
 /* ═══════════════════════════════════════════════
    PENDIENTES (Inicio)
 ═══════════════════════════════════════════════ */
@@ -1594,7 +1622,9 @@ body.en-rush .pie-app { display: none; }
   opacity: .55;
   pointer-events: none;
 }
-.pendientes__cuenta { font-size: 12px; color: #6E9D81; text-align: center; }
+/* Las cartas, en el sitio del marcador hasta que se hayan votado todas */
+.hero-section--cartas .last-match { display: none; }
+.hero-section--cartas .pendientes { grid-column: 2; grid-row: 1; }
 .pendiente-mvp {
   display: flex;
   align-items: center;

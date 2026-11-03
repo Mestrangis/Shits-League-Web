@@ -168,9 +168,11 @@ function aplicarMVPs(filas) {
   STATE.mvps = filas;
   STATE.jugadores = calcularStats(STATE.jugadoresBase, STATE.jornadas);
   guardarDatos();
+  aplicarOrdenTabs();
   initHero();
   document.querySelectorAll('.tab-panel:not(#panel-rush)').forEach(p => { p.dataset.rendered = ''; });
   renderTabIfNeeded(STATE.activeTab);
+  prepararVecinas();
 }
 
 // Cada 30 s con la pestaña abierta, sin rueda: solo repinta si algo ha cambiado (los puntos repartidos se conservan)
@@ -197,7 +199,8 @@ function partidoVistoMVP(jugador) {
 }
 
 function renderMVP(jugador) {
-  if (mvpLeyendo) return `<div class="mvp-rueda" role="status" aria-label="Cargando los votos"></div>`;
+  // Como vecina al deslizar, también la rueda: nada de enseñar votos sin leer antes la hoja
+  if (mvpLeyendo || STATE.activeTab !== 'mvp') return `<div class="mvp-rueda" role="status" aria-label="Cargando los votos"></div>`;
   const j = partidoVistoMVP(jugador);
   if (!j) return `<div class="sh"><span class="sh__title">MVP</span><span class="sh__line"></span></div>
     <div class="empty">Todavía no hay partidos.</div>`;
@@ -350,7 +353,6 @@ function abrirMVP(fecha) {
   mvpElegida = fecha;
   if (STATE.activeTab === 'mvp') repintarMVP();
   else switchTab('mvp');
-  document.querySelector('.main').scrollIntoView({ block: 'start', behavior: 'instant' });
 }
 
 /* ── Enviar el voto ──────────────────────────────────────────────────────── */
@@ -439,10 +441,7 @@ function bindMVP(panel) {
 
 /* ── Pendientes en Inicio ────────────────────────────────────────────────── */
 function votacionesPendientes(jugador) {
-  const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
-  return STATE.votaciones
-    .filter(v => { const f = parseFechaVoto(v.fecha); return f && f >= hoy && !votoDe(v, jugador); })
-    .sort((a, b) => parseFechaVoto(a.fecha) - parseFechaVoto(b.fecha));
+  return votacionesFuturas().filter(v => !votoDe(v, jugador));
 }
 
 function pilaPendientes(sesion) {
@@ -452,8 +451,7 @@ function pilaPendientes(sesion) {
     <div class="pendientes__pila">
       ${votos.length > 1 ? `<article class="voto voto--detras" aria-hidden="true">${renderVotoInner(votos[1], null)}</article>` : ''}
       <article class="voto voto--compacta" data-id="${votos[0].id}">${renderVotoInner(votos[0], sesion)}</article>
-    </div>
-    <p class="pendientes__cuenta">¿Puedes? Desliza → sí · ← no${votos.length > 1 ? ` · quedan ${votos.length}` : ''}</p>`;
+    </div>`;
 }
 
 function mvpPendientes(sesion) {
@@ -471,22 +469,22 @@ function mvpPendientes(sesion) {
     </div>`).join('');
 }
 
-// Solo se ve en Inicio y solo si hay algo: sin nada no queda ni el contenedor. Está por encima
-// de las pestañas: si queda fuera de la pantalla, la página no salta al quitarlo o ponerlo
+// Solo si hay algo: sin nada no queda ni el contenedor. Las cartas ocupan el sitio del marcador
+// del último partido hasta que se hayan votado todas. Si la cabecera ya ha quedado por encima
+// de la pantalla, la página no salta al cambiar de altura.
 function actualizarPendientes() {
   const hero = document.getElementById('hero-section');
   if (!hero || hero.querySelector('.voto-card.is-dragging')) return;
   const sesion = getSessionPlayer();
-  const enInicio = sesion && STATE.activeTab === 'inicio';
-  const pila = enInicio ? pilaPendientes(sesion) : '';
-  const mvp = enInicio ? mvpPendientes(sesion) : '';
+  const pila = sesion ? pilaPendientes(sesion) : '';
+  const mvp = sesion ? mvpPendientes(sesion) : '';
   if (pila === pendientesPila && mvp === pendientesMvp) return;
 
-  const main = document.querySelector('.main');
+  const pagina = paginaDe('inicio');
   const actual = hero.querySelector('#pendientes');
-  const referencia = actual || hero.querySelector('.last-match');
-  const fuera = referencia && referencia.getBoundingClientRect().bottom <= 0;
-  const antes = main.getBoundingClientRect().top;
+  const antes = hero.offsetHeight;
+  const fuera = pagina.scrollTop >= antes;
+  hero.classList.toggle('hero-section--cartas', !!pila);
 
   if (actual && pila === pendientesPila && (pila || mvp)) {
     // Solo cambia el aviso del MVP: las cartas no se vuelven a pintar
@@ -505,5 +503,5 @@ function actualizarPendientes() {
   }
   pendientesPila = pila;
   pendientesMvp = mvp;
-  if (fuera) window.scrollBy({ top: main.getBoundingClientRect().top - antes, behavior: 'instant' });
+  if (fuera) pagina.scrollTop += hero.offsetHeight - antes;
 }

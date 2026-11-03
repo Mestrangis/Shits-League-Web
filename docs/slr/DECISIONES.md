@@ -2331,3 +2331,36 @@ Sustituyen a lo anterior donde no coincidan: el plazo de 3 días, la identificac
 - **`banco/mvp.mjs`** (360 y 412 px, 240 comprobaciones): dos temporadas con la J1 repetida, cierre al votar el último y por un partido posterior con la pestaña abierta, sustituto con sesión, rueda, borrar una fila y la hoja entera con un voto hecho (vuelve a dejar votar y el script la crea).
 - **Con la hoja real, solo mirando:** J17 abierta, 10 que pueden votar (sin Borja ni Carlos). La fila de prueba de Nico a Borja cuenta como su voto, sin puntos.
 - **`banco/version.mjs` no se puede cortar a medias:** deja sus marcas de prueba en `js/ui.js` y `js/slr/ui.js`. Pasó al limitarle el tiempo; se vio antes del commit y se quitaron.
+
+## Shits League: deslizar entre pestañas, cabecera solo en Inicio y Partidos
+
+### Decisiones de Marcos
+
+- **Deslizar sigue al dedo** y se asienta según distancia y velocidad. La barra acompaña. Rush queda fuera. Cada pestaña conserva su scroll. Solo empieza si es claramente horizontal y no ha empezado encima de algo que ya se desliza.
+- **La cabecera solo en Inicio,** por encima de la barra, y se mueve con Inicio.
+- **Cartas de asistencia en el sitio del marcador** hasta votarlas todas, sin el texto de debajo, y sin atascarse a la derecha.
+- **«Votación» pasa a ser «Partidos».** Una fecha pasada no se vota ni sale en ningún sitio. Sin partidos futuros, la pestaña desaparece.
+- **MVP:** sin 🏆 en las cartas de Plantilla (el número, en la ficha). Con una votación en curso, la pestaña va después de Partidos; si no, entre Asistentes y Plantilla.
+
+### Decisiones mías
+
+- **Cada pestaña es una página con su propio scroll** dentro de un carril (`js/paginas.js`). La ventana ya no hace scroll fuera de Rush. Es lo que permite conservar el scroll sin tocarlo y mover la pantalla solo con `transform`. La contrapartida: en un navegador normal de móvil, la barra de direcciones ya no se esconde al hacer scroll.
+- **Rush sigue como antes:** con `body.en-rush` vuelve el scroll de la ventana y la barra pegajosa, y las páginas pasan a `display: none`, guardando su scroll. Dejarlas solo invisibles descargaba los vídeos de YouTube y Spotify de Inicio estando en Rush, y con la red lenta tardaba más de 10 s en volver a entrar (lo detectó `banco/datos.mjs`). Las temporadas archivadas (`body.archivo`) también usan el de la ventana.
+- **La barra de pestañas flota encima** y se coloca con `transform`: en Inicio, debajo de la cabecera hasta que esta se va; en el resto, arriba. Al deslizar desde Inicio con la cabecera a la vista, la barra sube mientras se mueve la página.
+- **Sin desenfoque** en la barra ni en la cabecera fija: desenfocar lo que pasa por debajo obligaba a repintar en cada fotograma. Rush lo conserva.
+- **Una sola raya** para la pestaña activa: viaja de una a otra con `transform`.
+- **Todo se mide al empezar el gesto.** Durante el gesto solo se escribe, una vez por fotograma.
+- **Velocidad:** la de los últimos 100 ms. Si el dedo se para antes de soltar, cuenta como 0. Se pasa de página a partir del 35 % del ancho o de 0,35 px/ms en esa dirección.
+- **Las de al lado se pintan en un rato libre,** después de cargar y de cada cambio. La de MVP, como vecina, enseña la rueda: nunca votos sin leer antes la hoja.
+- **Tocar una pestaña lejana:** esa página entra por el lado y las de en medio no se ven.
+- **El atasco de las cartas a la derecha** era el mismo de la pestaña Votación: al arrastrar a la derecha se ensanchaba el área desplazable en cada fotograma. El arreglo de entonces (`overflow-x: clip`) estaba en `.main`, y la cabecera quedaba fuera. Ahora lo llevan la cabecera y los paneles.
+- **Una fecha «ha pasado» al acabar ese día:** hoy todavía se puede votar, aunque ya sea tarde. Es solo de la web: el script no cambia.
+- **El pie con la versión y «Reparar la app» está solo en Inicio.**
+- **El aviso «PENDIENTES»** conserva su título encima de las cartas.
+
+### Pruebas
+
+- **`banco/deslizar.mjs`** (360 y 412 px, móvil con toques reales por CDP, 144 comprobaciones): seguir el dedo, soltar a medias, rápido y pasada la distancia; vertical; encima de las cartas y de la cuadrícula del MVP; scroll conservado; cabecera; tocar una pestaña lejana; Rush sin deslizar; Partidos que aparece y desaparece; MVP cambiando de sitio y el orden nuevo al deslizar.
+- **Con la CPU ×6:** 0 maquetaciones durante el gesto y unos 17 ms por fotograma, tanto en las páginas como en las cartas a los dos lados. Es Chrome sin pantalla en un PC: confirma que no se recalcula la página, no cómo va un móvil real.
+- **Ligas de prueba:** un banco cortado por tiempo no borra la suya, y con una de sobra `equipo`, `alineacion` y `descubrimientos` fallan por datos, no por el código. Quedaron tres de pruebas cortadas; se borraron y pasan enteras.
+- **Control:** quitando el recorte de la cabecera, la prueba detecta que la carta ensancha la página. Es decir, la medida sí ve el problema de antes.

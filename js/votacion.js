@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════
    SHITS LEAGUE — votacion.js
-   Pestaña Votación: una card estilo Tinder por fecha propuesta.
+   Pestaña Partidos: una card estilo Tinder por fecha propuesta.
    Swipe → (puedo) / ← (no puedo), o botones ✓ / ✗.
    Ver se puede sin sesión; votar requiere sesión (session.js).
 ═══════════════════════════════════════════════ */
@@ -25,6 +25,14 @@ function parseFechaVoto(str) {
   return null;
 }
 
+// Las que aún se pueden votar: una fecha ya pasada no sale en ningún sitio. Hoy todavía vale.
+function votacionesFuturas() {
+  const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+  return STATE.votaciones
+    .filter(v => { const f = parseFechaVoto(v.fecha); return f && f >= hoy; })
+    .sort((a, b) => parseFechaVoto(a.fecha) - parseFechaVoto(b.fecha));
+}
+
 // 'si' | 'no' | null
 function votoDe(v, nombre) {
   if (!nombre) return null;
@@ -42,10 +50,8 @@ function aplicarVoto(v, nombre, voto) {
 }
 
 /* ── Render ──────────────────────────────────────────────────────────────── */
-function renderVotacion(votaciones, jugador) {
-  const lista = votaciones.slice().sort((a, b) =>
-    (parseFechaVoto(a.fecha) || 0) - (parseFechaVoto(b.fecha) || 0)
-  );
+function renderVotacion(jugador) {
+  const lista = votacionesFuturas();
 
   const aviso = jugador
     ? `<p class="votacion-hint">Desliza la card → si puedes o ← si no puedes. También puedes usar los botones.</p>`
@@ -62,7 +68,7 @@ function renderVotacion(votaciones, jugador) {
 
   return `
     <div class="sh">
-      <span class="sh__title">VOTACIÓN</span>
+      <span class="sh__title">PARTIDOS</span>
       <span class="sh__line"></span>
       <span class="sh__sub">¿CUÁNDO JUGAMOS?</span>
     </div>
@@ -193,7 +199,7 @@ function predecodificarImagenes(root) {
 async function votar(id, voto) {
   const nombre = getSessionPlayer();
   const v = STATE.votaciones.find(x => x.id === id);
-  if (!nombre || !v || votoDe(v, nombre) === voto) return;
+  if (!nombre || !v || votoDe(v, nombre) === voto || !votacionesFuturas().includes(v)) return;
 
   const antes = { si: [...v.jugadores_si], no: [...v.jugadores_no] };
   ultimoVotoEnviado = Date.now();

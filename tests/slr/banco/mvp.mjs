@@ -134,8 +134,8 @@ try {
 
       // Pendientes en Inicio
       check(await page.$('#pendientes') !== null, 'bloque Pendientes con cosas por hacer');
-      const orden = await page.evaluate(() => { const v = e => document.querySelector(e).getBoundingClientRect(); return [v('.last-match').bottom <= v('#pendientes').top + 1, v('#pendientes').bottom <= v('.hero__counters').top + 1, v('.pendientes__pila').top < v('.pendiente-mvp').top]; });
-      check(orden.every(Boolean), 'entre el último partido y las estadísticas; primero las votaciones', JSON.stringify(orden));
+      const orden = await page.evaluate(() => { const v = e => document.querySelector(e).getBoundingClientRect(); return [v('#pendientes').bottom <= v('.hero__counters').top + 1, v('.pendientes__pila').top < v('.pendiente-mvp').top]; });
+      check(orden.every(Boolean), 'antes de las estadísticas; primero las votaciones', JSON.stringify(orden));
       check(await texto(page, '.pendiente-mvp span') === 'Vota el MVP de la Jornada 1', 'tarjeta «Vota el MVP de la Jornada 1»');
       const alturas = await page.evaluate(() => { const c = document.querySelector('.pendientes .voto--compacta .voto-card').getBoundingClientRect(); return c.height / (c.width * 5 / 4); });
       check(alturas > 0.55 && alturas < 0.65, 'la carta con el 60 % de la altura normal', alturas.toFixed(2));
@@ -172,10 +172,11 @@ try {
       // «Votar →» abre la pestaña en ese partido
       await page.click('.pendiente-mvp__btn');
       await page.waitForSelector('.mvp-reparto');
+      await page.waitForFunction(() => !document.body.classList.contains('asentando'));
       check(await texto(page, '.mvp-nav__titulo') === 'JORNADA 1 · MVP', 'abre la pestaña MVP en la J1 de la temporada nueva');
       check((await page.evaluate(() => mvpElegida)) === ABIERTA, 'identificada por su fecha');
       check((await texto(page, '.mvp-nav__fecha')).length > 5, 'con la fecha del partido', await texto(page, '.mvp-nav__fecha'));
-      check(await page.$('#pendientes') === null, 'Pendientes solo en Inicio');
+      check(await page.$eval('#pendientes', p => { const r = p.getBoundingClientRect(); return r.right <= 0 || r.left >= innerWidth || getComputedStyle(p).visibility === 'hidden'; }), 'Pendientes solo en Inicio');
       check(await texto(page, '.mvp-falta') === CIERRE, 'el texto del cierre, sin cuenta atrás', await texto(page, '.mvp-falta'));
       check(await texto(page, '.mvp-quedan') === 'Te quedan 3 puntos', '«Te quedan 3 puntos»');
       const cartas = await page.$$eval('.mvp-carta', c => c.map(x => x.dataset.nombre));
@@ -434,6 +435,7 @@ try {
       // Dos temporadas con J1 y el último partido con MVP a mano
       hojas.Jornadas = [CAB_JORNADAS, jornada(1, S1(1)), jornada(2, S1(2)), jornada(1, dia(-30), { mvp: 'Nicolás', local: 'Temporada2' })];
       hojas.MVPs = hojas.MVPs.filter(f => [S1(1), S1(2), 'fecha_partido'].includes(f[0]));
+      hojas.Votaciones = [CAB_VOTACIONES];   // sin cartas: se ve el marcador
       const { ctx, page, foto, errores } = await abrir(navegador, ancho, 'Mateo', hojas);
 
       check((await texto(page, '.last-match__mvp')) === '🏆 MVP: Nico', 'último partido: «🏆 MVP: Nico»', await texto(page, '.last-match__mvp'));
@@ -454,10 +456,13 @@ try {
         check(await page.evaluate(() => STATE.activeTab) === tab && await page.$eval(`.tab[data-tab="${tab}"]`, t => t.classList.contains('active')), `contador → ${tab}`);
       }
       await page.$eval('[data-ir="plantilla"]', b => b.click());
-      await page.waitForSelector('.card-wrap__mvp');
-      const marcas = await page.$$eval('.card-wrap', c => Object.fromEntries(c.map(x => [x.dataset.nombre, x.querySelector('.card-wrap__mvp')?.textContent ?? ''])));
-      check(marcas.Nico === '🏆 ×2' && marcas.Enzo === '🏆 ×1', 'Plantilla: veces MVP', JSON.stringify(marcas));
-      check(marcas.Mateo === '', 'sin marca si nunca lo ha sido');
+      await page.waitForSelector('.card-wrap[data-nombre="Nico"]');
+      check(await page.$('.card-wrap__mvp') === null, 'Plantilla sin marcas de MVP');
+      await page.$eval('.card-wrap[data-nombre="Nico"]', c => c.click());
+      await page.waitForSelector('#playerModal.open');
+      const ficha = await page.$$eval('#playerModalBox .player-modal__stat', s => s.map(x => x.textContent.replace(/\s+/g, ' ').trim()));
+      check(ficha.some(s => /^2 ?MVPs$/.test(s)), 'las veces MVP, en la ficha', ficha.join(' | '));
+      await page.evaluate(() => closeModal('playerModal'));
 
       // Dos filas con «J01» en Resumen: cada una abre lo suyo
       await irTab(page, 'resumen');

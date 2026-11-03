@@ -512,7 +512,6 @@ function renderPlantilla(jugadores) {
       <div class="card-wrap card-wrap--cargando" data-nombre="${j.nombre}" role="button" tabindex="0" aria-label="Ver ficha de ${j.nombre}">
         ${skeleton}
         ${j.img ? `<img class="card-wrap__img" ${attrsImagen(j.img)} alt="${j.nombre}" loading="lazy" width="300" height="343">` : ''}
-        ${j.stats.mvp ? `<span class="card-wrap__mvp" aria-label="${j.stats.mvp} veces MVP">🏆 ×${j.stats.mvp}</span>` : ''}
       </div>
     `).join('')
     : Array.from({ length: SKELETONS_DEFAULT }, () => `
