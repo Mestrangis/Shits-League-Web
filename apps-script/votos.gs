@@ -5,7 +5,7 @@ const ZONA     = 'Europe/Madrid';
 // La hoja de cada temporada, de la más vieja a la más nueva (las mismas que js/temporadas.js)
 const HOJAS = {
   '24-26': '1EHGrFt2Y3QDCOdSV3fVgWvspzXYcir4SmDxOezdSLRY',
-  '26-27': '',
+  '26-27': '1UW3JRsjC8DHPsMwz9LjyRrqPo2SVTBUtiLkpL8LqCIg',
 };
 // De dónde sale la temporada en curso: la lectura pública de Supabase, sin nada secreto
 const SUPABASE_URL = 'https://vtqhefwspnqsjskqkxqg.supabase.co';

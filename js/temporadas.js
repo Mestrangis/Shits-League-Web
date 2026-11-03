@@ -13,7 +13,7 @@
 ═══════════════════════════════════════════════ */
 
 const TEMPORADAS = [
-  { id: '26-27', etiqueta: 'Temporada 26/27', corta: '26/27', hoja: '', rush: true },
+  { id: '26-27', etiqueta: 'Temporada 26/27', corta: '26/27', hoja: '1UW3JRsjC8DHPsMwz9LjyRrqPo2SVTBUtiLkpL8LqCIg', rush: true },
   { id: '24-26', etiqueta: 'Temporada 24/26', corta: '24/26', hoja: '1EHGrFt2Y3QDCOdSV3fVgWvspzXYcir4SmDxOezdSLRY' },
   { id: '23-24', etiqueta: 'Temporada 23/24', corta: '23/24', imagenes: [
     { src: 'assets/clasificación23-24.png', alt: 'Clasificación 23-24' },

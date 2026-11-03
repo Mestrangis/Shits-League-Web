@@ -67,7 +67,8 @@ export function crearGas(principal, { otra = null, enCurso = null } = {}) {
     } },
   });
   const codigo = readFileSync(RUTA, 'utf8').replace(/\r\n/g, '\n');
-  vm.runInContext(otra ? codigo.replace("'26-27': ''", `'26-27': '${otra.id}'`) : codigo, contexto);
+  // La 26/27 con la hoja de mentira, o sin hoja: nunca la de verdad
+  vm.runInContext(codigo.replace(/'26-27': '[^']*'/, `'26-27': '${otra?.id ?? ''}'`), contexto);
   const doPost = contexto.doPost;
   return {
     hojas: principal,

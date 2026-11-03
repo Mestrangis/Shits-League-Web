@@ -2400,6 +2400,7 @@ Sustituyen a lo anterior donde no coincidan: el plazo de 3 días, la identificac
 - **Una temporada ya terminada no se vota:** el script lee la en curso de Supabase con la clave pública. Si no puede saberla, deja votar. Una próxima sí se vota, para que los beta prueben.
 - **El recordatorio** usa las fechas de la temporada en curso; si no puede saberla, no avisa.
 - **Sin publicar, el script antiguo escribe todo en la hoja 24/26:** por eso hay que publicar antes de que haya votaciones en la 26/27.
+- **La hoja de la 26/27** ya está en `js/temporadas.js` y en `votos.gs`. Las pruebas la sustituyen por una de mentira: nunca la escriben.
 
 ### Pruebas
 
