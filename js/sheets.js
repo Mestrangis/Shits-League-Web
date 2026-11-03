@@ -12,8 +12,9 @@ const SHEET_JORNADAS  = 'Jornadas';
 const SHEET_VOTACIONES = 'Votaciones';
 const SHEET_MVPS = 'MVPs';
 
-// Apps Script de votaciones (solo escritura de votos; apps-script/votos.gs)
-const VOTOS_GAS_URL    = 'https://script.google.com/macros/s/AKfycbyEujGUhTzs9F9a-5sLUr47yUMmMLBUL8wTnUxk8aRoPlyR_0ukfgSXtUjm8M-MWadkSA/exec';
+// Apps Script de votaciones (solo escritura de votos; apps-script/votos.gs): uno solo para todas
+// las temporadas, que escribe en la hoja de la temporada que le llega
+const VOTOS_GAS_URL    = 'https://script.google.com/macros/s/AKfycbzt5vjAG01F8_rYXtWqpXg6pfkzWSzTeC8hKhAIX2JHEHHzXold1nghD1ZtHJBV0j6dzw/exec';
 const VOTOS_GAS_SECRET = 'pissleague';
 
 // ── Core ──────────────────────────────────────────────────────────────────

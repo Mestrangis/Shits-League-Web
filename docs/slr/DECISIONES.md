@@ -2399,7 +2399,7 @@ Sustituyen a lo anterior donde no coincidan: el plazo de 3 días, la identificac
 - **`HOJAS`:** cada temporada con su ID. La web manda `temporada`; sin ella (una app vieja) es la 24/26.
 - **Una temporada ya terminada no se vota:** el script lee la en curso de Supabase con la clave pública. Si no puede saberla, deja votar. Una próxima sí se vota, para que los beta prueben.
 - **El recordatorio** usa las fechas de la temporada en curso; si no puede saberla, no avisa.
-- **Sin publicar, el script antiguo escribe todo en la hoja 24/26:** por eso hay que publicar antes de que haya votaciones en la 26/27.
+- **Un solo script para todas las temporadas:** el proyecto nuevo de Apps Script (creado desde la hoja de la 26/27) tiene su propia URL, y abre las dos hojas. El proyecto antiguo se queda sin tocar para las apps que aún no se hayan actualizado, que siguen votando en la 24/26. Comprobado con peticiones que el script rechaza sin escribir. El recordatorio de OneSignal va en el proyecto nuevo: la propiedad `ONESIGNAL_API_KEY` y el activador hay que pasarlos allí, y quitar el activador del antiguo.
 - **La hoja de la 26/27** ya está en `js/temporadas.js` y en `votos.gs`. Las pruebas la sustituyen por una de mentira: nunca la escriben.
 
 ### Pruebas
