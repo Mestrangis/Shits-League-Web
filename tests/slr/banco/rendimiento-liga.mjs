@@ -22,7 +22,7 @@ const dormir = ms => new Promise(r => setTimeout(r, ms));
 const SUPA = new URL(SUPABASE_URL).host;
 const UA = 'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Mobile Safari/537.36';
 // ¿Es de Rush? (código, CSS e iconos de Rush, Supabase y las fotos de las cartas)
-const deRush = url => { const u = new URL(url); return u.host === SUPA || (u.host === 'res.cloudinary.com' && u.pathname.includes('c_fill,ar_5:7'))
+const deRush = url => { const u = new URL(url); if (u.pathname.endsWith('/rest/v1/ajustes')) return false; return u.host === SUPA || (u.host === 'res.cloudinary.com' && u.pathname.includes('c_fill,ar_5:7'))
   || /^\/(js\/slr\/|css\/slr\.css|css\/acabados\/|img\/slr\/)/.test(decodeURIComponent(u.pathname)); };
 
 const tk = (await rpcOk('slr_login', { codigo: env.SLR_BOT_UNO_CODIGO })).token;
@@ -123,7 +123,7 @@ try {
     await dormir(1000);
     res.caliente = await abrirLiga(page);
     // JUGAR por primera vez, con la app ya abierta y quieta
-    await page.click('.tab[data-tab="rush"]');
+    await page.evaluate(() => abrirPortadaRush());   // Rush solo existe en su temporada
     await page.waitForSelector('#rushJugar:not([disabled])', { timeout: 30000 });
     await dormir(1500);
     registro = { t0: Date.now(), lista: [] };

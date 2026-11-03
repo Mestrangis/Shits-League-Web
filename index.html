@@ -39,12 +39,9 @@
     <div class="topbar__right">
       <div class="topbar__season" id="seasonToggle">
         <span class="topbar__season-dot"></span>
-        <span id="seasonLabel">TEMPORADA 25/26</span>
+        <span id="seasonLabel"></span>
         <span class="topbar__season-arrow">▾</span>
-        <div class="season-dropdown" id="seasonDropdown">
-          <button class="season-dropdown__item active" data-season="25-26">Temporada 25/26</button>
-          <button class="season-dropdown__item" data-season="23-24">Temporada 23/24</button>
-        </div>
+        <div class="season-dropdown" id="seasonDropdown"></div>
       </div>
       <button class="session-btn" id="sessionBtn" type="button"></button>
     </div>
@@ -82,6 +79,7 @@
               <button type="button" class="pie-app__reparar" data-reparar-app>Reparar la app</button>
             </footer>
           </div>
+          <div class="pagina" data-pagina="rush"><div class="tab-panel" id="panel-rush" role="tabpanel"></div></div>
           <div class="pagina" data-pagina="votacion"><div class="tab-panel" id="panel-votacion" role="tabpanel"></div></div>
           <div class="pagina" data-pagina="mvp"><div class="tab-panel" id="panel-mvp" role="tabpanel"></div></div>
           <div class="pagina" data-pagina="resumen"><div class="tab-panel" id="panel-resumen" role="tabpanel"></div></div>
@@ -91,8 +89,6 @@
           <div class="pagina" data-pagina="plantilla"><div class="tab-panel" id="panel-plantilla" role="tabpanel"></div></div>
         </div>
       </div>
-      <!-- Rush, fuera del carril: con el scroll de la ventana -->
-      <div class="tab-panel" id="panel-rush" role="tabpanel"></div>
     </main>
   </div>
 
@@ -171,6 +167,7 @@
 
   <!-- Versión de la app: service worker, «Hay una versión nueva» y actualización forzada -->
   <script src="js/version.js"></script>
+  <script src="js/temporadas.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/sheets.js"></script>
   <script src="js/calendar.js"></script>

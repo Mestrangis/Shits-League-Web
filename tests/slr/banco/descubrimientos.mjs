@@ -50,7 +50,7 @@ try {
     const cabe = sel => page.evaluate(s => [...document.querySelectorAll(s)].every(e => { const r = e.getBoundingClientRect(); return r.left >= -1 && r.right <= innerWidth + 1; }), sel);
     const atras = async () => { await page.evaluate(() => history.back()); await dormir(600); };
     await page.goto(URL_APP);
-    await page.click('.tab[data-tab="rush"]');
+    await page.evaluate(() => abrirPortadaRush());   // Rush solo existe en su temporada
     await page.waitForSelector('#rushJugar:not([disabled])', { timeout: 30000 });
     await page.$eval('#rushJugar', b => b.click());
     await page.waitForSelector('.slr-nav:not([hidden])', { timeout: 60000 });

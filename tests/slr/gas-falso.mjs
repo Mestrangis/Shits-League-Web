@@ -21,7 +21,9 @@ export function dia(desplazamiento = 0) {
 }
 
 // hojas: { nombre: [[cabecera], [fila]…] } (todo texto, como lo ve la web)
-export function crearGas(hojas) {
+// opciones: otra: { id, hojas } la hoja de la 26/27; enCurso: lo que responde Supabase
+export function crearGas(principal, { otra = null, enCurso = null } = {}) {
+  const libroDe = hojas => {
   const hoja = nombre => ({
     getDataRange: () => ({
       getValues: () => hojas[nombre].map(f => [...f]),
@@ -38,12 +40,15 @@ export function crearGas(hojas) {
     insertColumnBefore: () => { hojas[nombre].forEach(f => f.unshift('')); },
     appendRow: valores => { hojas[nombre].push(valores.map(String)); },
   });
-  const libro = {
+  return {
     getSheetByName: n => (hojas[n] ? hoja(n) : null),
     insertSheet: n => { hojas[n] = []; return hoja(n); },
   };
+  };
+  const libro = libroDe(principal);
+  const estado = { enCurso };
   const contexto = vm.createContext({
-    SpreadsheetApp: { openById: () => libro },
+    SpreadsheetApp: { openById: id => (otra && id === otra.id ? libroDe(otra.hojas) : libro) },
     LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
     ContentService: {
       MimeType: { JSON: 'json' },
@@ -56,12 +61,17 @@ export function crearGas(hojas) {
       },
     },
     PropertiesService: { getScriptProperties: () => ({ getProperty: () => null }) },
-    UrlFetchApp: { fetch() { throw new Error('sin red en las pruebas'); } },
+    UrlFetchApp: { fetch() {
+      if (!estado.enCurso) throw new Error('sin red en las pruebas');
+      return { getResponseCode: () => 200, getContentText: () => JSON.stringify([{ valor: estado.enCurso }]) };
+    } },
   });
-  vm.runInContext(readFileSync(RUTA, 'utf8'), contexto);
+  const codigo = readFileSync(RUTA, 'utf8').replace(/\r\n/g, '\n');
+  vm.runInContext(otra ? codigo.replace("'26-27': ''", `'26-27': '${otra.id}'`) : codigo, contexto);
   const doPost = contexto.doPost;
   return {
-    hojas,
+    hojas: principal,
+    estado,
     // Lo que recibe el Apps Script: el texto del POST. Devuelve el JSON que respondería
     post: texto => JSON.parse(doPost({ postData: { contents: texto } })),
     votar: datos => JSON.parse(doPost({ postData: { contents: JSON.stringify({ secret: 'pissleague', ...datos }) } })),

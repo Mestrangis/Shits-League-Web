@@ -154,6 +154,47 @@ test('la hoja de antes (sin fecha_partido) se convierte sin perder nada', () => 
   assert.equal(g.hojas.MVPs[2].slice(0, 3).join(), `${F},17,Markis`);
 });
 
+test('cada temporada escribe en SU hoja', () => {
+  const nueva = { Jugadores: FICHAS, Jornadas: [CAB_JORNADAS, jornada({ numero: 1, fecha: '2027-01-10', jugadores_local: 'Markis, Nico', jugadores_visitante: 'Pablín' })],
+    Votaciones: [CAB_VOTACIONES, fila(CAB_VOTACIONES, { id: '1', fecha: '2030-01-01' })] };
+  const vieja = () => ({ Jugadores: FICHAS, Jornadas: [CAB_JORNADAS, jornada({ numero: 1, fecha: F, jugadores_local: 'Markis, Nico', jugadores_visitante: 'Pablín' })],
+    Votaciones: [CAB_VOTACIONES, fila(CAB_VOTACIONES, { id: '1', fecha: '2030-01-01' })] });
+  const antigua = vieja();
+  const g = crearGas(antigua, { otra: { id: 'H2627', hojas: nueva } });
+  assert.equal(g.votar(voto({ temporada: '26-27', fecha: '2027-01-10' })).ok, true);
+  assert.equal(nueva.MVPs.length, 2);
+  assert.equal(antigua.MVPs, undefined, 'la otra hoja ni se toca');
+  assert.equal(g.votar(voto({ temporada: '24-26' })).ok, true);
+  assert.equal(antigua.MVPs.length, 2);
+  // Una app de antes de las temporadas no manda ninguna: es la 24/26
+  assert.equal(g.votar(voto({ votante: 'Nico', votos: [{ nombre: 'Markis', puntos: 3 }] })).ok, true);
+  assert.equal(antigua.MVPs.length, 3);
+  assert.equal(g.votar({ action: 'votar', temporada: '26-27', id: '1', nombre: 'Marcos', voto: 'si' }).ok, true);
+  assert.equal(nueva.Votaciones[1][CAB_VOTACIONES.indexOf('jugadores_si')], 'Marcos');
+  assert.equal(antigua.Votaciones[1][CAB_VOTACIONES.indexOf('jugadores_si')], '');
+});
+
+test('una temporada de archivo ya no se vota; una próxima, sí', () => {
+  const vieja = { Jugadores: FICHAS, Jornadas: [CAB_JORNADAS, jornada({ numero: 1, fecha: F, jugadores_local: 'Markis, Nico', jugadores_visitante: 'Pablín' })], Votaciones: [CAB_VOTACIONES, fila(CAB_VOTACIONES, { id: '1', fecha: '2030-01-01' })] };
+  const nueva = { Jugadores: FICHAS, Jornadas: [CAB_JORNADAS, jornada({ numero: 1, fecha: F, jugadores_local: 'Markis, Nico', jugadores_visitante: 'Pablín' })] };
+  const g = crearGas(vieja, { otra: { id: 'H2627', hojas: nueva }, enCurso: '26-27' });
+  assert.match(g.votar(voto({ temporada: '24-26' })).error, /terminado/);
+  assert.match(g.votar({ action: 'votar', temporada: '24-26', id: '1', nombre: 'Marcos', voto: 'si' }).error, /terminado/);
+  assert.equal(vieja.MVPs, undefined);
+  assert.equal(g.votar(voto({ temporada: '26-27' })).ok, true);
+  g.estado.enCurso = '24-26';
+  assert.equal(g.votar(voto({ temporada: '24-26' })).ok, true);
+  assert.equal(g.votar(voto({ temporada: '26-27', votante: 'Nico', votos: [{ nombre: 'Markis', puntos: 3 }] })).ok, true, 'antes del pistoletazo, los beta prueban en la nueva');
+});
+
+test('una temporada sin hoja o sin pestañas responde claro', () => {
+  const g = montar();
+  assert.match(g.votar(voto({ temporada: '26-27' })).error, /aún no tiene hoja/);
+  assert.match(g.votar(voto({ temporada: '99-00' })).error, /no existe/);
+  const h = crearGas({ Jugadores: FICHAS, Jornadas: [CAB_JORNADAS] }, { otra: { id: 'H2627', hojas: { Jugadores: FICHAS, Jornadas: [CAB_JORNADAS] } } });
+  assert.match(h.votar({ action: 'votar', temporada: '26-27', id: '1', nombre: 'Marcos', voto: 'si' }).error, /aún no tiene votaciones/);
+});
+
 test('el secreto y un cuerpo roto responden JSON', () => {
   const g = montar();
   assert.equal(g.post(JSON.stringify({ secret: 'mal', ...voto() })).error, 'Unauthorized');

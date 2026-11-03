@@ -171,6 +171,7 @@ button, [role="button"], .modal__backdrop, .tab, .result-row, .card-wrap, .voto-
 }
 .season-dropdown__item:hover { background: rgba(31,224,101,.08); color: #E8FBEF; }
 .season-dropdown__item.active { color: var(--verde); }
+.season-corta { display: none; }
 .topbar__season-dot {
   width: 7px;
   height: 7px;
@@ -466,22 +467,9 @@ button, [role="button"], .modal__backdrop, .tab, .result-row, .card-wrap, .voto-
 }
 .tab-panel.active, .pagina .tab-panel { display: block; }
 
-/* Rush y las temporadas archivadas, como una página normal: con el scroll de la ventana */
-body.en-rush, body.archivo { display: block; height: auto; min-height: 100vh; overflow-x: hidden; overflow-y: visible; }
-body.en-rush .app-zona { overflow: visible; }
-body.en-rush .main { position: relative; inset: auto; overflow-x: clip; }
-body.en-rush .tabs {
-  position: sticky;
-  top: calc(var(--topbar-h) + var(--safe-top));
-  transform: none !important;
-  will-change: auto;
-  background: rgba(6, 20, 13, 0.82);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-}
-body.en-rush .topbar, body.archivo .topbar { backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
-/* Fuera del todo, no solo invisibles: si no, sus vídeos e imágenes se descargarían estando en Rush */
-body.en-rush .paginas { display: none; }
+/* Las temporadas de solo imágenes, como una página normal: con el scroll de la ventana */
+body.archivo { display: block; height: auto; min-height: 100vh; overflow-x: hidden; overflow-y: visible; }
+body.archivo .topbar { backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
 body.archivo .app-zona { display: none; }
 
 /* ── Section heading (used in all tabs) ── */
@@ -920,9 +908,10 @@ body.archivo .app-zona { display: none; }
 @media (max-width: 640px) {
   :root { --topbar-h: 54px; }
   .topbar { padding: 10px clamp(12px,4vw,24px); padding-top: calc(10px + var(--safe-top)); }
-  .topbar__season { font-size: 0; gap: 6px; padding: 7px 10px; }
+  .topbar__season { gap: 6px; padding: 7px 10px; }
   .topbar__season-dot, .topbar__season-arrow { font-size: 10px; }
-  #seasonLabel { font-size: 0; }
+  .season-larga { display: none; }
+  .season-corta { display: inline; }
   .season-dropdown { right: -8px; }
   .result-row {
     grid-template-columns: 48px 1fr auto 1fr;
@@ -1562,7 +1551,6 @@ body.archivo .app-zona { display: none; }
   padding: 26px 16px calc(28px + env(safe-area-inset-bottom, 0px)); color: #6E8F7C; font-size: 12px; }
 .pie-app__reparar { padding: 4px 10px; border: 1px solid rgba(110,143,124,.4); border-radius: 999px; background: none;
   color: inherit; font: inherit; cursor: pointer; }
-body.en-rush .pie-app { display: none; }
 .version-actualizando__pct { min-height: 1em; color: #DCEFE3; font-variant-numeric: tabular-nums; }
 
 /* ═══════════════════════════════════════════════
@@ -1603,6 +1591,7 @@ body.en-rush .pie-app { display: none; }
   gap: 12px;
 }
 .pendientes .sh { margin-bottom: 0; }
+.pendientes__nota { margin-top: -6px; font-size: 12px; color: #6E9D81; }
 .pendientes__pila { position: relative; }
 /* La misma carta de Votación, con el 60 % de su altura (4:5 → 4:3) */
 .pendientes .voto { content-visibility: visible; gap: 8px; }

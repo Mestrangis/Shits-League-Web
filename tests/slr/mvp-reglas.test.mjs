@@ -22,7 +22,7 @@ function cargar(previo = {}) {
     window: { matchMedia: () => ({ matches: false }), addEventListener() {} },
     location: { hash: '' }, history: { replaceState() {} },
   });
-  for (const f of ['js/ui.js', 'js/sheets.js', 'js/session.js', 'js/votacion.js', 'js/mvp.js', 'js/app.js']) vm.runInContext(raiz(f), contexto);
+  for (const f of ['js/temporadas.js', 'js/ui.js', 'js/sheets.js', 'js/session.js', 'js/votacion.js', 'js/mvp.js', 'js/app.js']) vm.runInContext(raiz(f), contexto);
   return {
     ev: codigo => vm.runInContext(codigo, contexto),
     almacen,

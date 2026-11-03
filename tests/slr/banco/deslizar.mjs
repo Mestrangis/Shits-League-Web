@@ -126,11 +126,11 @@ try {
       await quieta(page);
       check(await activa(page) === 'inicio', 'soltar rápido aunque sea poca distancia: cambia');
 
-      // A la derecha de Inicio no hay nada, y Rush no cuenta
+      // A la izquierda de Inicio no hay nada: en la 24/26 no existe Rush
       await page.evaluate(() => rushMostrarPestana(true));
       await gesto(60, 300, pasosX(ancho * 0.6, 8));
       await quieta(page);
-      check(await activa(page) === 'inicio' && !await page.$eval('body', b => b.classList.contains('en-rush')), 'deslizando no se entra en Rush');
+      check(await activa(page) === 'inicio' && await page.$eval('.tab[data-tab="rush"]', t => t.hidden), 'en la 24/26 no hay Rush al que llegar');
       check(errores.length === 0, 'sin errores', errores.join());
       await ctx.close();
     }
@@ -277,21 +277,6 @@ try {
       check(dura < 600, 'y es rápido', `${dura} ms`);
       check(await page.$eval('.pagina[data-pagina="plantilla"]', p => { const r = p.getBoundingClientRect(); return r.left === 0; }), 'y llega a su sitio');
 
-      // Rush: se entra con su botón y al salir todo sigue donde estaba
-      await page.evaluate(() => rushMostrarPestana(true));
-      await scroll('plantilla', 150);
-      await irTab(page, 'rush');
-      check(await page.$eval('body', b => b.classList.contains('en-rush')), 'Rush con su botón');
-      const rushVis = await page.$eval('#panel-rush', p => p.getBoundingClientRect().height > 50 && getComputedStyle(p).display !== 'none');
-      check(rushVis, 'se ve su portada');
-      check(await page.$eval('#hero-section', h => h.offsetHeight) === 0, 'sin cabecera');
-      check(await page.$eval('.pagina--inicio', p => p.offsetHeight) === 0, 'y las páginas fuera, sin descargar nada estando en Rush');
-      const r1 = await rect(page, '#panel-rush');
-      await gesto(medio + 100, r1.top + 100, pasosX(-ancho * 0.6, 8));
-      await quieta(page);
-      check(await activa(page) === 'rush', 'deslizando no se sale de Rush');
-      await irTab(page, 'plantilla');
-      check(!await page.$eval('body', b => b.classList.contains('en-rush')) && await leer('plantilla') === 150, 'al salir de Rush, con su scroll');
       check(errores.length === 0, 'sin errores', errores.join());
       await ctx.close();
     }

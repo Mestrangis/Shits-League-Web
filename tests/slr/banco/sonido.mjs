@@ -54,7 +54,7 @@ try {
   const total = Number(await (async () => { await page.goto(URL_APP); return page.evaluate(`${S}.then(m => m.estadoSonidos().total)`); })());
 
   console.log('\nDescarga');
-  await page.click('.tab[data-tab="rush"]');
+  await page.evaluate(() => abrirPortadaRush());   // Rush solo existe en su temporada
   await page.waitForSelector('#rushJugar:not([disabled])');
   await dormir(1500);
   check(!pedidos.length, `antes de JUGAR, ningún sonido pedido (${pedidos.length})`);

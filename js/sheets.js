@@ -4,7 +4,6 @@
    Los votos se escriben via Google Apps Script (postVoto).
 ═══════════════════════════════════════════════ */
 
-const SHEETS_ID  = '1EHGrFt2Y3QDCOdSV3fVgWvspzXYcir4SmDxOezdSLRY';
 const SHEETS_KEY = 'AIzaSyC5TLnk-zGTAia4HZNvv77PgY2FtXYfhdc';
 
 // Nombre exacto de las pestañas en el spreadsheet
@@ -19,8 +18,11 @@ const VOTOS_GAS_SECRET = 'pissleague';
 
 // ── Core ──────────────────────────────────────────────────────────────────
 
+// Cada temporada lee SU hoja (js/temporadas.js)
+const hojaDeLaTemporada = () => temporadaPorId(STATE.season)?.hoja || '';
+
 function sheetsUrl(sheetName) {
-  return `https://sheets.googleapis.com/v4/spreadsheets/${SHEETS_ID}/values/${encodeURIComponent(sheetName)}?key=${SHEETS_KEY}`;
+  return `https://sheets.googleapis.com/v4/spreadsheets/${hojaDeLaTemporada()}/values/${encodeURIComponent(sheetName)}?key=${SHEETS_KEY}`;
 }
 
 // Fila 1 = cabeceras → devuelve array de objetos
@@ -34,8 +36,11 @@ function parseSheet(data) {
     ));
 }
 
+// Una temporada sin hoja o una pestaña que aún no existe (HTTP 400) es lo mismo que sin datos
 async function sheetsFetch(sheetName) {
+  if (!hojaDeLaTemporada()) return [];
   const res = await fetch(sheetsUrl(sheetName), { cache: 'no-store' });
+  if (res.status === 400) return [];
   if (!res.ok) throw new Error(`HTTP ${res.status} al leer "${sheetName}"`);
   return parseSheet(await res.json());
 }
@@ -114,7 +119,7 @@ async function fetchVotaciones() {
 
 // ── MVPs ──────────────────────────────────────────────────────────────────
 // Pestaña: fecha_partido | jornada | votante | voto_1 | puntos_1 | voto_2 | puntos_2 | voto_3 | puntos_3 | fecha_voto
-// Devuelve null si no se ha podido leer. Sin la hoja (HTTP 400): no hay votos. El número de jornada
+// Devuelve null si no se ha podido leer. El número de jornada
 // es solo informativo: las filas de antes de fecha_partido solo lo llevan a él (mvp.js → fechaDeFila).
 async function fetchMVPs() {
   try {
@@ -127,7 +132,6 @@ async function fetchMVPs() {
       fecha_voto: r.fecha_voto || '',
     }));
   } catch (e) {
-    if (String(e.message).includes('HTTP 400')) return [];
     console.warn('[sheets] fetchMVPs:', e);
     return null;
   }
@@ -141,7 +145,7 @@ async function postScript(datos) {
     res = await fetch(VOTOS_GAS_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ secret: VOTOS_GAS_SECRET, ...datos }),
+      body: JSON.stringify({ secret: VOTOS_GAS_SECRET, temporada: STATE.season, ...datos }),
     });
   } catch {
     throw new Error('No se ha podido enviar. Revisa la conexión e inténtalo otra vez.');

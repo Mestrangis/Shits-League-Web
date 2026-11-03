@@ -3,9 +3,10 @@
    Pestaña "Rush": portada ligera de Shits League Rush y el puente con la
    sesión de Shits League (session.js). Aquí no hay nada del juego: el modo
    Rush (js/slr/rush.js + css/slr.css) se carga al pulsar JUGAR.
-   Rush está en beta: la pestaña solo aparece con sesión y acceso. El acceso lo
-   dice el servidor (slr_login → tiene_acceso) al iniciar sesión y se guarda en
-   localStorage; al arrancar se usa lo guardado.
+   La pestaña solo existe en la temporada con Rush (js/temporadas.js). Antes de empezar
+   esa temporada, solo con sesión y acceso; después, para todos. El acceso lo dice el
+   servidor (slr_login → tiene_acceso) al iniciar sesión y se guarda en localStorage;
+   al arrancar se usa lo guardado.
    · NADA de Rush (código, Supabase, fotos) se pide antes de pulsar JUGAR: la
      Shits League normal carga sola, sin competir. El estado de la portada es el
      que guardó Rush la última vez (localStorage).
@@ -65,12 +66,18 @@ function rushAccesoGuardado() {
   } catch { return null; }
 }
 
-// Muestra u oculta la pestaña; si se oculta estando en ella, se vuelve a Inicio
+// ¿Se ve la pestaña en la temporada que se está viendo?
+let rushConAcceso = false;
+function rushPestanaVisible() {
+  const t = temporadaPorId(STATE.season);
+  return !!t?.rush && (modoTemporada(t) === 'en_curso' || rushConAcceso);
+}
+
+// Con acceso o sin él. Si se oculta estando en ella, aplicarOrdenTabs vuelve a la de por defecto.
 function rushMostrarPestana(visible) {
-  const tab = document.querySelector('.tab[data-tab="rush"]');
-  if (!tab || tab.hidden === !visible) return;
-  tab.hidden = !visible;
-  if (!visible && typeof STATE !== 'undefined' && STATE.activeTab === 'rush') switchTab('inicio');
+  rushConAcceso = !!visible;
+  if (typeof STATE === 'undefined' || typeof aplicarOrdenTabs !== 'function') return;
+  if (document.getElementById('tabs') && document.querySelector('.tabs__indicador')) aplicarOrdenTabs();
 }
 
 function rushGuardarAcceso(acceso) {
@@ -79,6 +86,7 @@ function rushGuardarAcceso(acceso) {
     else localStorage.removeItem(RUSH_ACCESO_KEY);
   } catch { /* sin persistencia */ }
   rushMostrarPestana(!!acceso && !!getSessionPlayer());
+  if (typeof revisarTemporadaVista === 'function' && typeof STATE !== 'undefined') revisarTemporadaVista();
 }
 
 /* ── Lo de la entrada a Rush, pedido al pulsar JUGAR ─────────────────────────
@@ -280,7 +288,7 @@ function rushTrasRecarga() {
   let entrar = false;
   try { entrar = sessionStorage.getItem('SL_ENTRAR_RUSH') === '1'; sessionStorage.removeItem('SL_ENTRAR_RUSH'); } catch { /* */ }
   if (!entrar || !getSessionPlayer()) return;
-  if (typeof switchTab === 'function') switchTab('rush');
+  abrirPortadaRush();
   rushJugar();
 }
 
@@ -327,7 +335,7 @@ async function rushJugar() {
       reautenticar: rushReautenticar,
       sesionPerdida: rushSesionPerdida,
       sinAcceso: rushSinAcceso,
-      alSalir: () => rerenderPanel('rush'),
+      alSalir: () => { rerenderPanel('rush'); prepararVecinas(); },
     });
   } catch (e) {
     console.error('[rush] No se pudo abrir Rush:', e);

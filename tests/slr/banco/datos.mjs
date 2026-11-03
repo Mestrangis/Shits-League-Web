@@ -48,7 +48,7 @@ try {
     const foto = async n => { if (SALIDA) await page.screenshot({ path: `${SALIDA}/datos-${ancho}-${n}.png` }); };
     // Llamadas a Supabase (POST de rpc y GET de lecturas), por nombre
     const llamadas = [];
-    page.on('request', r => { const u = r.url(); if (u.includes('supabase.co/rest/v1/') && r.method() !== 'OPTIONS') llamadas.push(u.split('/rest/v1/')[1].replace(/^rpc\//, '').split('?')[0]); });
+    page.on('request', r => { const u = r.url(); if (u.includes('supabase.co/rest/v1/') && !u.includes('/rest/v1/ajustes') && r.method() !== 'OPTIONS') llamadas.push(u.split('/rest/v1/')[1].replace(/^rpc\//, '').split('?')[0]); });
     const contar = nombre => llamadas.filter(x => x === nombre).length;
     // Retraso a voluntad de una función (para ver la rueda y las respuestas tardías)
     const lentas = new Map();

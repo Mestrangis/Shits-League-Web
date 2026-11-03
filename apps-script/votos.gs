@@ -1,9 +1,42 @@
 // Apps Script de las votaciones de la Shits League: se pega entero en el editor de Apps Script.
 // La clave privada de OneSignal NO está aquí: va en las propiedades del script (ONESIGNAL_API_KEY).
 const SECRET   = 'pissleague';
-const SHEET_ID = '1EHGrFt2Y3QDCOdSV3fVgWvspzXYcir4SmDxOezdSLRY';
 const ZONA     = 'Europe/Madrid';
+// La hoja de cada temporada, de la más vieja a la más nueva (las mismas que js/temporadas.js)
+const HOJAS = {
+  '24-26': '1EHGrFt2Y3QDCOdSV3fVgWvspzXYcir4SmDxOezdSLRY',
+  '26-27': '',
+};
+// De dónde sale la temporada en curso: la lectura pública de Supabase, sin nada secreto
+const SUPABASE_URL = 'https://vtqhefwspnqsjskqkxqg.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_VOrswpNPw1A9U4QoKEWdGQ_Rwr0DR4H';
 const CABECERA_MVPS = ['fecha_partido', 'jornada', 'votante', 'voto_1', 'puntos_1', 'voto_2', 'puntos_2', 'voto_3', 'puntos_3', 'fecha_voto'];
+
+// La temporada en curso; null si no se ha podido saber
+function temporadaEnCurso() {
+  try {
+    const r = UrlFetchApp.fetch(`${SUPABASE_URL}/rest/v1/ajustes?clave=eq.temporada_en_curso&select=valor`, {
+      headers: { apikey: SUPABASE_KEY }, muteHttpExceptions: true,
+    });
+    if (r.getResponseCode() !== 200) return null;
+    const id = JSON.parse(r.getContentText())[0]?.valor;
+    return HOJAS[id] !== undefined ? id : null;
+  } catch (err) {
+    return null;
+  }
+}
+
+// El libro en el que se vota; { error } si esa temporada no admite votos. Sin temporada en el
+// mensaje es una app de antes de las temporadas: la 24/26. Una de archivo ya no se vota.
+function libroDeVotos(body) {
+  const id = body.temporada || '24-26';
+  if (HOJAS[id] === undefined) return { error: 'Esa temporada no existe' };
+  if (!HOJAS[id]) return { error: 'Esa temporada aún no tiene hoja' };
+  const orden = Object.keys(HOJAS);
+  const curso = temporadaEnCurso();
+  if (curso && orden.indexOf(id) < orden.indexOf(curso)) return { error: 'Esa temporada ya ha terminado: no se puede votar' };
+  return { libro: SpreadsheetApp.openById(HOJAS[id]) };
+}
 
 function doPost(e) {
   try {
@@ -20,11 +53,14 @@ function doPost(e) {
 function votar(body) {
   if (body.voto !== 'si' && body.voto !== 'no') return { ok: false, error: 'Voto inválido' };
   if (!body.nombre) return { ok: false, error: 'Falta el nombre' };
+  const { libro, error } = libroDeVotos(body);
+  if (error) return { ok: false, error };
 
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
-    const sh   = SpreadsheetApp.openById(SHEET_ID).getSheetByName('Votaciones');
+    const sh   = libro.getSheetByName('Votaciones');
+    if (!sh) return { ok: false, error: 'Esa temporada aún no tiene votaciones' };
     const data = sh.getDataRange().getValues();
     const head = data[0].map(h => String(h).trim());
     const cId = head.indexOf('id'), cSi = head.indexOf('jugadores_si'), cNo = head.indexOf('jugadores_no');
@@ -101,11 +137,12 @@ function hojaMVPs(libro, oficiales) {
 }
 
 function votarMVP(body) {
+  const { libro, error } = libroDeVotos(body);
+  if (error) return { ok: false, error };
+
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
-    const libro = SpreadsheetApp.openById(SHEET_ID);
-
     // Los que tienen ficha en Jugadores, por nombre o alias → su nombre canónico
     const fichas = {};
     filasDe(libro.getSheetByName('Jugadores')).forEach(p => {
@@ -171,7 +208,11 @@ function recordatorioVotacion() {
   const apiKey = PropertiesService.getScriptProperties().getProperty('ONESIGNAL_API_KEY');
   if (!apiKey) throw new Error('Falta la propiedad del script ONESIGNAL_API_KEY');
 
-  const sh   = SpreadsheetApp.openById(SHEET_ID).getSheetByName('Votaciones');
+  // Las fechas de la temporada en curso; si no se puede saber, no se avisa de nada dudoso
+  const curso = temporadaEnCurso();
+  if (!curso || !HOJAS[curso]) return;
+  const sh   = SpreadsheetApp.openById(HOJAS[curso]).getSheetByName('Votaciones');
+  if (!sh) return;
   const data = sh.getDataRange().getValues();
   const head = data[0].map(h => String(h).trim());
   const cFecha = head.indexOf('fecha');

@@ -28,7 +28,8 @@ let ok = 0, mal = 0;
 const check = (c, que, det = '') => { c ? ok++ : mal++; console.log(`${c ? '  ✔' : '  ✖'} ${que}${!c && det ? ` → ${det}` : ''}`); };
 const UA = 'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Mobile Safari/537.36';
 const SUPA = new URL(SUPABASE_URL).host;
-const deRush = url => { const u = new URL(url); return u.host === SUPA || (u.host === 'res.cloudinary.com' && u.pathname.includes('c_fill,ar_5:7'))
+// (la temporada en curso sí se pregunta al arrancar: js/temporadas.js)
+const deRush = url => { const u = new URL(url); if (u.pathname.endsWith('/rest/v1/ajustes')) return false; return u.host === SUPA || (u.host === 'res.cloudinary.com' && u.pathname.includes('c_fill,ar_5:7'))
   || /^\/(js\/slr\/|css\/slr\.css|css\/acabados\/|img\/slr\/|assets\/slr-)/.test(decodeURIComponent(u.pathname)); };
 
 /* ── Despliegues de prueba ───────────────────────────────────────────────── */
@@ -82,7 +83,7 @@ try {
   const foto = async (page, n) => { if (SALIDA) await page.screenshot({ path: `${SALIDA}/version-${n}.png` }); };
   // JUGAR: si sale la barra, sus porcentajes; espera a estar dentro de Rush
   const jugar = async page => {
-    await page.click('.tab[data-tab="rush"]').catch(() => {});
+    await page.evaluate(() => abrirPortadaRush()).catch(() => {});   // Rush solo existe en su temporada
     await page.waitForSelector('#rushJugar:not([disabled])', { timeout: 30000 });
     await page.$eval('#rushJugar', b => b.click());
     const pcts = [];
@@ -121,7 +122,7 @@ try {
   await salirDeRush(dos.page);
   const e1 = await estado(uno.page);
   check(e1.rush && e1.app, 'A entera (la Shits League y Rush)');
-  await uno.page.click('.tab[data-tab="rush"]');
+  await uno.page.evaluate(() => abrirPortadaRush());
   await jugar(uno.page);
   await uno.page.click('.slr-nav__item[data-seccion="perfil"]');
   await uno.page.waitForSelector('.slr-perfil__version [data-version-app]');

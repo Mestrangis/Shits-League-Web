@@ -2,7 +2,7 @@
    SHITS LEAGUE — paginas.js
    Las pestañas como páginas de un carril: cada una tiene su propio scroll vertical
    y se pasa de una a otra moviendo el carril, solo con transform. Al deslizar, la
-   pantalla sigue al dedo. Rush queda fuera: se entra y se sale con su botón.
+   pantalla sigue al dedo. Se llega a la portada de Rush, pero al juego solo con JUGAR.
    La cabecera (hero) va dentro de la página de Inicio; la barra de pestañas flota
    encima: debajo de la cabecera en Inicio y arriba del todo en el resto.
 ═══════════════════════════════════════════════ */
@@ -18,19 +18,24 @@ const GESTO_EXCLUIR = '.voto-card--swipe, .mvp-cartas, .modal, iframe, input, te
 
 const paginaDe = name => document.querySelector(`.pagina[data-pagina="${name}"]`);
 const tabDe = name => document.querySelector(`.tab[data-tab="${name}"]`);
-const estaEnRush = () => document.body.classList.contains('en-rush');
+const estaEnRush = () => document.documentElement.classList.contains('slr-abierto');   // el juego, abierto encima
 
 let gestoActivo = false;
 let terminarTransicion = () => {};
 let heroAlto = 0;
 
-/* ── Orden de las pestañas ───────────────────────────────────────────────── */
-// Partidos solo si hay alguno que votar. MVP después de Partidos mientras haya una votación
-// en curso; si no, al final, entre Asistentes y Plantilla
+/* ── Las pestañas de la temporada que se ve ──────────────────────────────── */
+const tabPorDefecto = () => (modoTemporada(temporadaPorId(STATE.season)) === 'archivo' ? 'clasificacion' : 'inicio');
+
+// Archivo: solo el historial. En curso o próxima: todas; Partidos solo si hay alguno que votar,
+// y MVP después de Partidos mientras haya una votación en curso (si no, entre Asistentes y Plantilla)
 function ordenTabs() {
+  const t = temporadaPorId(STATE.season);
+  if (t.imagenes) return [];
+  if (modoTemporada(t) === 'archivo') return ['clasificacion', 'resumen', 'goleadores', 'asistentes', 'plantilla', 'mvp'];
   const partidos = votacionesFuturas().length > 0;
   const enCurso = partidosOficiales().some(mvpAbierta);
-  return ['rush', 'inicio',
+  return [...(t.rush ? ['rush'] : []), 'inicio',
     ...(partidos ? ['votacion'] : []),
     ...(enCurso ? ['mvp'] : []),
     'resumen', 'clasificacion', 'goleadores', 'asistentes',
@@ -38,36 +43,21 @@ function ordenTabs() {
     'plantilla'];
 }
 
-// Las que se ven (la de Rush depende de la sesión y del acceso a la beta)
-const tabsVisibles = () => ordenTabs().filter(t => !tabDe(t)?.hidden);
-// Las que se recorren deslizando
-const tabsDeslizables = () => ordenTabs().filter(t => t !== 'rush');
+// Las que se ven (la de Rush depende además de la sesión y del acceso) y por las que se desliza:
+// la portada de Rush también; el juego, solo con JUGAR
+const tabsVisibles = () => ordenTabs().filter(t => t !== 'rush' || rushPestanaVisible());
+const tabsDeslizables = tabsVisibles;
 
 function aplicarOrdenTabs() {
   if (gestoActivo) return;   // al soltar, con el orden nuevo
-  const orden = ordenTabs();
-  tabDe('votacion').hidden = !orden.includes('votacion');
+  const orden = tabsVisibles();
   const inner = document.querySelector('.tabs__inner');
-  const ahora = [...inner.querySelectorAll('.tab')].map(t => t.dataset.tab).filter(t => t !== 'votacion' || orden.includes(t));
-  if (ahora.join() !== orden.join()) orden.forEach(t => inner.appendChild(tabDe(t)));
-  if (!orden.includes(STATE.activeTab) && STATE.activeTab !== 'rush') { switchTab('inicio', { animar: false }); return; }
+  document.querySelectorAll('.tab').forEach(b => { b.hidden = !orden.includes(b.dataset.tab); });
+  const ahora = [...inner.querySelectorAll('.tab')].map(b => b.dataset.tab).filter(n => orden.includes(n));
+  if (ahora.join() !== orden.join()) orden.forEach(n => inner.appendChild(tabDe(n)));
+  if (orden.length && !orden.includes(STATE.activeTab)) { switchTab(tabPorDefecto(), { animar: false }); return; }
   colocarPaginas();
   pintarIndicador();
-}
-
-/* ── Entrar y salir de Rush ──────────────────────────────────────────────── */
-// Rush usa el scroll de la ventana y las páginas no están: cada una recupera el suyo al volver
-let scrollsAlEntrarEnRush = null;
-function cambiarARush(enRush) {
-  if (enRush) {
-    scrollsAlEntrarEnRush = [...document.querySelectorAll('.pagina')].map(p => [p, p.scrollTop]);
-  }
-  document.body.classList.toggle('en-rush', enRush);
-  window.scrollTo({ top: 0, behavior: 'instant' });
-  if (!enRush) {
-    scrollsAlEntrarEnRush?.forEach(([p, y]) => { p.scrollTop = y; });
-    scrollsAlEntrarEnRush = null;
-  }
 }
 
 /* ── Colocar las páginas ─────────────────────────────────────────────────── */
@@ -84,6 +74,16 @@ function colocarPaginas() {
   const pista = document.getElementById('pista');
   pista.style.transition = '';
   pista.style.transform = 'translate3d(0,0,0)';
+  activarEmbeds();
+}
+
+// Los vídeos y la música de Inicio se piden al estar en Inicio, no por ser su vecina
+function activarEmbeds() {
+  if (STATE.activeTab !== 'inicio') return;
+  document.querySelectorAll('#panel-inicio iframe[data-src]').forEach(f => {
+    f.src = f.dataset.src;
+    f.removeAttribute('data-src');
+  });
 }
 
 function vecinasDe(name) {
@@ -142,7 +142,7 @@ function pintarTabs() {
 function moverPaginas(anterior, name, { animar = true, desdeX = 0 } = {}) {
   terminarTransicion();
   const sinMovimiento = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  if (!animar || sinMovimiento || name === 'rush' || anterior === 'rush') {
+  if (!animar || sinMovimiento) {
     colocarPaginas();
     pintarIndicador();
     pintarTabs();
@@ -278,7 +278,7 @@ function initDeslizamiento() {
 
   zona.addEventListener('touchstart', e => {
     g = null;
-    if (e.touches.length !== 1 || STATE.season !== '25-26' || estaEnRush()) return;
+    if (e.touches.length !== 1 || estaEnRush()) return;
     if (document.querySelector('.modal.open') || dueñoDelGesto(e.target)) return;
     const t = e.touches[0];
     g = { x0: t.clientX, y0: t.clientY, activo: false, muestras: [] };

@@ -9,7 +9,7 @@ let STATE = {
   proximosPartidos: [],
   votaciones:       [],
   mvps:             null, // filas de la hoja MVPs; null: aún no se han podido leer
-  season:           '25-26',
+  season:           temporadaEnCursoId,
   alias:            {}, // nombre normalizado (propio o alias) → nombre canónico
   jugadoresBase:    [], // jugadores tal cual vienen de la hoja (sin stats)
   ultimaCarga:      0,  // Date.now() de la última carga correcta de Jugadores + Jornadas
@@ -18,23 +18,19 @@ let STATE = {
 /* ── Datos ───────────────────────────────────────────────────────────────── */
 // La última respuesta de Sheets, guardada en el navegador: al arrancar se pinta con ella al
 // momento y lo fresco llega detrás (antes, nada se veía hasta que respondía Sheets)
-const DATOS_GUARDADOS_KEY = 'SL_DATOS';
+// Una por temporada: nada se mezcla. La 24/26 conserva la clave de cuando era la única.
+const claveDatos = () => (STATE.season === '24-26' ? 'SL_DATOS' : `SL_DATOS_${STATE.season}`);
 function guardarDatos() {
   try {
-    localStorage.setItem(DATOS_GUARDADOS_KEY, JSON.stringify({
+    localStorage.setItem(claveDatos(), JSON.stringify({
       t: Date.now(), jugadores: STATE.jugadoresBase, jornadas: STATE.jornadas,
       proximos: STATE.proximosPartidos, votaciones: STATE.votaciones, mvps: STATE.mvps,
     }));
   } catch { /* sin espacio o sin almacenamiento: la próxima vez, por la red */ }
 }
-let datosRestaurados = null;   // lo restaurado de la última vez (una sola vez al arrancar)
 function restaurarDatos() {
-  if (datosRestaurados !== null) return datosRestaurados;
-  return (datosRestaurados = restaurarDatosAhora());
-}
-function restaurarDatosAhora() {
   try {
-    const d = JSON.parse(localStorage.getItem(DATOS_GUARDADOS_KEY) || 'null');
+    const d = JSON.parse(localStorage.getItem(claveDatos()) || 'null');
     if (!d?.jugadores?.length || !d?.jornadas) return false;
     STATE.jugadoresBase = d.jugadores;
     STATE.jornadas = d.jornadas;
@@ -48,15 +44,20 @@ function restaurarDatosAhora() {
 }
 
 async function loadData() {
+  const temporada = STATE.season;
+  const archivo = modoTemporada(temporadaPorId(temporada)) === 'archivo';
   mvpLeyendo++;
-  // Todo desde Sheets en paralelo — cero archivos locales de datos
+  // Todo desde Sheets en paralelo — cero archivos locales de datos.
+  // El archivo no tiene Inicio ni Partidos: ni próximos partidos ni votaciones
   const [jugadores, jornadas, proximos, votaciones, mvps] = await Promise.all([
     fetchJugadores(),
     fetchJornadas(),
-    fetchProximosPartidos(5),
-    fetchVotaciones(),
+    archivo ? [] : fetchProximosPartidos(5),
+    archivo ? [] : fetchVotaciones(),
     leerMVPs(),
   ]);
+  // Se ha cambiado de temporada mientras tanto: esto era de la otra
+  if (temporada !== STATE.season) return;
 
   // Si una lectura falla (null) se conservan los datos que ya había: un
   // refresco sin conexión no debe dejar la web vacía
@@ -84,9 +85,11 @@ let timerVotaciones = null;
 // pestañas se re-renderizan al visitarlas
 function recargarDatos() {
   if (recargaEnCurso) return recargaEnCurso;
-  recargaEnCurso = (async () => {
+  const temporada = STATE.season;
+  const recarga = (async () => {
     try {
       await loadData();
+      if (temporada !== STATE.season) return;
       aplicarOrdenTabs();
       initHero();
       document.querySelectorAll('.tab-panel:not(#panel-rush)').forEach(p => { p.dataset.rendered = ''; });
@@ -95,10 +98,10 @@ function recargarDatos() {
     } catch (e) {
       console.warn('[app] No se pudieron recargar los datos:', e);
     } finally {
-      recargaEnCurso = null;
+      if (recargaEnCurso === recarga) recargaEnCurso = null;
     }
   })();
-  return recargaEnCurso;
+  return (recargaEnCurso = recarga);
 }
 
 function recargarSiCaducado() {
@@ -119,8 +122,9 @@ async function refrescarVotaciones() {
   const ocupado = () => document.querySelector('.voto-card.is-dragging')
     || Date.now() - ultimoVotoEnviado < VOTO_PENDIENTE_MS;
   if (ocupado()) return;
+  const temporada = STATE.season;
   const nuevas = await fetchVotaciones();
-  if (!nuevas || ocupado()) return;
+  if (!nuevas || ocupado() || temporada !== STATE.season) return;
   if (JSON.stringify(nuevas) === JSON.stringify(STATE.votaciones)) return;
   STATE.votaciones = nuevas;
   aplicarOrdenTabs();
@@ -130,7 +134,6 @@ async function refrescarVotaciones() {
 // Intervalo de 30 s solo con la pestaña Votación o MVP activa y la página visible
 function actualizarRefrescoVotaciones() {
   const toca = (STATE.activeTab === 'votacion' || STATE.activeTab === 'mvp')
-    && STATE.season === '25-26'
     && document.visibilityState === 'visible';
   if (toca && !timerVotaciones) {
     timerVotaciones = setInterval(() => (STATE.activeTab === 'mvp' ? refrescarMVPs() : refrescarVotaciones()), VOTACIONES_REFRESCO_MS);
@@ -308,8 +311,6 @@ function switchTab(name, { animar = true, desdeX = 0 } = {}) {
     p.classList.toggle('active', p.id === `panel-${name}`)
   );
 
-  // Rush sigue con el scroll de la ventana; el resto, cada página con el suyo
-  if (name === 'rush' || anterior === 'rush') cambiarARush(name === 'rush');
   renderTabIfNeeded(name);
   moverPaginas(anterior, name, { animar, desdeX });
   history.replaceState(null, '', `#${name}`);
@@ -319,7 +320,7 @@ function switchTab(name, { animar = true, desdeX = 0 } = {}) {
 
 /* ── Pull-to-refresh (solo pantallas táctiles) ───────────────────────────── */
 // ¿Está arriba del todo lo que se ve?
-const enLoAlto = () => (estaEnRush() ? window.scrollY : paginaDe(STATE.activeTab)?.scrollTop ?? 0) <= 0;
+const enLoAlto = () => (paginaDe(STATE.activeTab)?.scrollTop ?? 0) <= 0;
 
 // En la PWA de iOS no existe el gesto nativo; en Chrome Android el nativo está
 // desactivado con overscroll-behavior-y (recargaría la página entera).
@@ -348,7 +349,7 @@ function initPullToRefresh() {
   document.addEventListener('touchstart', e => {
     activo = e.touches.length === 1
       && enLoAlto()                               // ya en lo alto de la página
-      && STATE.season === '25-26'
+      && !document.body.classList.contains('archivo')
       && !document.querySelector('.modal.open')
       && !e.target.closest('.slr');               // el modo Rush no recarga la app
     if (!activo) return;
@@ -429,6 +430,7 @@ function renderTabIfNeeded(name) {
 function bindPanel(panel, name) {
   if (name === 'inicio') {
     startCountdown(STATE.proximosPartidos[0]?.fecha);
+    activarEmbeds();
   }
   if (name === 'rush') bindRushPanel(panel);
   if (name === 'votacion') {
@@ -568,83 +570,133 @@ function initBubbles() {
 }
 
 /* ── Selector de temporada ───────────────────────────────────────────────── */
-const ARCHIVE_SEASONS = {
-  '23-24': {
-    label: 'TEMPORADA 23/24',
-    images: [
-      { src: 'assets/clasificación23-24.png', alt: 'Clasificación 23-24' },
-      { src: 'assets/goles23-24.png',             alt: 'Goleadores 23-24' },
-      { src: 'assets/Draft 2024.jpg',             alt: 'Draft 2024' },
-    ],
-  },
-};
+let temporadaElegida = false;      // la ha elegido el jugador: un cambio del servidor no le mueve
+let temporadaTrasLogin = null;     // la que se pidió sin sesión
+
+function pintarSelector() {
+  const t = temporadaPorId(STATE.season);
+  const label = document.getElementById('seasonLabel');
+  label.innerHTML = `<span class="season-larga">${t.etiqueta.toUpperCase()}</span><span class="season-corta">${t.corta}</span>`;
+  const dropdown = document.getElementById('seasonDropdown');
+  dropdown.innerHTML = TEMPORADAS.filter(temporadaEnSelector).map(x => `
+    <button class="season-dropdown__item${x.id === STATE.season ? ' active' : ''}" type="button" data-season="${x.id}">${x.etiqueta}</button>
+  `).join('');
+}
 
 function initSeasonSelector() {
   const toggle = document.getElementById('seasonToggle');
   const dropdown = document.getElementById('seasonDropdown');
-  if (!toggle || !dropdown) return;
-
   toggle.addEventListener('click', (e) => {
     e.stopPropagation();
     dropdown.classList.toggle('open');
   });
   document.addEventListener('click', () => dropdown.classList.remove('open'));
-
-  dropdown.querySelectorAll('.season-dropdown__item').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      dropdown.classList.remove('open');
-      switchSeason(btn.dataset.season);
-    });
+  dropdown.addEventListener('click', e => {
+    const btn = e.target.closest('.season-dropdown__item');
+    if (!btn) return;
+    e.stopPropagation();
+    dropdown.classList.remove('open');
+    elegirTemporada(btn.dataset.season);
   });
+  pintarSelector();
 }
 
-function switchSeason(season) {
-  if (season === STATE.season) return;
-  STATE.season = season;
+function elegirTemporada(id) {
+  const t = temporadaPorId(id);
+  if (puedeAbrirTemporada(t)) { switchSeason(id); return; }
+  // Sin sesión: hace falta el código para saber si es beta
+  if (!getSessionPlayer()) { temporadaTrasLogin = id; openSessionModal(); }
+}
 
-  const label = document.getElementById('seasonLabel');
-  const tabs = document.getElementById('tabs');
-  const main = document.querySelector('.main');
-  document.body.classList.toggle('archivo', !!archive);
-  const hero = document.getElementById('hero-section');
-  const archiveEl = document.getElementById('archiveSeason');
-  const dropdown = document.getElementById('seasonDropdown');
+// Deja la app en esa temporada, sin mezclar nada: datos, pestañas y lo que se estaba votando.
+// tab: la pestaña en la que abrir (si no, la de por defecto de la temporada)
+function switchSeason(id, { tab, elegida = true } = {}) {
+  if (id === STATE.season) return;
+  STATE.season = id;
+  temporadaElegida = elegida;
+  const t = temporadaPorId(id);
 
-  dropdown.querySelectorAll('.season-dropdown__item').forEach(b =>
-    b.classList.toggle('active', b.dataset.season === season)
-  );
+  // Lo que estuviera en marcha era de la otra temporada
+  recargaEnCurso = null;
+  mvpEpoca++;
+  mvpLeyendo = 0;
+  mvpElegida = null;
+  mvpReparto = { fecha: null, puntos: {} };
+  ultimoVotoEnviado = 0;
+  terminarTransicion();
+  pintarSelector();
 
-  const archive = ARCHIVE_SEASONS[season];
-
-  if (archive) {
-    label.textContent = archive.label;
-    tabs.style.display = 'none';
-    hero.style.display = 'none';
-    main.style.display = 'none';
-    archiveEl.hidden = false;
-    archiveEl.innerHTML = `
+  const archivo = document.getElementById('archiveSeason');
+  document.body.classList.toggle('archivo', !!t.imagenes);
+  archivo.hidden = !t.imagenes;
+  if (t.imagenes) {
+    archivo.innerHTML = `
       <div class="sh">
-        <span class="sh__title">${archive.label}</span>
+        <span class="sh__title">${t.etiqueta.toUpperCase()}</span>
         <span class="sh__line"></span>
       </div>
       <div class="archive-season__images">
-        ${archive.images.map(img => `
+        ${t.imagenes.map(img => `
           <div class="archive-season__img-wrap">
             <img src="${img.src}" alt="${img.alt}" loading="lazy">
           </div>
         `).join('')}
       </div>
     `;
-  } else {
-    label.textContent = 'TEMPORADA 25/26';
-    tabs.style.display = '';
-    hero.style.display = '';
-    main.style.display = '';
-    archiveEl.hidden = true;
-    archiveEl.innerHTML = '';
+    actualizarRefrescoVotaciones();
+    return;
   }
+  archivo.innerHTML = '';
+  window.scrollTo({ top: 0, behavior: 'instant' });
+
+  // Con lo guardado de esta temporada, o vacía hasta que llegue lo fresco
+  STATE.ultimaCarga = 0;
+  if (!restaurarDatos()) {
+    Object.assign(STATE, { jugadoresBase: [], jornadas: [], jugadores: [], proximosPartidos: [], votaciones: [], mvps: null, alias: {} });
+  }
+  document.querySelectorAll('.pagina').forEach(p => { p.scrollTop = 0; });
+  document.querySelectorAll('.tab-panel').forEach(p => { p.dataset.rendered = ''; p.innerHTML = ''; });
+
+  STATE.activeTab = tab && ordenTabs().includes(tab) ? tab : tabPorDefecto();
+  aplicarOrdenTabs();
+  marcarTab(STATE.activeTab);
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === `panel-${STATE.activeTab}`));
+  initHero();
+  renderTabIfNeeded(STATE.activeTab);
+  colocarPaginas();
+  pintarIndicador();
+  pintarTabs();
+  centrarTab(STATE.activeTab, false);
+  history.replaceState(null, '', `#${STATE.activeTab}`);
   actualizarRefrescoVotaciones();
+  recargarDatos();
+}
+
+// Si la temporada que se ve ya no se puede ver (se ha cerrado la sesión, no es beta…), a la de por defecto
+function revisarTemporadaVista() {
+  pintarSelector();
+  if (!puedeAbrirTemporada(temporadaPorId(STATE.season))) switchSeason(temporadaEnCursoId, { elegida: false });
+}
+
+// La temporada en curso del servidor. Si ha cambiado y nadie ha elegido otra, se pasa a ella
+function fijarTemporadaEnCurso(id) {
+  if (!id) return;
+  const cambia = id !== temporadaEnCursoId;
+  guardarTemporadaEnCurso(id);
+  if (!cambia) return;
+  if (!temporadaElegida) switchSeason(id, { elegida: false });
+  else { aplicarOrdenTabs(); revisarTemporadaVista(); rerenderPanel('mvp'); }
+  pintarSelector();
+  rushMostrarPestana(rushAccesoGuardado() === true);
+}
+
+// La portada de Rush, esté en la temporada que esté (un enlace, volver tras una actualización…)
+function abrirPortadaRush() {
+  const t = temporadaConRush();
+  if (!t) return false;
+  if (t.id !== STATE.season) switchSeason(t.id, { tab: 'rush', elegida: false });
+  else switchTab('rush', { animar: false });
+  return true;
 }
 
 /* ── Init ────────────────────────────────────────────────────────────────── */
@@ -663,9 +715,20 @@ async function init() {
   // Lo guardado de la última vez se pinta ya y lo fresco de Sheets llega detrás. Sin nada
   // guardado (la primera vez) se espera a Sheets. Nada de Rush compite con esto: Rush no
   // se pide hasta pulsar JUGAR (rush-panel.js)
-  if (tabDesdeHash() === 'rush') switchTab('rush', { animar: false });
+  // La temporada en curso: la guardada ya y la del servidor detrás. La primera vez se espera un
+  // poco, para no enseñar la temporada equivocada
+  const enCursoGuardada = leerEnCursoGuardada();
+  const enCursoFresca = pedirTemporadaEnCurso();
+  if (!enCursoGuardada) {
+    const id = await Promise.race([enCursoFresca, new Promise(r => setTimeout(r, 1500))]);
+    if (id) { guardarTemporadaEnCurso(id); STATE.season = id; }
+  }
+  // Un enlace a Rush lleva a la temporada que lo tiene
+  if (location.hash === '#rush' && temporadaConRush()) STATE.season = temporadaConRush().id;
+  pintarSelector();
+  STATE.activeTab = tabPorDefecto();
   const guardados = restaurarDatos();
-  if (guardados) aplicarOrdenTabs();
+  aplicarOrdenTabs();
   // «sl:cargada»: la Shits League ya tiene sus datos frescos. Entonces (y no antes) se registra
   // el service worker (version.js), que descarga la app en segundo plano
   const cargada = () => document.dispatchEvent(new Event('sl:cargada'));
@@ -685,9 +748,12 @@ async function init() {
     document.addEventListener('sl:cargada', () => rushVerificarAcceso(), { once: true });
   }
 
+  enCursoFresca.then(fijarTemporadaEnCurso);
   initHero();
-  renderTabIfNeeded('inicio');
   aplicarOrdenTabs();
+  marcarTab(STATE.activeTab);
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === `panel-${STATE.activeTab}`));
+  renderTabIfNeeded(STATE.activeTab);
   // Con hash (p. ej. desde una notificación), después de saber qué pestañas hay
   const tabInicial = tabDesdeHash();
   if (tabInicial) switchTab(tabInicial, { animar: false });
@@ -700,6 +766,7 @@ async function init() {
     actualizarRefrescoVotaciones();
     if (document.visibilityState !== 'visible') return;
     // Al volver a la app: votaciones al día y stats si llevan más de 5 min
+    pedirTemporadaEnCurso().then(fijarTemporadaEnCurso);
     if (STATE.activeTab === 'votacion') refrescarVotaciones();
     if (STATE.activeTab === 'mvp' || (STATE.activeTab === 'inicio' && getSessionPlayer())) leerHojaMVP();
     recargarSiCaducado();
@@ -712,12 +779,19 @@ async function init() {
 
 /* ── Cambio de sesión (login / logout) ───────────────────────────────────── */
 // Lo llama session.js; re-renderiza lo que depende del jugador logueado
-function onSessionChange() {
+async function onSessionChange() {
   rerenderPanel('votacion');
   rerenderPanel('mvp');
   rerenderPanel('rush');
   actualizarPendientes();
-  if (typeof rushVerificarAcceso === 'function') rushVerificarAcceso();
+  const pedida = temporadaTrasLogin;
+  temporadaTrasLogin = null;
+  pintarSelector();
+  if (typeof rushVerificarAcceso === 'function') await rushVerificarAcceso();
+  revisarTemporadaVista();
+  if (!pedida) return;
+  if (puedeAbrirTemporada(temporadaPorId(pedida))) switchSeason(pedida);
+  else if (getSessionPlayer()) avisoApp('Esa temporada aún no está disponible.');
 }
 
 document.addEventListener('DOMContentLoaded', init);

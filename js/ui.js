@@ -4,6 +4,7 @@
 ═══════════════════════════════════════════════ */
 
 /* ── Helpers ──────────────────────────────────────────────────────────────── */
+const SIN_EMPEZAR = 'La temporada aún no ha empezado';
 const MESES = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
 
 function fmtFechaCorta(iso) {
@@ -189,7 +190,7 @@ function renderYoutubeCard() {
       </div>
       ${embed ? `
         <div class="media-embed media-embed--youtube">
-          <iframe src="${embed}" title="Playlist de YouTube" loading="lazy" allowfullscreen></iframe>
+          <iframe data-src="${embed}" title="Playlist de YouTube" loading="lazy" allowfullscreen></iframe>
         </div>
       ` : ''}
       <a class="media-card media-card--youtube" href="${YOUTUBE_PLAYLIST_URL}" target="_blank" rel="noopener">
@@ -215,7 +216,7 @@ function renderSpotifyCard() {
       </div>
       ${embed ? `
         <div class="media-embed media-embed--spotify">
-          <iframe src="${embed}" title="Playlist de Spotify" loading="lazy" allow="encrypted-media"></iframe>
+          <iframe data-src="${embed}" title="Playlist de Spotify" loading="lazy" allow="encrypted-media"></iframe>
         </div>
       ` : ''}
       <a class="media-card media-card--spotify" href="${SPOTIFY_PLAYLIST_URL}" target="_blank" rel="noopener">
@@ -269,7 +270,7 @@ function renderLastMatch(j) {
   if (!j) return `
     <div class="last-match">
       <div class="last-match__glow"></div>
-      <p style="text-align:center;color:#6E9D81;padding:2rem;font-family:'Cormorant Garamond',serif;font-style:italic;">Sin partidos todavía</p>
+      <p style="text-align:center;color:#6E9D81;padding:2rem;font-family:'Cormorant Garamond',serif;font-style:italic;">${SIN_EMPEZAR}</p>
     </div>`;
 
   const gl = j.goles_local, gv = j.goles_visitante;
@@ -349,7 +350,7 @@ function renderResumen(jugadores, jornadas) {
 
   const ligasHtml = ligas.length
     ? ligas.map(j => resultRow(j)).join('')
-    : '<div class="empty">Aún no se han jugado jornadas de liga</div>';
+    : `<div class="empty">${SIN_EMPEZAR}</div>`;
 
   const amiHtml = amistosos.length
     ? amistosos.map(j => resultRow(j)).join('')
@@ -361,7 +362,7 @@ function renderResumen(jugadores, jornadas) {
     <div class="sh">
       <span class="sh__title">RESULTADOS</span>
       <span class="sh__line"></span>
-      <span class="sh__sub">2025 / 2026</span>
+      <span class="sh__sub">${temporadaPorId(STATE.season).corta}</span>
     </div>
     <div class="results-list">${ligasHtml}</div>
 
@@ -440,9 +441,9 @@ function renderClasificacion(jugadores) {
     <div class="sh">
       <span class="sh__title">CLASIFICACIÓN</span>
       <span class="sh__line"></span>
-      <span class="sh__sub">TEMPORADA 25/26</span>
+      <span class="sh__sub">${temporadaPorId(STATE.season).etiqueta.toUpperCase()}</span>
     </div>
-    <div class="ranking-list">${rows}</div>
+    <div class="ranking-list">${rows || `<div class="empty">${SIN_EMPEZAR}</div>`}</div>
   `;
 }
 
@@ -492,7 +493,7 @@ function renderRankingTab(jugadores, campo, unit, titulo, subtitulo) {
       <span class="sh__line"></span>
       <span class="sh__sub">${subtitulo}</span>
     </div>
-    <div class="ranking-list">${rows || '<div class="empty">Sin datos todavía</div>'}</div>
+    <div class="ranking-list">${rows || `<div class="empty">${SIN_EMPEZAR}</div>`}</div>
   `;
 }
 
@@ -506,6 +507,11 @@ const SKELETONS_DEFAULT = 16; // si Sheets no devuelve jugadores
 
 function renderPlantilla(jugadores) {
   const skeleton = `<img class="card-wrap__skeleton" src="${CARTA_VACIA}" alt="" aria-hidden="true" width="300" height="343">`;
+
+  // Ya se sabe que no hay nadie (y no es que aún no haya llegado)
+  if (!jugadores.length && STATE.ultimaCarga) return `
+    <div class="sh"><span class="sh__title">PLANTILLA</span><span class="sh__line"></span></div>
+    <div class="empty">${SIN_EMPEZAR}</div>`;
 
   const cards = jugadores.length
     ? jugadores.map(j => `

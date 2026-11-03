@@ -93,6 +93,7 @@ const hanVotadoTodos = j => votosDe(j).length >= plantillaMVP(j).length;
 
 // Abierta: el último partido oficial jugado, hasta que voten todos o se juegue el siguiente
 function mvpAbierta(j) {
+  if (modoTemporada(temporadaPorId(STATE.season)) === 'archivo') return false;   // solo historial
   if (j.amistoso || !tieneResultado(j) || !fechaValida(j.fecha)) return false;
   if (partidosOficiales().some(o => o.fecha > j.fecha && tieneResultado(o))) return false;
   return !hanVotadoTodos(j);
@@ -153,10 +154,12 @@ async function leerMVPs() {
 // Al abrir la pestaña o el aviso de Inicio: con la rueda hasta que llega la hoja
 async function leerHojaMVP() {
   if (mvpEnviando != null) return;
+  const temporada = STATE.season;
   mvpLeyendo++;
   repintarMVP();
   actualizarPendientes();
   const filas = await leerMVPs();
+  if (temporada !== STATE.season) return;   // al cambiar de temporada, la rueda ya se ha quitado
   mvpLeyendo--;
   if (filas && JSON.stringify(filas) !== JSON.stringify(STATE.mvps)) { aplicarMVPs(filas); return; }
   if (!filas && mvpEnviando == null && !mvpLeyendo && STATE.activeTab === 'mvp') avisoApp('No se han podido actualizar los votos.');
@@ -486,6 +489,7 @@ function actualizarPendientes() {
   const fuera = pagina.scrollTop >= antes;
   hero.classList.toggle('hero-section--cartas', !!pila);
 
+  // (con las mismas cartas: la nota de arriba depende de ellas)
   if (actual && pila === pendientesPila && (pila || mvp)) {
     // Solo cambia el aviso del MVP: las cartas no se vuelven a pintar
     actual.querySelector('[data-pendiente-mvp]').innerHTML = mvp;
@@ -494,6 +498,7 @@ function actualizarPendientes() {
     if (pila || mvp) {
       hero.insertAdjacentHTML('beforeend', `<section class="pendientes" id="pendientes">
         <div class="sh"><span class="sh__title">PENDIENTES</span><span class="sh__line"></span></div>
+        ${pila ? '<p class="pendientes__nota">Vota si puedes ir a cada partido</p>' : ''}
         ${pila}<div class="pendientes__mvp" data-pendiente-mvp>${mvp}</div>
       </section>`);
       const nuevo = hero.querySelector('#pendientes');

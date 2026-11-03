@@ -2364,3 +2364,45 @@ Sustituyen a lo anterior donde no coincidan: el plazo de 3 días, la identificac
 - **Con la CPU ×6:** 0 maquetaciones durante el gesto y unos 17 ms por fotograma, tanto en las páginas como en las cartas a los dos lados. Es Chrome sin pantalla en un PC: confirma que no se recalcula la página, no cómo va un móvil real.
 - **Ligas de prueba:** un banco cortado por tiempo no borra la suya, y con una de sobra `equipo`, `alineacion` y `descubrimientos` fallan por datos, no por el código. Quedaron tres de pruebas cortadas; se borraron y pasan enteras.
 - **Control:** quitando el recorte de la cabecera, la prueba detecta que la carta ensancha la página. Es decir, la medida sí ve el problema de antes.
+
+## Shits League: las temporadas y el pistoletazo de la 26/27
+
+### Decisiones de Marcos
+
+- **Un único sitio de configuración** (`js/temporadas.js`): 23/24 solo imágenes, 24/26 la hoja actual, 26/27 una hoja nueva. Cada temporada lee SU hoja; nada se mezcla.
+- **Un ajuste en Supabase** dice si la 26/27 ha empezado, con un botón en el Modo pruebas, confirmación y deshacer.
+- **Antes:** por defecto la 24/26, entera y sin Rush. La 26/27, solo para usuarios beta y con Rush.
+- **Después:** por defecto la 26/27 para todos, Rush público y solo en ella. La 24/26 queda de archivo: Clasificación (abre ahí), Resumen, Goleadores, Asistentes, Plantilla y MVP solo historial.
+- **Temporada vacía** con mensajes, no con huecos. **Deslizar** sigue el orden de la temporada y llega a la portada de Rush; al juego, solo con JUGAR.
+
+### Decisiones mías
+
+- **Ajuste `temporada_en_curso`** (`"24-26"`), no un sí/no de la 26/27: el año que viene basta con añadir otra entrada. Qué es cada temporada sale de su posición respecto a la en curso (próxima, en curso, archivo). El botón se llama solo según la lista.
+- **`slr_admin_empezar_temporada`** cambia ese ajuste y `rush_publico` a la vez. Exige ser el admin de una liga con modo pruebas y no ser un bot. Probada en una transacción que se deshace: ni otro usuario ni un bot pueden, y una temporada con formato raro se rechaza.
+- **Una lectura pública a Supabase al arrancar**, la única antes de JUGAR: `ajustes?clave=eq.temporada_en_curso`. Se usa lo guardado al momento y la respuesta llega detrás; también al volver a la app. Sin nada guardado (la primera vez) se espera como mucho 1,5 s para no enseñar la temporada equivocada. Los bancos que comprueban «nada de Rush antes de JUGAR» la permiten solo a ella.
+- **La URL y la clave pública están también en `temporadas.js`:** `js/slr/config.js` es de Rush y no se carga antes de JUGAR. Un test comprueba que coinciden.
+- **Sin sesión, la 26/27 sale en el selector** y al elegirla se pide el código, como pidió Marcos. Si quien entra no es beta, desaparece y se avisa. Con sesión y sin saber aún si es beta, no sale.
+- **«Beta» es el `tiene_acceso` de `slr_login`** (ya guardado en `RUSH_ACCESO`). Antes del pistoletazo equivale a `usuarios.beta` o bot. Después vale para todos por `rush_publico`: si un día hay una próxima con Rush ya público, habrá que distinguirlo.
+- **Límite de ocultar la 26/27:** su ID va en el JS público, y la hoja es de lectura pública. Se oculta en la app, no en el sentido estricto de la palabra.
+- **Un enlace `#rush` lleva a la temporada con Rush** si esa sesión puede abrirla. Por eso los bancos de Rush siguen entrando igual.
+- **La portada de Rush es una página más del carril.** El juego ya abre como capa encima, así que sobra el modo con el scroll de la ventana (`body.en-rush`). Solo las temporadas de imágenes usan ese scroll.
+- **Los vídeos y la música de Inicio** se piden al estar en Inicio (`data-src`, `activarEmbeds`): siendo vecina de la portada se descargarían en Rush (lo de `banco/datos.mjs` otra vez).
+- **Al cambiar de temporada** se vacían los paneles, el scroll y lo que se estaba votando, y lo que llegue tarde de la otra se descarta. Lo guardado va por temporada (`SL_DATOS` para la 24/26, `SL_DATOS_26-27`).
+- **Si el jugador ha elegido otra temporada,** un cambio del servidor no le mueve. Si deja de poder verla (cierra sesión, no es beta), sí.
+- **Una pestaña que aún no existe (HTTP 400) o una temporada sin ID es lo mismo que sin datos.** Con esto, la 26/27 ya funciona sin hoja.
+- **La temporada no se recuerda al cerrar la app:** se abre siempre la de por defecto.
+- **En el móvil, el selector enseña «24/26»:** antes solo se veía el punto.
+- **El texto de Pendientes** solo sale con cartas de asistencia: con solo el aviso del MVP no vendría a cuento.
+
+### Apps Script
+
+- **`HOJAS`:** cada temporada con su ID. La web manda `temporada`; sin ella (una app vieja) es la 24/26.
+- **Una temporada ya terminada no se vota:** el script lee la en curso de Supabase con la clave pública. Si no puede saberla, deja votar. Una próxima sí se vota, para que los beta prueben.
+- **El recordatorio** usa las fechas de la temporada en curso; si no puede saberla, no avisa.
+- **Sin publicar, el script antiguo escribe todo en la hoja 24/26:** por eso hay que publicar antes de que haya votaciones en la 26/27.
+
+### Pruebas
+
+- **`banco/temporadas.mjs`** (360 y 412 px, 301 comprobaciones): antes y después del pistoletazo; sin sesión, no beta y beta; login que abre o no la pedida; que no se mezclen estadísticas, veces MVP ni votos; respuesta tardía de la otra temporada; la 26/27 vacía de tres formas (sin ID, sin pestañas, solo cabeceras); archivo; deslizar en cada una, con la portada de Rush; empezar y deshacer con la app abierta. Hojas, ajuste y login de mentira, y `votos.gs` de verdad encima.
+- **El botón, con Supabase de verdad** y una liga de prueba: sale, pide confirmación y el servidor rechaza a un bot; el ajuste real no se mueve.
+- **`temporadas.test.mjs` y `votos-gs.test.mjs`:** modos, quién ve qué, hojas iguales en la web y en el script, cada voto en su hoja, archivo sin votos.

@@ -67,6 +67,7 @@
   color: #C9E8D5;
 }
 
+.rush-portada__estado[hidden] { display: none; }
 .rush-portada__estado {
   display: inline-flex;
   align-items: center;
