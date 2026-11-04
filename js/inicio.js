@@ -372,6 +372,13 @@ function bindInicio(panel) {
       htmlInicio = renderInicio(STATE.proximosPartidos);
     }
   });
+  // Con el dedo, :active no es fiable: la fila tocada lleva clase. Al desplazarse llega pointercancel y se quita
+  panel.addEventListener('pointerdown', e => {
+    if (e.pointerType !== 'mouse') e.target.closest?.('.tu-partido')?.classList.add('es-tocada');
+  }, { passive: true, capture: true });
+  ['pointerup', 'pointercancel'].forEach(t => panel.addEventListener(t, () => {
+    panel.querySelector('.es-tocada')?.classList.remove('es-tocada');
+  }, { passive: true, capture: true }));
   // En cuanto se toca, deja de moverse solo. Capture: el scroll no burbujea y la pista se repinta
   const parar = e => { if (e.target.closest?.('[data-lideres]')) carrusel.parado = true; };
   ['pointerdown', 'touchstart', 'wheel'].forEach(t => panel.addEventListener(t, parar, { passive: true, capture: true }));

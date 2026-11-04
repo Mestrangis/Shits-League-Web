@@ -87,7 +87,7 @@ async function centroDelPlay(page, sel) {
     return { dx: sx / n - cx, dy: sy / n - cy, ancho: (triangulo.x1 - triangulo.x0) / w, alto: (triangulo.y1 - triangulo.y0) / h, px: w };
   }, png);
 }
-const estiloPlay = (page, sel) => page.$eval(sel, e => { const s = getComputedStyle(e); return { w: e.offsetWidth, h: e.offsetHeight, fondo: s.backgroundColor, sombra: s.boxShadow, transform: s.transform, outline: s.outlineStyle, fill: getComputedStyle(e.querySelector('path')).fill }; });
+const estiloPlay = (page, sel) => page.$eval(sel, e => { const s = getComputedStyle(e); return { w: e.offsetWidth, h: e.offsetHeight, fondo: s.backgroundColor, sombra: s.boxShadow, transform: s.transform, outline: s.outlineStyle, borde: s.borderTopColor, bordeAncho: s.borderTopWidth, fill: getComputedStyle(e.querySelector('path')).fill }; });
 const contarPlay = m => console.log(`    círculo de ${m.px} píxeles de pantalla: el centroide se aparta ${m.dx.toFixed(2)} en horizontal y ${m.dy.toFixed(2)} en vertical; el triángulo ocupa ${(m.ancho * 100).toFixed(1)} × ${(m.alto * 100).toFixed(1)} %`);
 async function comprobarPlay(page, tam, foto) {
   await page.$eval('.vid__reproductor', e => e.scrollIntoView({ block: 'center', behavior: 'instant' }));
@@ -156,7 +156,7 @@ async function abrir(navegador, { ancho = 412, alto = 800, movil = true, sesion 
   await page.waitForFunction(() => STATE.ultimaCarga > 0 && !mvpLeyendo && !recargaEnCurso);
   await dormir(150);
   const cdp = await ctx.newCDPSession(page);
-  const toque = (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
+  const toque = (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' || type === 'touchCancel' ? [] : [{ x, y }] });
   const deslizar = async (x, y, dx, dy = 0) => {
     await toque('touchStart', x, y);
     for (let i = 1; i <= 8; i++) { await toque('touchMove', x + dx * i / 8, y + dy * i / 8); await dormir(25); }
@@ -345,12 +345,21 @@ try {
       await page.evaluate(() => closeModal('modal'));
       {
         const b = await estiloPlay(page, '.tu-partido [data-video-sonar]');
-        check(b.w === 34 && b.fondo === 'rgb(255, 255, 255)' && b.fill === 'rgb(15, 61, 36)', 'el ▶ de «Tus partidos», del mismo estilo y más pequeño', JSON.stringify(b));
+        check(b.w === 32 && b.h === 32, 'el ▶ de «Tus partidos», de 32 px', `${b.w}×${b.h}`);
+        check(b.fondo === 'rgba(0, 0, 0, 0)' && b.sombra === 'none', 'sin fondo ni sombra', `${b.fondo} ${b.sombra}`);
+        check(b.borde === 'rgba(255, 255, 255, 0.18)' && b.bordeAncho === '1px', 'con el borde fino', `${b.borde} ${b.bordeAncho}`);
+        check(b.fill === 'rgb(159, 214, 180)', 'y el triángulo, verde apagado', b.fill);
         await page.$eval('.tu-partido [data-video-sonar]', e => e.scrollIntoView({ block: 'center', behavior: 'instant' }));
         await dormir(100);
-        const m = await centroDelPlay(page, '.tu-partido [data-video-sonar]');
-        contarPlay(m);
-        check(Math.abs(m.dx) < .5 && Math.abs(m.dy) < .5, 'también centrado por el centroide', `${m.dx} ${m.dy}`);
+        await foto(`${ancho}-tus-partidos`);
+        // Tocar la fila: se cancela para que no abra el partido
+        const f = await page.$eval('.tu-partido:has([data-video-sonar]) .tu-partido__cuando', e => { const q = e.getBoundingClientRect(); return { x: q.x + q.width / 2, y: q.y + q.height / 2 }; });
+        await toque('touchStart', f.x, f.y);
+        await dormir(400);
+        const t = await estiloPlay(page, '.tu-partido [data-video-sonar]');
+        check(t.borde === 'rgb(255, 255, 255)' && t.fill === 'rgb(255, 255, 255)', 'al tocar la fila, borde y triángulo en blanco', `${t.borde} ${t.fill}`);
+        await toque('touchCancel');
+        await dormir(250);
         await comprobarFoco(page, '.tu-partido [data-video-sonar]');
       }
       red.youtube.length = 0;
@@ -496,6 +505,23 @@ try {
       const t = (await estiloPlay(page, '.vid__portada .boton-play')).transform;
       check(t.startsWith('matrix(1.06, 0, 0, 1.06'), 'con el ratón encima, escala 1.06', t);
       await page.mouse.move(0, 0);
+    }
+    {
+      const sel = '.tu-partido [data-video-sonar]';
+      await page.$eval(sel, e => e.scrollIntoView({ block: 'center', behavior: 'instant' }));
+      await dormir(250);
+      const g = await estiloPlay(page, '.vid__portada .boton-play');
+      check(g.w === 76 && g.fondo === 'rgb(255, 255, 255)' && g.fill === 'rgb(15, 61, 36)', 'el grande sigue como estaba', JSON.stringify(g));
+      const b = await estiloPlay(page, sel);
+      check(b.w === 32 && b.fondo === 'rgba(0, 0, 0, 0)' && b.borde === 'rgba(255, 255, 255, 0.18)' && b.fill === 'rgb(159, 214, 180)', 'el de la fila, discreto', JSON.stringify(b));
+      await foto(`pc${ancho}-tus-partidos`);
+      await page.hover('.tu-partido:has([data-video-sonar]) .tu-partido__cuando');
+      await dormir(250);
+      const h = await estiloPlay(page, sel);
+      check(h.borde === 'rgb(255, 255, 255)' && h.fill === 'rgb(255, 255, 255)', 'con el ratón en la fila, borde y triángulo en blanco', `${h.borde} ${h.fill}`);
+      await foto(`pc${ancho}-tus-partidos-encima`);
+      await page.mouse.move(0, 0);
+      await page.$eval('.pagina--inicio', p => { p.scrollTop = 0; });
     }
     await page.$eval('.pagina--inicio', p => { p.scrollTop = 500; });
     await dormir(100);

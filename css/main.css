@@ -1924,7 +1924,24 @@ details.mvp-fila[open] > summary .mvp-fila__puntos::after { content: ' ▴'; }
 .tu-partido__res--e { color: #E8FBEF; background: rgba(157,196,173,.28); }
 .tu-partido__res--d { color: #fff; background: rgba(255,90,90,.7); }
 .tu-partido__tuyo { font-size: 12px; text-align: right; white-space: nowrap; }
-.tu-partido__video { grid-column: 4; cursor: pointer; }
+/* El play de cada fila, discreto: solo el borde y el triángulo, en blanco al pasar por la fila o tocarla */
+.tu-partido__video {
+  --play-tam: 32px;
+  --play-halo: 0px;
+  grid-column: 4;
+  background: none;
+  border: 1px solid rgba(255,255,255,.18);
+  box-shadow: none;
+  cursor: pointer;
+  transition: transform .15s, border-color .15s;
+}
+.tu-partido__video .boton-play__icono path { fill: #9fd6b4; stroke: #9fd6b4; transition: fill .15s, stroke .15s; }
+.tu-partido.es-tocada .tu-partido__video { border-color: #fff; }
+.tu-partido.es-tocada .boton-play__icono path { fill: #fff; stroke: #fff; }
+@media (hover: hover) {
+  .tu-partido:hover .tu-partido__video { border-color: #fff; }
+  .tu-partido:hover .boton-play__icono path { fill: #fff; stroke: #fff; }
+}
 .tu-todos { margin-top: 8px; padding: 6px 0; font-size: 12px; font-weight: 600; color: var(--verde); cursor: pointer; }
 
 /* ── Extras ── */
