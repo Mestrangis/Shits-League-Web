@@ -84,14 +84,36 @@ function videosDeLaTemporada() {
 const videoEnReproductor = lista => lista.find(v => v.j.fecha === videoElegido) || lista[0];
 const tituloVideo = j => `${etiquetaPartido(j)} · ${marcador(j)}`;
 
+// El triángulo del play es equilátero y su centro está en el del viewBox (50,50): así el centroide
+// cae en el centro del círculo, también con las puntas redondeadas por el trazo. Mide el 46 % de alto.
+const ICONO_PLAY = '<svg class="boton-play__icono" viewBox="0 0 100 100" aria-hidden="true" focusable="false"><path d="M70.78 50 39.61 32v36z"/></svg>';
+
+// La portada grande, en la mejor calidad que tenga el vídeo. Cuando una no existe, YouTube
+// responde con una imagen gris de 120×90: eso cuenta como que falta y se prueba la siguiente.
+const CALIDADES_PORTADA = ['maxresdefault', 'sddefault', 'hqdefault'];
+const calidadPortada = new Map();   // id → la que ha funcionado: al volver a pintarla, sin repetir la prueba
+const urlPortada = (id, calidad) => `https://i.ytimg.com/vi/${id}/${CALIDADES_PORTADA[calidad]}.jpg`;
+
+function revisarPortada(img, fallo) {
+  const calidad = Number(img.dataset.calidad);
+  if (!fallo && img.naturalWidth > 120) {
+    calidadPortada.set(img.dataset.yt, calidad);
+    img.classList.add('es-buena');
+  } else if (calidad + 1 < CALIDADES_PORTADA.length) {
+    img.dataset.calidad = calidad + 1;
+    img.src = urlPortada(img.dataset.yt, calidad + 1);
+  }
+}
+
 function htmlReproductor(v) {
   if (videoSonando) {
     return `<iframe class="vid__marco" src="https://www.youtube-nocookie.com/embed/${v.id}?autoplay=1&rel=0&playsinline=1"
       title="${tituloVideo(v.j)}" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>`;
   }
+  const calidad = calidadPortada.get(v.id) ?? 0;
   return `<button class="vid__portada" type="button" data-vid-play aria-label="Reproducir el resumen de ${tituloVideo(v.j)}">
-    ${imgDiferida(`https://img.youtube.com/vi/${v.id}/hqdefault.jpg`, 480, '')}
-    <span class="vid__play" aria-hidden="true">▶</span>
+    ${imgDiferida(urlPortada(v.id, calidad), 1280, `data-yt="${v.id}" data-calidad="${calidad}"`)}
+    <span class="boton-play boton-play--grande" aria-hidden="true">${ICONO_PLAY}</span>
     <span class="vid__titulo">${tituloVideo(v.j)}<small>${fmtFechaLarga(v.j.fecha)}</small></span>
   </button>`;
 }
@@ -245,7 +267,7 @@ function renderTuTemporada() {
       <span class="tu-partido__cuando"><b>${etiquetaPartido(p.j)}</b><small>${fmtFechaCorta(p.j.fecha)}</small></span>
       <span class="tu-partido__res tu-partido__res--${p.resultado}">${p.mios}–${p.suyos}</span>
       <span class="tu-partido__tuyo">${p.goles ? `⚽ ${p.goles}` : ''}${p.asistencias ? ` 🅰️ ${p.asistencias}` : ''}${p.mvp ? ' ⭐' : ''}</span>
-      ${ytId(p.j.video_url) ? `<button class="tu-partido__video" type="button" data-video-sonar="${p.j.fecha}" aria-label="Ver el resumen de ${etiquetaPartido(p.j)}">▶</button>` : ''}
+      ${ytId(p.j.video_url) ? `<button class="tu-partido__video boton-play" type="button" data-video-sonar="${p.j.fecha}" aria-label="Ver el resumen de ${etiquetaPartido(p.j)}">${ICONO_PLAY}</button>` : ''}
     </li>`;
   return seccionInicio('TU TEMPORADA', `
     <div class="tu-bloque">
@@ -325,6 +347,10 @@ function salirDeInicio() {
 }
 
 function bindInicio(panel) {
+  // load y error no burbujean: en captura se oyen desde el panel, aunque la imagen se repinte
+  ['load', 'error'].forEach(t => panel.addEventListener(t, e => {
+    if (e.target.matches?.('img[data-yt]')) revisarPortada(e.target, t === 'error');
+  }, true));
   panel.addEventListener('click', e => {
     const jugador = e.target.closest('[data-jugador]');
     if (jugador) { openModalJugador(jugador.dataset.jugador); return; }

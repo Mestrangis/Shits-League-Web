@@ -7,6 +7,8 @@
 // · Temporada vacía: sin errores ni bloques vacíos. Sin total: barra rayada.
 // · El carrusel: tarjeta al azar, pasa solo, se para al tocarlo y vuelve a moverse al volver a Inicio.
 // · El deslizamiento entre pestañas sigue funcionando con los carruseles.
+// · La portada, en la mejor calidad que exista (la gris de 120×90 cuenta como que falta).
+// · El botón de play: tamaños, hover y foco; el centroide del triángulo se mide en los píxeles de una captura.
 import { chromium } from 'playwright';
 import { readFileSync } from 'node:fs';
 import { crearGas, fila, dia, CAB_JUGADORES, CAB_JORNADAS, CAB_VOTACIONES, CAB_MVPS } from '../gas-falso.mjs';
@@ -39,12 +41,88 @@ const jornadas = () => [CAB_JORNADAS,
   J('', -20, 9, 9, { amistoso: 'TRUE', goleadores: 'Nico:18', video_url: video('AAAAAAAAAAM') }),
 ];
 // Totales de los oficiales: 3+1 + 2+2 + 13+8 + 0+1 + 1+0 + 4+2 + 2+0 + 1+3 = 43 goles en 8 partidos
+// Las portadas de YouTube: lo que falta llega como la imagen gris, con 404 o con 200, según el caso
+const IMAGEN = (w, h) => `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><rect width="100%" height="100%" fill="#345"/></svg>`;
+const PORTADAS = {
+  AAAAAAAAAAM: { maxresdefault: 200 },                                     // la tiene
+  AAAAAAAAAA6: { maxresdefault: 'gris404', sddefault: 200 },               // cae a sd
+  AAAAAAAAAA4: { maxresdefault: 'gris200', sddefault: 'gris404', hqdefault: 200 },   // cae a hq
+  AAAAAAAAAA2: { maxresdefault: 'error', sddefault: 'error', hqdefault: 200 },       // 404 sin imagen
+};
+function responderPortada(r, pedidas) {
+  const [, id, calidad] = new URL(r.request().url()).pathname.match(/vi\/(.+)\/(.+)\.jpg/);
+  pedidas.push(`${id}/${calidad}`);
+  const caso = PORTADAS[id]?.[calidad] ?? 200;
+  if (caso === 'error') return r.fulfill({ status: 404, contentType: 'text/plain', body: 'no' });
+  if (caso === 200) return r.fulfill({ status: 200, contentType: 'image/svg+xml', body: IMAGEN(1280, 720) });
+  r.fulfill({ status: caso === 'gris404' ? 404 : 200, contentType: 'image/svg+xml', body: IMAGEN(120, 90) });
+}
+// Mide en los píxeles de una captura: el círculo es lo blanco más lo verde oscuro, tal como se ha pintado.
+// Devuelve cuánto se aparta el centroide del triángulo del centro del círculo, en píxeles de pantalla
+async function centroDelPlay(page, sel) {
+  const r = await page.$eval(sel, e => { const b = e.getBoundingClientRect(); return { x: b.x, y: b.y, width: b.width, height: b.height }; });
+  const clip = { x: r.x - 6, y: r.y - 6, width: r.width + 12, height: r.height + 12 };
+  const png = (await page.screenshot({ clip })).toString('base64');
+  return page.evaluate(async b64 => {
+    const img = new Image();
+    img.src = `data:image/png;base64,${b64}`;
+    await img.decode();
+    const c = document.createElement('canvas');
+    c.width = img.width; c.height = img.height;
+    const g = c.getContext('2d');
+    g.drawImage(img, 0, 0);
+    const { data } = g.getImageData(0, 0, c.width, c.height);
+    const caja = () => ({ x0: 1e9, x1: 0, y0: 1e9, y1: 0 });
+    const circulo = caja(), triangulo = caja();
+    const anota = (k, x, y) => { k.x0 = Math.min(k.x0, x); k.x1 = Math.max(k.x1, x + 1); k.y0 = Math.min(k.y0, y); k.y1 = Math.max(k.y1, y + 1); };
+    const pixel = (x, y) => { const i = (y * c.width + x) * 4; return [data[i], data[i + 1], data[i + 2]]; };
+    for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) if (pixel(x, y).every(k => k > 245)) anota(circulo, x, y);
+    const cx = (circulo.x0 + circulo.x1) / 2, cy = (circulo.y0 + circulo.y1) / 2, radio = (circulo.x1 - circulo.x0) / 2;
+    let sx = 0, sy = 0, n = 0;
+    for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) {
+      if (Math.hypot(x + .5 - cx, y + .5 - cy) > radio * .95 || pixel(x, y)[0] > 128) continue;
+      anota(triangulo, x, y); sx += x + .5; sy += y + .5; n++;
+    }
+    const w = circulo.x1 - circulo.x0, h = circulo.y1 - circulo.y0;
+    return { dx: sx / n - cx, dy: sy / n - cy, ancho: (triangulo.x1 - triangulo.x0) / w, alto: (triangulo.y1 - triangulo.y0) / h, px: w };
+  }, png);
+}
+const estiloPlay = (page, sel) => page.$eval(sel, e => { const s = getComputedStyle(e); return { w: e.offsetWidth, h: e.offsetHeight, fondo: s.backgroundColor, sombra: s.boxShadow, transform: s.transform, outline: s.outlineStyle, fill: getComputedStyle(e.querySelector('path')).fill }; });
+const contarPlay = m => console.log(`    círculo de ${m.px} píxeles de pantalla: el centroide se aparta ${m.dx.toFixed(2)} en horizontal y ${m.dy.toFixed(2)} en vertical; el triángulo ocupa ${(m.ancho * 100).toFixed(1)} × ${(m.alto * 100).toFixed(1)} %`);
+async function comprobarPlay(page, tam, foto) {
+  await page.$eval('.vid__reproductor', e => e.scrollIntoView({ block: 'center', behavior: 'instant' }));
+  await page.waitForFunction(() => document.querySelector('.vid__portada img.es-buena'));
+  await page.mouse.move(0, 0);
+  await dormir(250);
+  const g = await estiloPlay(page, '.vid__portada .boton-play');
+  check(g.w === tam && g.h === tam, `play de ${tam} px`, `${g.w}×${g.h}`);
+  check(g.fondo === 'rgb(255, 255, 255)' && g.fill === 'rgb(15, 61, 36)', 'blanco, con el triángulo #0f3d24', `${g.fondo} ${g.fill}`);
+  check(g.sombra.includes('rgba(255, 255, 255, 0.22) 0px 0px 0px 8px') && g.sombra.includes('rgba(0, 0, 0, 0.4) 0px 10px 30px'), 'halo y sombra', g.sombra);
+  const r = await rect(page, '.vid__portada .boton-play'), v = await rect(page, '.vid__portada');
+  check(Math.abs((r.left + r.right) / 2 - (v.left + v.right) / 2) < .51 && Math.abs((r.top + r.bottom) / 2 - (v.top + v.bottom) / 2) < .51, 'el círculo, en el centro de la portada');
+  const m = await centroDelPlay(page, '.vid__portada .boton-play');
+  contarPlay(m);
+  check(Math.abs(m.dx) < .5 && Math.abs(m.dy) < .5, 'centroide en el centro del círculo: menos de medio píxel', `${m.dx} ${m.dy}`);
+  check(Math.abs(m.alto - .46) < .02, 'el triángulo mide alrededor del 46 %', m.alto);
+  await foto(`${tam}-play`);
+  const titulo = await rect(page, '.vid__titulo');
+  check(r.bottom + 8 <= titulo.top, 'halo y título no se pisan', `${r.bottom} ${titulo.top}`);
+}
+// Con una tecla antes, el navegador cuenta el foco como de teclado
+async function comprobarFoco(page, sel) {
+  await page.keyboard.press('Tab');
+  await page.$eval(sel, e => e.closest('button').focus());
+  await dormir(50);
+  const s = await estiloPlay(page, sel);
+  check(s.outline === 'solid', `anillo de foco en ${sel}`, s.outline);
+  await page.evaluate(() => document.activeElement.blur());
+}
 const hoja = () => ({ Jugadores: jugadores(), Jornadas: jornadas(), Votaciones: [CAB_VOTACIONES], MVPs: [CAB_MVPS] });
 const vacia = () => ({ Jugadores: [CAB_JUGADORES, fila(CAB_JUGADORES, { nombre: 'markos', rating: 99 })], Jornadas: [CAB_JORNADAS], Votaciones: [CAB_VOTACIONES], MVPs: [CAB_MVPS] });
 
 async function abrir(navegador, { ancho = 412, alto = 800, movil = true, sesion = null, proximos = [], hojas = hoja(), nueva = hoja(), enCurso = '24-26', acceso = null, cpu = 1 } = {}) {
   const ctx = await navegador.newContext({ viewport: { width: ancho, height: alto }, hasTouch: movil, isMobile: movil, serviceWorkers: 'block', deviceScaleFactor: movil ? 2 : 1 });
-  const red = { youtube: [], miniaturas: [] };
+  const red = { youtube: [], miniaturas: [], portadas: [] };
   await ctx.addInitScript(([s, a]) => {
     if (sessionStorage.getItem('__listo')) return;
     sessionStorage.setItem('__listo', '1');
@@ -63,6 +141,7 @@ async function abrir(navegador, { ancho = 412, alto = 800, movil = true, sesion 
   await ctx.route('**/www.googleapis.com/calendar/**', r => r.fulfill({ status: 200, contentType: 'application/json', headers: CORS, body: JSON.stringify({ items: proximos }) }));
   await ctx.route('**/res.cloudinary.com/**', r => r.fulfill({ status: 200, contentType: 'image/png', body: FOTO }));
   await ctx.route('**/img.youtube.com/**', r => { red.miniaturas.push(r.request().url()); r.fulfill({ status: 200, contentType: 'image/png', body: FOTO }); });
+  await ctx.route('**/i.ytimg.com/**', r => responderPortada(r, red.portadas));
   await ctx.route('**/*youtube-nocookie.com/**', r => { red.youtube.push(r.request().url()); r.fulfill({ status: 200, contentType: 'text/html', body: '<title>video</title>' }); });
   await ctx.route('**/open.spotify.com/**', r => { red.youtube.push(r.request().url()); r.abort(); });
   await ctx.route('**/onesignal.com/**', r => r.abort());
@@ -159,6 +238,10 @@ try {
       await dormir(300);
       check(red.miniaturas.length > 0 && red.miniaturas.length < 6, 'al acercarse, solo las que se ven', red.miniaturas.length);
       await foto(`${ancho}-2-videos`);
+      check(red.portadas.join() === 'AAAAAAAAAAM/maxresdefault', 'portada en alta, sin probar más calidades', red.portadas.join());
+      check(red.miniaturas.every(u => u.endsWith('/mqdefault.jpg')), 'la fila, en la pequeña');
+      await comprobarPlay(page, 60, foto);
+      await comprobarFoco(page, '.vid__portada .boton-play');
       const listaR = await rect(page, '.vid__lista');
       const repr = await rect(page, '.vid__reproductor');
       check(listaR.top >= repr.bottom - 1, 'móvil: la fila debajo del reproductor');
@@ -169,6 +252,18 @@ try {
       await page.$eval('.vid__lista', l => { l.scrollLeft = 0; });
       await page.click('.vid__item[data-video]:nth-child(2)');
       check((await texto(page, '.vid__titulo')).startsWith('Jornada 6 · 4–2') && await page.$eval('.vid__item:nth-child(2)', i => i.classList.contains('es-actual')), 'tocar uno lo pone en el reproductor');
+      await page.waitForFunction(() => document.querySelector('.vid__portada img.es-buena'));
+      check(await page.$eval('.vid__portada img', i => i.src.endsWith('AAAAAAAAAA6/sddefault.jpg') && i.naturalWidth > 120), 'sin maxres (gris con 404), cae a sddefault', red.portadas.join());
+      await page.$eval('.vid__item[data-video]:nth-child(3)', b => b.click());
+      await page.waitForFunction(() => document.querySelector('.vid__portada img.es-buena'));
+      check(await page.$eval('.vid__portada img', i => i.src.endsWith('AAAAAAAAAA4/hqdefault.jpg')), 'gris con 200 y luego con 404: cae a hqdefault', red.portadas.join());
+      await page.$eval('.vid__item[data-video]:nth-child(4)', b => b.click());
+      await page.waitForFunction(() => document.querySelector('.vid__portada img.es-buena'));
+      check(await page.$eval('.vid__portada img', i => i.src.endsWith('AAAAAAAAAA2/hqdefault.jpg')), 'un 404 sin imagen también cae', red.portadas.join());
+      const antes = red.portadas.length;
+      await page.$eval('.vid__item[data-video]:nth-child(2)', b => b.click());
+      await page.waitForFunction(() => document.querySelector('.vid__portada img.es-buena'));
+      check(await page.$eval('.vid__portada img', i => i.src.endsWith('/sddefault.jpg')) && !red.portadas.slice(antes).some(p => p.includes('maxres')), 'al volver a uno, sin repetir la prueba', red.portadas.slice(antes).join());
       check(red.youtube.length === 0, 'y sigue sin cargar YouTube');
       await page.click('.vid__portada');
       await page.waitForSelector('.vid__marco');
@@ -248,6 +343,16 @@ try {
       await page.waitForSelector('#modal.open');
       check(true, 'tocar uno abre el partido');
       await page.evaluate(() => closeModal('modal'));
+      {
+        const b = await estiloPlay(page, '.tu-partido [data-video-sonar]');
+        check(b.w === 34 && b.fondo === 'rgb(255, 255, 255)' && b.fill === 'rgb(15, 61, 36)', 'el ▶ de «Tus partidos», del mismo estilo y más pequeño', JSON.stringify(b));
+        await page.$eval('.tu-partido [data-video-sonar]', e => e.scrollIntoView({ block: 'center', behavior: 'instant' }));
+        await dormir(100);
+        const m = await centroDelPlay(page, '.tu-partido [data-video-sonar]');
+        contarPlay(m);
+        check(Math.abs(m.dx) < .5 && Math.abs(m.dy) < .5, 'también centrado por el centroide', `${m.dx} ${m.dy}`);
+        await comprobarFoco(page, '.tu-partido [data-video-sonar]');
+      }
       red.youtube.length = 0;
       await page.$eval('.tu-partido [data-video-sonar]', b => b.click());
       await page.waitForSelector('.vid__marco');
@@ -383,6 +488,15 @@ try {
     const total = await rect(page, '.vid');
     check(c.left >= v.right - 1 && Math.abs(v.w / total.w - 2 / 3) < 0.05, `${ancho}: el reproductor, 2/3 a la izquierda; la lista, a la derecha`, (v.w / total.w).toFixed(2));
     check(Math.abs(c.h - v.h) < 2, 'la lista mide lo que el reproductor', `${c.h} / ${v.h}`);
+    await comprobarPlay(page, 76, n => foto(`pc${ancho}-${n}`));
+    await comprobarFoco(page, '.vid__portada .boton-play');
+    await page.hover('.vid__portada');
+    await dormir(250);
+    {
+      const t = (await estiloPlay(page, '.vid__portada .boton-play')).transform;
+      check(t.startsWith('matrix(1.06, 0, 0, 1.06'), 'con el ratón encima, escala 1.06', t);
+      await page.mouse.move(0, 0);
+    }
     await page.$eval('.pagina--inicio', p => { p.scrollTop = 500; });
     await dormir(100);
     await foto(`pc${ancho}-2`);

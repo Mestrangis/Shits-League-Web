@@ -2435,6 +2435,8 @@ Sustituyen a lo anterior donde no coincidan: el plazo de 3 días, la identificac
 - **La foto de «Tu temporada»** es la de tu perfil y, si no tienes, tu carta.
 - **Se quitan `activarEmbeds` y los `iframe` de Inicio:** ya no hay nada incrustado que cargar por adelantado.
 - **Las imágenes de Inicio se piden al acercarse (`imgDiferida`):** el `loading="lazy"` del navegador adelanta miles de píxeles con red lenta y pedía casi todas. Con un `IntersectionObserver` sobre la página, las de fuera de la fila de miniaturas o del carrusel esperan a verse.
+- **La portada grande sale de `i.ytimg.com` en la mejor calidad que exista** (`maxresdefault`, `sddefault`, `hqdefault`). Si una falta, YouTube responde con una imagen gris de 120×90, a veces con 404: se detecta por el ancho, se prueba la siguiente y no se enseña hasta saber que es buena. La que funciona se recuerda por vídeo. La lista y la fila siguen con `mqdefault`.
+- **El triángulo del play es equilátero con su centro en el del viewBox:** así el centroide cae en el centro del círculo sin margen ni desplazamiento, y el redondeo del trazo no lo mueve porque conserva la simetría. Por eso la caja del triángulo queda algo a la derecha del centro. Lo mide `banco/inicio.mjs` en los píxeles de una captura.
 - **Corregido, de antes de este cambio:** `switchTab` y `switchSeason` borraban `history.state`. Si se pulsaba JUGAR antes de acabar el arranque, ir atrás cerraba el juego entero en vez de la ficha. Lo detectó `banco/descubrimientos.mjs` de forma intermitente. Ahora se conserva el estado.
 
 ### Medido

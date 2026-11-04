@@ -1756,28 +1756,44 @@ details.mvp-fila[open] > summary .mvp-fila__puntos::after { content: ' ▴'; }
 }
 .vid__marco { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
 .vid__portada { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; cursor: pointer; color: #fff; text-align: left; }
-.vid__portada img { width: 100%; height: 100%; object-fit: cover; }
+/* Hasta saber que es buena, oculta: la gris de YouTube no llega a verse */
+.vid__portada img { width: 100%; height: 100%; object-fit: cover; opacity: 0; }
+.vid__portada img.es-buena { opacity: 1; }
 .vid__portada::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to top, rgba(3,10,6,.85), transparent 55%); }
-.vid__play {
-  position: absolute;
-  z-index: 1;
-  top: 50%;
-  left: 50%;
-  width: 62px;
-  height: 62px;
-  margin: -31px 0 0 -31px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding-left: 4px;
+/* El botón de play: el círculo, sin relleno ni desplazamientos. El icono lo ocupa entero
+   y es su viewBox el que centra el triángulo por el centroide (inicio.js → ICONO_PLAY) */
+.boton-play {
+  --play-tam: 34px;
+  --play-halo: 4px;
+  position: relative;
+  display: block;
+  flex: none;
+  width: var(--play-tam);
+  height: var(--play-tam);
+  padding: 0;
   border-radius: 50%;
-  background: var(--verde);
-  color: #06140D;
-  font-size: 22px;
-  box-shadow: 0 6px 24px rgba(0,0,0,.5);
+  background: #fff;
+  box-shadow: 0 0 0 var(--play-halo) rgba(255,255,255,.22), 0 4px 12px rgba(0,0,0,.4);
   transition: transform .15s;
 }
-.vid__portada:active .vid__play { transform: scale(.94); }
+.boton-play--grande {
+  --play-tam: 76px;
+  --play-halo: 8px;
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  margin: auto;
+  box-shadow: 0 0 0 var(--play-halo) rgba(255,255,255,.22), 0 10px 30px rgba(0,0,0,.4);
+}
+.boton-play__icono { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+.boton-play__icono path { fill: #0f3d24; stroke: #0f3d24; stroke-width: 10; stroke-linejoin: round; }
+.vid__portada:active .boton-play, button.boton-play:active { transform: scale(1.06); }
+@media (hover: hover) {
+  .vid__portada:hover .boton-play, button.boton-play:hover { transform: scale(1.06); }
+}
+/* Con el teclado: un anillo por fuera del halo */
+.vid__portada:focus-visible, button.boton-play:focus-visible { outline: none; }
+.vid__portada:focus-visible .boton-play, button.boton-play:focus-visible { outline: 3px solid var(--verde); outline-offset: calc(var(--play-halo) + 2px); }
 .vid__titulo { position: absolute; z-index: 1; left: 14px; right: 14px; bottom: 10px; font-family: 'Anton', sans-serif; font-size: 18px; letter-spacing: .03em; }
 .vid__titulo small { display: block; font-family: 'Sora', sans-serif; font-size: 11px; letter-spacing: 0; color: #9DC4AD; margin-top: 2px; }
 /* La lista mide lo que el reproductor: va absoluta dentro de su celda */
@@ -1908,7 +1924,7 @@ details.mvp-fila[open] > summary .mvp-fila__puntos::after { content: ' ▴'; }
 .tu-partido__res--e { color: #E8FBEF; background: rgba(157,196,173,.28); }
 .tu-partido__res--d { color: #fff; background: rgba(255,90,90,.7); }
 .tu-partido__tuyo { font-size: 12px; text-align: right; white-space: nowrap; }
-.tu-partido__video { grid-column: 4; width: 34px; height: 34px; border-radius: 50%; font-size: 11px; color: var(--verde); border: 1px solid rgba(31,224,101,.35); cursor: pointer; }
+.tu-partido__video { grid-column: 4; cursor: pointer; }
 .tu-todos { margin-top: 8px; padding: 6px 0; font-size: 12px; font-weight: 600; color: var(--verde); cursor: pointer; }
 
 /* ── Extras ── */
@@ -1924,6 +1940,7 @@ details.mvp-fila[open] > summary .mvp-fila__puntos::after { content: ' ▴'; }
 }
 @media (max-width: 760px) {
   /* La fila de miniaturas se desliza de lado, debajo del reproductor */
+  .boton-play--grande { --play-tam: 60px; }
   .vid { display: block; }
   .vid__lista-caja { margin-top: 8px; }
   .vid__lista { position: static; flex-direction: row; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; touch-action: pan-x pan-y; }
