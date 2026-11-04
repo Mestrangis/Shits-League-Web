@@ -235,7 +235,7 @@ function initHero() {
   if (!el) return;
   // Un arrastre en «Pendientes» no se corta: lo nuevo se pinta con el siguiente refresco
   if (el.querySelector('.voto-card.is-dragging')) return;
-  el.innerHTML = renderHeroSection(STATE.jugadores, STATE.jornadas);
+  el.innerHTML = renderHeroSection(STATE.jornadas);
   pendientesPila = pendientesMvp = null;
   actualizarPendientes();
 }
@@ -311,9 +311,12 @@ function switchTab(name, { animar = true, desdeX = 0 } = {}) {
     p.classList.toggle('active', p.id === `panel-${name}`)
   );
 
+  if (anterior === 'inicio') salirDeInicio();
   renderTabIfNeeded(name);
+  if (name === 'inicio') entrarEnInicio();
   moverPaginas(anterior, name, { animar, desdeX });
-  history.replaceState(null, '', `#${name}`);
+  // Conservando el estado: con el juego abierto, es por donde Rush sabe qué cerrar al ir atrás
+  history.replaceState(history.state, '', `#${name}`);
   actualizarRefrescoVotaciones();
   recargarSiCaducado();
 }
@@ -391,9 +394,15 @@ function renderTabIfNeeded(name) {
   if (!panel || panel.dataset.rendered) return;
 
   switch (name) {
-    case 'inicio':
-      panel.innerHTML = renderInicio(STATE.proximosPartidos);
+    case 'inicio': {
+      // Sin cambios no se repinta: ni parpadean las imágenes ni se corta el vídeo
+      const html = renderInicio(STATE.proximosPartidos);
+      if (html !== htmlInicio || !panel.children.length) {
+        panel.innerHTML = html;
+        htmlInicio = html;
+      }
       break;
+    }
     case 'votacion':
       panel.innerHTML = renderVotacion(getSessionPlayer());
       break;
@@ -429,8 +438,7 @@ function renderTabIfNeeded(name) {
 /* ── Eventos de panel ────────────────────────────────────────────────────── */
 function bindPanel(panel, name) {
   if (name === 'inicio') {
-    startCountdown(STATE.proximosPartidos[0]?.fecha);
-    activarEmbeds();
+    prepararInicio(panel);
   }
   if (name === 'rush') bindRushPanel(panel);
   if (name === 'votacion') {
@@ -617,6 +625,9 @@ function switchSeason(id, { tab, elegida = true } = {}) {
   const t = temporadaPorId(id);
 
   // Lo que estuviera en marcha era de la otra temporada
+  salirDeInicio();
+  videoElegido = null;
+  tusPartidosTodos = false;
   recargaEnCurso = null;
   mvpEpoca++;
   mvpLeyendo = 0;
@@ -663,11 +674,12 @@ function switchSeason(id, { tab, elegida = true } = {}) {
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === `panel-${STATE.activeTab}`));
   initHero();
   renderTabIfNeeded(STATE.activeTab);
+  if (STATE.activeTab === 'inicio') entrarEnInicio();
   colocarPaginas();
   pintarIndicador();
   pintarTabs();
   centrarTab(STATE.activeTab, false);
-  history.replaceState(null, '', `#${STATE.activeTab}`);
+  history.replaceState(history.state, '', `#${STATE.activeTab}`);
   actualizarRefrescoVotaciones();
   recargarDatos();
 }
@@ -754,6 +766,7 @@ async function init() {
   marcarTab(STATE.activeTab);
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === `panel-${STATE.activeTab}`));
   renderTabIfNeeded(STATE.activeTab);
+  if (STATE.activeTab === 'inicio') entrarEnInicio();
   // Con hash (p. ej. desde una notificación), después de saber qué pestañas hay
   const tabInicial = tabDesdeHash();
   if (tabInicial) switchTab(tabInicial, { animar: false });
@@ -780,6 +793,7 @@ async function init() {
 /* ── Cambio de sesión (login / logout) ───────────────────────────────────── */
 // Lo llama session.js; re-renderiza lo que depende del jugador logueado
 async function onSessionChange() {
+  rerenderPanel('inicio');
   rerenderPanel('votacion');
   rerenderPanel('mvp');
   rerenderPanel('rush');

@@ -148,8 +148,9 @@ try {
 
       // Las cartas de asistencia, en el sitio del marcador
       check(await page.$eval('.last-match', e => getComputedStyle(e).display) === 'none', 'con votaciones sin responder, el marcador no se ve');
-      const orden = await page.evaluate(() => { const v = e => document.querySelector(e).getBoundingClientRect(); return v('.pendientes__pila').bottom <= v('.hero__counters').top + 1; });
-      check(orden, 'las cartas en su sitio, encima de los contadores');
+      await dormir(100);   // la barra sigue al scroll en el siguiente fotograma
+      const orden = await page.evaluate(() => { const v = e => document.querySelector(e).getBoundingClientRect(); return v('.pendientes__pila').bottom <= v('#tabs').top + 1; });
+      check(orden, 'las cartas en su sitio, encima de la barra');
       check(await page.$('.pendientes__cuenta') === null && !(await page.$eval('#pendientes', p => p.textContent)).includes('Desliza'), 'sin el texto de debajo');
       check(!(await page.$eval('#hero-section', h => h.textContent)).includes('Campo 9'), 'la de fecha pasada no sale');
 

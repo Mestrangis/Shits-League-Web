@@ -14,7 +14,7 @@ const GESTO_VELOCIDAD   = 0.35;   // …o velocidad al soltar (px/ms)
 const GESTO_RECIENTE_MS = 100;
 // Donde el gesto horizontal ya tiene otro dueño o es para escribir (las zonas con
 // scroll horizontal propio se miran aparte, en dueñoDelGesto)
-const GESTO_EXCLUIR = '.voto-card--swipe, .mvp-cartas, .modal, iframe, input, textarea, .slr';
+const GESTO_EXCLUIR = '.voto-card--swipe, .mvp-cartas, .vid__lista, .lideres, .vid__marco, .modal, iframe, input, textarea, .slr';
 
 const paginaDe = name => document.querySelector(`.pagina[data-pagina="${name}"]`);
 const tabDe = name => document.querySelector(`.tab[data-tab="${name}"]`);
@@ -74,16 +74,6 @@ function colocarPaginas() {
   const pista = document.getElementById('pista');
   pista.style.transition = '';
   pista.style.transform = 'translate3d(0,0,0)';
-  activarEmbeds();
-}
-
-// Los vídeos y la música de Inicio se piden al estar en Inicio, no por ser su vecina
-function activarEmbeds() {
-  if (STATE.activeTab !== 'inicio') return;
-  document.querySelectorAll('#panel-inicio iframe[data-src]').forEach(f => {
-    f.src = f.dataset.src;
-    f.removeAttribute('data-src');
-  });
 }
 
 function vecinasDe(name) {
@@ -328,6 +318,25 @@ function initDeslizamiento() {
   zona.addEventListener('touchcancel', () => soltar(true), { passive: true });
 }
 
+/* ── Teclado ─────────────────────────────────────────────────────────────── */
+// Las páginas no enseñan barra de scroll y el foco suele estar en otra parte (el botón de la
+// pestaña, nada): las flechas y compañía mueven siempre la página que se ve
+function initTeclado() {
+  document.addEventListener('keydown', e => {
+    if (e.altKey || e.ctrlKey || e.metaKey || estaEnRush() || document.querySelector('.modal.open')) return;
+    if (e.target.closest?.('input, textarea, select, [contenteditable], iframe')) return;
+    const pagina = paginaDe(STATE.activeTab);
+    if (!pagina || document.body.classList.contains('archivo')) return;
+    const alto = pagina.clientHeight - document.getElementById('tabs').offsetHeight;
+    // Espacio, solo si no está pulsando un botón
+    const espacio = e.key === ' ' && !e.target.closest?.('button, a, [role="button"]');
+    const destino = { ArrowDown: 60, ArrowUp: -60, PageDown: alto, PageUp: -alto, Home: -pagina.scrollHeight, End: pagina.scrollHeight }[e.key] ?? (espacio ? (e.shiftKey ? -alto : alto) : null);
+    if (destino === null) return;
+    e.preventDefault();
+    pagina.scrollBy({ top: destino, behavior: 'instant' });
+  });
+}
+
 /* ── Arranque ────────────────────────────────────────────────────────────── */
 function initPaginas() {
   const hero = document.getElementById('hero-section');
@@ -346,5 +355,6 @@ function initPaginas() {
   new ResizeObserver(() => pintarIndicador()).observe(document.querySelector('.tabs__inner'));
   inicio.addEventListener('scroll', () => { if (STATE.activeTab === 'inicio') pintarTabs(); }, { passive: true });
   initDeslizamiento();
+  initTeclado();
   document.addEventListener('sl:cargada', prepararVecinas, { once: true });
 }

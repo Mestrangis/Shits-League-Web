@@ -93,7 +93,7 @@ async function abrir(navegador, ancho, jugador, hojas, opciones = {}) {
   const errores = [];
   page.on('pageerror', e => errores.push(e.message));
   await page.goto(URL_APP + (opciones.hash ?? ''), { waitUntil: 'load' });
-  await page.waitForFunction(() => STATE.ultimaCarga > 0 && document.querySelector('.hero__counter') && !mvpLeyendo);
+  await page.waitForFunction(() => STATE.ultimaCarga > 0 && document.getElementById('hero-section').children.length && !mvpLeyendo);
   const foto = async n => { if (SALIDA) await page.screenshot({ path: `${SALIDA}/mvp-${ancho}-${n}.png`, fullPage: false }); };
   return { ctx, page, gas, red, errores, foto };
 }
@@ -134,8 +134,8 @@ try {
 
       // Pendientes en Inicio
       check(await page.$('#pendientes') !== null, 'bloque Pendientes con cosas por hacer');
-      const orden = await page.evaluate(() => { const v = e => document.querySelector(e).getBoundingClientRect(); return [v('#pendientes').bottom <= v('.hero__counters').top + 1, v('.pendientes__pila').top < v('.pendiente-mvp').top]; });
-      check(orden.every(Boolean), 'antes de las estadísticas; primero las votaciones', JSON.stringify(orden));
+      const orden = await page.evaluate(() => { const v = e => document.querySelector(e).getBoundingClientRect(); return [v('#pendientes').bottom <= v('#tabs').top + 1, v('.pendientes__pila').top < v('.pendiente-mvp').top]; });
+      check(orden.every(Boolean), 'antes de la barra; primero las votaciones', JSON.stringify(orden));
       check(await texto(page, '.pendiente-mvp span') === 'Vota el MVP de la Jornada 1', 'tarjeta «Vota el MVP de la Jornada 1»');
       const alturas = await page.evaluate(() => { const c = document.querySelector('.pendientes .voto--compacta .voto-card').getBoundingClientRect(); return c.height / (c.width * 5 / 4); });
       check(alturas > 0.55 && alturas < 0.65, 'la carta con el 60 % de la altura normal', alturas.toFixed(2));
@@ -439,7 +439,6 @@ try {
       const { ctx, page, foto, errores } = await abrir(navegador, ancho, 'Mateo', hojas);
 
       check((await texto(page, '.last-match__mvp')) === '🏆 MVP: Nico', 'último partido: «🏆 MVP: Nico»', await texto(page, '.last-match__mvp'));
-      check(await page.$eval('.hero__counter', c => getComputedStyle(c).cursor) === 'pointer', 'contadores con cursor pointer');
       await foto('9-inicio');
 
       // Tocar el resultado abre el detalle de ese partido; tocar el MVP abre la pestaña
@@ -451,11 +450,11 @@ try {
       await page.waitForSelector('.mvp-vista');
       check(await page.$('#modal.open') === null && await page.evaluate(() => mvpElegida) === dia(-30), 'el MVP del detalle abre la pestaña en ese partido');
 
-      for (const [sel, tab] of [['[data-ir="resumen"]', 'resumen'], ['[data-ir="plantilla"]', 'plantilla'], ['[data-ir="goleadores"]', 'goleadores']]) {
+      for (const [sel, tab] of [['.lider__todos[data-ir="clasificacion"]', 'clasificacion'], ['.lider__todos[data-ir="mvp"]', 'mvp']]) {
         await page.$eval(sel, b => b.click());
-        check(await page.evaluate(() => STATE.activeTab) === tab && await page.$eval(`.tab[data-tab="${tab}"]`, t => t.classList.contains('active')), `contador → ${tab}`);
+        check(await page.evaluate(() => STATE.activeTab) === tab && await page.$eval(`.tab[data-tab="${tab}"]`, t => t.classList.contains('active')), `«Ver todos» → ${tab}`);
       }
-      await page.$eval('[data-ir="plantilla"]', b => b.click());
+      await page.$eval('.tab[data-tab="plantilla"]', b => b.click());
       await page.waitForSelector('.card-wrap[data-nombre="Nico"]');
       check(await page.$('.card-wrap__mvp') === null, 'Plantilla sin marcas de MVP');
       await page.$eval('.card-wrap[data-nombre="Nico"]', c => c.click());

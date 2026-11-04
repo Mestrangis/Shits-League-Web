@@ -2407,3 +2407,50 @@ Sustituyen a lo anterior donde no coincidan: el plazo de 3 días, la identificac
 - **`banco/temporadas.mjs`** (360 y 412 px, 301 comprobaciones): antes y después del pistoletazo; sin sesión, no beta y beta; login que abre o no la pedida; que no se mezclen estadísticas, veces MVP ni votos; respuesta tardía de la otra temporada; la 26/27 vacía de tres formas (sin ID, sin pestañas, solo cabeceras); archivo; deslizar en cada una, con la portada de Rush; empezar y deshacer con la app abierta. Hojas, ajuste y login de mentira, y `votos.gs` de verdad encima.
 - **El botón, con Supabase de verdad** y una liga de prueba: sale, pide confirmación y el servidor rechaza a un bot; el ajuste real no se mueve.
 - **`temporadas.test.mjs` y `votos-gs.test.mjs`:** modos, quién ve qué, hojas iguales en la web y en el script, cada voto en su hoja, archivo sin votos.
+
+## Shits League: rediseño de Inicio
+
+### Decisiones de Marcos
+
+- **Sin barra de scroll** en ninguna pestaña, con dedo, rueda y teclado. La transparencia de la barra de pestañas se queda.
+- **Cabecera sin los tres contadores.** En móvil ocupa como mínimo la primera pantalla, con la barra de pestañas justo abajo; si no cabe, es más larga. En PC no se fuerza.
+- **Ajustes a mano** para las jornadas previstas y los enlaces. Sin total: «Jornada X · total por decidir», con la barra rayada y sin porcentaje.
+- **Debajo de la barra, en orden:** próximo partido, resúmenes en vídeo, la temporada en números, líderes, tu temporada y extras. Todo de la temporada que se ve; lo que no tiene datos no aparece.
+- **YouTube no se carga hasta tocar.** Fuera el Spotify incrustado y las secciones de Música y Descargas.
+- **Carrusel de líderes:** en móvil, empieza en una tarjeta al azar y pasa sola cada 5 s hasta que se toca, hasta salir de Inicio o reabrir la app.
+
+### Decisiones mías
+
+- **El archivo de ajustes es `js/temporadas.js`:** ya era el sitio de cada temporada. `jornadas` va en cada temporada y los enlaces, en `ENLACES_LIGA`, junto con el de YouTube.
+- **El mínimo de la cabecera es `100 %` de la página menos la barra**, no `100svh`: la página ya mide la pantalla menos la barra de arriba (`100dvh`), así que coincide exactamente aunque cambie la barra del navegador.
+- **Teclado (`paginas.js → initTeclado`):** con el foco en un botón de pestaña, o en ninguna parte, las flechas no moverían la página. Flechas, AvPág, RePág, Inicio, Fin y espacio mueven la que se ve; no con un campo de texto, un modal o el juego abierto.
+- **Números y líderes, sin amistosos**, como las estadísticas. Los resúmenes en vídeo sí los incluyen: «Amistoso · 9–9».
+- **«Jornada X» es cuántas oficiales tienen resultado**, no el número de la última: los números pueden tener huecos.
+- **Con empate en el partido con más goles,** el más reciente.
+- **Tocar una miniatura pone la portada;** el play carga YouTube. El ▶ de «Tus partidos» ya lo reproduce, porque es lo que se ha pedido al tocarlo, y sube al reproductor.
+- **Salir de Inicio para el vídeo:** si no, seguiría sonando en una página que no se ve.
+- **Inicio no se repinta si no cambia nada** (`htmlInicio`): un refresco no corta el vídeo ni hace parpadear las imágenes. Si los datos cambian de verdad, sí se repinta, y el vídeo se corta.
+- **El carrusel no avanza fuera de la pantalla:** nadie lo vería, y al llegar a él estaría en otra tarjeta sin motivo.
+- **«Tu temporada» necesita ficha:** quien no tenga ficha en Jugadores (hoy Carlos, Luis y Víctor) no la ve, aunque haya jugado, igual que no vota el MVP.
+- **La foto de «Tu temporada»** es la de tu perfil y, si no tienes, tu carta.
+- **Se quitan `activarEmbeds` y los `iframe` de Inicio:** ya no hay nada incrustado que cargar por adelantado.
+- **Las imágenes de Inicio se piden al acercarse (`imgDiferida`):** el `loading="lazy"` del navegador adelanta miles de píxeles con red lenta y pedía casi todas. Con un `IntersectionObserver` sobre la página, las de fuera de la fila de miniaturas o del carrusel esperan a verse.
+- **Corregido, de antes de este cambio:** `switchTab` y `switchSeason` borraban `history.state`. Si se pulsaba JUGAR antes de acabar el arranque, ir atrás cerraba el juego entero en vez de la ficha. Lo detectó `banco/descubrimientos.mjs` de forma intermitente. Ahora se conserva el estado.
+
+### Medido
+
+Con `rendimiento-liga.mjs` (412×915, CPU ×4, «4G lenta», 3 pasadas), la versión anterior servida aparte. Sin contar la descarga del service worker (los `?v=`), que según la pasada cae en la medida en frío o en la caliente y falsea la comparación.
+
+| | Antes | Ahora |
+|---|---|---|
+| En frío: se ve | 4,0–4,6 s | 3,9–4,1 s |
+| En frío: datos frescos | 3,7–4,3 s | 3,6–3,8 s |
+| En frío: lo pedido | 39–86 peticiones, 724–2.416 KB | 39 peticiones, 537 KB |
+| En caliente: se ve | 0,6 s (una pasada, 4,2 s) | 0,6–0,7 s |
+| En caliente: datos frescos | 1,1–4,7 s | 1,1–1,2 s |
+| En caliente: lo pedido | 39–66 peticiones, 198–214 KB | 19 peticiones, 110 KB |
+| Peticiones a YouTube y Spotify | de 4 a 38 | 1 (la portada) |
+
+### Pruebas
+
+- **`banco/inicio.mjs`** (360 y 412 px con toques reales por CDP, y PC a 1280 y 1000): la cabecera en seis tamaños de móvil, en uno muy pequeño y con cartas; orden de las secciones; YouTube sin cargar hasta tocar; números exactos; líderes; tu temporada con sus cuentas; temporada vacía; barra rayada; carrusel (se para, deslizar lo mueve a él y no a la pestaña, vuelve a moverse al volver, tarjeta al azar); rueda y teclado.

@@ -43,12 +43,12 @@ body {
 img { display: block; max-width: 100%; }
 a { color: inherit; text-decoration: none; }
 button { font-family: inherit; cursor: pointer; border: none; background: none; }
-button, [role="button"], .modal__backdrop, .tab, .result-row, .card-wrap, .voto-card, .media-card {
+button, [role="button"], .modal__backdrop, .tab, .result-row, .card-wrap, .voto-card {
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;   /* mantener pulsado no saca el menú de copiar o guardar imagen */
 }
-.card-wrap img, .voto-card img, .media-card img { -webkit-user-drag: none; -webkit-touch-callout: none; }
+.card-wrap img, .voto-card img img { -webkit-user-drag: none; -webkit-touch-callout: none; }
 ::selection { background: var(--verde); color: #06140D; }
 
 /* ═══════════════════════════════════════════════
@@ -232,31 +232,6 @@ button, [role="button"], .modal__backdrop, .tab, .result-row, .card-wrap, .voto-
   line-height: 1.6;
   color: #9DC4AD;
 }
-.hero__counters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-.hero__counter {
-  display: flex;
-  align-items: baseline;
-  gap: 7px;
-  background: rgba(14, 32, 22, 0.7);
-  border: 1px solid rgba(31, 224, 101, 0.18);
-  border-radius: 12px;
-  padding: 11px 16px;
-}
-.hero__counter-num {
-  font-family: 'Anton', sans-serif;
-  font-size: 24px;
-  color: var(--verde);
-}
-.hero__counter-lbl {
-  font-size: 12px;
-  color: #6E9D81;
-  font-weight: 600;
-}
-
 /* ── Last match card ── */
 .last-match {
   position: relative;
@@ -452,7 +427,10 @@ button, [role="button"], .modal__backdrop, .tab, .result-row, .card-wrap, .voto-
   touch-action: pan-y;
   padding-top: var(--tabs-h);
   visibility: hidden;
+  /* Sin barra de scroll: se sigue moviendo con el dedo, la rueda y el teclado (paginas.js) */
+  scrollbar-width: none;
 }
+.pagina::-webkit-scrollbar { display: none; }
 .pagina--inicio { padding-top: 0; visibility: visible; }
 .pagina__hueco { height: var(--tabs-h); }
 /* Una carta arrastrada a la derecha ensanchaba el área desplazable en cada fotograma
@@ -891,19 +869,16 @@ body.archivo .app-zona { display: none; }
   }
 
   .pendientes, .hero-section--cartas .pendientes { order: 5; }
-  .hero__counters {
-    order: 6;
-    flex-wrap: nowrap;
-    gap: 6px;
+  /* Como mínimo, toda la primera pantalla: la barra de pestañas queda justo abajo del todo.
+     El 100 % es lo que mide la página (la pantalla menos la barra de arriba). Si no cabe, más larga. */
+  .hero-section {
+    min-height: calc(100% - var(--tabs-h));
+    justify-content: space-evenly;
+    gap: 16px;
+    padding-top: 20px;
+    padding-bottom: 20px;
   }
-  .hero__counter {
-    flex: 1;
-    justify-content: center;
-    gap: 5px;
-    padding: 9px 6px;
-  }
-  .hero__counter-num { font-size: 18px; }
-  .hero__counter-lbl { font-size: 9px; letter-spacing: .4px; white-space: nowrap; }
+  .hero__eyebrow, .hero__desc { margin: 0; }
 }
 @media (max-width: 640px) {
   :root { --topbar-h: 54px; }
@@ -940,7 +915,6 @@ body.archivo .app-zona { display: none; }
 /* ═══════════════════════════════════════════════
    INICIO TAB
 ═══════════════════════════════════════════════ */
-.inicio-block { margin-bottom: 32px; }
 
 /* ── Próximo partido + cuenta atrás ── */
 .proximo-partido {
@@ -996,19 +970,6 @@ body.archivo .app-zona { display: none; }
 .proximos-list__fecha { color: #6E9D81; font-weight: 600; font-size: 12px; white-space: nowrap; }
 
 /* ── Embeds (YouTube / Spotify) ── */
-.media-embed {
-  border-radius: 16px;
-  overflow: hidden;
-  margin-bottom: 14px;
-  border: 1px solid rgba(31,224,101,.16);
-}
-.media-embed iframe { width: 100%; border: none; display: block; }
-.media-embed--youtube { aspect-ratio: 16/9; }
-.media-embed--youtube iframe { height: 100%; }
-.media-embed--spotify iframe { height: 352px; }
-@media (max-width: 480px) {
-  .media-embed--spotify iframe { height: 152px; }
-}
 .countdown {
   display: flex;
   gap: 16px;
@@ -1034,61 +995,6 @@ body.archivo .app-zona { display: none; }
   margin-top: 4px;
 }
 
-/* ── Descargas ── */
-.descargas-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.descarga-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  background: rgba(11,26,17,.5);
-  border: 1px solid rgba(31,224,101,.12);
-  border-radius: 12px;
-  padding: 14px 18px;
-  font-size: 14px;
-  font-weight: 600;
-  color: #E8FBEF;
-  transition: border-color .2s, background .2s;
-}
-.descarga-item:hover { border-color: var(--verde); background: rgba(31,224,101,.06); }
-.descarga-item__icon { font-size: 18px; }
-.descarga-item__titulo { flex: 1; }
-.descarga-item__arrow { color: var(--verde); font-family: 'Anton', sans-serif; }
-
-/* ── Media cards (YouTube / Spotify) ── */
-.media-card {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  background: linear-gradient(160deg, rgba(16,40,26,.7), rgba(8,24,15,.7));
-  border: 1px solid rgba(31, 224, 101, 0.16);
-  border-radius: 16px;
-  padding: 22px 26px;
-  transition: border-color .2s, transform .15s;
-}
-.media-card:hover { border-color: var(--verde); transform: translateY(-2px); }
-.media-card__icon {
-  font-size: 28px;
-  width: 56px; height: 56px;
-  display: flex; align-items: center; justify-content: center;
-  border-radius: 50%;
-  background: rgba(31,224,101,.08);
-  color: var(--verde);
-  flex-shrink: 0;
-}
-.media-card--spotify .media-card__icon { color: #1DB954; background: rgba(29,185,84,.1); }
-.media-card__text { flex: 1; }
-.media-card__title {
-  font-family: 'Anton', sans-serif;
-  font-size: 17px;
-  letter-spacing: .03em;
-  color: #fff;
-}
-.media-card__sub { font-size: 12px; color: #9DC4AD; margin-top: 4px; }
-.media-card__arrow { font-size: 20px; color: var(--verde); }
 
 /* ── Archive season (temporadas anteriores) ── */
 .archive-season {
@@ -1556,13 +1462,13 @@ body.archivo .app-zona { display: none; }
 /* ═══════════════════════════════════════════════
    BLOQUES DE INICIO QUE LLEVAN A OTRA PARTE
 ═══════════════════════════════════════════════ */
-.hero__counter, .last-match {
+.last-match {
   cursor: pointer;
   transition: transform .12s ease, filter .12s ease;
   -webkit-user-select: none;
   user-select: none;
 }
-.hero__counter:active, .last-match:active:not(:has(.last-match__mvp:active)) { transform: scale(.97); filter: brightness(.92); }
+.last-match:active:not(:has(.last-match__mvp:active)) { transform: scale(.97); filter: brightness(.92); }
 .last-match__mvp, .modal__mvp {
   display: block;
   width: 100%;
@@ -1831,3 +1737,217 @@ details.mvp-fila[open] > summary .mvp-fila__puntos::after { content: ' ▴'; }
 .mvp-quien__foto { width: 22px; height: 25px; object-fit: contain; flex-shrink: 0; font-size: 12px; }
 .mvp-sub { margin-top: 1.5rem; }
 .mvp-votos .mvp-quien { padding: 7px 12px; border-radius: 10px; background: rgba(14,32,22,.5); }
+
+/* ═══════════════════════════════════════════════
+   INICIO (js/inicio.js)
+═══════════════════════════════════════════════ */
+.tab-panel#panel-inicio { padding-top: 26px; }
+.inicio-block { margin-bottom: 30px; min-width: 0; scroll-margin-top: calc(var(--tabs-h) + 10px); }
+
+/* ── Resúmenes en vídeo ── */
+.vid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 12px; }
+.vid__reproductor {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #030a06;
+  border: 1px solid rgba(31,224,101,.16);
+}
+.vid__marco { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.vid__portada { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; cursor: pointer; color: #fff; text-align: left; }
+.vid__portada img { width: 100%; height: 100%; object-fit: cover; }
+.vid__portada::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to top, rgba(3,10,6,.85), transparent 55%); }
+.vid__play {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: 50%;
+  width: 62px;
+  height: 62px;
+  margin: -31px 0 0 -31px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-left: 4px;
+  border-radius: 50%;
+  background: var(--verde);
+  color: #06140D;
+  font-size: 22px;
+  box-shadow: 0 6px 24px rgba(0,0,0,.5);
+  transition: transform .15s;
+}
+.vid__portada:active .vid__play { transform: scale(.94); }
+.vid__titulo { position: absolute; z-index: 1; left: 14px; right: 14px; bottom: 10px; font-family: 'Anton', sans-serif; font-size: 18px; letter-spacing: .03em; }
+.vid__titulo small { display: block; font-family: 'Sora', sans-serif; font-size: 11px; letter-spacing: 0; color: #9DC4AD; margin-top: 2px; }
+/* La lista mide lo que el reproductor: va absoluta dentro de su celda */
+.vid__lista-caja { position: relative; min-height: 0; }
+.vid__lista {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+.vid__lista::-webkit-scrollbar { display: none; }
+.vid__item {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: rgba(14,32,22,.6);
+  color: #E8FBEF;
+  text-align: left;
+  cursor: pointer;
+}
+.vid__item.es-actual { border-color: var(--verde); }
+.vid__item img { flex: none; width: 96px; height: 54px; object-fit: cover; border-radius: 6px; background: #030a06; }
+.vid__item-texto { min-width: 0; font-size: 12px; }
+.vid__item-texto b { display: block; font-weight: 700; }
+.vid__item-texto small { display: block; margin-top: 2px; font-size: 11px; color: #6E9D81; }
+.vid__completa { display: inline-block; margin-top: 10px; font-size: 12px; color: #6E9D81; }
+.vid__completa:hover { color: var(--verde); }
+
+/* ── La temporada en números ── */
+.num-barra { margin-bottom: 12px; }
+.num-barra__texto { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 7px; font-size: 13px; color: #9DC4AD; }
+.num-barra--indefinida .num-barra__texto { justify-content: flex-start; gap: 5px; }
+.num-barra__texto b { font-family: 'Anton', sans-serif; font-weight: 400; font-size: 18px; letter-spacing: .03em; color: #fff; }
+.num-barra__fondo { height: 10px; border-radius: 6px; overflow: hidden; background: rgba(31,224,101,.12); }
+.num-barra__fondo i { display: block; height: 100%; border-radius: 6px; background: linear-gradient(90deg, #17a84b, var(--verde)); }
+/* Sin total: rayada, sin llenar nada */
+.num-barra--indefinida .num-barra__fondo i {
+  width: 100%;
+  background: repeating-linear-gradient(-45deg, rgba(31,224,101,.4) 0 8px, rgba(31,224,101,.1) 8px 16px);
+}
+.num-casillas { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.num-casilla {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 13px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(31,224,101,.14);
+  background: linear-gradient(160deg, rgba(16,40,26,.7), rgba(8,24,15,.7));
+  text-align: left;
+  color: inherit;
+}
+.num-casilla__num { font-family: 'Anton', sans-serif; font-size: 34px; line-height: 1; color: var(--verde); }
+.num-casilla__lbl { font-size: 11px; font-weight: 600; color: #9DC4AD; }
+.num-casilla__lbl small { display: block; margin-top: 2px; font-size: 11px; font-weight: 500; color: #6E9D81; }
+.num-casilla--partido { cursor: pointer; transition: transform .12s, filter .12s; }
+.num-casilla--partido:active { transform: scale(.97); filter: brightness(.92); }
+
+/* ── Líderes ── */
+.lideres { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.lider {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 12px 12px 8px;
+  border-radius: 14px;
+  border: 1px solid rgba(31,224,101,.16);
+  background: linear-gradient(160deg, rgba(16,40,26,.8), rgba(8,24,15,.8));
+}
+.lider__titulo { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #6E9D81; }
+.lider__cabeza { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-height: 84px; padding: 2px 0 8px; text-align: left; color: inherit; cursor: pointer; }
+.lider__dato { min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 5px; }
+.lider__num { font-family: 'Anton', sans-serif; font-size: 42px; line-height: 1; color: var(--verde); }
+.lider__unidad { font-size: 11px; color: #6E9D81; }
+.lider__nombre { flex-basis: 100%; margin-top: 3px; font-size: 14px; font-weight: 700; overflow-wrap: anywhere; }
+.lider__carta { flex: none; width: 66px; height: auto; }
+.lider__top { list-style: none; margin: 0; padding: 0; border-top: 1px solid rgba(31,224,101,.1); }
+.lider__top button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 5px 0; font-size: 12px; color: #C9E6D4; text-align: left; cursor: pointer; }
+.lider__pos { width: 12px; flex: none; color: #6E9D81; text-align: center; }
+.lider__quien { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lider__top b { font-weight: 700; color: #fff; }
+.lider__todos { align-self: flex-end; margin-top: auto; padding: 6px 0; font-size: 12px; font-weight: 600; color: var(--verde); cursor: pointer; }
+.lideres__puntos { display: none; }
+
+/* ── Tu temporada ── */
+.tu-bloque {
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(31,224,101,.4);
+  background: radial-gradient(120% 120% at 0 0, rgba(31,224,101,.2), transparent 60%), rgba(8,24,15,.85);
+}
+.tu-cabeza { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.tu-foto { flex: none; width: 52px; height: 52px; border-radius: 50%; object-fit: cover; border: 2px solid var(--verde); background: #030a06; }
+.tu-foto--vacia { display: flex; align-items: center; justify-content: center; font-size: 22px; }
+.tu-quien b { display: block; font-family: 'Anton', sans-serif; font-weight: 400; font-size: 22px; letter-spacing: .03em; color: #fff; }
+.tu-quien span { font-size: 12px; color: var(--verde); font-weight: 600; }
+.tu-datos { display: flex; flex-wrap: wrap; gap: 8px 16px; }
+.tu-dato b { display: block; font-family: 'Anton', sans-serif; font-weight: 400; font-size: 24px; line-height: 1.1; color: var(--verde); }
+.tu-dato span { font-size: 11px; color: #9DC4AD; }
+.tu-dato small { display: block; font-size: 11px; color: #6E9D81; }
+.tu-subtitulo { margin: 16px 0 8px; font-size: 13px; font-weight: 700; color: #9DC4AD; }
+.tu-partidos { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.tu-partido {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) 34px;
+  align-items: center;
+  gap: 8px;
+  min-height: 46px;
+  padding: 5px 8px 5px 12px;
+  border-radius: 10px;
+  background: rgba(14,32,22,.6);
+  cursor: pointer;
+}
+.tu-partido--oculto { display: none; }
+.tu-partido__cuando { font-size: 12px; min-width: 0; }
+.tu-partido__cuando b { display: block; font-weight: 700; }
+.tu-partido__cuando small { font-size: 11px; color: #6E9D81; }
+.tu-partido__res { font-family: 'Anton', sans-serif; font-size: 17px; padding: 2px 9px; border-radius: 7px; }
+.tu-partido__res--v { color: #06140D; background: var(--verde); }
+.tu-partido__res--e { color: #E8FBEF; background: rgba(157,196,173,.28); }
+.tu-partido__res--d { color: #fff; background: rgba(255,90,90,.7); }
+.tu-partido__tuyo { font-size: 12px; text-align: right; white-space: nowrap; }
+.tu-partido__video { grid-column: 4; width: 34px; height: 34px; border-radius: 50%; font-size: 11px; color: var(--verde); border: 1px solid rgba(31,224,101,.35); cursor: pointer; }
+.tu-todos { margin-top: 8px; padding: 6px 0; font-size: 12px; font-weight: 600; color: var(--verde); cursor: pointer; }
+
+/* ── Extras ── */
+.extras { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 8px; }
+.extra { padding: 6px 11px; border-radius: 999px; border: 1px solid rgba(31,224,101,.16); font-size: 12px; color: #9DC4AD; white-space: nowrap; }
+.extra:hover { border-color: var(--verde); color: #E8FBEF; }
+
+/* ── Móvil ── */
+@media (max-width: 1050px) {
+  .lideres { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .num-casillas { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .num-casilla--partido { grid-column: 1 / -1; }
+}
+@media (max-width: 760px) {
+  /* La fila de miniaturas se desliza de lado, debajo del reproductor */
+  .vid { display: block; }
+  .vid__lista-caja { margin-top: 8px; }
+  .vid__lista { position: static; flex-direction: row; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; touch-action: pan-x pan-y; }
+  .vid__item { flex-direction: column; align-items: stretch; gap: 5px; width: 128px; padding: 5px; }
+  .vid__item img { width: 100%; height: auto; aspect-ratio: 16 / 9; }
+
+  .num-casillas { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .num-casilla__num { font-size: 30px; }
+
+  /* Carrusel de una tarjeta. Los puntitos salen en la app (inicio.js) */
+  .lideres {
+    display: flex;
+    gap: 0;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    overscroll-behavior-x: contain;
+    touch-action: pan-x pan-y;
+    scrollbar-width: none;
+  }
+  .lideres::-webkit-scrollbar { display: none; }
+  .lider { flex: 0 0 100%; scroll-snap-align: start; }
+  .lideres__puntos { display: flex; justify-content: center; gap: 7px; margin-top: 9px; }
+  .lideres__puntos i { width: 7px; height: 7px; border-radius: 50%; background: rgba(31,224,101,.22); transition: background .2s; }
+  .lideres__puntos i.es-actual { background: var(--verde); }
+
+  .tu-datos { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
