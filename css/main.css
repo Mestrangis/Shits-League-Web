@@ -185,6 +185,24 @@ button, [role="button"], .modal__backdrop, .tab, .result-row, .card-wrap, .voto-
 /* ═══════════════════════════════════════════════
    HERO SECTION  (always visible, above tabs)
 ═══════════════════════════════════════════════ */
+/* Iconos de img/iconos/: el SVG es la máscara y el color, el del texto. Gol, asistencia y MVP, siempre verdes */
+.icono {
+  display: inline-block;
+  flex: none;
+  width: 1.15em;
+  height: 1.15em;
+  vertical-align: -.2em;
+  background: currentColor;
+  -webkit-mask: center / contain no-repeat;
+  mask: center / contain no-repeat;
+}
+.icono--gol { -webkit-mask-image: url(../img/iconos/gol.svg); mask-image: url(../img/iconos/gol.svg); }
+.icono--asistencia { -webkit-mask-image: url(../img/iconos/asistencia.svg); mask-image: url(../img/iconos/asistencia.svg); }
+.icono--mvp { -webkit-mask-image: url(../img/iconos/mvp.svg); mask-image: url(../img/iconos/mvp.svg); }
+.icono--si { -webkit-mask-image: url(../img/iconos/si.svg); mask-image: url(../img/iconos/si.svg); }
+.icono--no { -webkit-mask-image: url(../img/iconos/no.svg); mask-image: url(../img/iconos/no.svg); }
+.icono--gol, .icono--asistencia, .icono--mvp { color: #3ddc84; }
+
 .hero-section {
   position: relative;
   z-index: 1;
@@ -849,26 +867,17 @@ body.archivo .app-zona { display: none; }
     display: flex;
     flex-direction: column;
   }
-  /* "desenvuelve" .hero__left para poder reordenar sus hijos junto con .last-match */
-  .hero__left { display: contents; }
-
-  .hero__eyebrow { order: 1; }
-  .hero__title   { order: 2; width: 100%; }
-  .hero__title-shits {
-    font-size: clamp(72px, 20vw, 108px);
-  }
+  /* El bloque de eslogan, título y frase va junto y a la izquierda, como en PC */
+  .hero__left { align-self: stretch; }
+  /* SHITS, el 70 % del ancho de la pantalla; LEAGUE, más ancho por su espaciado (Anton mide 2,04 em y
+     Cormorant, 3,76 em). El tope es para las tabletas: llega a unos 560 px de ancho */
+  .hero__title-shits { font-size: min(34vw, 190px); }
   .hero__title-league {
-    font-size: clamp(32px, 9.5vw, 52px);
-    letter-spacing: clamp(6px, 2.6vw, 18px);
+    font-size: min(14.5vw, 81px);
+    letter-spacing: min(5.6vw, 31px);
   }
-  .hero__desc { order: 3; }
+  .last-match { display: block; }
 
-  .last-match {
-    order: 4;
-    display: block;
-  }
-
-  .pendientes, .hero-section--cartas .pendientes { order: 5; }
   /* Como mínimo, toda la primera pantalla: la barra de pestañas queda justo abajo del todo.
      El 100 % es lo que mide la página (la pantalla menos la barra de arriba). Si no cabe, más larga. */
   .hero-section {
@@ -878,7 +887,8 @@ body.archivo .app-zona { display: none; }
     padding-top: 20px;
     padding-bottom: 20px;
   }
-  .hero__eyebrow, .hero__desc { margin: 0; }
+  .hero__eyebrow { margin: 0 0 8px; }
+  .hero__desc { margin: 14px 0 0; }
 }
 @media (max-width: 640px) {
   :root { --topbar-h: 54px; }
@@ -1048,7 +1058,6 @@ body.archivo .app-zona { display: none; }
   transition: border-color .2s, color .2s;
 }
 .session-btn:hover { border-color: rgba(31, 224, 101, 0.5); color: #E8FBEF; }
-.session-btn__icon { font-size: 12px; line-height: 1; }
 .session-btn--logged {
   color: var(--verde);
   border-color: rgba(31, 224, 101, 0.45);
@@ -1056,7 +1065,7 @@ body.archivo .app-zona { display: none; }
 }
 .session-btn--logged { padding: 4px 13px 4px 4px; }
 
-/* Avatar circular: foto del jugador o emoji 👤 de fallback */
+/* Avatar circular: foto del jugador o, si no tiene, su inicial */
 .avatar {
   display: flex;
   align-items: center;
@@ -1091,11 +1100,6 @@ body.archivo .app-zona { display: none; }
   max-width: 380px;
   padding: 2.25rem 1.75rem 1.75rem;
   text-align: center;
-}
-.dialog-box__icon {
-  font-size: 2.4rem;
-  margin-bottom: .9rem;
-  filter: drop-shadow(0 0 12px rgba(31,224,101,.4));
 }
 .dialog-box__title {
   font-family: 'Anton', sans-serif;
@@ -1160,7 +1164,6 @@ body.archivo .app-zona { display: none; }
   .topbar__right { gap: 6px; }
   .session-btn { padding: 7px 10px; gap: 6px; }
   .session-btn--logged { padding: 4px 10px 4px 4px; }
-  .session-btn__label { display: none; }
   .session-btn__name { max-width: 80px; }
 }
 
@@ -1205,6 +1208,9 @@ body.archivo .app-zona { display: none; }
   display: flex;
   flex-direction: column;
   gap: 12px;
+  /* content-visibility recorta lo que se sale: sitio para la sombra del botón del sí, sin mover nada */
+  padding-bottom: 28px;
+  margin-bottom: -28px;
   /* Las votaciones fuera de pantalla no se pintan ni se maquetan */
   content-visibility: auto;
   contain-intrinsic-size: auto 500px;
@@ -1298,7 +1304,7 @@ body.archivo .app-zona { display: none; }
   text-shadow: 0 2px 10px rgba(0,0,0,.7);
 }
 
-/* Sellos ✓ / ✗ en las esquinas */
+/* Sellos de sí y no en las esquinas */
 .voto-card__stamp {
   position: absolute;
   top: 16px;
@@ -1318,11 +1324,11 @@ body.archivo .app-zona { display: none; }
   pointer-events: none;
 }
 .voto-card__stamp--si { left: 16px;  color: var(--verde); box-shadow: 0 0 18px rgba(31,224,101,.55); }
-.voto-card__stamp--no { right: 16px; color: #ff5a5a;      box-shadow: 0 0 18px rgba(255,90,90,.5); }
+.voto-card__stamp--no { right: 16px; color: #fff;         box-shadow: 0 0 18px rgba(232,245,236,.35); }
 
 /* Voto actual del jugador: borde de color (los sellos solo salen durante el gesto) */
 .voto-card--si { border-color: var(--verde); box-shadow: 0 0 0 1px var(--verde), 0 12px 36px rgba(31,224,101,.22); }
-.voto-card--no { border-color: #ff5a5a;      box-shadow: 0 0 0 1px #ff5a5a,      0 12px 36px rgba(255,90,90,.18); }
+.voto-card--no { border-color: #e8f5ec;      box-shadow: 0 0 0 1px #e8f5ec,      0 12px 36px rgba(232,245,236,.14); }
 
 /* Hover sobre los botones (escritorio): la card se inclina y aparece el sello */
 .voto:has(.voto-btn--si:hover) .voto-card { transform: translateX(8px) rotate(2deg); }
@@ -1351,8 +1357,8 @@ body.archivo .app-zona { display: none; }
   transition: background .15s, transform .15s;
 }
 .voto-card__count:hover { transform: scale(1.06); }
-.voto-card__count--no { left: 14px;  color: #ff5a5a; }
-.voto-card__count--si { right: 14px; color: var(--verde); }
+.voto-card__count--no { left: 14px;  color: #fff; border-color: rgba(232,245,236,.35); }
+.voto-card__count--si { right: 14px; color: #3ddc84; }
 
 .voto__actions {
   display: flex;
@@ -1370,10 +1376,11 @@ body.archivo .app-zona { display: none; }
   transition: transform .15s, background .15s, color .15s, box-shadow .15s;
 }
 .voto-btn:hover { transform: scale(1.08); }
-.voto-btn--si { color: var(--verde); }
-.voto-btn--no { color: #ff5a5a; }
-.voto-btn--si[aria-pressed="true"] { background: var(--verde); color: #06140D; border-color: var(--verde); box-shadow: 0 0 20px rgba(31,224,101,.5); }
-.voto-btn--no[aria-pressed="true"] { background: #ff5a5a;      color: #06140D; border-color: #ff5a5a;      box-shadow: 0 0 20px rgba(255,90,90,.45); }
+.voto-btn--si { color: #062012; background: #3ddc84; border-color: #3ddc84; box-shadow: 0 6px 18px rgba(61,220,132,.3); }
+.voto-btn--no { color: #fff; background: none; border-color: rgba(232,245,236,.35); }
+/* Lo ya votado: el sí, con un anillo; el no, relleno */
+.voto-btn--si[aria-pressed="true"] { box-shadow: 0 0 0 3px rgba(61,220,132,.4), 0 6px 22px rgba(61,220,132,.45); }
+.voto-btn--no[aria-pressed="true"] { background: rgba(232,245,236,.2); border-color: #fff; }
 
 /* Modal de desglose de votos */
 .desglose__grupo {
@@ -1391,7 +1398,8 @@ body.archivo .app-zona { display: none; }
   margin-bottom: 8px;
 }
 .desglose__grupo--si .desglose__label { color: var(--verde); }
-.desglose__grupo--no .desglose__label { color: #ff5a5a; }
+.desglose__grupo--si .desglose__label .icono { color: #3ddc84; }
+.desglose__grupo--no .desglose__label { color: #fff; }
 .desglose__nombres { display: flex; flex-wrap: wrap; gap: 6px; }
 .desglose__nombre {
   font-size: 12px;
@@ -1401,7 +1409,7 @@ body.archivo .app-zona { display: none; }
   background: rgba(31,224,101,.1);
   color: #E8FBEF;
 }
-.desglose__grupo--no .desglose__nombre { background: rgba(255,90,90,.12); }
+.desglose__grupo--no .desglose__nombre { background: rgba(232,245,236,.1); }
 .desglose__nadie { font-size: 12px; color: #6E9D81; font-style: italic; }
 
 /* ═══════════════════════════════════════════════
@@ -1500,7 +1508,7 @@ body.archivo .app-zona { display: none; }
 .pendientes__nota { margin-top: -6px; font-size: 12px; color: #6E9D81; }
 .pendientes__pila { position: relative; }
 /* La misma carta de Votación, con el 60 % de su altura (4:5 → 4:3) */
-.pendientes .voto { content-visibility: visible; gap: 8px; }
+.pendientes .voto { content-visibility: visible; gap: 8px; padding-bottom: 0; margin-bottom: 0; }
 .pendientes .voto-card { aspect-ratio: 4 / 3; padding: 14px 14px 46px; }
 .pendientes .voto-card__lugar { font-size: clamp(15px, 6.5cqw, 22px); }
 .pendientes .voto-card__dia { font-size: clamp(30px, 13cqw, 52px); }
@@ -1899,7 +1907,8 @@ details.mvp-fila[open] > summary .mvp-fila__puntos::after { content: ' ▴'; }
 .tu-quien b { display: block; font-family: 'Anton', sans-serif; font-weight: 400; font-size: 22px; letter-spacing: .03em; color: #fff; }
 .tu-quien span { font-size: 12px; color: var(--verde); font-weight: 600; }
 .tu-datos { display: flex; flex-wrap: wrap; gap: 8px 16px; }
-.tu-dato b { display: block; font-family: 'Anton', sans-serif; font-weight: 400; font-size: 24px; line-height: 1.1; color: var(--verde); }
+.tu-dato b { display: block; font-family: 'Anton', sans-serif; font-weight: 400; font-size: 24px; line-height: 1.1; color: #fff; }
+.tu-dato b .icono { margin-right: 5px; font-size: 18px; vertical-align: -.1em; }
 .tu-dato span { font-size: 11px; color: #9DC4AD; }
 .tu-dato small { display: block; font-size: 11px; color: #6E9D81; }
 .tu-subtitulo { margin: 16px 0 8px; font-size: 13px; font-weight: 700; color: #9DC4AD; }
@@ -1923,7 +1932,9 @@ details.mvp-fila[open] > summary .mvp-fila__puntos::after { content: ' ▴'; }
 .tu-partido__res--v { color: #06140D; background: var(--verde); }
 .tu-partido__res--e { color: #E8FBEF; background: rgba(157,196,173,.28); }
 .tu-partido__res--d { color: #fff; background: rgba(255,90,90,.7); }
-.tu-partido__tuyo { font-size: 12px; text-align: right; white-space: nowrap; }
+.tu-partido__tuyo { font-size: 12px; text-align: right; white-space: nowrap; color: #fff; }
+.tu-marca { display: inline-flex; align-items: center; gap: 3px; margin-left: 8px; font-weight: 600; }
+.tu-marca .icono { font-size: 14px; }
 /* El play de cada fila, discreto: solo el borde y el triángulo, en blanco al pasar por la fila o tocarla */
 .tu-partido__video {
   --play-tam: 32px;

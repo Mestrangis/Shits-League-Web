@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════
    SHITS LEAGUE — votacion.js
    Pestaña Partidos: una card estilo Tinder por fecha propuesta.
-   Swipe → (puedo) / ← (no puedo), o botones ✓ / ✗.
+   Swipe → (puedo) / ← (no puedo), o botones de sí y no.
    Ver se puede sin sesión; votar requiere sesión (session.js).
 ═══════════════════════════════════════════════ */
 
@@ -102,9 +102,9 @@ function renderVotoInner(v, jugador) {
   const botones = jugador ? `
     <div class="voto__actions">
       <button class="voto-btn voto-btn--no" data-voto="no" type="button"
-        aria-pressed="${voto === 'no'}" aria-label="No puedo">✗</button>
+        aria-pressed="${voto === 'no'}" aria-label="No puedo">${icono('no')}</button>
       <button class="voto-btn voto-btn--si" data-voto="si" type="button"
-        aria-pressed="${voto === 'si'}" aria-label="Puedo">✓</button>
+        aria-pressed="${voto === 'si'}" aria-label="Puedo">${icono('si')}</button>
     </div>` : '';
 
   const nSi = v.jugadores_si.length, nNo = v.jugadores_no.length;
@@ -112,15 +112,15 @@ function renderVotoInner(v, jugador) {
   return `
     <div class="${cardClass}">
       ${bg}
-      <span class="voto-card__stamp voto-card__stamp--si" aria-hidden="true">✓</span>
-      <span class="voto-card__stamp voto-card__stamp--no" aria-hidden="true">✗</span>
+      <span class="voto-card__stamp voto-card__stamp--si" aria-hidden="true">${icono('si')}</span>
+      <span class="voto-card__stamp voto-card__stamp--no" aria-hidden="true">${icono('no')}</span>
       <div class="voto-card__lugar">${v.lugar || 'Lugar por decidir'}</div>
       <div class="voto-card__dia">${dia}</div>
       <div class="voto-card__fecha">${fechaHora}</div>
       <button class="voto-card__count voto-card__count--no" type="button"
-        aria-label="${nNo} no pueden. Ver quién">✗ ${nNo}</button>
+        aria-label="${nNo} no pueden. Ver quién">${icono('no')}${nNo}</button>
       <button class="voto-card__count voto-card__count--si" type="button"
-        aria-label="${nSi} pueden. Ver quién">✓ ${nSi}</button>
+        aria-label="${nSi} pueden. Ver quién">${icono('si')}${nSi}</button>
     </div>
     ${botones}
   `;
@@ -147,8 +147,8 @@ function abrirDesglose(id) {
   document.getElementById('votosModalBox').innerHTML = `
     <h2 class="dialog-box__title">${titulo}${hora}</h2>
     <p class="dialog-box__text">${v.lugar || 'Lugar por decidir'}</p>
-    ${grupo('si', '✓', 'Pueden', v.jugadores_si)}
-    ${grupo('no', '✗', 'No pueden', v.jugadores_no)}
+    ${grupo('si', icono('si'), 'Pueden', v.jugadores_si)}
+    ${grupo('no', icono('no'), 'No pueden', v.jugadores_no)}
   `;
   openModal('votosModal');
 }
@@ -171,8 +171,8 @@ function refrescarVotoEn(article, v) {
 
   const countSi = card.querySelector('.voto-card__count--si');
   const countNo = card.querySelector('.voto-card__count--no');
-  countSi.textContent = `✓ ${nSi}`;
-  countNo.textContent = `✗ ${nNo}`;
+  countSi.innerHTML = `${icono('si')}${nSi}`;
+  countNo.innerHTML = `${icono('no')}${nNo}`;
   countSi.setAttribute('aria-label', `${nSi} pueden. Ver quién`);
   countNo.setAttribute('aria-label', `${nNo} no pueden. Ver quién`);
 

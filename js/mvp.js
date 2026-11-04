@@ -252,7 +252,7 @@ function bannerMVP(j) {
   if (r.porDecidir) return `<div class="mvp-banner mvp-banner--decidir">MVP por decidir<small>Empate entre ${r.porDecidir.join(', ')}</small></div>`;
   return `<div class="mvp-banner">
     ${fotoMVP(r.nombre, 'mvp-banner__foto')}
-    <span>🏆 ${r.nombre}</span>
+    <span>${icono('mvp')} ${r.nombre}</span>
     ${r.manual && votosDe(j).length ? '<small>Fijado a mano</small>' : ''}
   </div>`;
 }
@@ -300,7 +300,7 @@ function filaRanking(f, i, { abierta, ganador }) {
   const cuerpo = `
     <span class="mvp-fila__pos">${i + 1}</span>
     ${fotoMVP(f.nombre, 'mvp-fila__foto')}
-    <span class="mvp-fila__nombre">${ganador ? '🏆 ' : ''}${f.nombre}</span>
+    <span class="mvp-fila__nombre">${ganador ? `${icono('mvp')} ` : ''}${f.nombre}</span>
     <span class="mvp-fila__puntos">${f.puntos}<small>pts</small></span>`;
   const clase = `mvp-fila${ganador ? ' mvp-fila--ganador' : ''}`;
   // Mientras está abierta no se ve quién votó a quién

@@ -30,6 +30,10 @@ function fmtMsg(msg) {
 // redondeado al siguiente múltiplo de 100 (pantallas parecidas comparten caché),
 // en formato ligero (WebP/AVIF) y calidad automática.
 // No usamos w_auto/dpr_auto: dependen de Client Hints, que Safari no envía.
+// Los iconos de img/iconos/, con el color del texto o el suyo (ver .icono en main.css).
+// Con etiqueta, el lector de pantalla la lee: para cuando el icono es lo único que lo dice.
+const icono = (nombre, etiqueta = '') => `<i class="icono icono--${nombre}" ${etiqueta ? `role="img" aria-label="${etiqueta}"` : 'aria-hidden="true"'}></i>`;
+
 function imagenOptimizada(url, anchoCss, extra = '') {
   if (!url || !url.includes('res.cloudinary.com')) return url;
   const w = Math.max(100, Math.ceil(anchoCss * (window.devicePixelRatio || 1) / 100) * 100);
@@ -134,7 +138,7 @@ function renderLastMatch(j) {
         </div>
       </div>
       ${j.mensaje ? `<div class="last-match__msg">${fmtMsg(j.mensaje)}</div>` : ''}
-      ${mvp ? `<button class="last-match__mvp" type="button" data-abrir-mvp="${j.fecha}">🏆 MVP: <span>${mvp}</span></button>` : ''}
+      ${mvp ? `<button class="last-match__mvp" type="button" data-abrir-mvp="${j.fecha}">${icono('mvp')} MVP: <span>${mvp}</span></button>` : ''}
     </div>
   `;
 }
@@ -371,7 +375,7 @@ function buildModalPartido(j) {
   const videoHtml = embedUrl
     ? `<div class="modal__video"><iframe src="${embedUrl}" allowfullscreen loading="lazy"></iframe></div>`
     : j.video_url
-      ? `<a class="modal__video-link" href="${j.video_url}" target="_blank" rel="noopener">▶ Ver resumen en YouTube</a>`
+      ? `<a class="modal__video-link" href="${j.video_url}" target="_blank" rel="noopener">Ver resumen en YouTube</a>`
       : '';
 
   const imgHtml = j.imagen
@@ -386,7 +390,7 @@ function buildModalPartido(j) {
         <div class="modal__teams">${nombreCanonico(j.local)} <span style="color:rgba(31,224,101,.3)">·vs·</span> ${nombreCanonico(j.visitante)}</div>
         <div class="modal__score">${j.goles_local} – ${j.goles_visitante}</div>
       </div>
-      ${nombreMVP(j) ? `<button class="modal__mvp" type="button" data-abrir-mvp="${j.fecha}">🏆 MVP: <span>${nombreMVP(j)}</span></button>` : ''}
+      ${nombreMVP(j) ? `<button class="modal__mvp" type="button" data-abrir-mvp="${j.fecha}">${icono('mvp')} MVP: <span>${nombreMVP(j)}</span></button>` : ''}
       ${buildGoleadoresAsistentes(j)}
       ${j.mensaje ? `<div class="modal__msg">${fmtMsg(j.mensaje)}</div>` : ''}
       ${videoHtml}
@@ -405,13 +409,13 @@ function buildGoleadoresAsistentes(j) {
     <div class="modal__goles-asis">
       ${j.goleadores.length ? `
         <div class="modal__stat-group">
-          <span class="modal__stat-label">⚽ Goles</span>
+          <span class="modal__stat-label">${icono('gol')} Goles</span>
           <div class="modal__stat-list">${list(j.goleadores)}</div>
         </div>
       ` : ''}
       ${j.asistentes.length ? `
         <div class="modal__stat-group">
-          <span class="modal__stat-label">🅰️ Asistencias</span>
+          <span class="modal__stat-label">${icono('asistencia')} Asistencias</span>
           <div class="modal__stat-list">${list(j.asistentes)}</div>
         </div>
       ` : ''}

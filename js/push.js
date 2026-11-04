@@ -5,7 +5,7 @@
    votaciones de fecha, highlights, próximos partidos, texto libre.
 ═══════════════════════════════════════════════ */
 
-// ⚠️ Pega aquí el App ID de OneSignal (Settings → Keys & IDs).
+// Pega aquí el App ID de OneSignal (Settings → Keys & IDs).
 // Mientras esté vacío, OneSignal no se carga y no se muestra ningún aviso.
 const ONESIGNAL_APP_ID = 'c3052327-e9b2-4f3a-8a86-964ab853ec62';
 // Safari Web ID (Settings → Push & In-App → Web), necesario para Safari en macOS antiguos

@@ -55,7 +55,7 @@ async function fetchJugadores() {
       nombre:  r.nombre  || '',
       media:   parseInt(r.rating) || 0,
       pos:     r.pos     || '',
-      bandera: r.bandera || '🏳️',
+      bandera: r.bandera || '',
       img:     r.carta_url || '',
       alias:   splitNombres(r.alias),
     }));

@@ -313,7 +313,7 @@ try {
       const v = await page.$eval('.mvp-vista', e => e.dataset.estado);
       check(v === 'cerrada', 'el último voto la cierra', v);
       check(await texto(page, '.mvp-cuenta') === '5 de 5 votaron', '«5 de 5 votaron»');
-      check((await texto(page, '.mvp-banner')).includes('🏆 Nico'), 'con su MVP');
+      check((await texto(page, '.mvp-banner')).includes('Nico'), 'con su MVP');
       check(await page.$('.mvp-votos') !== null, 'y ya se ve quién votó a quién');
       await foto('5-cerrada-todos');
       // Si se borra un voto de la hoja, se reabre
@@ -386,7 +386,7 @@ try {
     {
       const { ctx, page, foto, errores } = await abrir(navegador, ancho, 'Mateo', hojasBase());
       await irPartido(page, S1(1));
-      check((await texto(page, '.mvp-banner')).includes('🏆 Nico'), 'cerrada: MVP destacado');
+      check((await texto(page, '.mvp-banner')).includes('Nico'), 'cerrada: MVP destacado');
       check(!(await texto(page, '.mvp-banner')).includes('mano'), 'por votos: sin marca de «a mano»');
       check(await texto(page, '.mvp-cuenta') === '3 de 5 votaron', '«3 de 5 votaron»');
       check((await texto(page, '.mvp-fila--ganador')).includes('Nico'), 'fila del ganador destacada');
@@ -401,9 +401,9 @@ try {
       await foto('7-cerrada');
 
       await irPartido(page, S1(2));
-      check((await texto(page, '.mvp-banner')).includes('🏆 Enzo'), 'empate a puntos: gana el de más votantes');
+      check((await texto(page, '.mvp-banner')).includes('Enzo'), 'empate a puntos: gana el de más votantes');
       await irPartido(page, S1(3));
-      check((await texto(page, '.mvp-banner')).includes('🏆 Nico'), 'empate a puntos y votantes: gana el de más veces 3');
+      check((await texto(page, '.mvp-banner')).includes('Nico'), 'empate a puntos y votantes: gana el de más veces 3');
       await irPartido(page, S1(4));
       const dec = await texto(page, '.mvp-banner');
       check(dec.includes('MVP por decidir') && dec.includes('Enzo, Nico') && !dec.includes('🏆'), 'empate total: «MVP por decidir»', dec);
@@ -411,9 +411,9 @@ try {
       await foto('8-por-decidir');
       await irPartido(page, S1(5));
       const man = await texto(page, '.mvp-banner');
-      check(man.includes('🏆 Nico') && man.includes('Fijado a mano'), 'a mano: manda sobre los votos y se indica', man);
+      check(man.includes('Nico') && man.includes('Fijado a mano'), 'a mano: manda sobre los votos y se indica', man);
       await irPartido(page, S1(6));
-      check((await texto(page, '.mvp-aviso')).includes('No hubo votación') && (await texto(page, '.mvp-banner')).includes('🏆 Mateo') && !(await texto(page, '.mvp-banner')).includes('mano'), 'sin votos con la columna mvp');
+      check((await texto(page, '.mvp-aviso')).includes('No hubo votación') && (await texto(page, '.mvp-banner')).includes('Mateo') && !(await texto(page, '.mvp-banner')).includes('mano'), 'sin votos con la columna mvp');
       await irPartido(page, S1(7));
       check((await texto(page, '.mvp-aviso')).includes('No hubo votación') && !await page.$('.mvp-banner'), 'sin votos y sin mvp');
 
@@ -438,7 +438,7 @@ try {
       hojas.Votaciones = [CAB_VOTACIONES];   // sin cartas: se ve el marcador
       const { ctx, page, foto, errores } = await abrir(navegador, ancho, 'Mateo', hojas);
 
-      check((await texto(page, '.last-match__mvp')) === '🏆 MVP: Nico', 'último partido: «🏆 MVP: Nico»', await texto(page, '.last-match__mvp'));
+      check((await texto(page, '.last-match__mvp')) === 'MVP: Nico', 'último partido: «MVP: Nico»', await texto(page, '.last-match__mvp'));
       await foto('9-inicio');
 
       // Tocar el resultado abre el detalle de ese partido; tocar el MVP abre la pestaña

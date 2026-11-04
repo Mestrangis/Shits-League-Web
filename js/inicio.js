@@ -60,7 +60,7 @@ function renderProximoPartido(partidos) {
       <div class="proximo-partido__info">
         <div class="proximo-partido__titulo">${destacado.titulo || 'Próxima jornada'}</div>
         <div class="proximo-partido__fecha">${fmtFechaLarga(fecha)}${hora ? ` · ${hora}` : ''}</div>
-        ${destacado.lugar ? `<div class="proximo-partido__lugar">📍 ${destacado.lugar}</div>` : ''}
+        ${destacado.lugar ? `<div class="proximo-partido__lugar">${destacado.lugar}</div>` : ''}
       </div>
       <div class="countdown" id="countdown"></div>
     </div>
@@ -261,26 +261,27 @@ function renderTuTemporada() {
   const s = ficha.stats;
   const posicion = topDe(LIDERES[0]).indexOf(ficha) + 1;
   const foto = JUGADORES_FOTOS[sesion] || ficha.img;
-  const dato = (num, lbl, nota = '') => `<div class="tu-dato"><b>${num}</b><span>${lbl}</span>${nota ? `<small>${nota}</small>` : ''}</div>`;
+  const dato = (num, lbl, nota = '', ico = '') => `<div class="tu-dato"><b>${ico ? icono(ico) : ''}${num}</b><span>${lbl}</span>${nota ? `<small>${nota}</small>` : ''}</div>`;
+  const marca = (ico, etiqueta, num = '') => `<span class="tu-marca">${icono(ico, etiqueta)}${num}</span>`;
   const fila = (p, i) => `
     <li class="tu-partido${!tusPartidosTodos && i >= TUS_PARTIDOS_A_LA_VISTA ? ' tu-partido--oculto' : ''}" role="button" tabindex="0" ${abrirPartido(p.j)}>
       <span class="tu-partido__cuando"><b>${etiquetaPartido(p.j)}</b><small>${fmtFechaCorta(p.j.fecha)}</small></span>
       <span class="tu-partido__res tu-partido__res--${p.resultado}">${p.mios}–${p.suyos}</span>
-      <span class="tu-partido__tuyo">${p.goles ? `⚽ ${p.goles}` : ''}${p.asistencias ? ` 🅰️ ${p.asistencias}` : ''}${p.mvp ? ' ⭐' : ''}</span>
+      <span class="tu-partido__tuyo">${p.goles ? marca('gol', 'Goles', p.goles) : ''}${p.asistencias ? marca('asistencia', 'Asistencias', p.asistencias) : ''}${p.mvp ? marca('mvp', 'MVP') : ''}</span>
       ${ytId(p.j.video_url) ? `<button class="tu-partido__video boton-play" type="button" data-video-sonar="${p.j.fecha}" aria-label="Ver el resumen de ${etiquetaPartido(p.j)}">${ICONO_PLAY}</button>` : ''}
     </li>`;
   return seccionInicio('TU TEMPORADA', `
     <div class="tu-bloque">
       <div class="tu-cabeza">
-        ${foto ? imgDiferida(foto, 52, 'class="tu-foto"') : '<span class="tu-foto tu-foto--vacia" aria-hidden="true">👤</span>'}
+        ${foto ? imgDiferida(foto, 52, 'class="tu-foto"') : `<span class="tu-foto tu-foto--vacia" aria-hidden="true">${yo[0].toUpperCase()}</span>`}
         <div class="tu-quien"><b>${yo}</b><span>${posicion}.º en la clasificación</span></div>
       </div>
       <div class="tu-datos">
         ${dato(s.pts, 'Puntos')}
         ${dato(s.pj, 'Partidos', `${s.victorias}V ${s.empates}E ${s.derrotas}D`)}
-        ${dato(s.goles, 'Goles')}
-        ${dato(s.asistencias, 'Asistencias')}
-        ${dato(s.mvp, 'MVP')}
+        ${dato(s.goles, 'Goles', '', 'gol')}
+        ${dato(s.asistencias, 'Asistencias', '', 'asistencia')}
+        ${dato(s.mvp, 'MVP', '', 'mvp')}
       </div>
     </div>
     <h3 class="tu-subtitulo">Tus partidos</h3>

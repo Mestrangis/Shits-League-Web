@@ -283,7 +283,7 @@ try {
       const est = await page.$eval('.mvp-vista', v => v.dataset.estado);
       check(est === 'cerrada', 'MVP: solo historial, sin votación', est);
       check(await page.$('.mvp-reparto') === null, 'ni cartas para votar');
-      check((await texto(page, '.mvp-banner')).includes('🏆 Nico'), 'con el MVP de esos votos');
+      check((await texto(page, '.mvp-banner')).includes('Nico'), 'con el MVP de esos votos');
 
       // Deslizar sigue el orden de esta temporada
       await irTab(page, 'clasificacion');

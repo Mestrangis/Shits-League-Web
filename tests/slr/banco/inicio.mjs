@@ -179,14 +179,21 @@ try {
   /* ── La cabecera llena la primera pantalla ─────────────────────────────── */
   console.log('\n== Cabecera');
   for (const [ancho, alto] of [[360, 640], [360, 740], [360, 800], [412, 732], [412, 915], [390, 844]]) {
-    const { ctx, page, errores } = await abrir(navegador, { ancho, alto });
+    const { ctx, page, errores, foto } = await abrir(navegador, { ancho, alto });
     const b = await rect(page, '#tabs');
     check(Math.abs(b.bottom - alto) <= 1, `${ancho}×${alto}: la barra de pestañas, justo abajo del todo`, `${b.bottom}`);
-    const huecos = await page.evaluate(() => {
-      const hs = ['.hero__eyebrow', '.hero__title', '.hero__desc', '.last-match'].map(s => document.querySelector(s).getBoundingClientRect());
-      return hs.slice(1).map((r, i) => Math.round(r.top - hs[i].bottom));
+    const t = await page.evaluate(() => {
+      const ancho = s => { const r = document.createRange(); r.selectNodeContents(document.querySelector(s)); return r.getBoundingClientRect(); };
+      const caja = s => document.querySelector(s).getBoundingClientRect();
+      const shits = ancho('.hero__title-shits'), league = ancho('.hero__title-league'), ojo = ancho('.hero__eyebrow');
+      return { shits: shits.width / innerWidth, league: league.width, leagueD: league.right, shitsAncho: shits.width, ojoIzq: ojo.left, shitsIzq: shits.left,
+        pegado: caja('.hero__title').top - caja('.hero__eyebrow').bottom, arriba: caja('.hero__eyebrow').top - caja('#hero-section').top, medio: caja('.last-match').top - caja('.hero__desc').bottom, cabe: document.getElementById('hero-section').clientHeight };
     });
-    check(Math.max(...huecos) - Math.min(...huecos) <= 4, 'con el espacio repartido', huecos.join());
+    check(Math.abs(t.shits - .7) < .02, 'SHITS, el 70 % del ancho', t.shits.toFixed(3));
+    check(t.league > t.shitsAncho && t.leagueD <= ancho, 'LEAGUE, más ancho y sin salirse', `${t.league} ${t.leagueD}`);
+    check(Math.abs(t.ojoIzq - t.shitsIzq) <= 1 && t.pegado >= 0 && t.pegado <= 12, 'el eslogan, encima, a la izquierda y pegado', `${t.ojoIzq} ${t.shitsIzq} ${t.pegado}`);
+    check(Math.abs(t.arriba - t.medio) <= 6, 'el bloque, centrado en el hueco', `${t.arriba} ${t.medio}`);
+    await foto(`cabecera-${ancho}x${alto}`);
     check(errores.length === 0, 'sin errores', errores.join());
     await ctx.close();
   }
@@ -338,7 +345,14 @@ try {
       const todas = await page.$$eval('.tu-partido:not(.tu-partido--oculto)', f => f.map(x => x.textContent.replace(/\s+/g, ' ').trim()));
       check(todas.length === 7 && await page.$('[data-tus-partidos]') === null, '«Ver todos» enseña el resto', todas.length);
       const j1 = todas.at(-1);
-      check(j1.startsWith('Jornada 1') && j1.includes('3–1') && j1.includes('⚽ 1') && j1.includes('🅰️ 2') && j1.includes('⭐'), 'tus goles, asistencias y ⭐', j1);
+      check(j1.startsWith('Jornada 1') && j1.includes('3–1'), 'tu última fila', j1);
+      const iconos = await page.$$eval('.tu-partido:last-child .tu-marca', m => m.map(x => x.querySelector('.icono').getAttribute('aria-label') + x.textContent));
+      check(iconos.join() === 'Goles1,Asistencias2,MVP', 'tus goles, asistencias y MVP, con icono', iconos.join());
+      const pinta = await page.$eval('.tu-marca .icono--gol', i => { const s = getComputedStyle(i); return { color: s.backgroundColor, mask: s.maskImage || s.webkitMaskImage, w: i.offsetWidth }; });
+      check(pinta.color === 'rgb(61, 220, 132)' && pinta.mask.includes('iconos/gol.svg') && pinta.w > 10, 'el icono, en verde y con su dibujo', JSON.stringify(pinta));
+      check(await page.$eval('.tu-partido__tuyo', e => getComputedStyle(e).color) === 'rgb(255, 255, 255)', 'y el número, en blanco');
+      check(!/[\u{1F300}-\u{1FAFF}\u2600-\u27BF]/u.test(await texto(page, '#panel-inicio')), 'sin emojis en Inicio');
+      await foto(`${ancho}-tu-temporada`);
       await page.$eval('.tu-partido:nth-child(3)', f => f.click());
       await page.waitForSelector('#modal.open');
       check(true, 'tocar uno abre el partido');

@@ -28,7 +28,7 @@ const JUGADORES_CODIGOS = {
   "327bef5f4505da8ef5b97fed057a33a6c4376efc9b07daee6086cbe69f202af7": "Víctor",
 };
 
-// Foto de perfil por jugador (URL). Vacía → se muestra el emoji 👤
+// Foto de perfil por jugador (URL). Vacía → se muestra su inicial
 const JUGADORES_FOTOS = {
   "Marcos":   "https://res.cloudinary.com/dnd3g3zgm/image/upload/v1791741814/DALL_E_2022-08-29_14.48.06_-_A_Capibara_DJ_in_a_discotheque_ezgybe.png",
   "Alberto":  "https://res.cloudinary.com/dnd3g3zgm/image/upload/v1791741813/pepe-bordalas-efe_ti5q4z.jpg",
@@ -95,17 +95,18 @@ async function identificarCodigo(codigo) {
 }
 
 /* ── UI ──────────────────────────────────────────────────────────────────── */
-// Rellena un contenedor .avatar con la foto del jugador, o el emoji si no
+// Rellena un contenedor .avatar con la foto del jugador, o su inicial si no
 // tiene foto o la imagen no carga
 function renderAvatar(el, nombre) {
   const url = JUGADORES_FOTOS[nombre];
   el.innerHTML = '';
-  if (!url) { el.textContent = '👤'; return; }
+  const inicial = () => { el.textContent = nombre[0].toUpperCase(); };
+  if (!url) { inicial(); return; }
 
   const img = document.createElement('img');
   img.src = url;
   img.alt = nombre;
-  img.addEventListener('error', () => { el.textContent = '👤'; }, { once: true });
+  img.addEventListener('error', inicial, { once: true });
   el.appendChild(img);
 }
 
@@ -116,7 +117,7 @@ function renderSessionButton(nombre) {
   btn.setAttribute('aria-label', nombre ? `Sesión de ${nombre}` : 'Iniciar sesión');
   btn.innerHTML = nombre
     ? `<span class="avatar session-btn__avatar"></span><span class="session-btn__name">${nombre}</span>`
-    : `<span class="session-btn__icon">👤</span><span class="session-btn__label">ENTRAR</span>`;
+    : `<span class="session-btn__label">ENTRAR</span>`;
   if (nombre) renderAvatar(btn.querySelector('.avatar'), nombre);
 }
 

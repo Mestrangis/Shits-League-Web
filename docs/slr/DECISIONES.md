@@ -2439,6 +2439,8 @@ Sustituyen a lo anterior donde no coincidan: el plazo de 3 días, la identificac
 - **El triángulo del play es equilátero con su centro en el del viewBox:** así el centroide cae en el centro del círculo sin margen ni desplazamiento, y el redondeo del trazo no lo mueve porque conserva la simetría. Por eso la caja del triángulo queda algo a la derecha del centro. Lo mide `banco/inicio.mjs` en los píxeles de una captura.
 - **Corregido, de antes de este cambio:** `switchTab` y `switchSeason` borraban `history.state`. Si se pulsaba JUGAR antes de acabar el arranque, ir atrás cerraba el juego entero en vez de la ficha. Lo detectó `banco/descubrimientos.mjs` de forma intermitente. Ahora se conserva el estado.
 
+- **Iconos propios (`img/iconos/`):** se pintan con `mask` (`.icono`, `icono()` en `ui.js`): el SVG sigue siendo el único original y el service worker ya guarda `img/`. Sin icono para persona, campana, sitio, calendario, vídeo y lápiz: el botón de entrar muestra «ENTRAR» también en móvil, un jugador sin foto muestra su inicial, y los diálogos y la lista de avisos quedan solo con texto. Las flechas de texto (→ ▾) no son emojis y se quedan. Lo que viene de la hoja no se toca.
+
 ### Medido
 
 Con `rendimiento-liga.mjs` (412×915, CPU ×4, «4G lenta», 3 pasadas), la versión anterior servida aparte. Sin contar la descarga del service worker (los `?v=`), que según la pasada cae en la medida en frío o en la caliente y falsea la comparación.
