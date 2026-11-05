@@ -4,7 +4,7 @@
 ═══════════════════════════════════════════════ */
 
 /* ── Helpers ──────────────────────────────────────────────────────────────── */
-const SIN_EMPEZAR = 'La temporada aún no ha empezado';
+const SIN_EMPEZAR = AJUSTES_LIGA.textos.sinEmpezar;
 const MESES = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
 
 function fmtFechaCorta(iso) {
@@ -86,12 +86,12 @@ function renderHeroSection(jornadas) {
 
   return `
     <div class="hero__left">
-      <div class="hero__eyebrow">La liga que nunca debió existir —</div>
+      <div class="hero__eyebrow">${AJUSTES_LIGA.textos.eslogan}</div>
       <h1 class="hero__title">
         <span class="hero__title-shits">SHITS</span>
         <span class="hero__title-league">LEAGUE</span>
       </h1>
-      <p class="hero__desc">Es una mierda! Es la mayor mierda que he visto en toda mi vida.</p>
+      <p class="hero__desc">${AJUSTES_LIGA.textos.frase}</p>
     </div>
     ${renderLastMatch(lastMatch)}
   `;

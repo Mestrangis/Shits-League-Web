@@ -1,6 +1,6 @@
 // Genera la migración de usuarios de SLR:
 //   · los 18 jugadores de Shits League, con el hash de su código y su foto,
-//     leídos de js/session.js (JUGADORES_CODIGOS y JUGADORES_FOTOS);
+//     leídos de ajustes.js (usuarios);
 //   · bots de prueba ("Bot Uno", "Bot Dos" y, en una migración posterior,
 //     "Bot Tres") con códigos aleatorios.
 //
@@ -10,6 +10,7 @@
 // git). Si ya existen allí, se reutilizan; a la migración solo van los hashes.
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { createHash, randomBytes } from 'node:crypto';
+import vm from 'node:vm';
 
 const raiz = new URL('../../', import.meta.url);
 const ruta = p => new URL(p, raiz);
@@ -17,18 +18,11 @@ const MIGRACION = 'supabase/migrations/20261012230200_slr_usuarios.sql';
 // Los bots añadidos después van en su propia migración: las ya aplicadas no se tocan
 const MIGRACION_BOT_TRES = 'supabase/migrations/20261013000000_slr_bot_tres.sql';
 
-// ── Jugadores desde js/session.js ──────────────────────────────────────────
-const session = readFileSync(ruta('js/session.js'), 'utf8');
-const bloque = nombre => {
-  const i = session.indexOf(`const ${nombre}`);
-  if (i < 0) throw new Error(`No encuentro ${nombre} en js/session.js`);
-  return session.slice(i, session.indexOf('};', i) + 2);
-};
-const codigos = [...bloque('JUGADORES_CODIGOS').matchAll(/"([0-9a-f]{64})":\s*"([^"]+)"/g)]
-  .map(m => ({ hash: m[1], nombre: m[2] }));
-const fotos = Object.fromEntries(
-  [...bloque('JUGADORES_FOTOS').matchAll(/"([^"]+)":\s*"([^"]*)"/g)].map(m => [m[1], m[2]])
-);
+// ── Jugadores desde ajustes.js ──────────────────────────────────────────
+const contexto = {};
+vm.runInNewContext(readFileSync(ruta('ajustes.js'), 'utf8'), contexto);
+const codigos = contexto.AJUSTES.usuarios.map(u => ({ hash: u.huella, nombre: u.nombre }));
+const fotos = Object.fromEntries(contexto.AJUSTES.usuarios.map(u => [u.nombre, u.foto]));
 if (codigos.length !== 18) throw new Error(`Esperaba 18 jugadores y hay ${codigos.length}`);
 
 // ── Bots: códigos en .env.local ────────────────────────────────────────────

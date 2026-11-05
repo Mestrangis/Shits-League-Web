@@ -2460,3 +2460,13 @@ Con `rendimiento-liga.mjs` (412×915, CPU ×4, «4G lenta», 3 pasadas), la vers
 ### Pruebas
 
 - **`banco/inicio.mjs`** (360 y 412 px con toques reales por CDP, y PC a 1280 y 1000): la cabecera en seis tamaños de móvil, en uno muy pequeño y con cartas; orden de las secciones; YouTube sin cargar hasta tocar; números exactos; líderes; tu temporada con sus cuentas; temporada vacía; barra rayada; carrusel (se para, deslizar lo mueve a él y no a la pestaña, vuelve a moverse al volver, tarjeta al azar); rueda y teclado.
+
+## Shits League: ajustes.js, los ajustes a mano
+
+- **`ajustes.js` en la raíz, y `js/lector-ajustes.js` lo lee:** temporadas, enlaces, usuarios, textos, puntos, Inicio y calendario. El resto del código sigue usando `TEMPORADAS`, `ENLACES_LIGA`, `JUGADORES_CODIGOS` y `JUGADORES_FOTOS`.
+- **Los valores por defecto están en el lector, duplicados a propósito:** un error de escritura deja `ajustes.js` entero sin leer, y tiene que haber con qué arrancar. `var AJUSTES` y no `const`: con un error al evaluarlo, un `const` deja la variable inaccesible y el `typeof` lanzaría.
+- **Admin y beta no están en `ajustes.js`:** los decide el servidor (`usuarios.beta`, admin de la liga, `rush_publico`). Un archivo público no puede dar permisos, y un campo que no hiciera nada engañaría.
+- **En los enlaces, vacío es «que no salga»;** en el resto, vacío es un error y vale el de por defecto. En una temporada, `hoja: ''` es una temporada vacía.
+- **`js/version.js` no repara por errores de `ajustes.js`:** borraría las cachés y recargaría cada 5 minutos sin arreglar nada.
+- **`herramientas/precarga.mjs` incluye `ajustes.js`:** así entra en `version.json`, y cambiarlo es una versión nueva que llega sola a los móviles. No hace falta subir `CACHE_NAME`.
+- **Las temporadas nuevas también van en `HOJAS` de `apps-script/votos.gs`:** el script no puede leer `ajustes.js`.

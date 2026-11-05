@@ -270,6 +270,8 @@
   window.addEventListener('error', e => {
     if (arrancada || !navigator.serviceWorker.controller) return;
     const archivo = e.filename || e.target?.src || e.target?.href || '';
+    // ajustes.js se edita a mano: si está mal escrito no es una caché rota, y repararla no lo arregla
+    if (archivo.split('?')[0] === new URL('ajustes.js', document.baseURI).href) return;
     if (archivo.startsWith(new URL('./', document.baseURI).href)) reparar({ auto: true });
   }, true);
 

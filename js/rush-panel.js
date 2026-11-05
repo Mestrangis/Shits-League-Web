@@ -3,7 +3,7 @@
    Pestaña "Rush": portada ligera de Shits League Rush y el puente con la
    sesión de Shits League (session.js). Aquí no hay nada del juego: el modo
    Rush (js/slr/rush.js + css/slr.css) se carga al pulsar JUGAR.
-   La pestaña solo existe en la temporada con Rush (js/temporadas.js). Antes de empezar
+   La pestaña solo existe en la temporada con Rush (ajustes.js). Antes de empezar
    esa temporada, solo con sesión y acceso; después, para todos. El acceso lo dice el
    servidor (slr_login → tiene_acceso) al iniciar sesión y se guarda en localStorage;
    al arrancar se usa lo guardado.

@@ -191,13 +191,13 @@ function calcularStats(jugadores, jornadas) {
       const esCapitan = nombre === resolverNombre(capitan);
       if (resultado === 'win') {
         s.victorias++;
-        s.pts += esCapitan ? 7 : 3;
+        s.pts += esCapitan ? AJUSTES_LIGA.puntos.capitanVictoria : AJUSTES_LIGA.puntos.victoria;
       } else if (resultado === 'draw') {
         s.empates++;
-        s.pts += esCapitan ? 4 : 1;
+        s.pts += esCapitan ? AJUSTES_LIGA.puntos.capitanEmpate : AJUSTES_LIGA.puntos.empate;
       } else {
         s.derrotas++;
-        s.pts += esCapitan ? 2 : 0;
+        s.pts += esCapitan ? AJUSTES_LIGA.puntos.capitanDerrota : AJUSTES_LIGA.puntos.derrota;
       }
     });
   }

@@ -1,38 +1,13 @@
 /* ═══════════════════════════════════════════════
    SHITS LEAGUE — temporadas.js
-   LOS AJUSTES DE LA LIGA: lo que se puede cambiar a mano sin tocar nada más.
-   · TEMPORADAS: las temporadas, de la más nueva a la más vieja. Añadir una es añadir
-     una entrada aquí (y su hoja en apps-script/votos.gs).
-   · ENLACES_LIGA: Spotify, YouTube, acta y reglamento.
-     hoja:     ID de su Google Sheet (Jugadores, Jornadas, Votaciones, MVPs). Sin ID, vacía.
-     jornadas: total de jornadas previstas, para la barra de progreso de Inicio.
-               null: sin decidir («Jornada X · total por decidir», con la barra rayada).
-     imagenes: solo unas imágenes, sin hoja (las temporadas de antes de la web).
-     rush:     Rush existe en esta temporada.
+   Qué es cada temporada. La lista (TEMPORADAS) y los enlaces se editan en ajustes.js, en
+   la raíz, y llegan por js/lector-ajustes.js.
    Qué es cada una lo dice el ajuste temporada_en_curso de Supabase (el botón «Empezar la
    temporada» del Modo pruebas):
      · la en curso: la de por defecto, con todas las pestañas;
      · las más nuevas: próximas, igual que una en curso pero solo para los usuarios beta;
      · las más viejas: archivo, solo el historial, sin votar.
 ═══════════════════════════════════════════════ */
-
-const TEMPORADAS = [
-  { id: '26-27', etiqueta: 'Temporada 26/27', corta: '26/27', jornadas: null, hoja: '1UW3JRsjC8DHPsMwz9LjyRrqPo2SVTBUtiLkpL8LqCIg', rush: true },
-  { id: '24-26', etiqueta: 'Temporada 24/26', corta: '24/26', jornadas: 16, hoja: '1EHGrFt2Y3QDCOdSV3fVgWvspzXYcir4SmDxOezdSLRY' },
-  { id: '23-24', etiqueta: 'Temporada 23/24', corta: '23/24', imagenes: [
-    { src: 'assets/clasificación23-24.png', alt: 'Clasificación 23-24' },
-    { src: 'assets/goles23-24.png',         alt: 'Goleadores 23-24' },
-    { src: 'assets/Draft 2024.jpg',         alt: 'Draft 2024' },
-  ] },
-];
-
-// Los enlaces de Inicio. Vacío (''): ese enlace no sale.
-const ENLACES_LIGA = {
-  spotify:    'https://open.spotify.com/playlist/4ED3CETGtGm8VYAhcC4Ok5?si=TRYceS8WTd-7zoKMXp3-Gg',
-  youtube:    'https://youtube.com/playlist?list=PLTptgVdQcUSUE0YFK4LhRHxyxqTH96nJh&si=cMLi67cImjm7jOeQ',
-  acta:       'assets/acta.pdf',
-  reglamento: 'assets/reglamento.pdf',
-};
 
 // Lo mismo que js/slr/config.js (público), que es de Rush y no se carga hasta pulsar JUGAR.
 // tests/slr/temporadas.test.mjs comprueba que coinciden.
@@ -48,7 +23,9 @@ function leerEnCursoGuardada() {
     return temporadaPorId(id) ? id : null;
   } catch { return null; }
 }
-let temporadaEnCursoId = leerEnCursoGuardada() ?? TEMPORADA_EN_CURSO_INICIAL;
+// Si la inicial ya no está en ajustes.js, la más nueva con datos
+const enCursoInicial = () => (temporadaPorId(TEMPORADA_EN_CURSO_INICIAL) ? TEMPORADA_EN_CURSO_INICIAL : (TEMPORADAS.find(t => !t.imagenes) ?? TEMPORADAS[0]).id);
+let temporadaEnCursoId = leerEnCursoGuardada() ?? enCursoInicial();
 
 // Lo que dice el servidor (null si no se ha podido saber). Una lectura pequeña, sin nada más de Rush
 async function pedirTemporadaEnCurso(ms = 4000) {

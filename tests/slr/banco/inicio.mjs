@@ -128,7 +128,7 @@ async function abrir(navegador, { ancho = 412, alto = 800, movil = true, sesion 
     sessionStorage.setItem('__listo', '1');
     if (s) { localStorage.setItem('SESSION_PLAYER', s); localStorage.setItem('SESSION_CODE', 'prueba'); if (a !== null) localStorage.setItem('RUSH_ACCESO', JSON.stringify({ jugador: s, acceso: a })); }
   }, [sesion, acceso]);
-  await ctx.route('**/js/temporadas.js*', async r => {
+  await ctx.route('http://localhost:3000/ajustes.js*', async r => {
     const res = await r.fetch();
     r.fulfill({ response: res, body: (await res.text()).replace(/hoja: '1UW[^']*'/, `hoja: '${H2627}'`) });
   });

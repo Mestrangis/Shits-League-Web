@@ -9,7 +9,7 @@
 //   node herramientas/precarga.mjs   → escribe version.json (no está en el repo: lo genera
 //   el despliegue, .github/workflows/static.yml, y cada banco de pruebas antes de empezar)
 //
-// Qué entra: index.html, manifest.json, todo js/ (.js), css/ (.css), img/ y las imágenes
+// Qué entra: index.html, manifest.json, ajustes.js, todo js/ (.js), css/ (.css), img/ y las imágenes
 // PNG/SVG de assets/ que cita la web (index.html, manifest.json, CSS o JS: logos, iconos…)
 // de hasta 300 KB (las que solo cita Rush van con Rush). Qué no: tests/, docs/, supabase/, push/
 // (el worker de OneSignal), herramientas/, sw.js y version.json, ni las fotos JPG y los PDF de
@@ -53,7 +53,7 @@ const assetsDeRush = () => new Set(assetsDeLaWeb().filter(([, quien]) => quien.e
 
 export function archivosDeLaWeb() {
   const lista = [
-    'index.html', 'manifest.json',
+    'index.html', 'manifest.json', 'ajustes.js',
     ...todos('js').filter(f => f.endsWith('.js')),
     ...todos('css').filter(f => f.endsWith('.css')),
     ...todos('img').filter(f => IMAGEN.test(f)),

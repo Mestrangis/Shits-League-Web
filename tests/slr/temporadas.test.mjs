@@ -8,10 +8,10 @@ const raiz = f => readFileSync(new URL(`../../${f}`, import.meta.url), 'utf8');
 
 function cargar({ sesion = null, acceso = null, enCurso = null } = {}) {
   const ctx = vm.createContext({
-    localStorage: { getItem: k => (k === 'SL_TEMPORADA_EN_CURSO' ? enCurso : null), setItem() {} },
+    console, localStorage: { getItem: k => (k === 'SL_TEMPORADA_EN_CURSO' ? enCurso : null), setItem() {} },
     getSessionPlayer: () => sesion, rushAccesoGuardado: () => acceso,
   });
-  vm.runInContext(raiz('js/temporadas.js'), ctx);
+  for (const f of ['ajustes.js', 'js/lector-ajustes.js', 'js/temporadas.js']) vm.runInContext(raiz(f), ctx);
   return { ev: c => vm.runInContext(c, ctx) };
 }
 const modos = a => a.ev(`TEMPORADAS.map(t => t.id + ':' + modoTemporada(t)).join()`);

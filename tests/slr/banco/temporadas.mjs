@@ -51,7 +51,7 @@ async function abrir(navegador, ancho, { sesion = null, acceso = null, enCurso =
     if (g) localStorage.setItem('SL_TEMPORADA_EN_CURSO', g);
   }, [sesion, acceso, guardado]);
   // La 26/27 con su ID de prueba (o sin ID), sin tocar el archivo: la hoja real ni se pide
-  await ctx.route('**/js/temporadas.js*', async r => {
+  await ctx.route('http://localhost:3000/ajustes.js*', async r => {
     const res = await r.fetch();
     const cuerpo = await res.text();
     r.fulfill({ response: res, body: cuerpo.replace(/hoja: '[^']*', rush: true/, `hoja: '${conHoja ? H2627 : ''}', rush: true`) });

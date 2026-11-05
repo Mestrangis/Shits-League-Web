@@ -69,7 +69,7 @@ test('dos partes: la Shits League normal (con la app) y Rush (al pulsar JUGAR), 
   for (const r of cierreDeImports(['js/slr/config.js', 'js/slr/rush.js'])) assert.ok(rush.has(r), `${r} (módulo de Rush)`);
   for (const r of ['css/slr.css', 'js/slr/partido/ajustes.js', 'css/acabados/foil.css', 'assets/slr-muestra-sin-fondo.png']) assert.ok(rush.has(r), r);
   for (const r of app) assert.ok(!esDeRush(r) && r !== 'assets/slr-muestra-sin-fondo.png', `${r} es de Rush`);
-  for (const r of ['index.html', 'js/app.js', 'js/rush-panel.js', 'js/version.js', 'css/main.css', 'css/rush-panel.css', 'assets/logo-s-green.png']) assert.ok(V.app[r], r);
+  for (const r of ['index.html', 'ajustes.js', 'js/lector-ajustes.js', 'js/app.js', 'js/rush-panel.js', 'js/version.js', 'css/main.css', 'css/rush-panel.css', 'assets/logo-s-green.png']) assert.ok(V.app[r], r);
   for (const r of app) {
     if (r.endsWith('.js')) for (const i of importsDe(r)) assert.ok(!rush.has(i), `${r} importa ${i}`);
     if (/\.(css|html)$/.test(r)) assert.doesNotMatch(leer(r), /(?:href|src|url\()\s*=?\s*["']?(?:\.\.\/)?(?:js\/slr\/|css\/slr\.css|css\/acabados\/|img\/slr\/)/, r);

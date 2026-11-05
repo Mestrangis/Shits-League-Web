@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Huella de un código</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; padding: 24px 16px; background: #06140d; color: #e8fbef; font: 15px/1.5 system-ui, sans-serif; }
+  main { max-width: 640px; margin: 0 auto; }
+  h1 { margin: 0 0 6px; font-size: 22px; }
+  p { margin: 0 0 18px; color: #9dc4ad; }
+  label { display: block; margin: 14px 0 5px; font-weight: 600; }
+  input { box-sizing: border-box; width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid #2c5c41; background: #0e2016; color: inherit; font: inherit; }
+  output { display: block; padding: 10px 12px; min-height: 22px; border-radius: 8px; background: #0e2016; font: 13px/1.5 ui-monospace, Consolas, monospace; overflow-wrap: anywhere; }
+  button { margin-top: 10px; padding: 9px 16px; border: 0; border-radius: 8px; background: #1fe065; color: #06140d; font: inherit; font-weight: 700; cursor: pointer; }
+  button:disabled { opacity: .4; cursor: default; }
+  .nota { margin-top: 18px; font-size: 13px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Huella de un código</h1>
+  <p>Para añadir un usuario a <code>ajustes.js</code>. El código no sale de esta página: la cuenta se hace en tu navegador.</p>
+
+  <label for="nombre">Nombre del usuario</label>
+  <input id="nombre" autocomplete="off" spellcheck="false" placeholder="Paco">
+
+  <label for="codigo">Su código</label>
+  <input id="codigo" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="El código con el que entrará">
+
+  <label for="huella">Huella</label>
+  <output id="huella"></output>
+
+  <label for="linea">La línea para pegar en <code>usuarios</code>, en ajustes.js</label>
+  <output id="linea"></output>
+  <button id="copiar" type="button" disabled>Copiar la línea</button>
+
+  <p class="nota">Las mayúsculas y los espacios de los extremos dan igual, igual que al entrar en la app. Con esto entra en la Shits League; para Rush hay que darlo de alta también en el servidor.</p>
+</main>
+<script>
+  const $ = id => document.getElementById(id);
+  const comillas = t => t.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+
+  async function huellaDe(codigo) {
+    // Lo mismo que hace el login (js/session.js)
+    const datos = new TextEncoder().encode(codigo.trim().toLowerCase());
+    const buf = await crypto.subtle.digest('SHA-256', datos);
+    return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  async function calcular() {
+    const codigo = $('codigo').value;
+    if (!codigo.trim()) {
+      $('huella').textContent = $('linea').textContent = '';
+      $('copiar').disabled = true;
+      return;
+    }
+    if (!crypto.subtle) {
+      $('huella').textContent = 'Este navegador no deja calcularla aquí: abre la página desde la web publicada.';
+      return;
+    }
+    const huella = await huellaDe(codigo);
+    $('huella').textContent = huella;
+    $('linea').textContent = `{ nombre: '${comillas($('nombre').value.trim() || 'NOMBRE')}', huella: '${huella}', foto: '' },`;
+    $('copiar').disabled = false;
+  }
+
+  $('codigo').addEventListener('input', calcular);
+  $('nombre').addEventListener('input', calcular);
+  $('copiar').addEventListener('click', async () => {
+    const boton = $('copiar');
+    try {
+      await navigator.clipboard.writeText($('linea').textContent);
+      boton.textContent = '¡Copiada!';
+    } catch {
+      getSelection().selectAllChildren($('linea'));
+      boton.textContent = 'Selecciónala y cópiala';
+    }
+    setTimeout(() => { boton.textContent = 'Copiar la línea'; }, 2000);
+  });
+</script>
+</body>
+</html>

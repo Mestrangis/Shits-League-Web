@@ -19,7 +19,7 @@ const VOTOS_GAS_SECRET = 'pissleague';
 
 // ── Core ──────────────────────────────────────────────────────────────────
 
-// Cada temporada lee SU hoja (js/temporadas.js)
+// Cada temporada lee SU hoja (ajustes.js)
 const hojaDeLaTemporada = () => temporadaPorId(STATE.season)?.hoja || '';
 
 function sheetsUrl(sheetName) {

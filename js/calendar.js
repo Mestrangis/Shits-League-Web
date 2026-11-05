@@ -5,7 +5,7 @@
 ═══════════════════════════════════════════════ */
 
 // TODO: reemplaza con tu Calendar ID y API Key
-const CALENDAR_ID  = '38a5afd4c120a661ffbf3e4392af235b395891931485fb16ebca3e152524e5c0@group.calendar.google.com';
+const CALENDAR_ID  = AJUSTES_LIGA.calendario;
 const CALENDAR_KEY = 'AIzaSyC5TLnk-zGTAia4HZNvv77PgY2FtXYfhdc';
 
 // Devuelve los próximos N eventos del calendario

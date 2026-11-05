@@ -2,11 +2,11 @@
    SHITS LEAGUE — inicio.js
    La pestaña Inicio, de la temporada que se está viendo: próximo partido, resúmenes
    en vídeo, la temporada en números, líderes, tu temporada y los enlaces. Lo que no
-   tiene datos no aparece. Lo que se puede cambiar a mano está en js/temporadas.js.
+   tiene datos no aparece. Lo que se puede cambiar a mano está en ajustes.js.
 ═══════════════════════════════════════════════ */
 
-const CARRUSEL_MS = 5000;
-const TUS_PARTIDOS_A_LA_VISTA = 5;
+const CARRUSEL_MS = AJUSTES_LIGA.inicio.segundosCarrusel * 1000;
+const TUS_PARTIDOS_A_LA_VISTA = AJUSTES_LIGA.inicio.tusPartidosALaVista;
 const MQ_CARRUSEL = window.matchMedia('(max-width: 760px)');
 
 let videoElegido = null;    // fecha del partido en el reproductor; null: el último resumen
