@@ -86,7 +86,7 @@ test('2. con votación: a los del sí y a los que no han votado, con textos dist
   assert.equal(pend.contents.es, '¿Vienes al partido de mañana?');
   for (const n of ['Marcos', 'Nicolás', 'Mateo']) assert.ok(!pend.include_aliases.external_id.includes(n), n);
   assert.ok(pend.include_aliases.external_id.includes('Puebla'));
-  assert.ok(si.web_url.endsWith('#votacion'));
+  assert.ok(si.web_url.endsWith('#inicio') && pend.web_url.endsWith('#inicio'), 'el calendario abre Inicio');
 });
 
 test('un partido recién creado no lleva además el recordatorio de ese tramo', () => {

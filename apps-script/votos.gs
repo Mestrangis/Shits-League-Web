@@ -482,7 +482,7 @@ function calcularAvisos(ahora, datos, enviados) {
     const horaTexto = ev.todoElDia ? '' : hora;
     const detalles = [horaTexto, sinEmojis(ev.lugar)].filter(Boolean).join(', ');
     const votacion = votaciones.find(v => v.fecha === dia);
-    const url = votacion ? '#votacion' : '#inicio';
+    const url = '#inicio';   // todo lo del calendario abre Inicio, haya votación o no
 
     const tipo = !ev.todoElDia && falta <= HORA ? 'hora' : falta > 12 * HORA && falta <= DIA ? 'dia' : falta > 6 * DIA && falta <= 7 * DIA ? 'semana' : null;
     const claveRec = t => `rec:${t}:${ev.id}:${inicio}`;

@@ -2474,6 +2474,7 @@ Con `rendimiento-liga.mjs` (412×915, CPU ×4, «4G lenta», 3 pasadas), la vers
 ## Shits League: partido nuevo, cambio de hora y cancelado
 
 - **Cada partido anunciado guarda su hora (`av:calfecha:<id>`).** Si cambia, se avisa con «Cambio de hora» y los recordatorios van con la hora nueva, sin los que ya han pasado. Si desaparece del calendario antes de jugarse, se avisa con «Partido cancelado». Sin calendario leído no se da nada por cancelado. Los anunciados antes de esto apuntan su hora en la primera pasada, sin avisar.
+- **Todo lo del calendario abre Inicio,** también los recordatorios de un partido con votación (antes abrían Partidos).
 - **Los eventos repetidos** comparten id en Google Calendar: cada sesión va con el id y su hora de inicio.
 
 ## Shits League: notificaciones que se reparan solas
