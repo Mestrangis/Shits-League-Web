@@ -264,13 +264,6 @@ async function pintarDiagnostico() {
   </ul>`;
 }
 
-const TEXTO_REPARAR = {
-  bien: 'Ya estaban bien: suscrito y con token.',
-  reparada: 'Reparadas: ya hay token.',
-  'sin permiso': 'El permiso no está concedido: no hay nada que reparar.',
-  'sin OneSignal': 'OneSignal no se ha cargado.',
-  'sin token': 'Sigue sin token. Mira el último error.',
-};
 
 /* ── El pistoletazo de la temporada ──────────────────────────────────────── */
 // Por su id: el nombre público de una temporada puede estar oculto en ajustes.js
@@ -340,10 +333,11 @@ function htmlSimulacro(r) {
 
 async function accionAdmin(accion, salida) {
   salida.textContent = 'Un momento…';
+  // Reinicio completo de OneSignal en este dispositivo: acaba recargando la página
   if (accion === 'reparar') {
-    salida.textContent = TEXTO_REPARAR[await pushReparar()];
-    await pintarDiagnostico();
-    refrescarEstadoApp();
+    salida.textContent = 'Reparando…';
+    avisoApp('Reparando…', 'ok');
+    await pushReiniciar();
     return;
   }
   try {

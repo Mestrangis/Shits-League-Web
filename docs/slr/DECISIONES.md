@@ -2474,6 +2474,7 @@ Con `rendimiento-liga.mjs` (412×915, CPU ×4, «4G lenta», 3 pasadas), la vers
 ## Shits League: notificaciones que se reparan solas
 
 - **Suscrito es `optedIn` y con token:** `optedIn` sin token sale «Unsubscribed» en OneSignal y no recibe nada. Con el permiso dado, `pushReparar()` (`js/push.js`) hace `optIn`, espera el token y repite el login. Si sigue sin token, da de baja la suscripción del navegador del worker de OneSignal (`push/onesignal/`) y prueba una vez más. El último error queda en `SL_PUSH_ULTIMO_ERROR`, y el panel de admin lo enseña con el diagnóstico del dispositivo.
+- **«Reparar notificaciones» reinicia OneSignal en el dispositivo:** el SDK no se entera de que la suscripción ya no existe en el servidor (borrada en el panel), y la reparación de antes lo ve todo bien. Hace `logout`, da de baja la suscripción y su worker, borra sus claves y recarga. Al arrancar, borra sus bases de IndexedDB antes de cargar el SDK, porque abiertas no se dejan borrar, y repara. Ni la sesión de la app ni el permiso se tocan.
 
 ## Shits League: avisos de instalar y notificaciones, según el estado real
 

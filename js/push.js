@@ -46,6 +46,7 @@ function initPush() {
     }
     const jugador = getSessionPlayer();
     if (jugador) pushVincularJugador(jugador);
+    if (pushTrasReinicio) terminarReinicio();
     // Suscrito de verdad: con token. optedIn sin token no recibe nada
     const avisar = () => appCambioPush(pushBien(OneSignal));
     OneSignal.User.PushSubscription.addEventListener('change', avisar);
@@ -56,12 +57,15 @@ function initPush() {
 
   // El SDK, en el primer rato libre (como mucho a los 4 s): no compite con lo que se está
   // viendo al arrancar (las notificaciones no tienen prisa)
-  (window.requestIdleCallback ?? (f => setTimeout(f, 2000)))(() => {
+  // Tras un reinicio, antes de que el SDK abra sus bases: así se pueden borrar
+  pushTrasReinicio = leerReinicio();
+  const antes = pushTrasReinicio ? borrarBasesOneSignal() : Promise.resolve();
+  (window.requestIdleCallback ?? (f => setTimeout(f, 2000)))(() => antes.finally(() => {
     const s = document.createElement('script');
     s.src = ONESIGNAL_SDK_URL;
     s.async = true;
     document.head.appendChild(s);
-  }, { timeout: 4000 });
+  }), { timeout: 4000 });
 }
 
 /* ── Pedir el permiso (desde la alarma) ──────────────────────────────────── */
@@ -144,6 +148,74 @@ async function repararPush() {
   if (await intentar()) return 'reparada';
   anotarErrorPush('reparación', `sigue sin token (optedIn: ${OneSignal.User.PushSubscription.optedIn}, id: ${OneSignal.User.PushSubscription.id ?? 'ninguno'})`);
   return 'sin token';
+}
+
+/* ── Reinicio completo (el botón «Reparar notificaciones») ───────────────── */
+// Para cuando el SDK cree que todo va bien y en OneSignal ya no existe la suscripción (borrada en
+// el panel, por ejemplo): se olvida todo lo de OneSignal en este dispositivo y se empieza de cero.
+// No toca la sesión de la app ni el permiso del navegador. En dos tiempos, con una recarga en
+// medio: las bases de IndexedDB solo se pueden borrar sin el SDK abierto
+const PUSH_REINICIO_KEY = 'SL_PUSH_REINICIO';
+const ES_DE_ONESIGNAL = /onesignal|one_signal|^os_|^isOptedOut$|^isPushNotificationsEnabled$/i;
+let pushTrasReinicio = false;
+
+function leerReinicio() {
+  try {
+    const hay = localStorage.getItem(PUSH_REINICIO_KEY) === '1';
+    localStorage.removeItem(PUSH_REINICIO_KEY);
+    return hay;
+  } catch { return false; }
+}
+
+// 1: fuera el login, la suscripción del navegador, su worker y sus claves guardadas; y recarga
+async function pushReiniciar() {
+  const OneSignal = await pushConTiempo();
+  if (OneSignal) {
+    try { await OneSignal.logout(); } catch (e) { anotarErrorPush('logout', e); }
+  }
+  try {
+    const reg = await registroOneSignal();
+    const sub = await reg?.pushManager.getSubscription();
+    if (sub) await sub.unsubscribe();
+    // Sin su worker, nada tiene abiertas las bases: se pueden borrar al volver. El SDK lo registra otra vez
+    if (reg) await reg.unregister();
+  } catch (e) { anotarErrorPush('reinicio', e); }
+  for (const almacen of ['localStorage', 'sessionStorage']) {
+    try {
+      const a = window[almacen];
+      Object.keys(a).filter(k => ES_DE_ONESIGNAL.test(k)).forEach(k => a.removeItem(k));
+    } catch { /* sin almacenamiento */ }
+  }
+  try { localStorage.setItem(PUSH_REINICIO_KEY, '1'); } catch { /* sin persistencia: no habrá segundo tiempo */ }
+  location.reload();
+  await new Promise(() => {});
+}
+
+// 2, al arrancar: sus bases de IndexedDB. Si alguna sigue abierta, se sigue a los 5 s (queda apuntado)
+async function borrarBasesOneSignal() {
+  let nombres = ['ONE_SIGNAL_SDK_DB'];
+  try {
+    const lista = await indexedDB.databases?.();
+    if (lista) nombres = [...new Set([...nombres, ...lista.map(d => d.name).filter(n => n?.startsWith('ONE_SIGNAL'))])];
+  } catch { /* sin la lista: la de siempre */ }
+  await Promise.all(nombres.map(n => new Promise(res => {
+    const t = setTimeout(() => { anotarErrorPush('IndexedDB', `${n} sigue abierta: no se ha podido borrar a tiempo`); res(); }, 5000);
+    try {
+      const req = indexedDB.deleteDatabase(n);
+      req.onsuccess = () => { clearTimeout(t); res(); };
+      req.onerror = () => { clearTimeout(t); anotarErrorPush('IndexedDB', req.error ?? n); res(); };
+    } catch (e) { clearTimeout(t); anotarErrorPush('IndexedDB', e); res(); }
+  })));
+}
+
+// 3, con el SDK ya iniciado: optIn, token y login con el nombre de la cuenta (pushReparar)
+async function terminarReinicio() {
+  const r = await pushReparar();
+  const id = (await pushConTiempo())?.User.PushSubscription.id;
+  if (r === 'bien' || r === 'reparada') avisoApp(`Notificaciones reiniciadas. Suscripción nueva: ${id}`, 'ok');
+  else if (r === 'sin permiso') avisoApp('OneSignal reiniciado. Sin el permiso concedido no hay suscripción.');
+  else avisoApp('OneSignal reiniciado, pero sigue sin token. Mira el diagnóstico.');
+  if (typeof pintarPerfilAdmin === 'function') pintarPerfilAdmin();
 }
 
 // Para el panel de admin: cómo está ESTE dispositivo
