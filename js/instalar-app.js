@@ -325,7 +325,7 @@ function htmlSimulacro(r) {
   if (r.primeraVez) return `${cabeza}<p>Es la primera pasada: solo apuntará lo que ya hay, sin enviar nada.</p>`;
   if (!r.avisos.length) return `${cabeza}<p>Ahora mismo no se enviaría nada.</p>`;
   return `${cabeza}<ul class="perfil-admin__lista">${r.avisos.map(a => `<li>
-    <b>${escaparApp(a.cuerpo)}</b>
+    <b>${a.titulo ? `${escaparApp(a.titulo)}: ` : ''}${escaparApp(a.cuerpo)}</b>
     <span>A: ${a.a === 'todos' ? 'todos' : escaparApp(a.a.join(', '))}</span>
     ${a.espera ? '<small>Espera a las 9:00</small>' : ''}
   </li>`).join('')}</ul>`;

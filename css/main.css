@@ -201,10 +201,9 @@ button, [role="button"], .modal__backdrop, .tab, .result-row, .card-wrap, .voto-
 .icono--mvp { -webkit-mask-image: url(../img/iconos/mvp.svg); mask-image: url(../img/iconos/mvp.svg); }
 .icono--si { -webkit-mask-image: url(../img/iconos/si.svg); mask-image: url(../img/iconos/si.svg); }
 .icono--no { -webkit-mask-image: url(../img/iconos/no.svg); mask-image: url(../img/iconos/no.svg); }
-.icono--wrapped { -webkit-mask-image: url(../img/iconos/wrapped.svg); mask-image: url(../img/iconos/wrapped.svg); }
 .icono--movil { -webkit-mask-image: url(../img/iconos/movil.svg); mask-image: url(../img/iconos/movil.svg); }
 .icono--campana-no { -webkit-mask-image: url(../img/iconos/campana-no.svg); mask-image: url(../img/iconos/campana-no.svg); }
-.icono--gol, .icono--asistencia, .icono--mvp, .icono--wrapped { color: var(--verde); }
+.icono--gol, .icono--asistencia, .icono--mvp { color: var(--verde); }
 
 .hero-section {
   position: relative;
@@ -1878,23 +1877,29 @@ details.mvp-fila[open] > summary .mvp-fila__puntos::after { content: ' ▴'; }
 .lider__todos { align-self: flex-end; margin-top: auto; padding: 6px 0; font-size: 12px; font-weight: 600; color: var(--verde); cursor: pointer; }
 .lideres__puntos { display: none; }
 
-/* ── Wrapped de la 24/26 ── */
-.wrapped-tarjeta {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px;
-  border-radius: 14px;
-  border: 1px solid rgba(31,224,101,.4);
-  background: radial-gradient(120% 120% at 0 0, rgba(31,224,101,.2), transparent 60%), rgba(8,24,15,.85);
-  color: #fff;
-  text-decoration: none;
-}
-.wrapped-tarjeta .icono { font-size: 30px; }
-.wrapped-tarjeta__texto { flex: 1; min-width: 0; }
-.wrapped-tarjeta__texto b { display: block; font-family: 'Anton', sans-serif; font-weight: 400; font-size: 22px; letter-spacing: .03em; color: #fff; }
-.wrapped-tarjeta__texto span { font-size: 12px; font-weight: 600; color: var(--verde); }
-.wrapped-tarjeta__flecha { flex: none; font-size: 18px; font-weight: 600; color: var(--verde); }
+/* ── Wrapped de la 24/26 (el diseño de tarjeta.html, tal cual) ── */
+.wr-tarjeta{--verde:#1FE065;position:relative;display:block;height:168px;border-radius:24px;overflow:hidden;text-decoration:none;color:#06140b;
+  background:radial-gradient(120% 140% at 0% 0%,#5CF595 0%,var(--verde) 45%,#12B44E 100%);
+  box-shadow:0 10px 30px -8px rgba(31,224,101,.55),inset 0 0 0 1px rgba(255,255,255,.25);-webkit-tap-highlight-color:transparent;transition:transform .15s}
+.wr-tarjeta:active{transform:scale(.97)}
+.wr-franjas{position:absolute;inset:-40%;background:repeating-linear-gradient(115deg,rgba(0,0,0,.07) 0 22px,transparent 22px 44px);animation:wr-desliza 6s linear infinite}
+@keyframes wr-desliza{to{transform:translateX(44px)}}
+.wr-brillo{position:absolute;top:0;bottom:0;width:60%;left:-70%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.55),transparent);transform:skewX(-18deg);animation:wr-brillo 4.5s 1s ease-in-out infinite}
+@keyframes wr-brillo{0%{left:-70%}35%,100%{left:130%}}
+.wr-texto{position:absolute;left:20px;top:18px;bottom:18px;display:flex;flex-direction:column;z-index:2}
+.wr-etq{font:700 11px Sora;letter-spacing:.16em;opacity:.75}
+.wr-titulo{font:400 50px/0.9 Anton;letter-spacing:.01em;margin-top:6px;text-transform:uppercase}
+.wr-titulo span{display:block;font-size:30px;color:#fff;-webkit-text-stroke:0;text-shadow:0 2px 0 rgba(0,0,0,.18)}
+.wr-ver{margin-top:auto;align-self:flex-start;display:flex;align-items:center;gap:8px;background:#0A0C0B;color:var(--verde);font:700 13px Sora;padding:8px 14px 8px 10px;border-radius:99px}
+.wr-ver i{width:20px;height:20px;border-radius:50%;background:var(--verde);display:grid;place-items:center}
+.wr-ver i svg{width:9px;height:9px;margin-left:1px}
+.wr-fotos{position:absolute;right:22px;top:50%;width:96px;height:122px;transform:translateY(-50%);z-index:2}
+.wr-fotos div{position:absolute;inset:0;border-radius:12px;border:4px solid #fff;box-shadow:0 8px 18px rgba(0,0,0,.3);background-size:cover;background-position:center 30%}
+.wr-fotos .a{transform:rotate(-9deg) translate(-22px,8px);background:#0A0C0B;border-color:#0A0C0B;display:grid;place-items:center}
+
+.wr-fotos .b{transform:rotate(6deg);animation:wr-flota 3.2s ease-in-out infinite}
+@keyframes wr-flota{50%{transform:rotate(3deg) translateY(-5px)}}
+@media (prefers-reduced-motion:reduce){.wr-franjas,.wr-brillo,.wr-fotos .b{animation:none}}
 
 /* ── Tu temporada ── */
 .tu-bloque {

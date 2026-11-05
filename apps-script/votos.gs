@@ -317,7 +317,7 @@ function enviarNotificacion(aviso) {
   const payload = {
     app_id: ONESIGNAL_APP_ID,
     target_channel: 'push',
-    headings: { en: 'Shits League', es: 'Shits League' },
+    headings: { en: aviso.titulo || 'Shits League', es: aviso.titulo || 'Shits League' },
     contents: { en: aviso.cuerpo, es: aviso.cuerpo },
     web_url: url,
     chrome_web_icon: ICONO_APP,
@@ -364,6 +364,12 @@ const sumaDias = (fecha, n) => {
   return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
 };
 const hayNoche = ahora => { const { h } = relojMadrid(ahora); return h >= 23 || h < 9; };
+// «Sábado 14 nov · 18:00 · Polideportivo X»
+function textoPartido(inicio, todoElDia, lugar) {
+  const { dia, hora } = relojMadrid(inicio);
+  const fecha = fechaEnTexto(dia);
+  return [fecha.charAt(0).toUpperCase() + fecha.slice(1), todoElDia ? '' : hora, sinEmojis(lugar)].filter(Boolean).join(' · ');
+}
 
 // El nombre del login de quien sale en la hoja: por su ficha (nombre o alias) o directamente
 function resolvedorDeLogin(jugadores) {
@@ -427,7 +433,7 @@ function leerCalendario(ahora) {
     const cal = CalendarApp.getCalendarById(CALENDARIO_ID) || CalendarApp.subscribeToCalendar(CALENDARIO_ID);
     if (!cal) return null;
     return cal.getEvents(ahora, new Date(ahora.getTime() + 90 * DIA)).map(e => ({
-      id: e.getId(), titulo: e.getTitle(), lugar: e.getLocation(), inicio: e.getStartTime(), todoElDia: e.isAllDayEvent(),
+      id: e.isRecurringEvent && e.isRecurringEvent() ? `${e.getId()}@${e.getStartTime().getTime()}` : e.getId(), titulo: e.getTitle(), lugar: e.getLocation(), inicio: e.getStartTime(), todoElDia: e.isAllDayEvent(),
     }));
   } catch (err) {
     console.warn('Calendario: ' + err.message);
@@ -451,7 +457,10 @@ function leerDatosAvisos(ahora) {
 }
 
 // Todo lo que toca avisar según los datos. enviados: { clave: cuándo se envió, en ms }. Cada aviso:
-// { clave, grupo, a, cuerpo, url, imagen, urgente, tambien }. tambien: claves que quedan cubiertas al enviarlo
+// { clave, grupo, a, titulo, cuerpo, url, imagen, urgente, tambien, fijar, borrar }. tambien: claves que
+// quedan cubiertas al enviarlo; fijar ({ clave: valor }) y borrar ([clave]): lo que se apunta al enviarlo,
+// o ya, si estaba enviado (calfecha:<id> es la hora con la que se anunció cada partido, en ms)
+const PLAZOS_RECORDATORIO = { semana: 7 * DIA, dia: DIA, hora: HORA };
 function calcularAvisos(ahora, datos, enviados) {
   const avisos = [];
   const { jugadores, jornadas, votaciones, mvps, eventos, temporada } = datos;
@@ -466,7 +475,8 @@ function calcularAvisos(ahora, datos, enviados) {
 
   /* El calendario */
   (eventos || []).forEach(ev => {
-    const falta = ev.inicio.getTime() - ahora.getTime();
+    const inicio = ev.inicio.getTime();
+    const falta = inicio - ahora.getTime();
     if (falta <= 0) return;
     const { dia, hora } = relojMadrid(ev.inicio);
     const horaTexto = ev.todoElDia ? '' : hora;
@@ -475,13 +485,24 @@ function calcularAvisos(ahora, datos, enviados) {
     const url = votacion ? '#votacion' : '#inicio';
 
     const tipo = !ev.todoElDia && falta <= HORA ? 'hora' : falta > 12 * HORA && falta <= DIA ? 'dia' : falta > 6 * DIA && falta <= 7 * DIA ? 'semana' : null;
-    const claveRec = t => `rec:${t}:${ev.id}:${ev.inicio.getTime()}`;
-    const claveNuevo = `cal:${ev.id}`;
+    const claveRec = t => `rec:${t}:${ev.id}:${inicio}`;
+    const claveNuevo = `cal:${ev.id}`, claveFecha = `calfecha:${ev.id}`;
+    // Con esta hora, los recordatorios cuyo momento ya ha pasado (a 3 días, el de la semana) no se
+    // envían: quedan como enviados. Los que aún no han llegado, normales
+    const pasados = Object.keys(PLAZOS_RECORDATORIO).filter(t => falta <= PLAZOS_RECORDATORIO[t]).map(claveRec);
+    const fijar = { [claveFecha]: inicio };
     if (!enviados[claveNuevo]) {
-      // El recién creado no lleva además el recordatorio del tramo en el que ya está
-      const tambien = tipo ? [claveRec(tipo)] : [];
-      avisos.push({ clave: claveNuevo, grupo: 'cal', a: 'todos', url, tambien,
-        cuerpo: `Nuevo partido: ${[fechaEnTexto(dia), detalles].filter(Boolean).join(', ')}` });
+      avisos.push({ clave: claveNuevo, grupo: 'cal', a: 'todos', url: '#inicio', tambien: pasados, fijar,
+        titulo: 'Partido nuevo', cuerpo: textoPartido(ev.inicio, ev.todoElDia, ev.lugar) });
+      return;
+    }
+    const anunciada = enviados[claveFecha];
+    // Uno anunciado antes de apuntar su hora: se apunta, sin avisar
+    if (!anunciada) { avisos.push({ clave: claveNuevo, grupo: 'cal', a: 'todos', fijar }); return; }
+    if (anunciada !== inicio) {
+      // Hasta que se avise del cambio, nada de recordatorios con la hora nueva
+      avisos.push({ clave: `calcambio:${ev.id}:${inicio}`, grupo: 'cal', a: 'todos', url: '#inicio', tambien: pasados, fijar,
+        titulo: 'Cambio de hora', cuerpo: textoPartido(ev.inicio, ev.todoElDia, ev.lugar) });
       return;
     }
     if (!tipo || enviados[claveRec(tipo)]) return;
@@ -498,6 +519,18 @@ function calcularAvisos(ahora, datos, enviados) {
     if (si.length) avisos.push({ clave: `${claveRec(tipo)}:si`, grupo: 'cal', a: si, url, urgente, cuerpo: hayPartido, tambien: [claveRec(tipo)] });
     if (pendientes.length) avisos.push({ clave: `${claveRec(tipo)}:pend`, grupo: 'cal', a: pendientes, url, urgente, cuerpo: `¿Vienes al partido ${deCuando}?`, tambien: [claveRec(tipo)] });
   });
+
+  // Anunciado, aún por jugar y ya no está en el calendario: cancelado. Sin calendario leído, nada
+  if (eventos) {
+    const siguen = new Set(eventos.map(ev => ev.id));
+    Object.keys(enviados).filter(k => k.startsWith('calfecha:')).forEach(k => {
+      const id = k.slice('calfecha:'.length), inicio = enviados[k];
+      if (siguen.has(id) || inicio <= ahora.getTime()) return;
+      const cuando = new Date(inicio);
+      avisos.push({ clave: `calcancel:${id}:${inicio}`, grupo: 'cal', a: 'todos', url: '#inicio', borrar: [k],
+        titulo: 'Partido cancelado', cuerpo: textoPartido(cuando, relojMadrid(cuando).hora === '00:00', '') });
+    });
+  }
 
   /* Votaciones de asistencia */
   votaciones.filter(v => v.fecha >= hoy && v.id).forEach(v => {
@@ -551,6 +584,12 @@ function leerEnviados(props) {
 }
 
 // La primera vez con una temporada (o con el calendario) no se avisa de lo que ya había: se apunta
+// Lo que apunta un aviso al enviarse (o ya enviado): su hora, sus partidos cancelados
+function apuntarEstado(aviso, props, enviados) {
+  Object.keys(aviso.fijar || {}).forEach(c => { props.setProperty(PREFIJO_AVISO + c, String(aviso.fijar[c])); enviados[c] = aviso.fijar[c]; });
+  (aviso.borrar || []).forEach(c => { props.deleteProperty(PREFIJO_AVISO + c); delete enviados[c]; });
+}
+
 function apuntarLoQueYaHabia(avisos, props, enviados, datos, ahora) {
   const marcar = clave => { props.setProperty(PREFIJO_AVISO + clave, String(ahora)); enviados[clave] = ahora; };
   const inicial = { hoja: `iniciado:${datos.temporada}`, cal: 'iniciado:calendario' };
@@ -560,6 +599,7 @@ function apuntarLoQueYaHabia(avisos, props, enviados, datos, ahora) {
     avisos.filter(a => a.grupo === grupo).forEach(a => {
       marcar(a.clave);
       (a.tambien || []).forEach(marcar);
+      apuntarEstado(a, props, enviados);
       apuntados.push(a.clave);
     });
     marcar(inicial[grupo]);
@@ -582,19 +622,21 @@ function ejecutarAvisos(ms, simulacro = false) {
     return {
       ok: true, noche, temporada: datos.temporada, calendario: datos.eventos ? 'leído' : 'sin acceso',
       primeraVez: inicial,
-      avisos: inicial ? [] : avisos.filter(a => a.grupo !== 'cal' || enviados['iniciado:calendario']).map(a => ({
-        cuerpo: a.cuerpo, a: a.a, url: a.url, imagen: a.imagen || '', espera: noche && !a.urgente,
+      avisos: inicial ? [] : avisos.filter(a => !enviados[a.clave] && (a.grupo !== 'cal' || enviados['iniciado:calendario'])).map(a => ({
+        titulo: a.titulo || '', cuerpo: a.cuerpo, a: a.a, url: a.url, imagen: a.imagen || '', espera: noche && !a.urgente,
       })),
     };
   }
 
   const apuntados = apuntarLoQueYaHabia(avisos, props, enviados, datos, ms);
+  avisos.filter(a => enviados[a.clave]).forEach(a => apuntarEstado(a, props, enviados));
   const pendientes = avisos.filter(a => !enviados[a.clave] && (a.urgente || !noche)).slice(0, AVISOS_POR_PASADA);
   const resultado = [];
   pendientes.forEach(a => {
     const r = enviarNotificacion(a);
     if (r.ok) {
       [a.clave, ...(a.tambien || [])].forEach(c => props.setProperty(PREFIJO_AVISO + c, String(ms)));
+      apuntarEstado(a, props, enviados);
     } else console.warn(`No se ha podido enviar «${a.cuerpo}»: ${r.error}`);
     resultado.push({ cuerpo: a.cuerpo, ok: r.ok });
   });

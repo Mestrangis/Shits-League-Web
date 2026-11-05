@@ -73,6 +73,7 @@ export function crearGas(principal, { otra = null, enCurso = null, eventos = [],
       getProperty: k => estado.propiedades[k] ?? null,
       getProperties: () => ({ ...estado.propiedades }),
       setProperty: (k, v) => { estado.propiedades[k] = String(v); },
+      deleteProperty: k => { delete estado.propiedades[k]; },
     }) },
     CalendarApp: {
       getCalendarById: () => (estado.sinCalendario ? null : {

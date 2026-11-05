@@ -301,15 +301,24 @@ const WRAPPED_24_26 = {
   Mateo: 'Mateo', Nacho: 'Nacho', Pelayo: 'Pelayo', Puebla: 'Puebla',
 };
 
+// La foto: la del campo «foto» del jugador en wrapped-24-26/index.html, que es su nombre del Wrapped
+// en minúsculas, sin tildes ni espacios (De la Mano → delamano, Pablín → pablin)
+const fotoWrapped = nombre => `wrapped-24-26/fotos/${nombre.normalize('NFD').toLowerCase().replace(/[^a-z]/g, '')}.jpg`;
+
 // El de la cuenta con sesión, también para los admin. Sin Wrapped ni sesión, nada
 function renderTarjetaWrapped() {
   const nombre = WRAPPED_24_26[getSessionPlayer()];
   if (!nombre) return '';
   return `<section class="inicio-block inicio-wrapped">
-    <a class="wrapped-tarjeta" href="wrapped-24-26/?j=${encodeURIComponent(nombre)}">
-      ${icono('wrapped')}
-      <span class="wrapped-tarjeta__texto"><b>Tu 24/26</b><span>Tu temporada en 11 pantallas</span></span>
-      <span class="wrapped-tarjeta__flecha" aria-hidden="true">→</span>
+    <a class="wr-tarjeta" href="wrapped-24-26/?j=${encodeURIComponent(nombre)}">
+      <div class="wr-franjas"></div>
+      <div class="wr-texto">
+        <div class="wr-etq">TU TEMPORADA</div>
+        <div class="wr-titulo">Wrapped<span>24/26</span></div>
+        <div class="wr-ver"><i><svg viewBox="0 0 10 10"><path d="M1.5 1v8l7-4z" fill="#0A0C0B"/></svg></i>Ver el tuyo</div>
+      </div>
+      <div class="wr-fotos"><div class="a"></div><div class="b" style="background-image:url(${fotoWrapped(nombre)})"></div></div>
+      <div class="wr-brillo"></div>
     </a>
   </section>`;
 }
@@ -318,7 +327,7 @@ const tarjetaWrappedArchivo = () => (STATE.season === '24-26' && modoTemporada(t
 
 // En el documento, porque la tarjeta está en dos pestañas. Solo se navega con un worker que sepa servirlo
 document.addEventListener('click', async e => {
-  const tarjeta = e.target.closest?.('.wrapped-tarjeta');
+  const tarjeta = e.target.closest?.('.wr-tarjeta');
   if (!tarjeta) return;
   e.preventDefault();
   if (tarjeta.dataset.abriendo) return;

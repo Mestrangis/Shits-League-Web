@@ -42,9 +42,10 @@ test('1. partido nuevo en el calendario: a todos, una sola vez, con su texto', (
   const g = arrancado();
   g.fijarEventos([evento('e1', '2026-11-27T18:00:00+01:00')]);
   g.pasada(AHORA);
-  assert.deepEqual(g.textos(), ['Nuevo partido: viernes 27 nov, 18:00, Palau Deportes']);
+  assert.deepEqual(g.textos(), ['Viernes 27 nov · 18:00 · Palau Deportes']);
   assert.ok(g.envios[0].included_segments.length);
-  assert.equal(g.envios[0].headings.es, 'Shits League');
+  assert.equal(g.envios[0].headings.es, 'Partido nuevo');
+  assert.ok(g.envios[0].web_url.endsWith('#inicio'));
   assert.ok(g.envios[0].chrome_web_icon.endsWith('assets/icon-192.png'));
   g.pasada(AHORA + 60000);
   assert.equal(g.envios.length, 1);
@@ -93,7 +94,22 @@ test('un partido recién creado no lleva además el recordatorio de ese tramo', 
   g.fijarEventos([evento('e1', '2026-11-05T10:00:00+01:00')]);   // faltan 22 h
   g.pasada(AHORA);
   g.pasada(AHORA + 15 * 60000);
-  assert.deepEqual(g.textos(), ['Nuevo partido: jueves 5 nov, 10:00, Palau Deportes']);
+  assert.deepEqual(g.textos(), ['Jueves 5 nov · 10:00 · Palau Deportes']);
+});
+
+test('cambio de hora y partido cancelado: a todos, una vez, y los recordatorios con la hora nueva', () => {
+  const g = arrancado({ eventos: [evento('e1', '2026-11-27T18:00:00+01:00')] });
+  g.fijarEventos([evento('e1', '2026-11-06T20:00:00+01:00')]);   // a 2 días y 8 horas
+  g.pasada(AHORA);
+  assert.deepEqual(g.envios.map(e => [e.headings.es, e.contents.es]), [['Cambio de hora', 'Viernes 6 nov · 20:00 · Palau Deportes']]);
+  g.pasada(AHORA + 60000);
+  assert.equal(g.envios.length, 1, 'una vez, y sin el recordatorio de la semana, que ya ha pasado');
+  g.envios.length = 0;
+  g.fijarEventos([]);
+  g.pasada(AHORA + 120000);
+  assert.deepEqual(g.envios.map(e => [e.headings.es, e.contents.es]), [['Partido cancelado', 'Viernes 6 nov · 20:00']]);
+  g.pasada(AHORA + 180000);
+  assert.equal(g.envios.length, 1);
 });
 
 test('de noche no se envía nada, salvo el aviso de una hora; lo demás espera a las 9:00', () => {
