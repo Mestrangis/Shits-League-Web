@@ -101,8 +101,6 @@ export async function panelAdmin(cont, ctx, admin = null) {
         <button class="slr-btn slr-btn--pruebas" type="button" data-pruebas="plantillas">🃏 Plantillas: dar o quitar cartas</button>
         <button class="slr-btn slr-btn--pruebas" type="button" data-pruebas="muestrario">✨ Muestrario de cartas</button>
         <button class="slr-btn slr-btn--pruebas" type="button" data-pruebas="escenas-partido">🎬 Escenas de partido</button>
-        ${temporadaProxima() ? `<button class="slr-btn slr-btn--pruebas" type="button" data-pruebas="empezar-temporada">🚀 Empezar la ${esc(temporadaProxima().etiqueta.toLowerCase())}</button>` : ''}
-        ${temporadaAnteriorAlCurso() && !temporadaAnteriorAlCurso().imagenes ? `<button class="slr-btn slr-btn--fantasma" type="button" data-pruebas="deshacer-temporada">↩ Deshacer: volver a la ${esc(temporadaAnteriorAlCurso().etiqueta.toLowerCase())}</button>` : ''}
         <button class="slr-btn slr-btn--peligro" type="button" data-pruebas="borrar-beta">Borrar cartas beta (sin foto)</button>
         <button class="slr-btn slr-btn--peligro" type="button" data-pruebas="reiniciar">Reiniciar beta</button>
       </div>
@@ -117,8 +115,6 @@ export async function panelAdmin(cont, ctx, admin = null) {
     else if (b.dataset.pruebas === 'colecciones') abrirColecciones(ctx).catch(e => toast(e.message, 'error'));
     else if (b.dataset.pruebas === 'sobres') abrirSobresAdmin(ctx).catch(e => toast(e.message, 'error'));
     else if (b.dataset.pruebas === 'borrar-beta') borrarBeta(b, ctx);
-    else if (b.dataset.pruebas === 'empezar-temporada') cambiarTemporada(b, ctx, liga.id, temporadaProxima(), true);
-    else if (b.dataset.pruebas === 'deshacer-temporada') cambiarTemporada(b, ctx, liga.id, temporadaAnteriorAlCurso(), false);
     else accionPruebas(b, ctx);
   }));
 
@@ -155,28 +151,6 @@ function renombrar(ctx) {
       ctx.pintar();
     }).catch(() => {});
   });
-}
-
-/* ── El pistoletazo de la temporada ──────────────────────────────────────── */
-// Empezar: pasa a ser la temporada por defecto para todos y Rush se abre a todos. Deshacer, al revés.
-async function cambiarTemporada(boton, ctx, ligaId, temporada, empezar) {
-  const ok = await confirmar(empezar ? {
-    titulo: `Empezar la ${temporada.etiqueta.toLowerCase()}`,
-    texto: `Pasa a ser la temporada por defecto para <b>todos</b> y Rush se abre a todo el mundo. La anterior queda de archivo. Se puede deshacer desde aquí.`,
-    ok: 'Empezar la temporada',
-  } : {
-    titulo: `Volver a la ${temporada.etiqueta.toLowerCase()}`,
-    texto: `Vuelve a ser la temporada por defecto para <b>todos</b> y Rush vuelve a ser solo para los usuarios beta.`,
-    ok: 'Deshacer',
-  });
-  if (!ok) return;
-  await conEspera(boton, async () => {
-    await rpc('slr_admin_empezar_temporada', { liga_id: ligaId, temporada: temporada.id, rush_publico: empezar });
-    fijarTemporadaEnCurso(temporada.id);
-    toast(empezar ? `${temporada.etiqueta}: ¡empieza!` : `De vuelta en la ${temporada.etiqueta.toLowerCase()}`, 'ok');
-    await ctx.recargar();
-    await ctx.pintar();
-  }).catch(() => {});
 }
 
 /* ── Modo pruebas ────────────────────────────────────────────────────────── */

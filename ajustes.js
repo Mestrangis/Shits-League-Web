@@ -30,7 +30,7 @@ var AJUSTES = {
      Ojo, una temporada nueva también hay que añadirla, con su hoja, a HOJAS en
      apps-script/votos.gs (y publicar el script), o no se podrá votar en ella.
      Cuál está en curso NO se decide aquí: es el botón «Empezar la temporada» del
-     Modo pruebas de Rush.
+     panel de admin, en tu perfil.
      Ejemplo: { id: '27-28', nombre: 'Temporada 27/28', jornadas: 18, hoja: 'ID-de-la-hoja', rush: true },  */
   temporadas: [
     { id: '26-27', nombre: 'Temporada 26/27', jornadas: null, hoja: '1UW3JRsjC8DHPsMwz9LjyRrqPo2SVTBUtiLkpL8LqCIg', rush: true,

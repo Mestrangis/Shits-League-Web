@@ -3,7 +3,7 @@
    Qué es cada temporada. La lista (TEMPORADAS) y los enlaces se editan en ajustes.js, en
    la raíz, y llegan por js/lector-ajustes.js.
    Qué es cada una lo dice el ajuste temporada_en_curso de Supabase (el botón «Empezar la
-   temporada» del Modo pruebas):
+   temporada» del panel de admin, en el perfil):
      · la en curso: la de por defecto, con todas las pestañas;
      · las más nuevas: próximas, igual que una en curso pero solo para los usuarios beta;
      · las más viejas: archivo, solo el historial, sin votar.

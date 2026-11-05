@@ -196,16 +196,62 @@ function pintarPerfilAdmin() {
     <button class="dialog-box__btn dialog-box__btn--ghost" type="button" data-admin-accion="lista">QUIÉN LO TIENE ACTIVADO</button>
     <button class="dialog-box__btn dialog-box__btn--ghost" type="button" data-admin-accion="prueba">ENVIARME UNA NOTIFICACIÓN DE PRUEBA</button>
     <button class="dialog-box__btn dialog-box__btn--ghost" type="button" data-admin-accion="simulacro">SIMULACRO DE AVISOS</button>
+    ${temporadaProxima() ? `<button class="dialog-box__btn" type="button" data-admin-temporada="empezar">EMPEZAR LA ${nombreTemporadaAdmin(temporadaProxima()).toUpperCase()}</button>` : ''}
+    ${temporadaAnteriorAlCurso() && !temporadaAnteriorAlCurso().imagenes ? `<button class="dialog-box__btn dialog-box__btn--ghost" type="button" data-admin-temporada="deshacer">DESHACER: VOLVER A LA ${nombreTemporadaAdmin(temporadaAnteriorAlCurso()).toUpperCase()}</button>` : ''}
     <div class="perfil-admin__salida" data-admin-salida></div>`;
+}
+
+/* ── El pistoletazo de la temporada ──────────────────────────────────────── */
+// Por su id: el nombre público de una temporada puede estar oculto en ajustes.js
+const nombreTemporadaAdmin = t => `temporada ${t.id.replace('-', '/')}`;
+
+// Empezar: pasa a ser la temporada por defecto para todos y Rush se abre a todos. Deshacer, al revés
+function pedirConfirmarTemporada(accion, salida) {
+  const empezar = accion === 'empezar';
+  const t = empezar ? temporadaProxima() : temporadaAnteriorAlCurso();
+  const nombre = nombreTemporadaAdmin(t);
+  salida.innerHTML = `
+    <p><b>${empezar ? `¿Empezar la ${nombre}?` : `¿Volver a la ${nombre}?`}</b></p>
+    <p>${empezar
+    ? 'Pasa a ser la temporada por defecto para <b>todos</b> y Rush se abre a todo el mundo. La anterior queda de archivo. Se puede deshacer desde aquí.'
+    : 'Vuelve a ser la temporada por defecto para <b>todos</b> y Rush vuelve a ser solo para los usuarios beta.'}</p>
+    <button class="dialog-box__btn" type="button" data-admin-si="${accion}">${empezar ? 'EMPEZAR LA TEMPORADA' : 'DESHACER'}</button>
+    <button class="dialog-box__btn dialog-box__btn--ghost" type="button" data-admin-no>CANCELAR</button>`;
+}
+
+// Quien comprueba que eres admin es el servidor, con tu sesión de Rush
+async function cambiarTemporadaAdmin(accion, salida) {
+  const empezar = accion === 'empezar';
+  const t = empezar ? temporadaProxima() : temporadaAnteriorAlCurso();
+  const nombre = nombreTemporadaAdmin(t);
+  salida.textContent = 'Un momento…';
+  try {
+    // Una sesión recién abierta con tu código: la guardada puede haber caducado
+    if (await rushReautenticar() !== 'ok') throw new Error('No se ha podido abrir tu sesión de Rush. Vuelve a entrar con tu código.');
+    const token = rushToken();
+    const yo = await rushRpc('slr_yo', { token });
+    // En local, la liga de prueba, igual que Rush
+    const liga = (RUSH_ES_LOCAL && yo.ligas?.find(l => l.es_prueba)) || yo.liga_principal;
+    if (!liga) throw new Error('No hay liga');
+    await rushRpc('slr_admin_empezar_temporada', { token, liga_id: liga.id, temporada: t.id, rush_publico: empezar });
+    fijarTemporadaEnCurso(t.id);
+    pintarPerfilAdmin();
+    document.querySelector('[data-admin-salida]').textContent = empezar ? `La ${nombre} ha empezado.` : `De vuelta en la ${nombre}.`;
+  } catch (e) {
+    salida.textContent = e.message;
+  }
 }
 
 function htmlListaAdmin(usuarios) {
   return `<ul class="perfil-admin__lista">${usuarios.map(u => {
+    // Quien nunca ha enviado su estado no es que las tenga desactivadas: no se sabe
+    if (u.notificaciones === 'sin datos') {
+      return `<li class="es-sin-datos"><b>${escaparApp(u.nombre)}</b><span>Sin datos (no ha entrado desde el cambio)</span></li>`;
+    }
     const bien = u.notificaciones === 'activadas';
     return `<li class="${bien ? '' : 'es-mal'}">
       <b>${escaparApp(u.nombre)}</b>
-      <span>${u.instalada ? 'Instalada' : 'Sin instalar'} · ${escaparApp(u.notificaciones)}</span>
-      <small>${u.ultima ? `Última vez: ${escaparApp(u.ultima)}` : 'No ha entrado desde un móvil'}</small>
+      <span>${u.instalada ? 'Instalada' : 'Sin instalar'} · ${escaparApp(u.notificaciones)} · ${escaparApp(u.ultima)}</span>
     </li>`;
   }).join('')}</ul>`;
 }
@@ -271,6 +317,12 @@ function initInstalarApp() {
   document.addEventListener('click', e => {
     if (e.target.closest('[data-app-paso]')) { hacerPasoApp(); return; }
     if (e.target.closest('[data-app-luego]')) { posponerAlarma(); pintarAvisoApp(); return; }
+    const salidaAdmin = () => document.querySelector('[data-admin-salida]');
+    const temporada = e.target.closest('[data-admin-temporada]');
+    if (temporada) { pedirConfirmarTemporada(temporada.dataset.adminTemporada, salidaAdmin()); return; }
+    const si = e.target.closest('[data-admin-si]');
+    if (si) { cambiarTemporadaAdmin(si.dataset.adminSi, salidaAdmin()); return; }
+    if (e.target.closest('[data-admin-no]')) { salidaAdmin().innerHTML = ''; return; }
     const admin = e.target.closest('[data-admin-accion]');
     if (admin) accionAdmin(admin.dataset.adminAccion, admin.parentElement.querySelector('[data-admin-salida]'));
   });

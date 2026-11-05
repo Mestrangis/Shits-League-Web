@@ -2005,3 +2005,4 @@ details.mvp-fila[open] > summary .mvp-fila__puntos::after { content: ' ▴'; }
 .perfil-admin__lista small { font-size: 11px; color: #6E9D81; }
 .perfil-admin__lista li.es-mal { background: rgba(255,90,90,.14); }
 .perfil-admin__lista li.es-mal b, .perfil-admin__lista li.es-mal span { color: #ff5a5a; }
+.perfil-admin__lista li.es-sin-datos b, .perfil-admin__lista li.es-sin-datos span { color: #7b8a81; }

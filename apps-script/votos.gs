@@ -207,6 +207,7 @@ function json(obj) {
 const ONESIGNAL_APP_ID = 'c3052327-e9b2-4f3a-8a86-964ab853ec62';
 const URL_APP = 'https://mestrangis.github.io/Shits-League-Web/';
 const ICONO_APP = URL_APP + 'assets/icon-192.png';
+const INSIGNIA_APP = URL_APP + 'assets/insignia-96.png';   // la de la barra de estado en Android
 // El mismo que ajustes.js (calendario): este script no puede leer ese archivo
 const CALENDARIO_ID = '38a5afd4c120a661ffbf3e4392af235b395891931485fb16ebca3e152524e5c0@group.calendar.google.com';
 // Huella del código de cada admin. La web solo enseña los botones (ajustes.js → admins): quien manda es esto
@@ -320,6 +321,7 @@ function enviarNotificacion(aviso) {
     contents: { en: aviso.cuerpo, es: aviso.cuerpo },
     web_url: url,
     chrome_web_icon: ICONO_APP,
+    chrome_web_badge: INSIGNIA_APP,
     firefox_icon: ICONO_APP,
   };
   if (aviso.imagen) payload.chrome_web_image = aviso.imagen;

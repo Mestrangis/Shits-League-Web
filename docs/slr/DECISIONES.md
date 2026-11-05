@@ -2471,6 +2471,10 @@ Con `rendimiento-liga.mjs` (412×915, CPU ×4, «4G lenta», 3 pasadas), la vers
 - **`herramientas/precarga.mjs` incluye `ajustes.js`:** así entra en `version.json`, y cambiarlo es una versión nueva que llega sola a los móviles. No hace falta subir `CACHE_NAME`.
 - **Las temporadas nuevas también van en `HOJAS` de `apps-script/votos.gs`:** el script no puede leer `ajustes.js`.
 
+## Shits League: el pistoletazo pasa al panel de admin
+
+- **«Empezar la temporada» y «Deshacer» están en el perfil de la liga,** no en el Modo pruebas de Rush. El servidor sigue exigiendo lo mismo (`slr_admin_empezar_temporada`: admin de la liga con el modo pruebas activado, y nunca un bot), con la sesión de Rush guardada. Los botones nombran la temporada por su id, porque su nombre público puede estar oculto en `ajustes.js`.
+
 ## Shits League: puntuación por temporada
 
 - **`puntuacion` va dentro de cada temporada, en `ajustes.js`.** Sin ella (`null`), la clasificación se ordena por partidos ganados y luego por goles, sin columna de puntos. La barra de cada fila pasa a medir victorias, y Líderes enseña «vict.». «Puntos» desaparece de «Tu temporada» y de la ficha del jugador.
