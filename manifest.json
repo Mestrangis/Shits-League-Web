@@ -4,6 +4,9 @@
   "start_url": ".",
   "scope": ".",
   "display": "standalone",
+  "related_applications": [
+    { "platform": "webapp", "url": "https://mestrangis.github.io/Shits-League-Web/manifest.json" }
+  ],
   "background_color": "#06140D",
   "theme_color": "#06140D",
   "icons": [

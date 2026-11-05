@@ -82,6 +82,12 @@ async function pushSuscribir() {
   try { await OneSignal.User.PushSubscription.optIn(); } catch (e) { console.warn('[push] No se pudo suscribir:', e); }
 }
 
+// Lo que dice OneSignal ahora mismo; null si no está disponible
+async function pushSuscritoAhora() {
+  const OneSignal = await pushConTiempo();
+  return OneSignal ? OneSignal.User.PushSubscription.optedIn === true : null;
+}
+
 /* ── Vincular el dispositivo al jugador logueado ─────────────────────────── */
 // Permite enviar a personas concretas: External ID = nombre canónico (el del login), que es
 // a quien se dirige el Apps Script, y tag player_name = nombre.

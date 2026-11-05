@@ -2471,6 +2471,12 @@ Con `rendimiento-liga.mjs` (412×915, CPU ×4, «4G lenta», 3 pasadas), la vers
 - **`herramientas/precarga.mjs` incluye `ajustes.js`:** así entra en `version.json`, y cambiarlo es una versión nueva que llega sola a los móviles. No hace falta subir `CACHE_NAME`.
 - **Las temporadas nuevas también van en `HOJAS` de `apps-script/votos.gs`:** el script no puede leer `ajustes.js`.
 
+## Shits League: avisos de instalar y notificaciones, según el estado real
+
+- **Nada guardado decide si se avisa, salvo la fecha de la última alarma de «bloqueadas» (una a la semana).** `situacionApp` lo calcula de `display-mode`, `Notification.permission`, `optedIn` y `getInstalledRelatedApps`, al abrir y al volver a primer plano. Volver tras 30 minutos fuera cuenta como abrir: una app instalada no se recarga.
+- **No llegar `beforeinstallprompt` no se usa como pista de «ya la tienes»:** no llega por muchas otras razones, y a quien no tiene la app se le dejaría de insistir.
+- **Abierta sola, la alarma suena desde el primer toque:** el navegador no deja sonar nada antes. No sale con `navigator.webdriver`, para no tapar los bancos de pruebas.
+
 ## Shits League: Wrapped de la 24/26
 
 - **`wrapped-24-26/` es una página aparte con parte propia en `version.json` (`wrapped`).** No se instala con la app: el service worker la guarda al abrirla (caché `sl-wrapped`, comprobada contra su huella) y atiende los trozos que Safari pide de la música. Su navegación se mira antes que la de la app, que siempre sirve `index.html`.

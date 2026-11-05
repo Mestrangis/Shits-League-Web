@@ -1,4 +1,4 @@
-// js/instalar-app.js: en qué situación está cada móvil y qué hace el toque en cada caso
+// js/instalar-app.js: en qué situación está cada móvil y cómo se abre cada alarma
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 
 const ctx = vm.createContext({ window: { addEventListener() {} }, document: {}, navigator: {}, console });
 vm.runInContext(readFileSync(new URL('../../js/instalar-app.js', import.meta.url), 'utf8'), ctx);
-const { detectarDispositivo, pasoApp, planApp, textoNotificaciones } = ctx;
+const { detectarDispositivo, situacionApp, planAlarma, textoNotificaciones } = ctx;
 const plano = x => JSON.parse(JSON.stringify(x));
 
 const UA = {
@@ -30,30 +30,33 @@ test('qué dispositivo es: solo iPhone y móviles Android son móvil', () => {
   assert.equal(detectarDispositivo({ ua: UA.pc }).movil, false);
 });
 
-test('el siguiente paso, por orden', () => {
-  const base = { movil: true, instalada: true, permiso: 'granted', suscrito: true };
-  assert.equal(pasoApp({ ...base, movil: false, instalada: false, permiso: 'default' }), null, 'en PC y tablet, nada');
-  assert.equal(pasoApp({ ...base, instalada: false, permiso: 'no_disponible' }), 'instalar', 'iPhone sin instalar');
-  assert.equal(pasoApp({ ...base, instalada: false, permiso: 'denied' }), 'instalar', 'primero instalar');
-  assert.equal(pasoApp({ ...base, permiso: 'default', suscrito: false }), 'notificaciones');
-  assert.equal(pasoApp({ ...base, permiso: 'denied', suscrito: false }), 'notificaciones');
-  assert.equal(pasoApp({ ...base, suscrito: false }), 'notificaciones', 'permiso sí, suscrito no');
-  assert.equal(pasoApp({ ...base, suscrito: null }), null, 'mientras OneSignal no diga nada, no se molesta');
-  assert.equal(pasoApp(base), null, 'todo bien');
-  assert.equal(pasoApp({ ...base, permiso: 'no_disponible', suscrito: null }), null, 'un navegador sin notificaciones');
+test('qué le toca a cada móvil, según su estado real', () => {
+  const ve = d => plano(situacionApp({ movil: true, plataforma: 'android', instalada: true, permiso: 'granted', suscrito: true, yaInstalada: false, ...d }));
+  assert.deepEqual(ve({ movil: false, instalada: false, permiso: 'default' }), { alarmas: [], aviso: null, suscribir: false }, 'en PC y tablet, nada');
+  // iPhone en Safari: solo instalar
+  assert.deepEqual(ve({ plataforma: 'iphone', instalada: false, permiso: 'no_disponible', suscrito: null }), { alarmas: ['iphone'], aviso: 'iphone', suscribir: false });
+  // Android en el navegador
+  assert.deepEqual(ve({ instalada: false, permiso: 'default', suscrito: false }), { alarmas: ['instalar', 'notificaciones'], aviso: 'instalar', suscribir: false });
+  assert.deepEqual(ve({ instalada: false, permiso: 'denied', suscrito: false }), { alarmas: ['instalar', 'bloqueadas'], aviso: 'bloqueadas', suscribir: false });
+  assert.deepEqual(ve({ instalada: false, suscrito: false }), { alarmas: ['instalar'], aviso: 'instalar', suscribir: true });
+  assert.deepEqual(ve({ instalada: false, yaInstalada: true, permiso: 'default', suscrito: false }), { alarmas: [], aviso: 'abrir', suscribir: false }, 'ya la tiene: que la abra');
+  // Dentro de la app
+  assert.deepEqual(ve({ permiso: 'default', suscrito: false }), { alarmas: ['notificaciones'], aviso: 'notificaciones', suscribir: false });
+  assert.deepEqual(ve({ permiso: 'denied', suscrito: false }), { alarmas: ['bloqueadas'], aviso: 'bloqueadas', suscribir: false });
+  assert.deepEqual(ve({ suscrito: false }), { alarmas: [], aviso: null, suscribir: true }, 'permiso sí, suscrito no: sin preguntar');
+  assert.deepEqual(ve({ suscrito: null }), { alarmas: [], aviso: null, suscribir: false }, 'mientras OneSignal no diga nada');
+  assert.deepEqual(ve({}), { alarmas: [], aviso: null, suscribir: false }, 'todo bien');
+  assert.deepEqual(ve({ plataforma: 'iphone', permiso: 'denied', suscrito: false }), { alarmas: ['bloqueadas'], aviso: 'bloqueadas', suscribir: false });
 });
 
-test('qué hace el toque en cada caso', () => {
-  const plan = d => plano(planApp(d));
-  assert.deepEqual(plan({ paso: 'instalar', plataforma: 'android', hayEventoInstalar: true }), { modo: 'instalar', accion: 'instalar', caso: 'instalar' });
-  assert.deepEqual(plan({ paso: 'instalar', plataforma: 'android', hayEventoInstalar: false }), { modo: 'instalar', accion: 'mal', caso: 'instalar' });
-  assert.deepEqual(plan({ paso: 'instalar', plataforma: 'iphone' }), { modo: 'iphone', accion: 'nada' });
-  assert.deepEqual(plan({ paso: 'notificaciones', plataforma: 'android', instalada: true, permiso: 'default' }), { modo: 'notificaciones', accion: 'permiso', caso: 'bloqueadas-android-app' });
-  assert.deepEqual(plan({ paso: 'notificaciones', plataforma: 'android', instalada: true, permiso: 'denied' }), { modo: 'notificaciones', accion: 'mal', caso: 'bloqueadas-android-app' });
-  assert.deepEqual(plan({ paso: 'notificaciones', plataforma: 'android', instalada: false, permiso: 'denied' }), { modo: 'notificaciones', accion: 'mal', caso: 'bloqueadas-android-chrome' });
-  assert.deepEqual(plan({ paso: 'notificaciones', plataforma: 'iphone', instalada: true, permiso: 'denied' }), { modo: 'notificaciones', accion: 'mal', caso: 'bloqueadas-iphone' });
-  assert.deepEqual(plan({ paso: 'notificaciones', plataforma: 'iphone', instalada: true, permiso: 'granted' }), { accion: 'suscribir' });
-  assert.equal(planApp({ paso: null }), null);
+test('cómo se abre cada alarma', () => {
+  const plan = (tipo, d) => plano(planAlarma(tipo, d));
+  assert.deepEqual(plan('iphone', { plataforma: 'iphone', instalada: false }), { modo: 'iphone', accion: 'nada' });
+  assert.deepEqual(plan('instalar', { plataforma: 'android', instalada: false }), { modo: 'instalar', accion: 'instalar', caso: 'instalar' });
+  assert.deepEqual(plan('notificaciones', { plataforma: 'android', instalada: true }), { modo: 'notificaciones', accion: 'permiso', caso: 'bloqueadas-android-app' });
+  assert.deepEqual(plan('bloqueadas', { plataforma: 'android', instalada: true }), { modo: 'bloqueadas', accion: 'nada', caso: 'bloqueadas-android-app' });
+  assert.deepEqual(plan('bloqueadas', { plataforma: 'android', instalada: false }), { modo: 'bloqueadas', accion: 'nada', caso: 'bloqueadas-android-chrome' });
+  assert.deepEqual(plan('bloqueadas', { plataforma: 'iphone', instalada: true }), { modo: 'bloqueadas', accion: 'nada', caso: 'bloqueadas-iphone' });
 });
 
 test('lo que dice el perfil', () => {

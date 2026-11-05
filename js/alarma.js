@@ -8,18 +8,18 @@
    USO
      import { mostrarAlarma } from './alarma.js';
      const r = await mostrarAlarma({
-       modo: 'notificaciones',          // 'notificaciones' | 'instalar' | 'iphone'
+       modo: 'notificaciones',          // 'notificaciones' | 'instalar' | 'iphone' | 'bloqueadas'
        accion: async () => 'ok',        // lo que lanza la ventanita del navegador;
                                         // devuelve 'ok', 'mal' (denegado) o 'nada'
-       instrucciones: '<ol>…</ol>',     // HTML que se enseña si sale 'mal'
+       instrucciones: '<ol>…</ol>',     // HTML que se enseña si sale 'mal' (en 'bloqueadas', siempre)
        sonidos: { sirena, boom, ok },   // URLs de los MP3 (opcional; ok puede faltar)
                                         // cada toque en la alarma suena un «boom» (se solapan)
        silencio: false,                 // true = sin sonido
      });
      // r: 'ok' | 'mal' | 'nada' | 'luego' (cerró con «Ahora no»)
 
-   La sirena solo suena porque esto se abre siempre tras un toque del usuario
-   (el navegador no deja sonar nada sin un toque antes). Nada de vibración.
+   El navegador no deja sonar nada sin un toque antes: abierta sola, la sirena
+   empieza con el primer toque dentro de la alarma. Nada de vibración.
    Las luces parpadean despacio (menos de 3 veces por segundo) por seguridad.
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -57,6 +57,13 @@ const TEXTOS = {
     sub: 'En iPhone hay que instalarla a mano (culpa de Apple)',
     orden: 'SON <b>3 TOQUES</b>',
     aviso: 'Sin instalarla, en iPhone no te llegan las notificaciones. Ni una.',
+    boton: 'ENTENDIDO',
+  },
+  bloqueadas: {
+    titulo: 'ALERTA MÁXIMA',
+    sub: 'Tienes las notificaciones bloqueadas',
+    orden: 'DESBLOQUÉALAS <b>A MANO</b>',
+    aviso: 'El móvil ya no nos deja volver a preguntarte. O haces esto o no te enteras de los partidos, ni del MVP, ni de nada.',
     boton: 'ENTENDIDO',
   },
 };
@@ -143,7 +150,7 @@ let ctxAudio = null;
 const buffers = {};
 function sonador(urls = {}, silencio) {
   const AC = window.AudioContext || window.webkitAudioContext;
-  if (silencio || !AC) return { tocar() {}, fundir() {}, pararTodo() {} };
+  if (silencio || !AC) return { tocar() {}, fundir() {}, pararTodo() {}, despertar() {} };
   ctxAudio = ctxAudio || new AC();
   if (ctxAudio.state === 'suspended') ctxAudio.resume().catch(() => {});
   const cargar = k => {
@@ -174,7 +181,8 @@ function sonador(urls = {}, silencio) {
     v.gan.gain.linearRampToValueAtTime(0, t + seg);
     try { v.src.stop(t + seg + 0.05); } catch {}
   });
-  return { tocar, fundir, pararTodo: () => fundir(null, 0.4) };
+  const despertar = () => { if (ctxAudio.state === 'suspended') ctxAudio.resume().catch(() => {}); };
+  return { tocar, fundir, pararTodo: () => fundir(null, 0.4), despertar };
 }
 
 export function mostrarAlarma({ modo = 'notificaciones', accion, instrucciones = '', sonidos = {}, silencio = false } = {}) {
@@ -198,6 +206,19 @@ export function mostrarAlarma({ modo = 'notificaciones', accion, instrucciones =
     };
 
     function pantallaAlarma() {
+      if (modo === 'bloqueadas') {
+        el.innerHTML = marco(`
+          <div class="al__tit">${T.titulo}</div>
+          <p class="al__sub">${T.sub}</p>
+          <div class="al__orden">${T.orden}</div>
+          <p class="al__aviso">${T.aviso}</p>
+          <div class="al__pasos-html">${instrucciones}</div>
+          <button class="al__btn" type="button" data-ok>${T.boton}</button>`);
+        el.querySelector('[data-ok]').onclick = () => fin('nada');
+        snd.tocar('boom', { vol: 0.9 });
+        snd.tocar('sirena', { bucle: true, vol: 0.24 });
+        return;
+      }
       if (modo === 'iphone') {
         el.innerHTML = marco(`
           <div class="al__tit">${T.titulo}</div>
@@ -261,6 +282,8 @@ export function mostrarAlarma({ modo = 'notificaciones', accion, instrucciones =
     el.addEventListener('keydown', e => { if (e.key === 'Escape') fin('luego'); });
     // Cada toque en cualquier sitio de la alarma: ¡BUM!, encima de los anteriores
     el.addEventListener('pointerdown', () => snd.tocar('boom', { vol: 0.75 }));
+    // Abierta sola, el sonido espera al primer toque. Con el dedo, el navegador solo lo da por toque al levantarlo
+    ['pointerup', 'click'].forEach(t => el.addEventListener(t, snd.despertar));
     document.body.appendChild(el);
     pantallaAlarma();
     el.querySelector('button')?.focus();

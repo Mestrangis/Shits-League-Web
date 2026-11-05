@@ -1,14 +1,17 @@
 /* ═══════════════════════════════════════════════
    SHITS LEAGUE — instalar-app.js
    Instalar la app y activar las notificaciones, solo en móvil:
-   · en qué situación está cada uno;
-   · la tarjeta de Inicio y las líneas del perfil, que abren la alarma (js/alarma.js);
+   · en qué situación está cada uno, leído del estado REAL en cada apertura y al volver
+     a primer plano. Lo único guardado es la fecha del último aviso de «bloqueadas»;
+   · la alarma (js/alarma.js), que sale sola, y el aviso de arriba y el perfil, que la abren;
    · el estado de cada móvil, que se envía al Apps Script para la lista del admin.
-   Las cuatro primeras funciones no tocan el navegador: las prueba tests/slr/instalar-app.test.mjs.
+   detectarDispositivo, situacionApp, planAlarma y textoNotificaciones no tocan el navegador:
+   las prueba tests/slr/instalar-app.test.mjs.
 ═══════════════════════════════════════════════ */
 
-const APP_LUEGO_KEY = 'SL_AVISO_APP_LUEGO';
-const APP_LUEGO_MS = 3 * 86400000;
+const BLOQUEADAS_KEY = 'SL_AVISO_BLOQUEADAS';     // la fecha de la última alarma de «bloqueadas»
+const BLOQUEADAS_CADA_MS = 7 * 86400000;
+const REAPERTURA_MS = 30 * 60000;                // una app no se recarga: tanto tiempo fuera cuenta como abrirla otra vez
 const DISPOSITIVO_KEY = 'SL_DISPOSITIVO';
 const SILENCIO_KEY = 'slr_partido_silencio';   // el botón de sonido de Rush: quien lo quitó no quiere ruidos
 
@@ -22,25 +25,33 @@ function detectarDispositivo({ ua = '', plataforma = '', toques = 0 } = {}) {
   return { movil: false, plataforma: 'otra' };
 }
 
-// El siguiente paso: 'instalar', 'notificaciones' o null si no hay nada que hacer. Sin saber aún si
-// OneSignal lo tiene suscrito (suscrito: null), no se molesta a quien ya dio el permiso.
-function pasoApp({ movil, instalada, permiso, suscrito }) {
-  if (!movil) return null;
-  if (!instalada) return 'instalar';
-  if (permiso === 'default' || permiso === 'denied') return 'notificaciones';
-  return permiso === 'granted' && suscrito === false ? 'notificaciones' : null;
+// Qué le toca a este móvil, en cualquier momento:
+//   alarmas: las que salen solas al abrir, por orden ('iphone', 'instalar', 'notificaciones', 'bloqueadas')
+//   aviso: lo fijo de arriba ('iphone', 'instalar', 'notificaciones', 'bloqueadas', 'abrir' o null)
+//   suscribir: tiene el permiso pero OneSignal no lo tiene suscrito (suscrito: null es que aún no se sabe)
+function situacionApp({ movil, plataforma, instalada, permiso, suscrito, yaInstalada }) {
+  if (!movil) return { alarmas: [], aviso: null, suscribir: false };
+  // En iPhone, sin instalar no hay notificaciones que valgan: solo se pide instalar
+  if (plataforma === 'iphone' && !instalada) return { alarmas: ['iphone'], aviso: 'iphone', suscribir: false };
+  const suscribir = permiso === 'granted' && suscrito === false;
+  // Ya la tiene: que la abra. El permiso del navegador y el de la app son el mismo
+  if (!instalada && yaInstalada) return { alarmas: [], aviso: 'abrir', suscribir };
+  const alarmas = [];
+  if (!instalada) alarmas.push('instalar');
+  if (permiso === 'default') alarmas.push('notificaciones');
+  if (permiso === 'denied') alarmas.push('bloqueadas');
+  const aviso = permiso === 'denied' ? 'bloqueadas' : !instalada ? 'instalar' : permiso === 'default' ? 'notificaciones' : null;
+  return { alarmas, aviso, suscribir };
 }
 
-// Qué hace el toque. caso: las instrucciones que se enseñan si sale mal
-function planApp({ paso, plataforma, instalada, permiso, hayEventoInstalar }) {
-  if (paso === 'instalar') {
-    if (plataforma === 'iphone') return { modo: 'iphone', accion: 'nada' };
-    return hayEventoInstalar ? { modo: 'instalar', accion: 'instalar', caso: 'instalar' } : { modo: 'instalar', accion: 'mal', caso: 'instalar' };
-  }
-  if (paso !== 'notificaciones') return null;
-  if (permiso === 'granted') return { accion: 'suscribir' };
-  const caso = plataforma === 'iphone' ? 'bloqueadas-iphone' : instalada ? 'bloqueadas-android-app' : 'bloqueadas-android-chrome';
-  return { modo: 'notificaciones', accion: permiso === 'denied' ? 'mal' : 'permiso', caso };
+// Cómo se abre cada alarma. caso: las instrucciones que enseña
+function planAlarma(tipo, { plataforma, instalada }) {
+  const bloqueadas = plataforma === 'iphone' ? 'bloqueadas-iphone' : instalada ? 'bloqueadas-android-app' : 'bloqueadas-android-chrome';
+  if (tipo === 'iphone') return { modo: 'iphone', accion: 'nada' };
+  // Sin el evento del navegador (puede llegar mientras está abierta), lanzarInstalar enseña los pasos a mano
+  if (tipo === 'instalar') return { modo: 'instalar', accion: 'instalar', caso: 'instalar' };
+  if (tipo === 'notificaciones') return { modo: 'notificaciones', accion: 'permiso', caso: bloqueadas };
+  return { modo: 'bloqueadas', accion: 'nada', caso: bloqueadas };
 }
 
 function textoNotificaciones({ permiso, suscrito }) {
@@ -51,6 +62,7 @@ function textoNotificaciones({ permiso, suscrito }) {
 /* ── El estado de este móvil ─────────────────────────────────────────────── */
 let eventoInstalar = null;
 let suscritoOneSignal = null;
+let yaInstalada = false;     // Android, en el navegador: la app está instalada en este móvil
 
 window.addEventListener('beforeinstallprompt', e => {
   e.preventDefault();        // sin la barrita del navegador: se ofrece desde nuestra tarjeta
@@ -63,7 +75,15 @@ function estadoApp() {
   const { movil, plataforma } = detectarDispositivo({ ua: n.userAgent, plataforma: n.platform, toques: n.maxTouchPoints });
   const instalada = window.matchMedia('(display-mode: standalone)').matches || n.standalone === true;
   const permiso = typeof Notification === 'undefined' ? 'no_disponible' : Notification.permission;
-  return { movil, plataforma, instalada, permiso, suscrito: suscritoOneSignal, hayEventoInstalar: !!eventoInstalar };
+  return { movil, plataforma, instalada, permiso, suscrito: suscritoOneSignal, yaInstalada };
+}
+
+// Solo Chrome en Android sabe decirlo. Si no lo sabe, se le trata como a quien no la tiene: es mejor
+// insistirle de más que decirle a alguien sin la app que ya la tiene (por eso tampoco vale como
+// pista que no llegue beforeinstallprompt: no llega por muchas otras razones)
+async function mirarAppInstalada() {
+  if (yaInstalada || !navigator.getInstalledRelatedApps) return;
+  try { yaInstalada = (await navigator.getInstalledRelatedApps()).length > 0; } catch { /* no se sabe */ }
 }
 
 function idDispositivo() {
@@ -77,21 +97,21 @@ function idDispositivo() {
   } catch { return ''; }
 }
 
-const alarmaPospuesta = () => {
-  try { return Date.now() - (Number(localStorage.getItem(APP_LUEGO_KEY)) || 0) < APP_LUEGO_MS; } catch { return false; }
-};
-const posponerAlarma = () => { try { localStorage.setItem(APP_LUEGO_KEY, String(Date.now())); } catch { /* sin persistencia */ } };
+function tocaAvisoBloqueadas() {
+  try { return Date.now() - (Number(localStorage.getItem(BLOQUEADAS_KEY)) || 0) >= BLOQUEADAS_CADA_MS; } catch { return false; }
+}
+const apuntarAvisoBloqueadas = () => { try { localStorage.setItem(BLOQUEADAS_KEY, String(Date.now())); } catch { /* sin persistencia */ } };
 
 /* ── La alarma ───────────────────────────────────────────────────────────── */
-// Se carga en cuanto hay tarjeta: al tocarla ya está y la sirena sale dentro del propio toque
+// Se carga en cuanto hay aviso: al tocarlo ya está y la sirena sale dentro del propio toque
 let alarmaModulo = null;
 const cargarAlarma = () => (alarmaModulo ??= import('./alarma.js'));
 
 const pasosAlarma = lista => `<ol class="al__pasos">${lista.map((p, i) => `<li><i>${i + 1}</i><span>${p}</span></li>`).join('')}</ol>`;
 const INSTRUCCIONES_APP = {
   instalar: pasosAlarma(['Toca el menú <b>⋮</b> del navegador, arriba a la derecha', 'Toca <b>Instalar app</b> o <b>Añadir a pantalla de inicio</b>', 'Abre la app desde el <b>icono nuevo</b>']),
-  'bloqueadas-android-app': pasosAlarma(['Mantén pulsado el <b>icono</b> de la app', 'Toca <b>Información de la aplicación</b>', 'Entra en <b>Notificaciones</b> y <b>actívalas</b>']),
-  'bloqueadas-android-chrome': pasosAlarma(['Toca el <b>candado</b> de la barra de direcciones', 'Entra en <b>Permisos</b> y luego en <b>Notificaciones</b>', 'Elige <b>Permitir</b>']),
+  'bloqueadas-android-app': pasosAlarma(['Abre los <b>Ajustes</b> del móvil', 'Entra en <b>Aplicaciones</b> y luego en <b>Shits League</b>', 'Toca <b>Notificaciones</b> y <b>actívalas</b>']),
+  'bloqueadas-android-chrome': pasosAlarma(['Toca el <b>candado</b> de la barra de direcciones', 'Entra en <b>Configuración del sitio</b> y luego en <b>Notificaciones</b>', 'Elige <b>Permitir</b>']),
   'bloqueadas-iphone': pasosAlarma(['Abre los <b>Ajustes</b> del iPhone', 'Entra en <b>Notificaciones</b> y luego en <b>Shits League</b>', 'Activa <b>Permitir notificaciones</b>']),
 };
 
@@ -113,54 +133,76 @@ async function lanzarInstalar() {
 const ACCIONES_ALARMA = {
   instalar: lanzarInstalar,
   permiso: () => pushPedirPermiso(),
-  mal: async () => 'mal',
   nada: async () => 'nada',
 };
 
-async function hacerPasoApp() {
-  const e = estadoApp();
-  const plan = planApp({ ...e, paso: pasoApp(e) });
-  if (!plan) return;
-  if (plan.accion === 'suscribir') {
-    await pushSuscribir();
+// Abre esa alarma y dice cómo ha acabado; null si ya hay una abierta o no se ha podido cargar
+let alarmaAbierta = false;
+async function abrirAlarma(tipo) {
+  if (alarmaAbierta) return null;
+  alarmaAbierta = true;
+  try {
+    const plan = planAlarma(tipo, estadoApp());
+    const { mostrarAlarma } = await cargarAlarma();
+    const r = await mostrarAlarma({
+      modo: plan.modo,
+      accion: ACCIONES_ALARMA[plan.accion],
+      instrucciones: INSTRUCCIONES_APP[plan.caso] ?? '',
+      sonidos: SONIDOS_ALARMA(),
+      silencio: alarmaEnSilencio(),
+    });
+    if (tipo === 'instalar' && r === 'ok') yaInstalada = true;
+    // Al bloquearlas acaba de ver los pasos: la semana empieza a contar
+    if (tipo === 'bloqueadas' || (tipo === 'notificaciones' && r === 'mal')) apuntarAvisoBloqueadas();
+    return r;
+  } catch (e) {
+    alarmaModulo = null;
+    console.warn('[app] No se ha podido abrir la alarma:', e.message);
+    return null;
+  } finally {
+    alarmaAbierta = false;
     refrescarEstadoApp();
-    return;
   }
-  const { mostrarAlarma } = await cargarAlarma();
-  const r = await mostrarAlarma({
-    modo: plan.modo,
-    accion: ACCIONES_ALARMA[plan.accion],
-    instrucciones: INSTRUCCIONES_APP[plan.caso] ?? '',
-    sonidos: SONIDOS_ALARMA(),
-    silencio: alarmaEnSilencio(),
-  });
-  // Recién instalada sigue en el navegador hasta que se abra desde el icono: no se le insiste
-  if (r === 'luego' || (plan.modo === 'instalar' && r === 'ok')) posponerAlarma();
-  refrescarEstadoApp();
 }
 
-/* ── La tarjeta de Inicio ────────────────────────────────────────────────── */
-const TITULOS_PASO = {
-  instalar: { titulo: 'Instala la app', texto: 'Va más rápido y te llegan los avisos' },
+// Las que salen solas. En cada una se mira otra vez qué toca
+async function lanzarAlarmas() {
+  // Con un navegador automático (los bancos de pruebas), no: taparía todo lo que prueban
+  if (navigator.webdriver || document.visibilityState !== 'visible') return;
+  for (const tipo of situacionApp(estadoApp()).alarmas) {
+    if (tipo === 'bloqueadas' && !tocaAvisoBloqueadas()) continue;
+    const r = await abrirAlarma(tipo);
+    if (r === null || (tipo === 'instalar' && r === 'ok')) return;
+  }
+}
+
+/* ── El aviso de arriba ──────────────────────────────────────────────────── */
+const INSTALA_LA_APP = { titulo: 'Instala la app', texto: 'Va más rápido y te llegan los avisos' };
+const AVISOS_APP = {
+  iphone: INSTALA_LA_APP,
+  instalar: INSTALA_LA_APP,
   notificaciones: { titulo: 'Activa las notificaciones', texto: 'Para enterarte de los partidos y del MVP' },
+  bloqueadas: { titulo: 'Tienes las notificaciones bloqueadas', icono: 'campana-no', clase: ' instalar-aviso--mal' },
+  abrir: { titulo: 'Ya tienes la app: ábrela desde el icono', icono: 'movil', soloLeer: true },
 };
 
 function pintarAvisoApp() {
   const el = document.getElementById('instalarAviso');
   if (!el) return;
-  const paso = pasoApp(estadoApp());
-  if (!paso || alarmaPospuesta()) {
+  const { aviso } = situacionApp(estadoApp());
+  el.className = `instalar-aviso${AVISOS_APP[aviso]?.clase ?? ''}`;
+  if (!aviso) {
     el.hidden = true;
     el.innerHTML = '';
     return;
   }
-  cargarAlarma().catch(() => { alarmaModulo = null; });
-  const t = TITULOS_PASO[paso];
-  el.innerHTML = `
-    <button class="instalar-aviso__toque" type="button" data-app-paso>
-      <b>${t.titulo}</b><span>${t.texto}</span>
-    </button>
-    <button class="instalar-aviso__luego" type="button" data-app-luego>Luego</button>`;
+  const t = AVISOS_APP[aviso];
+  const dentro = `${t.icono ? icono(t.icono) : ''}<span class="instalar-aviso__textos"><b>${t.titulo}</b>${t.texto ? `<span>${t.texto}</span>` : ''}</span>`;
+  if (t.soloLeer) el.innerHTML = `<div class="instalar-aviso__toque">${dentro}</div>`;
+  else {
+    cargarAlarma().catch(() => { alarmaModulo = null; });
+    el.innerHTML = `<button class="instalar-aviso__toque" type="button" data-app-paso="${aviso}">${dentro}</button>`;
+  }
   el.hidden = false;
 }
 
@@ -171,12 +213,12 @@ function pintarPerfilApp() {
   const e = estadoApp();
   caja.hidden = !e.movil;
   if (e.movil) {
-    const paso = pasoApp(e);
+    const { aviso } = situacionApp(e);
     const notif = textoNotificaciones(e);
     caja.innerHTML = `
-      <p class="perfil-app__linea">App: <b>${e.instalada ? 'instalada' : 'sin instalar'}</b></p>
+      <p class="perfil-app__linea">App: <b>${e.instalada || e.yaInstalada ? 'instalada' : 'sin instalar'}</b></p>
       <p class="perfil-app__linea">Notificaciones: <b class="perfil-app__${notif}">${notif}</b></p>
-      ${paso ? `<button class="dialog-box__btn" type="button" data-app-paso>${TITULOS_PASO[paso].titulo.toUpperCase()}</button>` : ''}`;
+      ${aviso && !AVISOS_APP[aviso].soloLeer ? `<button class="dialog-box__btn" type="button" data-app-paso="${aviso}">${AVISOS_APP[aviso].titulo.toUpperCase()}</button>` : ''}`;
   }
   pintarPerfilAdmin();
 }
@@ -291,7 +333,7 @@ async function enviarEstadoApp() {
   const e = estadoApp();
   // Desde local no: las pruebas no escriben en la hoja de verdad
   if (!nombre || !e.movil || ['localhost', '127.0.0.1'].includes(location.hostname)) return;
-  const datos = { action: 'estadoDispositivo', nombre, dispositivo: idDispositivo(), plataforma: e.plataforma, instalada: e.instalada, permiso: e.permiso, suscrito: !!e.suscrito };
+  const datos = { action: 'estadoDispositivo', nombre, dispositivo: idDispositivo(), plataforma: e.plataforma, instalada: e.instalada || e.yaInstalada, permiso: e.permiso, suscrito: !!e.suscrito };
   const firma = JSON.stringify(datos);
   if (firma === ultimoEstadoEnviado) return;
   ultimoEstadoEnviado = firma;
@@ -304,19 +346,38 @@ function refrescarEstadoApp() {
   enviarEstadoApp();
 }
 
+// Con el permiso dado y sin suscribir: se suscribe sin preguntar y se vuelve a vincular a su
+// nombre de login, que es a quien envía el Apps Script. Sin insistir si no sale a la primera
+let ultimoIntentoSuscribir = 0;
+async function asegurarSuscripcion() {
+  if (Date.now() - ultimoIntentoSuscribir < 30000) return;
+  ultimoIntentoSuscribir = Date.now();
+  await pushSuscribir();
+  const nombre = getSessionPlayer();
+  if (nombre) pushVincularJugador(nombre);
+}
+
 // Cuando OneSignal dice algo nuevo (push.js)
 function appCambioPush(suscrito) {
   suscritoOneSignal = suscrito;
-  const e = estadoApp();
-  // Dio el permiso pero no está suscrito: se suscribe sin preguntar
-  if (e.movil && e.permiso === 'granted' && suscrito === false) pushSuscribir();
+  if (situacionApp(estadoApp()).suscribir) asegurarSuscripcion();
   refrescarEstadoApp();
+}
+
+// Lee el estado real: al abrir y al volver a primer plano (de los ajustes, por ejemplo)
+async function revisarEstadoApp({ alarmas = false } = {}) {
+  if (!estadoApp().movil) return;
+  await mirarAppInstalada();
+  refrescarEstadoApp();
+  if (alarmas) lanzarAlarmas();
+  const suscrito = await pushSuscritoAhora();
+  if (suscrito !== null) appCambioPush(suscrito);
 }
 
 function initInstalarApp() {
   document.addEventListener('click', e => {
-    if (e.target.closest('[data-app-paso]')) { hacerPasoApp(); return; }
-    if (e.target.closest('[data-app-luego]')) { posponerAlarma(); pintarAvisoApp(); return; }
+    const paso = e.target.closest('[data-app-paso]');
+    if (paso) { abrirAlarma(paso.dataset.appPaso); return; }
     const salidaAdmin = () => document.querySelector('[data-admin-salida]');
     const temporada = e.target.closest('[data-admin-temporada]');
     if (temporada) { pedirConfirmarTemporada(temporada.dataset.adminTemporada, salidaAdmin()); return; }
@@ -326,8 +387,16 @@ function initInstalarApp() {
     const admin = e.target.closest('[data-admin-accion]');
     if (admin) accionAdmin(admin.dataset.adminAccion, admin.parentElement.querySelector('[data-admin-salida]'));
   });
-  window.addEventListener('appinstalled', () => { eventoInstalar = null; posponerAlarma(); pintarAvisoApp(); });
+  window.addEventListener('appinstalled', () => { eventoInstalar = null; yaInstalada = true; refrescarEstadoApp(); });
+  let ocultaDesde = 0;
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') { ocultaDesde = Date.now(); return; }
+    const reapertura = ocultaDesde && Date.now() - ocultaDesde >= REAPERTURA_MS;
+    ocultaDesde = 0;
+    revisarEstadoApp({ alarmas: !!reapertura });
+  });
   pintarAvisoApp();
+  revisarEstadoApp({ alarmas: true });
   // Al abrir la app, con lo que diga OneSignal o, si tarda, con lo que se sepa
   Promise.race([pushListo, new Promise(r => setTimeout(r, 8000))]).then(() => enviarEstadoApp());
 }
