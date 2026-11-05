@@ -36,8 +36,8 @@ test('qué le toca a cada móvil, según su estado real', () => {
   // iPhone en Safari: solo instalar
   assert.deepEqual(ve({ plataforma: 'iphone', instalada: false, permiso: 'no_disponible', suscrito: null }), { alarmas: ['iphone'], aviso: 'iphone', suscribir: false });
   // Android en el navegador
-  assert.deepEqual(ve({ instalada: false, permiso: 'default', suscrito: false }), { alarmas: ['instalar', 'notificaciones'], aviso: 'instalar', suscribir: false });
-  assert.deepEqual(ve({ instalada: false, permiso: 'denied', suscrito: false }), { alarmas: ['instalar', 'bloqueadas'], aviso: 'bloqueadas', suscribir: false });
+  assert.deepEqual(ve({ instalada: false, permiso: 'default', suscrito: false }), { alarmas: ['instalar'], aviso: 'instalar', suscribir: false });
+  assert.deepEqual(ve({ instalada: false, permiso: 'denied', suscrito: false }), { alarmas: ['instalar'], aviso: 'instalar', suscribir: false });
   assert.deepEqual(ve({ instalada: false, suscrito: false }), { alarmas: ['instalar'], aviso: 'instalar', suscribir: true });
   assert.deepEqual(ve({ instalada: false, yaInstalada: true, permiso: 'default', suscrito: false }), { alarmas: [], aviso: 'abrir', suscribir: false }, 'ya la tiene: que la abra');
   // Dentro de la app
@@ -53,9 +53,8 @@ test('cómo se abre cada alarma', () => {
   const plan = (tipo, d) => plano(planAlarma(tipo, d));
   assert.deepEqual(plan('iphone', { plataforma: 'iphone', instalada: false }), { modo: 'iphone', accion: 'nada' });
   assert.deepEqual(plan('instalar', { plataforma: 'android', instalada: false }), { modo: 'instalar', accion: 'instalar', caso: 'instalar' });
-  assert.deepEqual(plan('notificaciones', { plataforma: 'android', instalada: true }), { modo: 'notificaciones', accion: 'permiso', caso: 'bloqueadas-android-app' });
-  assert.deepEqual(plan('bloqueadas', { plataforma: 'android', instalada: true }), { modo: 'bloqueadas', accion: 'nada', caso: 'bloqueadas-android-app' });
-  assert.deepEqual(plan('bloqueadas', { plataforma: 'android', instalada: false }), { modo: 'bloqueadas', accion: 'nada', caso: 'bloqueadas-android-chrome' });
+  assert.deepEqual(plan('notificaciones', { plataforma: 'android', instalada: true }), { modo: 'notificaciones', accion: 'permiso', caso: 'bloqueadas-android' });
+  assert.deepEqual(plan('bloqueadas', { plataforma: 'android', instalada: true }), { modo: 'bloqueadas', accion: 'nada', caso: 'bloqueadas-android' });
   assert.deepEqual(plan('bloqueadas', { plataforma: 'iphone', instalada: true }), { modo: 'bloqueadas', accion: 'nada', caso: 'bloqueadas-iphone' });
 });
 

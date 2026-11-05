@@ -36,17 +36,16 @@ function situacionApp({ movil, plataforma, instalada, permiso, suscrito, yaInsta
   const suscribir = permiso === 'granted' && suscrito === false;
   // Ya la tiene: que la abra. El permiso del navegador y el de la app son el mismo
   if (!instalada && yaInstalada) return { alarmas: [], aviso: 'abrir', suscribir };
-  const alarmas = [];
-  if (!instalada) alarmas.push('instalar');
-  if (permiso === 'default') alarmas.push('notificaciones');
-  if (permiso === 'denied') alarmas.push('bloqueadas');
-  const aviso = permiso === 'denied' ? 'bloqueadas' : !instalada ? 'instalar' : permiso === 'default' ? 'notificaciones' : null;
-  return { alarmas, aviso, suscribir };
+  // En el navegador solo se pide instalar: las notificaciones se piden dentro de la app
+  if (!instalada) return { alarmas: ['instalar'], aviso: 'instalar', suscribir };
+  if (permiso === 'default') return { alarmas: ['notificaciones'], aviso: 'notificaciones', suscribir };
+  if (permiso === 'denied') return { alarmas: ['bloqueadas'], aviso: 'bloqueadas', suscribir };
+  return { alarmas: [], aviso: null, suscribir };
 }
 
 // Cómo se abre cada alarma. caso: las instrucciones que enseña
-function planAlarma(tipo, { plataforma, instalada }) {
-  const bloqueadas = plataforma === 'iphone' ? 'bloqueadas-iphone' : instalada ? 'bloqueadas-android-app' : 'bloqueadas-android-chrome';
+function planAlarma(tipo, { plataforma }) {
+  const bloqueadas = plataforma === 'iphone' ? 'bloqueadas-iphone' : 'bloqueadas-android';
   if (tipo === 'iphone') return { modo: 'iphone', accion: 'nada' };
   // Sin el evento del navegador (puede llegar mientras está abierta), lanzarInstalar enseña los pasos a mano
   if (tipo === 'instalar') return { modo: 'instalar', accion: 'instalar', caso: 'instalar' };
@@ -110,8 +109,7 @@ const cargarAlarma = () => (alarmaModulo ??= import('./alarma.js'));
 const pasosAlarma = lista => `<ol class="al__pasos">${lista.map((p, i) => `<li><i>${i + 1}</i><span>${p}</span></li>`).join('')}</ol>`;
 const INSTRUCCIONES_APP = {
   instalar: pasosAlarma(['Toca el menú <b>⋮</b> del navegador, arriba a la derecha', 'Toca <b>Instalar app</b> o <b>Añadir a pantalla de inicio</b>', 'Abre la app desde el <b>icono nuevo</b>']),
-  'bloqueadas-android-app': pasosAlarma(['Abre los <b>Ajustes</b> del móvil', 'Entra en <b>Aplicaciones</b> y luego en <b>Shits League</b>', 'Toca <b>Notificaciones</b> y <b>actívalas</b>']),
-  'bloqueadas-android-chrome': pasosAlarma(['Toca el <b>candado</b> de la barra de direcciones', 'Entra en <b>Configuración del sitio</b> y luego en <b>Notificaciones</b>', 'Elige <b>Permitir</b>']),
+  'bloqueadas-android': pasosAlarma(['Abre los <b>Ajustes</b> del móvil', 'Entra en <b>Aplicaciones</b> y luego en <b>Shits League</b>', 'Toca <b>Notificaciones</b> y <b>actívalas</b>']),
   'bloqueadas-iphone': pasosAlarma(['Abre los <b>Ajustes</b> del iPhone', 'Entra en <b>Notificaciones</b> y luego en <b>Shits League</b>', 'Activa <b>Permitir notificaciones</b>']),
 };
 
@@ -172,7 +170,7 @@ async function lanzarAlarmas() {
   for (const tipo of situacionApp(estadoApp()).alarmas) {
     if (tipo === 'bloqueadas' && !tocaAvisoBloqueadas()) continue;
     const r = await abrirAlarma(tipo);
-    if (r === null || (tipo === 'instalar' && r === 'ok')) return;
+    if (r === null) return;
   }
 }
 

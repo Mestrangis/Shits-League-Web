@@ -2474,6 +2474,7 @@ Con `rendimiento-liga.mjs` (412×915, CPU ×4, «4G lenta», 3 pasadas), la vers
 ## Shits League: avisos de instalar y notificaciones, según el estado real
 
 - **Nada guardado decide si se avisa, salvo la fecha de la última alarma de «bloqueadas» (una a la semana).** `situacionApp` lo calcula de `display-mode`, `Notification.permission`, `optedIn` y `getInstalledRelatedApps`, al abrir y al volver a primer plano. Volver tras 30 minutos fuera cuenta como abrir: una app instalada no se recarga.
+- **En el navegador solo se pide instalar, también en Android:** las notificaciones se piden dentro de la app. La única excepción es suscribir sin preguntar si el permiso ya está dado.
 - **No llegar `beforeinstallprompt` no se usa como pista de «ya la tienes»:** no llega por muchas otras razones, y a quien no tiene la app se le dejaría de insistir.
 - **Abierta sola, la alarma suena desde el primer toque:** el navegador no deja sonar nada antes. No sale con `navigator.webdriver`, para no tapar los bancos de pruebas.
 
