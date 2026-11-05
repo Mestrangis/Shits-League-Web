@@ -33,7 +33,7 @@ var AJUSTES = {
      panel de admin, en tu perfil.
      Ejemplo: { id: '27-28', nombre: 'Temporada 27/28', jornadas: 18, hoja: 'ID-de-la-hoja', rush: true },  */
   temporadas: [
-    { id: '26-27', nombre: 'Temporada 26/27', jornadas: null, hoja: '1UW3JRsjC8DHPsMwz9LjyRrqPo2SVTBUtiLkpL8LqCIg', rush: true,
+    { id: '26-27', nombre: '???', jornadas: null, hoja: '1UW3JRsjC8DHPsMwz9LjyRrqPo2SVTBUtiLkpL8LqCIg', rush: true,
       // Por definir. Puede ser una puntuación totalmente distinta (sin capitanes, sin empates…). Cuando se sepa, se programa aquí
       puntuacion: null,
     },
