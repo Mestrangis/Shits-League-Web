@@ -201,7 +201,7 @@ button, [role="button"], .modal__backdrop, .tab, .result-row, .card-wrap, .voto-
 .icono--mvp { -webkit-mask-image: url(../img/iconos/mvp.svg); mask-image: url(../img/iconos/mvp.svg); }
 .icono--si { -webkit-mask-image: url(../img/iconos/si.svg); mask-image: url(../img/iconos/si.svg); }
 .icono--no { -webkit-mask-image: url(../img/iconos/no.svg); mask-image: url(../img/iconos/no.svg); }
-.icono--gol, .icono--asistencia, .icono--mvp { color: #3ddc84; }
+.icono--gol, .icono--asistencia, .icono--mvp { color: var(--verde); }
 
 .hero-section {
   position: relative;
@@ -887,7 +887,7 @@ body.archivo .app-zona { display: none; }
     padding-top: 20px;
     padding-bottom: 20px;
   }
-  .hero__eyebrow { margin: 0 0 8px; }
+  .hero__eyebrow { margin: 0 0 8px; font-size: 19px; }
   .hero__desc { margin: 14px 0 0; }
 }
 @media (max-width: 640px) {
@@ -1208,15 +1208,7 @@ body.archivo .app-zona { display: none; }
   display: flex;
   flex-direction: column;
   gap: 12px;
-  /* content-visibility recorta lo que se sale: sitio para la sombra del botón del sí, sin mover nada */
-  padding-bottom: 28px;
-  margin-bottom: -28px;
-  /* Las votaciones fuera de pantalla no se pintan ni se maquetan */
-  content-visibility: auto;
-  contain-intrinsic-size: auto 500px;
 }
-/* content-visibility implica contain: paint → recortaría la card al arrastrarla fuera */
-.voto.is-active { content-visibility: visible; }
 
 .voto-card {
   position: relative;
@@ -1324,11 +1316,11 @@ body.archivo .app-zona { display: none; }
   pointer-events: none;
 }
 .voto-card__stamp--si { left: 16px;  color: var(--verde); box-shadow: 0 0 18px rgba(31,224,101,.55); }
-.voto-card__stamp--no { right: 16px; color: #fff;         box-shadow: 0 0 18px rgba(232,245,236,.35); }
+.voto-card__stamp--no { right: 16px; color: #ff5a5a;      box-shadow: 0 0 18px rgba(255,90,90,.5); }
 
 /* Voto actual del jugador: borde de color (los sellos solo salen durante el gesto) */
 .voto-card--si { border-color: var(--verde); box-shadow: 0 0 0 1px var(--verde), 0 12px 36px rgba(31,224,101,.22); }
-.voto-card--no { border-color: #e8f5ec;      box-shadow: 0 0 0 1px #e8f5ec,      0 12px 36px rgba(232,245,236,.14); }
+.voto-card--no { border-color: #ff5a5a;      box-shadow: 0 0 0 1px #ff5a5a,      0 12px 36px rgba(255,90,90,.18); }
 
 /* Hover sobre los botones (escritorio): la card se inclina y aparece el sello */
 .voto:has(.voto-btn--si:hover) .voto-card { transform: translateX(8px) rotate(2deg); }
@@ -1358,7 +1350,7 @@ body.archivo .app-zona { display: none; }
 }
 .voto-card__count:hover { transform: scale(1.06); }
 .voto-card__count--no { left: 14px;  color: #fff; border-color: rgba(232,245,236,.35); }
-.voto-card__count--si { right: 14px; color: #3ddc84; }
+.voto-card__count--si { right: 14px; color: var(--verde); }
 
 .voto__actions {
   display: flex;
@@ -1376,11 +1368,11 @@ body.archivo .app-zona { display: none; }
   transition: transform .15s, background .15s, color .15s, box-shadow .15s;
 }
 .voto-btn:hover { transform: scale(1.08); }
-.voto-btn--si { color: #062012; background: #3ddc84; border-color: #3ddc84; box-shadow: 0 6px 18px rgba(61,220,132,.3); }
+.voto-btn--si { color: #062012; background: var(--verde); border-color: var(--verde); box-shadow: 0 6px 18px rgba(31,224,101,.3); }
 .voto-btn--no { color: #fff; background: none; border-color: rgba(232,245,236,.35); }
-/* Lo ya votado: el sí, con un anillo; el no, relleno */
-.voto-btn--si[aria-pressed="true"] { box-shadow: 0 0 0 3px rgba(61,220,132,.4), 0 6px 22px rgba(61,220,132,.45); }
-.voto-btn--no[aria-pressed="true"] { background: rgba(232,245,236,.2); border-color: #fff; }
+/* Lo ya votado: el sí, con un anillo; el no, en rojo */
+.voto-btn--si[aria-pressed="true"] { box-shadow: 0 0 0 3px rgba(31,224,101,.4), 0 6px 22px rgba(31,224,101,.45); }
+.voto-btn--no[aria-pressed="true"] { background: #ff5a5a; color: #06140D; border-color: #ff5a5a; box-shadow: 0 0 20px rgba(255,90,90,.45); }
 
 /* Modal de desglose de votos */
 .desglose__grupo {
@@ -1398,8 +1390,7 @@ body.archivo .app-zona { display: none; }
   margin-bottom: 8px;
 }
 .desglose__grupo--si .desglose__label { color: var(--verde); }
-.desglose__grupo--si .desglose__label .icono { color: #3ddc84; }
-.desglose__grupo--no .desglose__label { color: #fff; }
+.desglose__grupo--no .desglose__label { color: #ff5a5a; }
 .desglose__nombres { display: flex; flex-wrap: wrap; gap: 6px; }
 .desglose__nombre {
   font-size: 12px;
@@ -1409,7 +1400,7 @@ body.archivo .app-zona { display: none; }
   background: rgba(31,224,101,.1);
   color: #E8FBEF;
 }
-.desglose__grupo--no .desglose__nombre { background: rgba(232,245,236,.1); }
+.desglose__grupo--no .desglose__nombre { background: rgba(255,90,90,.12); }
 .desglose__nadie { font-size: 12px; color: #6E9D81; font-style: italic; }
 
 /* ═══════════════════════════════════════════════
@@ -1508,7 +1499,7 @@ body.archivo .app-zona { display: none; }
 .pendientes__nota { margin-top: -6px; font-size: 12px; color: #6E9D81; }
 .pendientes__pila { position: relative; }
 /* La misma carta de Votación, con el 60 % de su altura (4:5 → 4:3) */
-.pendientes .voto { content-visibility: visible; gap: 8px; padding-bottom: 0; margin-bottom: 0; }
+.pendientes .voto { gap: 8px; }
 .pendientes .voto-card { aspect-ratio: 4 / 3; padding: 14px 14px 46px; }
 .pendientes .voto-card__lugar { font-size: clamp(15px, 6.5cqw, 22px); }
 .pendientes .voto-card__dia { font-size: clamp(30px, 13cqw, 52px); }

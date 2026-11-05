@@ -265,7 +265,6 @@ function iniciarSwipe(e) {
       if (Math.abs(dx) < 8 || Math.abs(dx) < Math.abs(ev.clientY - y0)) return;
       arrastrando = true;
       card.classList.add('is-dragging');
-      voto.classList.add('is-active'); // quita content-visibility para que no recorte la card
       try { card.setPointerCapture(ev.pointerId); } catch { /* puntero ya liberado */ }
     }
     if (!frame) frame = requestAnimationFrame(pintar);
@@ -280,7 +279,6 @@ function iniciarSwipe(e) {
     cancelAnimationFrame(frame);
     ultimoSwipe = Date.now();
     card.classList.remove('is-dragging');
-    voto.classList.remove('is-active');
     card.style.transform = '';
     stampSi.style.opacity = '';
     stampNo.style.opacity = '';

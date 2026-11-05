@@ -2439,6 +2439,8 @@ Sustituyen a lo anterior donde no coincidan: el plazo de 3 días, la identificac
 - **El triángulo del play es equilátero con su centro en el del viewBox:** así el centroide cae en el centro del círculo sin margen ni desplazamiento, y el redondeo del trazo no lo mueve porque conserva la simetría. Por eso la caja del triángulo queda algo a la derecha del centro. Lo mide `banco/inicio.mjs` en los píxeles de una captura.
 - **Corregido, de antes de este cambio:** `switchTab` y `switchSeason` borraban `history.state`. Si se pulsaba JUGAR antes de acabar el arranque, ir atrás cerraba el juego entero en vez de la ficha. Lo detectó `banco/descubrimientos.mjs` de forma intermitente. Ahora se conserva el estado.
 
+- **Las votaciones ya no llevan `content-visibility`:** recortaba la sombra de la carta y del botón del sí por el borde de su caja. Son pocas cartas, y solo se pintan al abrir la pestaña.
+- **Colores de la votación:** el verde es el de la liga (`--verde`). El «no» votado va en rojo (`#ff5a5a`): carta, borde, sello, botón y lista.
 - **Iconos propios (`img/iconos/`):** se pintan con `mask` (`.icono`, `icono()` en `ui.js`): el SVG sigue siendo el único original y el service worker ya guarda `img/`. Sin icono para persona, campana, sitio, calendario, vídeo y lápiz: el botón de entrar muestra «ENTRAR» también en móvil, un jugador sin foto muestra su inicial, y los diálogos y la lista de avisos quedan solo con texto. Las flechas de texto (→ ▾) no son emojis y se quedan. Lo que viene de la hoja no se toca.
 
 ### Medido

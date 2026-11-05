@@ -349,7 +349,7 @@ try {
       const iconos = await page.$$eval('.tu-partido:last-child .tu-marca', m => m.map(x => x.querySelector('.icono').getAttribute('aria-label') + x.textContent));
       check(iconos.join() === 'Goles1,Asistencias2,MVP', 'tus goles, asistencias y MVP, con icono', iconos.join());
       const pinta = await page.$eval('.tu-marca .icono--gol', i => { const s = getComputedStyle(i); return { color: s.backgroundColor, mask: s.maskImage || s.webkitMaskImage, w: i.offsetWidth }; });
-      check(pinta.color === 'rgb(61, 220, 132)' && pinta.mask.includes('iconos/gol.svg') && pinta.w > 10, 'el icono, en verde y con su dibujo', JSON.stringify(pinta));
+      check(pinta.color === 'rgb(31, 224, 101)' && pinta.mask.includes('iconos/gol.svg') && pinta.w > 10, 'el icono, en verde y con su dibujo', JSON.stringify(pinta));
       check(await page.$eval('.tu-partido__tuyo', e => getComputedStyle(e).color) === 'rgb(255, 255, 255)', 'y el número, en blanco');
       check(!/[\u{1F300}-\u{1FAFF}\u2600-\u27BF]/u.test(await texto(page, '#panel-inicio')), 'sin emojis en Inicio');
       await foto(`${ancho}-tu-temporada`);
