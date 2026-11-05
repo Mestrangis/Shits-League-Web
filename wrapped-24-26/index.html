@@ -12,14 +12,14 @@
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;background:#000;color:var(--tinta);font-family:Sora,sans-serif;overflow:hidden;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
 #elegir{position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:50;font:600 14px Sora;padding:6px 10px;border-radius:10px;background:#1b1f1d;color:#fff;border:1px solid #333}
-#escena{position:absolute;left:50%;top:50%;width:min(100vw,calc(100vh*9/16));height:min(100vh,calc(100vw*16/9));transform:translate(-50%,-50%);overflow:hidden;background:var(--fondo);container-type:size}
+#escena{position:fixed;top:0;bottom:0;left:0;right:0;margin:0 auto;width:100%;max-width:calc(100vh*.62);max-width:calc(100dvh*.62);overflow:hidden;background:var(--fondo);container-type:size;--arriba:env(safe-area-inset-top,0px);--abajo:env(safe-area-inset-bottom,0px)}
 /* unidades relativas al ancho de la escena */
-.s{position:absolute;inset:0;padding:16cqw 8cqw 10cqw;display:flex;flex-direction:column;justify-content:center}
-#cerrar{position:absolute;top:5.4cqw;right:3cqw;width:8cqw;height:8cqw;padding:1.6cqw;z-index:45;opacity:.9}
-#barras{position:absolute;top:3.2cqw;left:3cqw;right:3cqw;display:flex;gap:1.2cqw;z-index:20}
+.s{position:absolute;inset:0;padding:calc(var(--arriba) + 16cqw) 8cqw calc(var(--abajo) + 10cqw);display:flex;flex-direction:column;justify-content:center}
+#cerrar{position:absolute;top:calc(var(--arriba) + 5.4cqw);right:3cqw;width:8cqw;height:8cqw;padding:1.6cqw;z-index:45;opacity:.9}
+#barras{position:absolute;top:calc(var(--arriba) + 3.2cqw);left:3cqw;right:3cqw;display:flex;gap:1.2cqw;z-index:20}
 #barras i{flex:1;height:.9cqw;border-radius:1cqw;background:rgba(255,255,255,.25);overflow:hidden}
 #barras i b{display:block;height:100%;width:0;background:#fff}
-#marca{position:absolute;top:6.4cqw;left:3.4cqw;z-index:20;font:700 3.1cqw Sora;letter-spacing:.06em;opacity:.85;display:flex;align-items:center;gap:1.6cqw}
+#marca{position:absolute;top:calc(var(--arriba) + 6.4cqw);left:3.4cqw;z-index:20;font:700 3.1cqw Sora;letter-spacing:.06em;opacity:.85;display:flex;align-items:center;gap:1.6cqw}
 #marca span{color:var(--verde)}
 .etq{font:700 3.6cqw Sora;letter-spacing:.14em;text-transform:uppercase;color:var(--verde)}
 .ant{font-family:Anton;text-transform:uppercase;line-height:.9;letter-spacing:.005em}
@@ -86,7 +86,13 @@ html,body{height:100%;background:#000;color:var(--tinta);font-family:Sora,sans-s
 .titulo .nom{font-size:21cqw;color:var(--verde);margin:4cqw 0;opacity:0;animation:golpe .7s 1.75s cubic-bezier(.3,1.5,.5,1) forwards}
 @keyframes golpe{from{opacity:0;transform:scale(2.4) rotate(-6deg)}to{opacity:1;transform:rotate(-3deg)}}
 /* 11 resumen */
-.res{padding:15cqw 6cqw 7cqw}
+.res{padding:calc(var(--arriba) + 15cqw) 6cqw calc(var(--abajo) + 7cqw)}
+.btns{display:flex;gap:3cqw;margin-top:5cqw}
+.btns button{flex:1;display:flex;align-items:center;justify-content:center;gap:2cqw;border:0;border-radius:99px;padding:3.8cqw 0;font:700 4cqw Sora;cursor:pointer}
+.btns button svg{width:5cqw;height:5cqw}
+.btns .si{background:var(--verde);color:#000}
+.btns .no{background:#1d2320;color:var(--tinta)}
+.btns button:active{transform:scale(.96)}
 .tarjeta{background:#121614;border-radius:6cqw;overflow:hidden;border:.5cqw solid rgba(31,224,101,.35)}
 .tarjeta .cab{height:54cqw;background-size:cover;background-position:center 28%;position:relative}
 .tarjeta .cab:after{z-index:1;content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 35%,#121614)}
@@ -106,7 +112,7 @@ html,body{height:100%;background:#000;color:var(--tinta);font-family:Sora,sans-s
 <div id="escena">
   <div id="capa"></div>
   <div id="barras"></div>
-  <a id="cerrar" href="../" aria-label="Cerrar"><svg viewBox="0 0 24 24" width="100%" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></a>
+  <a id="cerrar" href="../#inicio" aria-label="Cerrar"><svg viewBox="0 0 24 24" width="100%" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></a>
   <div id="marca"><span>SHITS LEAGUE</span> 24/26</div>
   <div id="inicio"><div class="play"><svg viewBox="0 0 24 24" width="45%" fill="#000"><path d="M8.5 5.8v12.4a1 1 0 0 0 1.5.86l9.9-6.2a1 1 0 0 0 0-1.72L10 4.94a1 1 0 0 0-1.5.86z" transform="translate(-1.6 0)"/></svg></div><div class="etq">Toca para empezar</div></div>
 </div>
@@ -218,7 +224,7 @@ function slides(p){
       <div><b>${p.a}</b><span>Asistencias</span></div>
       <div><b>${p.mvp}</b><span>MVP</span></div>
     </div></div>
-    <div class="txt gris e" style="text-align:center;margin-top:5cqw;animation-delay:.8s;font-size:3.6cqw">Shits League · Temporada 24/26</div></div>`});
+    <div class="btns e" style="animation-delay:.7s">${navigator.canShare?`<button class="si" data-acc="compartir"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="18" cy="5.5" r="3.2"/><circle cx="6" cy="12" r="3.2"/><circle cx="18" cy="18.5" r="3.2"/><path d="M8.4 10.6 15.6 6.9l.9 1.8-7.2 3.7zM9.3 12.5l7.2 3.7-.9 1.8-7.2-3.7z"/></svg>Compartir</button>`:''}<button class="${navigator.canShare?'no':'si'}" data-acc="descargar"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M10.6 3.5h2.8v8.3l3-3 2 2L12 17.2l-6.4-6.4 2-2 3 3z"/><rect x="4" y="18.4" width="16" height="2.6" rx="1.3"/></svg>Descargar</button></div></div>`});
   return S;
 }
 
@@ -247,10 +253,12 @@ function cargar(nombre){
 }
 // controles: toque izq/der, mantener = pausa
 let abajo=0,tPausa=null;
-esc.addEventListener('pointerdown',e=>{if(e.target.closest('#inicio,#cerrar'))return;abajo=performance.now();tPausa=setTimeout(()=>{pausado=true;acum+=performance.now()-t0;capa.classList.add('pausa')},180)});
-esc.addEventListener('pointerup',e=>{if(e.target.closest('#inicio,#cerrar'))return;clearTimeout(tPausa);
+esc.addEventListener('pointerdown',e=>{if(e.target.closest('#inicio,#cerrar,.btns'))return;abajo=performance.now();tPausa=setTimeout(()=>{pausado=true;acum+=performance.now()-t0;capa.classList.add('pausa')},180)});
+esc.addEventListener('pointerup',e=>{if(e.target.closest('#inicio,#cerrar,.btns'))return;clearTimeout(tPausa);
   if(pausado){pausado=false;t0=performance.now();capa.classList.remove('pausa');return}
-  const r=esc.getBoundingClientRect();ir(e.clientX-r.left<r.width*.3?i-1:i+1)});
+  const r=esc.getBoundingClientRect(),atras=e.clientX-r.left<r.width*.3;
+  if(!atras&&i===S.length-1){location.href=document.getElementById('cerrar').href;return}
+  ir(atras?i-1:i+1)});
 document.getElementById('inicio').onclick=(e=>{e.currentTarget.remove();mus.currentTime=0;mus.play().catch(()=>{});cargar(sel.value)});
 const sel=document.getElementById('elegir');
 sel.innerHTML=Object.keys(D).sort((a,b)=>a.localeCompare(b,'es')).map(n=>`<option>${n}</option>`).join('');
@@ -264,6 +272,41 @@ sel.value=pedido||Object.keys(D)[0];
 sel.onchange=()=>{cargar(sel.value);mus.currentTime=0};
 if(!pedido&&q.get('todos')!=='1'){document.getElementById('inicio').innerHTML='<div class="etq">No hay Wrapped para ti</div><div class="txt gris" style="text-align:center;padding:0 10cqw">Solo tienen Wrapped los que jugaron la temporada 24/26.</div>';document.getElementById('inicio').style.cursor='default';document.getElementById('inicio').onclick=null}
 else{cargar(sel.value);requestAnimationFrame(tic);}
+// imagen para compartir (1080x1920), dibujada en canvas
+function cargarImg(src){return new Promise((ok,mal)=>{const im=new Image();im.onload=()=>ok(im);im.onerror=mal;im.src=src})}
+function rr(c,x,y,w,h,r){c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);c.closePath()}
+function encaja(c,txt,max,tam,fam){let t=tam;do{c.font=`${fam.replace('$',t)}`;t-=4}while(c.measureText(txt).width>max&&t>20)}
+async function imagen(){
+  const p=D[sel.value],W=1080,H=1920,cv=document.createElement('canvas');cv.width=W;cv.height=H;const c=cv.getContext('2d');
+  await Promise.all([document.fonts.load('100px Anton'),document.fonts.load('700 40px Sora'),document.fonts.load('400 40px Sora')]);
+  c.fillStyle='#0A0C0B';c.fillRect(0,0,W,H);const X=60,CW=960,FH=680,CH=FH+520,Y=Math.round((H-CH)/2)+10;
+  c.save();c.rotate(-25*Math.PI/180);c.fillStyle='rgba(31,224,101,.06)';for(let x=-2200;x<2600;x+=200)c.fillRect(x,-400,100,3200);c.restore();
+  c.textBaseline='alphabetic';c.font='700 34px Sora';c.fillStyle='#1FE065';c.fillText('SHITS LEAGUE',80,Y-60);const wm=c.measureText('SHITS LEAGUE ').width;c.fillStyle='#F2F5F3';c.fillText('24/26',80+wm,Y-60);
+  
+  c.save();rr(c,X,Y,CW,CH,64);c.fillStyle='#121614';c.fill();c.clip();
+  c.save();c.beginPath();c.rect(X,Y,CW,FH);c.clip();const im=await cargarImg(FOTOS[p.foto]);const k=Math.max(CW/im.width,FH/im.height),iw=im.width*k,ih=im.height*k;
+  c.drawImage(im,X+(CW-iw)/2,Y+(FH-ih)*.28,iw,ih);
+  const g=c.createLinearGradient(0,Y+FH*.35,0,Y+FH);g.addColorStop(0,'rgba(18,22,20,0)');g.addColorStop(1,'#121614');c.fillStyle=g;c.fillRect(X,Y,CW,FH);c.restore();
+  c.fillStyle='#F2F5F3';encaja(c,p.nombre.toUpperCase(),CW-110,170,'$px Anton');c.fillText(p.nombre.toUpperCase(),X+55,Y+FH-90);
+  c.font='62px Anton';const tt=p.titulo.toUpperCase(),tw=c.measureText(tt).width;
+  c.save();c.translate(X+55,Y+FH-20);c.rotate(-2*Math.PI/180);rr(c,0,-62,tw+64,86,20);c.fillStyle='#1FE065';c.fill();c.fillStyle='#000';c.fillText(tt,32,4);c.restore();
+  const celdas=[[p.rk_pts,'PUESTO',1],[p.pj,'PARTIDOS'],[`${p.v}-${p.e}-${p.d}`,'V-E-D'],[p.g,'GOLES'],[p.a,'ASISTENCIAS'],[p.mvp,'MVP']];
+  const gx=X+50,gy=Y+FH+60,gap=26,cw=(CW-100-gap*2)/3,ch=180;
+  celdas.forEach(([v,l,ver],n)=>{const x=gx+(n%3)*(cw+gap),y=gy+Math.floor(n/3)*(ch+gap);rr(c,x,y,cw,ch,32);c.fillStyle='#1a1f1c';c.fill();
+    c.textAlign='center';c.fillStyle=ver?'#1FE065':'#F2F5F3';encaja(c,String(v),cw-40,100,'$px Anton');if(ver){const vw=c.measureText(String(v)).width;c.fillText(String(v),x+cw/2-14,y+112);c.font='700 40px Sora';c.fillText('º',x+cw/2-14+vw/2+16,y+62)}else c.fillText(String(v),x+cw/2,y+112);
+    c.font='700 25px Sora';c.fillStyle='#8A938E';c.fillText(l,x+cw/2,y+154);c.textAlign='left'});
+  c.restore();
+  c.save();rr(c,X,Y,CW,CH,64);c.strokeStyle='rgba(31,224,101,.35)';c.lineWidth=5;c.stroke();c.restore();
+  c.textAlign='center';c.font='400 34px Sora';c.fillStyle='#8A938E';c.fillText('Shits League · Temporada 24/26',W/2,Y+CH+110);
+  const b=await new Promise(ok=>cv.toBlob(ok,'image/png'));
+  return new File([b],`shits-league-24-26-${nrm(p.nombre).replace(/ /g,'-')}.png`,{type:'image/png'});
+}
+capa.addEventListener('click',async e=>{const bt=e.target.closest('[data-acc]');if(!bt)return;bt.disabled=true;
+  try{const f=await imagen();
+    if(bt.dataset.acc==='compartir'&&navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f]}).catch(()=>{})}
+    else{const u=URL.createObjectURL(f),a=document.createElement('a');a.href=u;a.download=f.name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000)}
+  }finally{bt.disabled=false}});
+window.__imagen=imagen;
 window.__ir=ir;window.__cargar=cargar;
 </script>
 </body>

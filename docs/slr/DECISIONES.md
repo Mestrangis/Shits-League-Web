@@ -2475,6 +2475,7 @@ Con `rendimiento-liga.mjs` (412×915, CPU ×4, «4G lenta», 3 pasadas), la vers
 
 - **`wrapped-24-26/` es una página aparte con parte propia en `version.json` (`wrapped`).** No se instala con la app: el service worker la guarda al abrirla (caché `sl-wrapped`, comprobada contra su huella) y atiende los trozos que Safari pide de la música. Su navegación se mira antes que la de la app, que siempre sirve `index.html`.
 - **Login → Wrapped: tabla fija en `js/inicio.js`, sacada de los alias de la hoja de la 24/26.** `fichaMVP` mira la hoja de la temporada que se está viendo. Carlos, Luis y Víctor no tienen Wrapped.
+- **La tarjeta abre siempre el Wrapped de la cuenta, también a los admin;** `?todos=1` solo se escribe a mano. **Antes de navegar, `SLVersion.prepararWrapped()`:** si manda un worker anterior a la v59 (da la app a cualquier navegación y el Wrapped sale en blanco), activa el nuevo y espera a que tome el mando. Si no lo consigue, no navega y avisa.
 
 ## Shits League: el pistoletazo pasa al panel de admin
 

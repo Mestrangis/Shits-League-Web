@@ -19,6 +19,7 @@
      app». Después de arrancar, el worker vuelve a comprobar lo guardado.
    · forzarActualizacion(): el servidor ya no entiende el código guardado (una
      función de Supabase que ya no existe): se busca la versión nueva y se aplica.
+   · prepararWrapped(): antes de abrir el Wrapped, que mande un worker que sepa servirlo.
    Sin service worker (navegador viejo, modo privado…), todo funciona por la red.
 ═══════════════════════════════════════════════ */
 (function () {
@@ -102,6 +103,46 @@
     location.reload();
     await new Promise(() => {});
   }
+
+  /* ── Antes de abrir el Wrapped ───────────────────────────────────────────── */
+  // Los workers de antes de la v59 dan la app a cualquier navegación: el Wrapped saldría en blanco.
+  // Si manda uno de esos, se busca el nuevo, se activa y se espera a que tome el mando. Sin
+  // conseguirlo responde false y no se navega: una página en blanco no puede salir
+  const WORKER_CON_WRAPPED = 59;
+  async function workerSirveWrapped() {
+    const sw = navigator.serviceWorker.controller ?? (await navigator.serviceWorker.getRegistration())?.active;
+    if (!sw) return true;   // sin worker no hay nada que intercepte: va a la red
+    const e = await preguntar(sw, { tipo: 'estado' });
+    return Number(/-v(\d+)$/.exec(e?.worker ?? '')?.[1]) >= WORKER_CON_WRAPPED;
+  }
+  async function activarWorkerNuevo() {
+    const r = await navigator.serviceWorker.getRegistration();
+    if (!r) return;
+    await r.update().catch(() => {});
+    const tomaElMando = new Promise(res => navigator.serviceWorker.addEventListener('controllerchange', res, { once: true }));
+    const nuevo = r.installing;
+    if (nuevo) await new Promise(res => {
+      const mirar = () => { if (nuevo.state !== 'installing') res(); };
+      nuevo.addEventListener('statechange', mirar);
+      mirar();
+    });
+    r.waiting?.postMessage({ tipo: 'activar_worker' });
+    if (nuevo || r.waiting || r.active !== navigator.serviceWorker.controller) {
+      await Promise.race([tomaElMando, new Promise(res => setTimeout(res, 8000))]);
+    }
+  }
+  SLVersion.prepararWrapped = async () => {
+    try {
+      if (await workerSirveWrapped()) return true;
+      capa('Actualizando la app…');
+      await activarWorkerNuevo();
+      return await workerSirveWrapped();
+    } catch {
+      return false;
+    } finally {
+      quitarCapa();
+    }
+  };
 
   /* ── Al abrir la app ─────────────────────────────────────────────────────── */
   SLVersion.alArrancar = (async () => {

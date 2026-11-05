@@ -301,13 +301,12 @@ const WRAPPED_24_26 = {
   Mateo: 'Mateo', Nacho: 'Nacho', Pelayo: 'Pelayo', Puebla: 'Puebla',
 };
 
-// Los admin, con el selector de todos; el resto, el suyo. Sin Wrapped ni sesión, nada
+// El de la cuenta con sesión, también para los admin. Sin Wrapped ni sesión, nada
 function renderTarjetaWrapped() {
-  const yo = getSessionPlayer();
-  const destino = esAdminLiga() ? 'todos=1' : WRAPPED_24_26[yo] ? `j=${encodeURIComponent(WRAPPED_24_26[yo])}` : '';
-  if (!destino) return '';
+  const nombre = WRAPPED_24_26[getSessionPlayer()];
+  if (!nombre) return '';
   return `<section class="inicio-block inicio-wrapped">
-    <a class="wrapped-tarjeta" href="wrapped-24-26/?${destino}">
+    <a class="wrapped-tarjeta" href="wrapped-24-26/?j=${encodeURIComponent(nombre)}">
       ${icono('wrapped')}
       <span class="wrapped-tarjeta__texto"><b>Tu 24/26</b><span>Tu temporada en 11 pantallas</span></span>
       <span class="wrapped-tarjeta__flecha" aria-hidden="true">→</span>
@@ -316,6 +315,19 @@ function renderTarjetaWrapped() {
 }
 // En el archivo no hay Inicio: va encima de la clasificación
 const tarjetaWrappedArchivo = () => (STATE.season === '24-26' && modoTemporada(temporadaPorId(STATE.season)) === 'archivo' ? renderTarjetaWrapped() : '');
+
+// En el documento, porque la tarjeta está en dos pestañas. Solo se navega con un worker que sepa servirlo
+document.addEventListener('click', async e => {
+  const tarjeta = e.target.closest?.('.wrapped-tarjeta');
+  if (!tarjeta) return;
+  e.preventDefault();
+  if (tarjeta.dataset.abriendo) return;
+  tarjeta.dataset.abriendo = '1';
+  const listo = await (window.SLVersion?.prepararWrapped?.() ?? true);
+  delete tarjeta.dataset.abriendo;
+  if (listo) location.href = tarjeta.href;
+  else avisoApp('Actualizando la app. Inténtalo en un momento.');
+});
 
 /* ── Extras ──────────────────────────────────────────────────────────────── */
 function renderExtras() {
