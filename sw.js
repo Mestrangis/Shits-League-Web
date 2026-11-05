@@ -18,17 +18,20 @@
      vuelve a instalar todo).
    · Sonidos de los partidos (audio/): no se precargan; al pedirlos se guardan
      en su caché, comprobados contra su huella.
+   · Wrapped de la 24/26 (wrapped-24-26/): es otra página, no la app. Tampoco se
+     precarga: se guarda al abrirlo, en su caché y comprobado contra su huella.
    · Fotos de las cartas (Cloudinary): caché propia, «primero la caché», con
      las 600 más recientes (el resto se borra).
    · Supabase, Google y el resto: directos a la red.
    Sube CACHE_NAME para empezar con cachés nuevas (lo igual se copia, comprobado).
 ═══════════════════════════════════════════════ */
 
-const CACHE_NAME = 'shits-league-v58';
+const CACHE_NAME = 'shits-league-v59';
 const CACHE_ESTADO = `${CACHE_NAME}-estado`;   // ACTIVA: la etiqueta de la versión que manda
 const CACHE_FOTOS = 'slr-fotos-cartas';
 const CACHE_FUENTES = 'sl-fuentes';
 const CACHE_AUDIO = 'slr-audio';
+const CACHE_WRAPPED = 'sl-wrapped';
 const MAX_FOTOS = 600;
 const ACTIVA = '__activa__.json';
 const ENTERA = '__entera__.json';                   // marca de «esta parte está entera», con la etiqueta
@@ -184,7 +187,7 @@ self.addEventListener('activate', event => {
     const keys = await caches.keys();
     const heredadas = keys.some(k => DE_CODIGO.test(k)) && !keys.some(k => /^shits-league-v\d+-estado$/.test(k));
     // Fuera lo que no es de ahora (las de código se limpian al activar una versión)
-    const quedan = k => k === CACHE_ESTADO || [CACHE_FOTOS, CACHE_FUENTES, CACHE_AUDIO].includes(k) || DE_CODIGO.test(k);
+    const quedan = k => k === CACHE_ESTADO || [CACHE_FOTOS, CACHE_FUENTES, CACHE_AUDIO, CACHE_WRAPPED].includes(k) || DE_CODIGO.test(k);
     await Promise.all(keys.filter(k => !quedan(k)).map(k => caches.delete(k)));
     await self.clients.claim();
     // Las páginas abiertas con el código de antes de version.json: se recargan una vez para
@@ -243,8 +246,14 @@ self.addEventListener('fetch', event => {
 
   // La web: de la versión activa
   if (url.href.startsWith(BASE)) {
-    const ruta = req.mode === 'navigate' ? 'index.html' : decodeURIComponent(url.pathname.slice(new URL(BASE).pathname.length));
+    const pedida = decodeURIComponent(url.pathname.slice(new URL(BASE).pathname.length));
+    const ruta = req.mode === 'navigate' ? 'index.html' : pedida;
     if (ruta === 'version.json' || ruta === 'sw.js' || url.searchParams.has('v')) return;   // siempre de la red
+    // Antes que la navegación a la app: el Wrapped es otra página
+    if (pedida.startsWith('wrapped-24-26/')) {
+      event.respondWith(archivoWrapped(req, pedida.endsWith('/') ? `${pedida}index.html` : pedida));
+      return;
+    }
     event.respondWith(servir(req, ruta));
     return;
   }
@@ -297,6 +306,49 @@ async function sonidoPartido(ruta, h) {
   const guardada = new Response(await res.arrayBuffer(), { status: 200, headers: { 'Content-Type': res.headers.get('Content-Type'), 'x-huella': h } });
   await cache.put(url, guardada.clone());
   return guardada;
+}
+
+/* ── Wrapped de la 24/26 ──────────────────────────────────────────────────── */
+// De su caché si es el de esta versión; si no, de la red, comprobado, y se guarda. Si no se puede
+// comprobar (la red ya tiene otra versión), tal cual: es una página aparte y no se mezcla con nada
+const wrappedBajando = new Map();   // ruta → promesa: el móvil pide la música varias veces, a trozos
+async function archivoWrapped(req, ruta) {
+  const h = (await leerActiva())?.wrapped?.[ruta]?.[0];
+  if (!h) return fetch(req);
+  const cache = await caches.open(CACHE_WRAPPED);
+  const url = BASE + ruta;
+  let r = await cache.match(url);
+  if (r?.headers.get('x-huella') !== h) {
+    if (!wrappedBajando.has(ruta)) {
+      wrappedBajando.set(ruta, (async () => {
+        const res = await descargar(ruta, h);
+        await cache.put(url, new Response(await res.arrayBuffer(), { status: 200, headers: { 'Content-Type': res.headers.get('Content-Type'), 'x-huella': h } }));
+      })().finally(() => wrappedBajando.delete(ruta)));
+    }
+    try {
+      await wrappedBajando.get(ruta);
+      r = await cache.match(url);
+    } catch {
+      return fetch(req);
+    }
+  }
+  return respuestaConRango(req, r);
+}
+// Safari pide la música por trozos y, si le llega entera, no la reproduce
+async function respuestaConRango(req, r) {
+  const rango = /^bytes=(\d+)-(\d*)$/.exec(req.headers.get('range') || '');
+  if (!rango) return r;
+  const buf = await r.arrayBuffer();
+  const total = buf.byteLength;
+  const ini = Number(rango[1]);
+  const fin = Math.min(rango[2] ? Number(rango[2]) : total - 1, total - 1);
+  if (ini > fin) return new Response(null, { status: 416, headers: { 'Content-Range': `bytes */${total}` } });
+  return new Response(buf.slice(ini, fin + 1), { status: 206, headers: {
+    'Content-Type': r.headers.get('Content-Type'),
+    'Content-Length': String(fin - ini + 1),
+    'Content-Range': `bytes ${ini}-${fin}/${total}`,
+    'Accept-Ranges': 'bytes',
+  } });
 }
 
 /* ── Fotos de las cartas ──────────────────────────────────────────────────── */

@@ -1,9 +1,10 @@
 // Genera version.json, la etiqueta de versión de la app: la versión, el commit y la fecha del
-// despliegue y la huella (resumen del contenido y tamaño) de cada archivo, en tres partes:
+// despliegue y la huella (resumen del contenido y tamaño) de cada archivo, en cuatro partes:
 //   · app: la Shits League normal; se instala con la app.
 //   · rush: Shits League Rush (js/slr/, css/slr.css, css/acabados/, img/slr/ y lo de
 //     assets/ que solo cita Rush); se descarga al pulsar JUGAR.
 //   · audio: los sonidos de los partidos (audio/); no se precargan, se guardan al pedirlos.
+//   · wrapped: el Wrapped de la 24/26 (wrapped-24-26/); tampoco, y se guarda al abrirlo.
 // La app lo pide siempre sin caché (js/version.js) y el service worker comprueba cada
 // archivo que descarga contra su huella (sw.js).
 //   node herramientas/precarga.mjs   → escribe version.json (no está en el repo: lo genera
@@ -98,9 +99,9 @@ export function generar({ commit, fecha } = {}) {
   const rush = todas.filter(r => esDeRush(r) || deRush.has(r));
   const app = todas.filter(r => !rush.includes(r));
   const audio = (existsSync(join(RAIZ, 'audio')) ? todos('audio') : []).filter(f => SONIDO.test(f)).sort();
-  const m = { app: huellas(app), rush: huellas(rush), audio: huellas(audio) };
+  const m = { app: huellas(app), rush: huellas(rush), audio: huellas(audio), wrapped: huellas(todos('wrapped-24-26').sort()) };
   return {
-    version: resumen([m.app, m.rush, m.audio]),
+    version: resumen([m.app, m.rush, m.audio, m.wrapped]),
     commit: commit ?? process.env.SL_COMMIT ?? (git(['rev-parse', '--short=7', 'HEAD']) || 'local'),
     fecha: fecha ?? process.env.SL_FECHA ?? (git(['log', '-1', '--format=%cI']) || new Date().toISOString()),
     ...m,
@@ -112,5 +113,5 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const v = generar();
   writeFileSync(join(RAIZ, 'version.json'), JSON.stringify(v) + '\n');
   const kb = o => Math.round(Object.values(o).reduce((s, a) => s + a[1], 0) / 1024);
-  console.log(`version.json: ${v.version} (${v.commit}, ${v.fecha}) · Shits League ${Object.keys(v.app).length} archivos (${kb(v.app)} KB) · Rush ${Object.keys(v.rush).length} (${kb(v.rush)} KB) · sonidos ${Object.keys(v.audio).length}`);
+  console.log(`version.json: ${v.version} (${v.commit}, ${v.fecha}) · Shits League ${Object.keys(v.app).length} archivos (${kb(v.app)} KB) · Rush ${Object.keys(v.rush).length} (${kb(v.rush)} KB) · sonidos ${Object.keys(v.audio).length} · Wrapped ${Object.keys(v.wrapped).length}`);
 }

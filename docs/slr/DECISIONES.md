@@ -2471,6 +2471,11 @@ Con `rendimiento-liga.mjs` (412×915, CPU ×4, «4G lenta», 3 pasadas), la vers
 - **`herramientas/precarga.mjs` incluye `ajustes.js`:** así entra en `version.json`, y cambiarlo es una versión nueva que llega sola a los móviles. No hace falta subir `CACHE_NAME`.
 - **Las temporadas nuevas también van en `HOJAS` de `apps-script/votos.gs`:** el script no puede leer `ajustes.js`.
 
+## Shits League: Wrapped de la 24/26
+
+- **`wrapped-24-26/` es una página aparte con parte propia en `version.json` (`wrapped`).** No se instala con la app: el service worker la guarda al abrirla (caché `sl-wrapped`, comprobada contra su huella) y atiende los trozos que Safari pide de la música. Su navegación se mira antes que la de la app, que siempre sirve `index.html`.
+- **Login → Wrapped: tabla fija en `js/inicio.js`, sacada de los alias de la hoja de la 24/26.** `fichaMVP` mira la hoja de la temporada que se está viendo. Carlos, Luis y Víctor no tienen Wrapped.
+
 ## Shits League: el pistoletazo pasa al panel de admin
 
 - **«Empezar la temporada» y «Deshacer» están en el perfil de la liga,** no en el Modo pruebas de Rush. El servidor sigue exigiendo lo mismo (`slr_admin_empezar_temporada`: admin de la liga con el modo pruebas activado, y nunca un bot), con la sesión de Rush guardada. Los botones nombran la temporada por su id, porque su nombre público puede estar oculto en `ajustes.js`.

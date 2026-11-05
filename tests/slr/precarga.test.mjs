@@ -24,7 +24,7 @@ test('la genera el despliegue (no está en el repo) y la pide la app sin caché'
   assert.ok(!existsSync(join(RAIZ, 'precarga.js')), 'ya no hay precarga.js');
   assert.match(leer('js/version.js'), /cache: 'no-store'/);
   assert.match(leer('js/version.js'), /\?t=\$\{Date\.now\(\)\}/);
-  assert.deepEqual(Object.keys(V).sort(), ['app', 'audio', 'commit', 'fecha', 'rush', 'version']);
+  assert.deepEqual(Object.keys(V).sort(), ['app', 'audio', 'commit', 'fecha', 'rush', 'version', 'wrapped']);
   assert.equal(V.commit, 'abc1234');
   assert.equal(V.fecha, '2026-10-29T10:00:00Z');
 });
@@ -58,8 +58,8 @@ test('cada archivo con su huella (resumen del contenido con LF y bytes)', () => 
     assert.equal(bytes, b.length, r);
   }
   assert.match(V.version, /^[0-9a-f]{12}$/);
-  // La versión es la del contenido de las tres partes
-  assert.equal(V.version, h12(JSON.stringify([V.app, V.rush, V.audio])));
+  // La versión es la del contenido de las cuatro partes
+  assert.equal(V.version, h12(JSON.stringify([V.app, V.rush, V.audio, V.wrapped])));
 });
 
 test('dos partes: la Shits League normal (con la app) y Rush (al pulsar JUGAR), sin repetir nada', () => {

@@ -201,7 +201,8 @@ button, [role="button"], .modal__backdrop, .tab, .result-row, .card-wrap, .voto-
 .icono--mvp { -webkit-mask-image: url(../img/iconos/mvp.svg); mask-image: url(../img/iconos/mvp.svg); }
 .icono--si { -webkit-mask-image: url(../img/iconos/si.svg); mask-image: url(../img/iconos/si.svg); }
 .icono--no { -webkit-mask-image: url(../img/iconos/no.svg); mask-image: url(../img/iconos/no.svg); }
-.icono--gol, .icono--asistencia, .icono--mvp { color: var(--verde); }
+.icono--wrapped { -webkit-mask-image: url(../img/iconos/wrapped.svg); mask-image: url(../img/iconos/wrapped.svg); }
+.icono--gol, .icono--asistencia, .icono--mvp, .icono--wrapped { color: var(--verde); }
 
 .hero-section {
   position: relative;
@@ -1874,6 +1875,24 @@ details.mvp-fila[open] > summary .mvp-fila__puntos::after { content: ' ▴'; }
 .lider__top b { font-weight: 700; color: #fff; }
 .lider__todos { align-self: flex-end; margin-top: auto; padding: 6px 0; font-size: 12px; font-weight: 600; color: var(--verde); cursor: pointer; }
 .lideres__puntos { display: none; }
+
+/* ── Wrapped de la 24/26 ── */
+.wrapped-tarjeta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(31,224,101,.4);
+  background: radial-gradient(120% 120% at 0 0, rgba(31,224,101,.2), transparent 60%), rgba(8,24,15,.85);
+  color: #fff;
+  text-decoration: none;
+}
+.wrapped-tarjeta .icono { font-size: 30px; }
+.wrapped-tarjeta__texto { flex: 1; min-width: 0; }
+.wrapped-tarjeta__texto b { display: block; font-family: 'Anton', sans-serif; font-weight: 400; font-size: 22px; letter-spacing: .03em; color: #fff; }
+.wrapped-tarjeta__texto span { font-size: 12px; font-weight: 600; color: var(--verde); }
+.wrapped-tarjeta__flecha { flex: none; font-size: 18px; font-weight: 600; color: var(--verde); }
 
 /* ── Tu temporada ── */
 .tu-bloque {

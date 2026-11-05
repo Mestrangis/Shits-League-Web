@@ -428,7 +428,7 @@ function renderTabIfNeeded(name) {
       panel.innerHTML = renderResumen(STATE.jugadores, STATE.jornadas);
       break;
     case 'clasificacion':
-      panel.innerHTML = renderClasificacion(STATE.jugadores);
+      panel.innerHTML = tarjetaWrappedArchivo() + renderClasificacion(STATE.jugadores);
       break;
     case 'goleadores':
       panel.innerHTML = renderGoleadores(STATE.jugadores);
@@ -812,6 +812,7 @@ async function init() {
 // Lo llama session.js; re-renderiza lo que depende del jugador logueado
 async function onSessionChange() {
   rerenderPanel('inicio');
+  rerenderPanel('clasificacion');
   rerenderPanel('votacion');
   rerenderPanel('mvp');
   rerenderPanel('rush');

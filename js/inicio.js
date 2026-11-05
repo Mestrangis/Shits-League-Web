@@ -292,6 +292,31 @@ function renderTuTemporada() {
     ${!tusPartidosTodos && partidos.length > TUS_PARTIDOS_A_LA_VISTA ? `<button class="tu-todos" type="button" data-tus-partidos>Ver todos (${partidos.length}) →</button>` : ''}`, 'inicio-tuya');
 }
 
+/* ── Wrapped de la 24/26 ─────────────────────────────────────────────────── */
+// Del nombre de login al del Wrapped. Fijo y no con fichaMVP, que mira la hoja de la temporada
+// que se está viendo: desde la 26/27 no tiene por qué encontrarlos
+const WRAPPED_24_26 = {
+  Marcos: 'Markis', Hugo: 'Junquera', Jorge: 'De la Mano', Javier: 'Javi', Nicolás: 'Nico', Pablo: 'Pablín',
+  Alberto: 'Alberto', David: 'David', Enzo: 'Enzo', Fernando: 'Fernando', Gonzalo: 'Gonzalo',
+  Mateo: 'Mateo', Nacho: 'Nacho', Pelayo: 'Pelayo', Puebla: 'Puebla',
+};
+
+// Los admin, con el selector de todos; el resto, el suyo. Sin Wrapped ni sesión, nada
+function renderTarjetaWrapped() {
+  const yo = getSessionPlayer();
+  const destino = esAdminLiga() ? 'todos=1' : WRAPPED_24_26[yo] ? `j=${encodeURIComponent(WRAPPED_24_26[yo])}` : '';
+  if (!destino) return '';
+  return `<section class="inicio-block inicio-wrapped">
+    <a class="wrapped-tarjeta" href="wrapped-24-26/?${destino}">
+      ${icono('wrapped')}
+      <span class="wrapped-tarjeta__texto"><b>Tu 24/26</b><span>Tu temporada en 11 pantallas</span></span>
+      <span class="wrapped-tarjeta__flecha" aria-hidden="true">→</span>
+    </a>
+  </section>`;
+}
+// En el archivo no hay Inicio: va encima de la clasificación
+const tarjetaWrappedArchivo = () => (STATE.season === '24-26' && modoTemporada(temporadaPorId(STATE.season)) === 'archivo' ? renderTarjetaWrapped() : '');
+
 /* ── Extras ──────────────────────────────────────────────────────────────── */
 function renderExtras() {
   const { spotify, acta, reglamento } = ENLACES_LIGA;
@@ -302,7 +327,7 @@ function renderExtras() {
 }
 
 function renderInicio(proximos) {
-  return [renderProximoPartido(proximos), renderResumenes(), renderNumeros(), renderLideres(), renderTuTemporada(), renderExtras()].join('');
+  return [renderTarjetaWrapped(), renderProximoPartido(proximos), renderResumenes(), renderNumeros(), renderLideres(), renderTuTemporada(), renderExtras()].join('');
 }
 
 /* ── Carrusel de líderes (móvil) ─────────────────────────────────────────── */
