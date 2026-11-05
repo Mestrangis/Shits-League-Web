@@ -235,11 +235,42 @@ function pintarPerfilAdmin() {
     <h3 class="perfil-admin__titulo">Admin</h3>
     <button class="dialog-box__btn dialog-box__btn--ghost" type="button" data-admin-accion="lista">QUIÉN LO TIENE ACTIVADO</button>
     <button class="dialog-box__btn dialog-box__btn--ghost" type="button" data-admin-accion="prueba">ENVIARME UNA NOTIFICACIÓN DE PRUEBA</button>
+    <button class="dialog-box__btn dialog-box__btn--ghost" type="button" data-admin-accion="reparar">REPARAR NOTIFICACIONES</button>
+    <div class="perfil-admin__diagnostico" data-admin-diagnostico>Mirando este dispositivo…</div>
     <button class="dialog-box__btn dialog-box__btn--ghost" type="button" data-admin-accion="simulacro">SIMULACRO DE AVISOS</button>
     ${temporadaProxima() ? `<button class="dialog-box__btn" type="button" data-admin-temporada="empezar">EMPEZAR LA ${nombreTemporadaAdmin(temporadaProxima()).toUpperCase()}</button>` : ''}
     ${temporadaAnteriorAlCurso() && !temporadaAnteriorAlCurso().imagenes ? `<button class="dialog-box__btn dialog-box__btn--ghost" type="button" data-admin-temporada="deshacer">DESHACER: VOLVER A LA ${nombreTemporadaAdmin(temporadaAnteriorAlCurso()).toUpperCase()}</button>` : ''}
     <div class="perfil-admin__salida" data-admin-salida></div>`;
+  pintarDiagnostico();
 }
+
+// Las notificaciones de ESTE dispositivo
+async function pintarDiagnostico() {
+  const d = await pushDiagnostico();
+  const caja = document.querySelector('[data-admin-diagnostico]');
+  if (!caja) return;
+  const fila = (nombre, valor) => `<li><b>${nombre}</b><span>${escaparApp(valor)}</span></li>`;
+  caja.innerHTML = `<h4 class="perfil-admin__subtitulo">Este dispositivo</h4><ul class="perfil-admin__lista">
+    ${fila('Notification.permission', d.permiso)}
+    ${fila('Standalone (app instalada)', d.standalone ? 'sí' : 'no')}
+    ${fila('OneSignal cargado', d.onesignal ? 'sí' : 'no')}
+    ${fila('optedIn', d.optedIn)}
+    ${fila('PushSubscription.id', d.id)}
+    ${fila('Token', d.token ? 'sí' : 'no')}
+    ${fila('external_id', d.externalId)}
+    ${fila('Suscripción del navegador (worker de OneSignal)', d.navegador)}
+    ${fila('Service workers', d.workers.join('\n') || 'ninguno')}
+    ${fila('Último error de la reparación', d.error)}
+  </ul>`;
+}
+
+const TEXTO_REPARAR = {
+  bien: 'Ya estaban bien: suscrito y con token.',
+  reparada: 'Reparadas: ya hay token.',
+  'sin permiso': 'El permiso no está concedido: no hay nada que reparar.',
+  'sin OneSignal': 'OneSignal no se ha cargado.',
+  'sin token': 'Sigue sin token. Mira el último error.',
+};
 
 /* ── El pistoletazo de la temporada ──────────────────────────────────────── */
 // Por su id: el nombre público de una temporada puede estar oculto en ajustes.js
@@ -309,6 +340,12 @@ function htmlSimulacro(r) {
 
 async function accionAdmin(accion, salida) {
   salida.textContent = 'Un momento…';
+  if (accion === 'reparar') {
+    salida.textContent = TEXTO_REPARAR[await pushReparar()];
+    await pintarDiagnostico();
+    refrescarEstadoApp();
+    return;
+  }
   try {
     const codigo = getSessionCode();
     if (accion === 'lista') {
@@ -344,15 +381,13 @@ function refrescarEstadoApp() {
   enviarEstadoApp();
 }
 
-// Con el permiso dado y sin suscribir: se suscribe sin preguntar y se vuelve a vincular a su
-// nombre de login, que es a quien envía el Apps Script. Sin insistir si no sale a la primera
+// Con el permiso dado y sin suscribir o sin token: se repara sin preguntar (push.js), y se vuelve a
+// vincular a su nombre de login, que es a quien envía el Apps Script. Sin insistir a cada evento
 let ultimoIntentoSuscribir = 0;
 async function asegurarSuscripcion() {
   if (Date.now() - ultimoIntentoSuscribir < 30000) return;
   ultimoIntentoSuscribir = Date.now();
-  await pushSuscribir();
-  const nombre = getSessionPlayer();
-  if (nombre) pushVincularJugador(nombre);
+  await pushReparar();
 }
 
 // Cuando OneSignal dice algo nuevo (push.js)

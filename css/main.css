@@ -2025,6 +2025,9 @@ div.instalar-aviso__toque { cursor: default; }
 .perfil-admin__lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .perfil-admin__lista li { padding: 7px 10px; border-radius: 8px; background: rgba(14,32,22,.8); }
 .perfil-admin__lista b, .perfil-admin__lista span, .perfil-admin__lista small { display: block; }
+.perfil-admin__diagnostico { margin-top: .75rem; font-size: 13px; color: #9DC4AD; }
+.perfil-admin__diagnostico span { white-space: pre-line; overflow-wrap: anywhere; color: #E8FBEF; }
+.perfil-admin__subtitulo { margin: 0 0 .4rem; font-size: 13px; font-weight: 700; color: #E8FBEF; }
 .perfil-admin__lista b { color: #E8FBEF; font-size: 13px; }
 .perfil-admin__lista span { font-size: 12px; }
 .perfil-admin__lista small { font-size: 11px; color: #6E9D81; }

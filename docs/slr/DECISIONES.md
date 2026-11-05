@@ -2471,6 +2471,10 @@ Con `rendimiento-liga.mjs` (412×915, CPU ×4, «4G lenta», 3 pasadas), la vers
 - **`herramientas/precarga.mjs` incluye `ajustes.js`:** así entra en `version.json`, y cambiarlo es una versión nueva que llega sola a los móviles. No hace falta subir `CACHE_NAME`.
 - **Las temporadas nuevas también van en `HOJAS` de `apps-script/votos.gs`:** el script no puede leer `ajustes.js`.
 
+## Shits League: notificaciones que se reparan solas
+
+- **Suscrito es `optedIn` y con token:** `optedIn` sin token sale «Unsubscribed» en OneSignal y no recibe nada. Con el permiso dado, `pushReparar()` (`js/push.js`) hace `optIn`, espera el token y repite el login. Si sigue sin token, da de baja la suscripción del navegador del worker de OneSignal (`push/onesignal/`) y prueba una vez más. El último error queda en `SL_PUSH_ULTIMO_ERROR`, y el panel de admin lo enseña con el diagnóstico del dispositivo.
+
 ## Shits League: avisos de instalar y notificaciones, según el estado real
 
 - **Nada guardado decide si se avisa, salvo la fecha de la última alarma de «bloqueadas» (una a la semana).** `situacionApp` lo calcula de `display-mode`, `Notification.permission`, `optedIn` y `getInstalledRelatedApps`, al abrir y al volver a primer plano. Volver tras 30 minutos fuera cuenta como abrir: una app instalada no se recarga.
