@@ -236,6 +236,7 @@ function initHero() {
   // Un arrastre en «Pendientes» no se corta: lo nuevo se pinta con el siguiente refresco
   if (el.querySelector('.voto-card.is-dragging')) return;
   el.innerHTML = renderHeroSection(STATE.jornadas);
+  pintarAvisoApp();
   pendientesPila = pendientesMvp = null;
   actualizarPendientes();
 }
@@ -280,6 +281,18 @@ function avisoApp(texto, tipo = 'error') {
 }
 
 /* ── Tabs ────────────────────────────────────────────────────────────────── */
+// Los enlaces de las notificaciones a algo concreto: #partido=AAAA-MM-DD y #mvp=AAAA-MM-DD.
+// Se quitan al abrirse, y si los datos aún no están, se vuelve a mirar cuando lleguen.
+function abrirEnlaceDeHash() {
+  const m = location.hash.match(/^#(partido|mvp)=(\d{4}-\d{2}-\d{2})$/);
+  if (!m) return;
+  const j = STATE.jornadas.find(x => x.fecha === m[2]);
+  if (!j) return;
+  history.replaceState(history.state, '', location.pathname + location.search);
+  if (m[1] === 'mvp') abrirMVP(m[2]);
+  else openModalPartido(j.amistoso ? 'ami' : 'oficial', m[2]);
+}
+
 // '#votacion' → 'votacion'; null si el hash no es una pestaña.
 // Permite que las notificaciones enlacen a una pestaña concreta.
 function tabDesdeHash() {
@@ -774,7 +787,10 @@ async function init() {
   window.addEventListener('hashchange', () => {
     const tab = tabDesdeHash();
     if (tab) switchTab(tab);
+    abrirEnlaceDeHash();
   });
+  abrirEnlaceDeHash();
+  document.addEventListener('sl:cargada', abrirEnlaceDeHash, { once: true });
   document.addEventListener('visibilitychange', () => {
     actualizarRefrescoVotaciones();
     if (document.visibilityState !== 'visible') return;
@@ -786,6 +802,7 @@ async function init() {
   });
   actualizarRefrescoVotaciones();
   initPush();
+  initInstalarApp();
   // Recargada para aplicar una versión nueva al pulsar JUGAR: se entra en Rush sola
   if (typeof rushTrasRecarga === 'function') rushTrasRecarga();
 }

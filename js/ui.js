@@ -85,6 +85,7 @@ function renderHeroSection(jornadas) {
   const lastMatch  = [...ligas].sort((a,b) => b.fecha.localeCompare(a.fecha))[0] || jornadas[0];
 
   return `
+    <div class="instalar-aviso" id="instalarAviso" hidden></div>
     <div class="hero__left">
       <div class="hero__eyebrow">${AJUSTES_LIGA.textos.eslogan}</div>
       <h1 class="hero__title">

@@ -51,6 +51,7 @@ const AJUSTES_POR_DEFECTO = {
   puntos: { victoria: 3, empate: 1, derrota: 0, capitanVictoria: 7, capitanEmpate: 4, capitanDerrota: 2 },
   inicio: { tusPartidosALaVista: 5, segundosCarrusel: 5 },
   calendario: '38a5afd4c120a661ffbf3e4392af235b395891931485fb16ebca3e152524e5c0@group.calendar.google.com',
+  admins: ['Marcos'],
 };
 
 function leerAjustes(escritos, defecto, avisar) {
@@ -142,7 +143,13 @@ function leerAjustes(escritos, defecto, avisar) {
     if (calendario !== undefined) avisar('calendario: tiene que ser el ID entre comillas. Uso el de por defecto');
     calendario = defecto.calendario;
   }
+  let admins = escritos.admins;
+  if (!Array.isArray(admins) || !admins.every(esTexto)) {
+    if (admins !== undefined) avisar('admins: tiene que ser una lista de nombres. Uso la de por defecto');
+    admins = defecto.admins;
+  }
   return {
+    admins: admins.map(a => a.trim()),
     temporadas: lista('temporadas', temporada, 'id'),
     // En los enlaces, vacío es «que no salga»
     enlaces: grupo('enlaces', v => typeof v === 'string', 'tiene que ir entre comillas'),

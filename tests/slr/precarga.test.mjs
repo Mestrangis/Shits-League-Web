@@ -77,7 +77,7 @@ test('dos partes: la Shits League normal (con la app) y Rush (al pulsar JUGAR), 
 });
 
 test('sonidos: todos los de audio/, con su huella, fuera de las dos partes', () => {
-  const enDisco = readdirSync(join(RAIZ, 'audio/partido')).filter(f => /\.mp3$/.test(f)).map(f => `audio/partido/${f}`).sort();
+  const enDisco = ['partido', 'alarma'].flatMap(d => readdirSync(join(RAIZ, `audio/${d}`)).filter(f => /\.mp3$/.test(f)).map(f => `audio/${d}/${f}`)).sort();
   assert.deepEqual(Object.keys(V.audio), enDisco);
   for (const [r, [h, bytes]] of Object.entries(V.audio)) {
     const b = readFileSync(join(RAIZ, r));

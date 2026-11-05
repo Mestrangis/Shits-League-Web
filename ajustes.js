@@ -104,6 +104,13 @@ var AJUSTES = {
   },
 
   /* ── CALENDARIO ──────────────────────────────────────────────────────────
-     El ID del Google Calendar del que sale «Próximo partido».  */
+     El ID del Google Calendar del que sale «Próximo partido». Si lo cambias, cámbialo
+     también en CALENDARIO_ID de apps-script/votos.gs (los avisos de partidos salen de ahí).  */
   calendario: '38a5afd4c120a661ffbf3e4392af235b395891931485fb16ebca3e152524e5c0@group.calendar.google.com',
+
+  /* ── ADMINS ──────────────────────────────────────────────────────────────
+     A quién se le enseñan en su perfil los botones de admin: quién tiene las notificaciones
+     activadas, la notificación de prueba y el simulacro. Esto solo los enseña: lo que da
+     acceso de verdad es su huella en HUELLAS_ADMIN de apps-script/votos.gs.  */
+  admins: ['Marcos'],
 };

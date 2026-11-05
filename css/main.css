@@ -1114,16 +1114,6 @@ body.archivo .app-zona { display: none; }
   color: #9DC4AD;
   margin-bottom: 1.25rem;
 }
-.dialog-box__list {
-  list-style: none;
-  text-align: left;
-  display: grid;
-  gap: .5rem;
-  margin: 0 auto 1.5rem;
-  max-width: 280px;
-  font-size: .88rem;
-  color: #E8FBEF;
-}
 .dialog-box__input {
   width: 100%;
   padding: .75rem 1rem;
@@ -1987,3 +1977,31 @@ details.mvp-fila[open] > summary .mvp-fila__puntos::after { content: ' ▴'; }
 
   .tu-datos { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
+
+/* ── Instalar la app y activar las notificaciones (solo en móvil) ── */
+.instalar-aviso { display: flex; align-self: stretch; align-items: stretch; flex: none; gap: 4px; border: 1px solid var(--verde); border-radius: 12px; background: rgba(31,224,101,.1); }
+.instalar-aviso[hidden] { display: none; }
+.instalar-aviso__toque { flex: 1; min-width: 0; padding: 9px 12px; color: #E8FBEF; text-align: left; cursor: pointer; }
+.instalar-aviso__toque b { display: block; font-size: 14px; font-weight: 700; color: var(--verde); }
+.instalar-aviso__toque span { display: block; margin-top: 1px; font-size: 12px; color: #9DC4AD; }
+.instalar-aviso__luego { flex: none; padding: 0 12px; font-size: 12px; color: #9DC4AD; cursor: pointer; }
+.perfil-app { margin-bottom: 1rem; }
+.perfil-app[hidden], .perfil-admin[hidden] { display: none; }
+.perfil-app__linea { margin: 0 0 .35rem; font-size: 14px; color: #9DC4AD; }
+.perfil-app__linea b { color: #E8FBEF; }
+.perfil-app__activadas { color: var(--verde) !important; }
+.perfil-app__bloqueadas { color: #ff5a5a !important; }
+.perfil-app .dialog-box__btn { margin-top: .6rem; }
+.perfil-admin { margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid rgba(31,224,101,.2); text-align: left; }
+.perfil-admin .dialog-box__btn { margin-top: .5rem; }
+.perfil-admin__titulo { margin: 0; font-family: 'Anton', sans-serif; font-weight: 400; font-size: 1rem; letter-spacing: .08em; color: #fff; }
+.perfil-admin__salida { margin-top: .75rem; font-size: 13px; color: #9DC4AD; }
+.perfil-admin__salida p { margin: 0 0 .5rem; }
+.perfil-admin__lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.perfil-admin__lista li { padding: 7px 10px; border-radius: 8px; background: rgba(14,32,22,.8); }
+.perfil-admin__lista b, .perfil-admin__lista span, .perfil-admin__lista small { display: block; }
+.perfil-admin__lista b { color: #E8FBEF; font-size: 13px; }
+.perfil-admin__lista span { font-size: 12px; }
+.perfil-admin__lista small { font-size: 11px; color: #6E9D81; }
+.perfil-admin__lista li.es-mal { background: rgba(255,90,90,.14); }
+.perfil-admin__lista li.es-mal b, .perfil-admin__lista li.es-mal span { color: #ff5a5a; }

@@ -2470,3 +2470,20 @@ Con `rendimiento-liga.mjs` (412×915, CPU ×4, «4G lenta», 3 pasadas), la vers
 - **`js/version.js` no repara por errores de `ajustes.js`:** borraría las cachés y recargaría cada 5 minutos sin arreglar nada.
 - **`herramientas/precarga.mjs` incluye `ajustes.js`:** así entra en `version.json`, y cambiarlo es una versión nueva que llega sola a los móviles. No hace falta subir `CACHE_NAME`.
 - **Las temporadas nuevas también van en `HOJAS` de `apps-script/votos.gs`:** el script no puede leer `ajustes.js`.
+
+## Shits League: instalar la app y notificaciones automáticas
+
+- **`js/instalar-app.js`:** detección, tarjeta, perfil, lista del admin y envío del estado. `js/alarma.js` es de Marcos y no se toca: se carga con `import()` en cuanto hay tarjeta, para que la sirena salga dentro del toque.
+- **La tarjeta va dentro de la cabecera de Inicio:** debajo de las pestañas no se vería, porque la cabecera llena la pantalla.
+- **El silencio del móvil no se puede leer desde la web.** En iPhone, Web Audio ya obedece al interruptor; en Android suena según el volumen multimedia. Además se respeta el botón de sonido de Rush.
+- **El permiso concedido sin suscripción se arregla al abrir la app,** además de al tocar la tarjeta.
+- **Tras aceptar instalar,** la tarjeta se oculta 3 días: sigue en el navegador hasta abrir el icono, y Chrome no deja saber que ya está instalada.
+- **El admin lo comprueba el script con el código de la sesión** (`HUELLAS_ADMIN`), no con `ajustes.js`, que es público. El `SECRET` de siempre está en el código de la web y no protege nada.
+- **El calendario, con `CalendarApp`:** la clave de la web está limitada por referer y desde el script da 403.
+- **La primera pasada de cada temporada apunta lo que ya hay sin enviar nada,** y lo mismo la primera vez que se lee el calendario. Si no, saldrían todos los partidos del histórico a la vez.
+- **Lo aplazado por la noche no se pierde:** no se apunta, y sale a las 9:00. Tope de 12 envíos por pasada.
+- **Ventanas de los recordatorios:** semana, de 7 a 6 días; día, de 24 a 12 horas; hora, la última. Son más anchas que la noche (10 h), así que no se saltan. Un partido recién creado no lleva el recordatorio del tramo en el que ya está.
+- **Recordatorio de asistencia (el 4):** uno por votación, a las 24 h de aparecer. Antes el activador lo repetía sin límite.
+- **Solo avisa de la temporada en curso,** y sin saber cuál es no envía nada.
+- **«A todos» es por segmento de OneSignal,** probando sus dos nombres posibles; a personas, por `external_id` (el nombre del login). La hoja se traduce por la ficha: nombre o alias.
+- **`Authorization: Key`:** el `Bearer` de antes no es el formato documentado.

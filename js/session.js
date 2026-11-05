@@ -23,6 +23,7 @@ function setSessionPlayer(nombre) {
   } catch { /* sin persistencia: la sesión dura lo que la pestaña */ }
   renderSessionButton(nombre);
   if (typeof pushVincularJugador === 'function') pushVincularJugador(nombre);
+  if (typeof enviarEstadoApp === 'function') enviarEstadoApp();
   if (typeof onSessionChange === 'function') onSessionChange(nombre);
 }
 
@@ -83,6 +84,7 @@ function openSessionModal() {
   if (nombre) {
     document.getElementById('sessionLoggedName').textContent = nombre;
     renderAvatar(document.getElementById('sessionAvatar'), nombre);
+    pintarPerfilApp();
   }
   openModal('sessionModal');
   if (!nombre) setTimeout(() => document.getElementById('sessionCode').focus(), 50);

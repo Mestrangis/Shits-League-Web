@@ -2,6 +2,7 @@
 // votos-gs.test.mjs y banco/mvp.mjs. Nunca toca la hoja real.
 import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 
 const RUTA = new URL('../../apps-script/votos.gs', import.meta.url);
 
@@ -22,7 +23,8 @@ export function dia(desplazamiento = 0) {
 
 // hojas: { nombre: [[cabecera], [fila]…] } (todo texto, como lo ve la web)
 // opciones: otra: { id, hojas } la hoja de la 26/27; enCurso: lo que responde Supabase
-export function crearGas(principal, { otra = null, enCurso = null } = {}) {
+// eventos: los del calendario, { id, inicio (ms), lugar }; sinCalendario: sin acceso a él
+export function crearGas(principal, { otra = null, enCurso = null, eventos = [], sinCalendario = false } = {}) {
   const libroDe = hojas => {
   const hoja = nombre => ({
     getDataRange: () => ({
@@ -35,6 +37,7 @@ export function crearGas(principal, { otra = null, enCurso = null } = {}) {
         while (hojas[nombre].length < f) hojas[nombre].push([]);
         hojas[nombre][f - 1][c - 1] = String(v);
       },
+      setValues: filas => filas.forEach((r, i) => r.forEach((v, k) => { hojas[nombre][f - 1 + i][c - 1 + k] = String(v); })),
       setNumberFormat() {},
     }),
     insertColumnBefore: () => { hojas[nombre].forEach(f => f.unshift('')); },
@@ -46,7 +49,8 @@ export function crearGas(principal, { otra = null, enCurso = null } = {}) {
   };
   };
   const libro = libroDe(principal);
-  const estado = { enCurso };
+  const estado = { enCurso, eventos, sinCalendario, fallar: false, propiedades: { ONESIGNAL_API_KEY: 'clave-de-prueba' } };
+  const envios = [];
   const contexto = vm.createContext({
     SpreadsheetApp: { openById: id => (otra && id === otra.id ? libroDe(otra.hojas) : libro) },
     LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
@@ -55,13 +59,37 @@ export function crearGas(principal, { otra = null, enCurso = null } = {}) {
       createTextOutput: texto => ({ setMimeType: () => texto }),
     },
     Utilities: {
+      DigestAlgorithm: { SHA_256: 'sha256' },
+      Charset: { UTF_8: 'utf8' },
+      computeDigest: (alg, texto) => [...createHash(alg).update(texto).digest()].map(b => (b > 127 ? b - 256 : b)),
       formatDate: (fecha, zona, formato) => {
         const dia = new Intl.DateTimeFormat('en-CA', { timeZone: zona }).format(fecha);
+        const hora = new Intl.DateTimeFormat('en-GB', { timeZone: zona, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(fecha);
+        if (formato === "yyyy-MM-dd'T'HH:mm") return `${dia}T${hora}`;
         return formato === 'yyyy-MM-dd' ? dia : `${dia} 12:00:00`;
       },
     },
-    PropertiesService: { getScriptProperties: () => ({ getProperty: () => null }) },
-    UrlFetchApp: { fetch() {
+    PropertiesService: { getScriptProperties: () => ({
+      getProperty: k => estado.propiedades[k] ?? null,
+      getProperties: () => ({ ...estado.propiedades }),
+      setProperty: (k, v) => { estado.propiedades[k] = String(v); },
+    }) },
+    CalendarApp: {
+      getCalendarById: () => (estado.sinCalendario ? null : {
+        getEvents: (desde, hasta) => estado.eventos.filter(e => e.inicio >= desde.getTime() && e.inicio <= hasta.getTime()).map(e => ({
+          getId: () => e.id, getTitle: () => e.titulo ?? 'Partido', getLocation: () => e.lugar ?? '',
+          getStartTime: () => new Date(e.inicio), isAllDayEvent: () => !!e.todoElDia,
+        })),
+      }),
+      subscribeToCalendar: () => null,
+    },
+    UrlFetchApp: { fetch(url, opciones) {
+      if (url.includes('onesignal.com')) {
+        if (estado.fallar) return { getResponseCode: () => 500, getContentText: () => 'error' };
+        const cuerpo = JSON.parse(opciones.payload);
+        envios.push(cuerpo);
+        return { getResponseCode: () => 200, getContentText: () => JSON.stringify({ id: `n${envios.length}` }) };
+      }
       if (!estado.enCurso) throw new Error('sin red en las pruebas');
       return { getResponseCode: () => 200, getContentText: () => JSON.stringify([{ valor: estado.enCurso }]) };
     } },
@@ -73,6 +101,13 @@ export function crearGas(principal, { otra = null, enCurso = null } = {}) {
   return {
     hojas: principal,
     estado,
+    envios,
+    avisos: ms => contexto.ejecutarAvisos(ms),
+    simulacro: ms => contexto.ejecutarAvisos(ms, true),
+    fijarEventos: e => { estado.eventos = e; estado.sinCalendario = false; },
+    fallarEnvios: si => { estado.fallar = si; },
+    // Un admin de mentira, con un código de prueba: el de verdad no se conoce aquí
+    fijarHuellaAdmin: codigo => { contexto.__huella = createHash('sha256').update(codigo).digest('hex'); vm.runInContext("HUELLAS_ADMIN[__huella] = 'Marcos'", contexto); },
     // Lo que recibe el Apps Script: el texto del POST. Devuelve el JSON que respondería
     post: texto => JSON.parse(doPost({ postData: { contents: texto } })),
     votar: datos => JSON.parse(doPost({ postData: { contents: JSON.stringify({ secret: 'pissleague', ...datos }) } })),

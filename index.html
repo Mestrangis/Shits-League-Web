@@ -123,7 +123,9 @@
         <div class="avatar dialog-box__avatar" id="sessionAvatar"></div>
         <h2 class="dialog-box__title" id="sessionLoggedName"></h2>
         <p class="dialog-box__text">Has iniciado sesión en este dispositivo.</p>
+        <div class="perfil-app" id="sessionApp" hidden></div>
         <button class="dialog-box__btn dialog-box__btn--ghost" id="sessionLogoutBtn" type="button">CERRAR SESIÓN</button>
+        <div class="perfil-admin" id="sessionAdmin" hidden></div>
       </div>
     </div>
   </div>
@@ -145,24 +147,6 @@
     </div>
   </div>
 
-  <!-- MODAL — NOTIFICACIONES (antes del prompt nativo) -->
-  <div class="modal" id="pushModal" role="dialog" aria-modal="true" aria-label="Activar notificaciones">
-    <div class="modal__backdrop"></div>
-    <div class="modal__box dialog-box">
-      <h2 class="dialog-box__title">NO TE PIERDAS NADA</h2>
-      <p class="dialog-box__text">Activa las notificaciones y te avisamos cuando haya:</p>
-      <ul class="dialog-box__list">
-        <li>Votación para la fecha del partido</li>
-        <li>Nuevo partido programado</li>
-        <li>Nuevos highlights</li>
-        <li>Avisos importantes de la liga</li>
-      </ul>
-      <button class="dialog-box__btn" id="pushAcceptBtn" type="button">ACTIVAR NOTIFICACIONES</button>
-      <button class="dialog-box__btn dialog-box__btn--ghost" id="pushLaterBtn" type="button">AHORA NO</button>
-    </div>
-  </div>
-
-
   <!-- Versión de la app: service worker, «Hay una versión nueva» y actualización forzada -->
   <script src="js/version.js"></script>
   <script src="ajustes.js"></script>
@@ -173,6 +157,7 @@
   <script src="js/calendar.js"></script>
   <script src="js/session.js"></script>
   <script src="js/push.js"></script>
+  <script src="js/instalar-app.js"></script>
   <script src="js/votacion.js"></script>
   <script src="js/mvp.js"></script>
   <script src="js/inicio.js"></script>
