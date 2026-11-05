@@ -244,9 +244,18 @@ function resultRow(j) {
 /* ═══════════════════════════════════════════════
    CLASIFICACIÓN TAB
 ═══════════════════════════════════════════════ */
+// Por puntos o, si la temporada no tiene puntuación, por partidos ganados. Luego, por goles
+const campoClasificacion = () => (puntuacionVista() ? 'pts' : 'victorias');
+function ordenClasificacion(jugadores) {
+  const campo = campoClasificacion();
+  return [...jugadores].sort((a, b) => b.stats[campo] - a.stats[campo] || b.stats.goles - a.stats.goles);
+}
+
 function renderClasificacion(jugadores) {
-  const sorted = [...jugadores].sort((a,b) => b.stats.pts - a.stats.pts || b.stats.goles - a.stats.goles);
-  const maxPts = sorted[0]?.stats.pts || 1;
+  const sorted = ordenClasificacion(jugadores);
+  const campo = campoClasificacion();
+  const conPuntos = campo === 'pts';
+  const maximo = sorted[0]?.stats[campo] || 1;
 
   const rows = sorted.map((j, i) => `
     <div class="${rowClass(i)}">
@@ -259,13 +268,13 @@ function renderClasificacion(jugadores) {
           <span style="margin-left:auto;font-size:10px;color:#6E9D81;font-weight:600">${j.stats.pj} PJ · ${j.stats.victorias}V ${j.stats.empates}E ${j.stats.derrotas}D</span>
         </div>
         <div class="ranking-row__bar-bg">
-          <div class="ranking-row__bar" style="width:${Math.round((j.stats.pts/maxPts)*100)}%"></div>
+          <div class="ranking-row__bar" style="width:${Math.round((j.stats[campo]/maximo)*100)}%"></div>
         </div>
       </div>
-      <div class="ranking-row__count">
+      ${conPuntos ? `<div class="ranking-row__count">
         <span class="ranking-row__num">${j.stats.pts}</span>
         <span class="ranking-row__unit">pts</span>
-      </div>
+      </div>` : ''}
     </div>
   `).join('');
 
@@ -444,7 +453,7 @@ function buildModalJugador(j) {
         <div class="player-modal__stat"><div class="player-modal__stat-val">${j.stats.goles}</div><div class="player-modal__stat-lbl">Goles</div></div>
         <div class="player-modal__stat"><div class="player-modal__stat-val">${j.stats.asistencias}</div><div class="player-modal__stat-lbl">Asistencias</div></div>
         <div class="player-modal__stat"><div class="player-modal__stat-val">${j.stats.mvp}</div><div class="player-modal__stat-lbl">MVPs</div></div>
-        <div class="player-modal__stat"><div class="player-modal__stat-val">${j.stats.pts}</div><div class="player-modal__stat-lbl">Puntos</div></div>
+        ${puntuacionVista() ? `<div class="player-modal__stat"><div class="player-modal__stat-val">${j.stats.pts}</div><div class="player-modal__stat-lbl">Puntos</div></div>` : ''}
       </div>
     </div>
   `;

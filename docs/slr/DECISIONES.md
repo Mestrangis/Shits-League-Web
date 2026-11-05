@@ -2471,6 +2471,10 @@ Con `rendimiento-liga.mjs` (412×915, CPU ×4, «4G lenta», 3 pasadas), la vers
 - **`herramientas/precarga.mjs` incluye `ajustes.js`:** así entra en `version.json`, y cambiarlo es una versión nueva que llega sola a los móviles. No hace falta subir `CACHE_NAME`.
 - **Las temporadas nuevas también van en `HOJAS` de `apps-script/votos.gs`:** el script no puede leer `ajustes.js`.
 
+## Shits League: puntuación por temporada
+
+- **`puntuacion` va dentro de cada temporada, en `ajustes.js`.** Sin ella (`null`), la clasificación se ordena por partidos ganados y luego por goles, sin columna de puntos. La barra de cada fila pasa a medir victorias, y Líderes enseña «vict.». «Puntos» desaparece de «Tu temporada» y de la ficha del jugador.
+
 ## Shits League: instalar la app y notificaciones automáticas
 
 - **`js/instalar-app.js`:** detección, tarjeta, perfil, lista del admin y envío del estado. `js/alarma.js` es de Marcos y no se toca: se carga con `import()` en cuanto hay tarjeta, para que la sirena salga dentro del toque.

@@ -194,21 +194,24 @@ function renderNumeros() {
 }
 
 /* ── Líderes ─────────────────────────────────────────────────────────────── */
-const LIDERES = [
-  { titulo: 'Clasificación', campo: 'pts', unidad: 'pts', tab: 'clasificacion' },
+// La primera, según la puntuación de la temporada que se está viendo
+const lideres = () => [
+  puntuacionVista()
+    ? { titulo: 'Clasificación', campo: 'pts', unidad: 'pts', tab: 'clasificacion' }
+    : { titulo: 'Clasificación', campo: 'victorias', unidad: 'vict.', tab: 'clasificacion' },
   { titulo: 'Goleadores', campo: 'goles', unidad: 'goles', tab: 'goleadores' },
   { titulo: 'Asistentes', campo: 'asistencias', unidad: 'asist.', tab: 'asistentes' },
   { titulo: 'MVP', campo: 'mvp', unidad: 'veces', tab: 'mvp' },
 ];
 
 // Con el mismo orden que su pestaña. Clasificación: los que han jugado; el resto, los que tienen algo
-function topDe({ campo }) {
-  const conDatos = STATE.jugadores.filter(j => (campo === 'pts' ? j.stats.pj > 0 : j.stats[campo] > 0));
-  return conDatos.sort((a, b) => b.stats[campo] - a.stats[campo] || (campo === 'pts' ? b.stats.goles - a.stats.goles : 0));
+function topDe({ campo, tab }) {
+  if (tab === 'clasificacion') return ordenClasificacion(STATE.jugadores.filter(j => j.stats.pj > 0));
+  return STATE.jugadores.filter(j => j.stats[campo] > 0).sort((a, b) => b.stats[campo] - a.stats[campo]);
 }
 
 function renderLideres() {
-  const tarjetas = LIDERES.map(l => ({ l, top: topDe(l) })).filter(t => t.top.length);
+  const tarjetas = lideres().map(l => ({ l, top: topDe(l) })).filter(t => t.top.length);
   if (!tarjetas.length) return '';
   return seccionInicio('LÍDERES', `
     <div class="lideres" data-lideres>
@@ -259,7 +262,7 @@ function renderTuTemporada() {
   const partidos = misPartidos(yo);
   if (!partidos.length) return '';
   const s = ficha.stats;
-  const posicion = topDe(LIDERES[0]).indexOf(ficha) + 1;
+  const posicion = topDe(lideres()[0]).indexOf(ficha) + 1;
   const foto = JUGADORES_FOTOS[sesion] || ficha.img;
   const dato = (num, lbl, nota = '', ico = '') => `<div class="tu-dato"><b>${ico ? icono(ico) : ''}${num}</b><span>${lbl}</span>${nota ? `<small>${nota}</small>` : ''}</div>`;
   const marca = (ico, etiqueta, num = '') => `<span class="tu-marca">${icono(ico, etiqueta)}${num}</span>`;
@@ -277,7 +280,7 @@ function renderTuTemporada() {
         <div class="tu-quien"><b>${yo}</b><span>${posicion}.º en la clasificación</span></div>
       </div>
       <div class="tu-datos">
-        ${dato(s.pts, 'Puntos')}
+        ${puntuacionVista() ? dato(s.pts, 'Puntos') : ''}
         ${dato(s.pj, 'Partidos', `${s.victorias}V ${s.empates}E ${s.derrotas}D`)}
         ${dato(s.goles, 'Goles', '', 'gol')}
         ${dato(s.asistencias, 'Asistencias', '', 'asistencia')}

@@ -9,8 +9,9 @@
 
 const AJUSTES_POR_DEFECTO = {
   temporadas: [
-    { id: '26-27', nombre: 'Temporada 26/27', jornadas: null, hoja: '1UW3JRsjC8DHPsMwz9LjyRrqPo2SVTBUtiLkpL8LqCIg', rush: true },
-    { id: '24-26', nombre: 'Temporada 24/26', jornadas: 16, hoja: '1EHGrFt2Y3QDCOdSV3fVgWvspzXYcir4SmDxOezdSLRY' },
+    { id: '26-27', nombre: 'Temporada 26/27', jornadas: null, hoja: '1UW3JRsjC8DHPsMwz9LjyRrqPo2SVTBUtiLkpL8LqCIg', rush: true, puntuacion: null },
+    { id: '24-26', nombre: 'Temporada 24/26', jornadas: 16, hoja: '1EHGrFt2Y3QDCOdSV3fVgWvspzXYcir4SmDxOezdSLRY',
+      puntuacion: { victoria: 3, empate: 1, derrota: 0, capitanVictoria: 7, capitanEmpate: 4, capitanDerrota: 2 } },
     { id: '23-24', nombre: 'Temporada 23/24', imagenes: [
       { src: 'assets/clasificación23-24.png', alt: 'Clasificación 23-24' },
       { src: 'assets/goles23-24.png',         alt: 'Goleadores 23-24' },
@@ -48,7 +49,6 @@ const AJUSTES_POR_DEFECTO = {
     frase: 'Es una mierda! Es la mayor mierda que he visto en toda mi vida.',
     sinEmpezar: 'La temporada aún no ha empezado',
   },
-  puntos: { victoria: 3, empate: 1, derrota: 0, capitanVictoria: 7, capitanEmpate: 4, capitanDerrota: 2 },
   inicio: { tusPartidosALaVista: 5, segundosCarrusel: 5 },
   calendario: '38a5afd4c120a661ffbf3e4392af235b395891931485fb16ebca3e152524e5c0@group.calendar.google.com',
   admins: ['Marcos'],
@@ -71,6 +71,24 @@ function leerAjustes(escritos, defecto, avisar) {
     avisar(`${nombre}.${clave}: ${explicacion}. Uso el de por defecto`);
     return [clave, porDefecto];
   }));
+
+  // La puntuación de una temporada; null si no tiene. Lo que falta vale 0, y el capitán, como los demás
+  function puntuacion(escrita, base, donde) {
+    if (escrita === undefined || escrita === null) return null;
+    if (!esObjeto(escrita)) {
+      avisar(`${donde}: la puntuación no es un grupo de valores entre { }`);
+      return base?.puntuacion ?? null;
+    }
+    const valor = (clave, siFalta) => {
+      const v = escrita[clave];
+      if (v === undefined) return siFalta;
+      if (typeof v === 'number' && v >= 0) return v;
+      avisar(`${donde}: puntuacion.${clave} tiene que ser un número`);
+      return base?.puntuacion?.[clave] ?? siFalta;
+    };
+    const victoria = valor('victoria', 0), empate = valor('empate', 0), derrota = valor('derrota', 0);
+    return { victoria, empate, derrota, capitanVictoria: valor('capitanVictoria', victoria), capitanEmpate: valor('capitanEmpate', empate), capitanDerrota: valor('capitanDerrota', derrota) };
+  }
 
   function temporada(t) {
     if (!esObjeto(t) || !esTexto(t.id)) { avisar('una temporada sin id: la ignoro'); return null; }
@@ -98,6 +116,7 @@ function leerAjustes(escritos, defecto, avisar) {
       salida.hoja = base?.hoja ?? '';
     }
     if (t.rush === true) salida.rush = true;
+    salida.puntuacion = puntuacion(t.puntuacion, base, donde);
     return salida;
   }
 
@@ -155,7 +174,6 @@ function leerAjustes(escritos, defecto, avisar) {
     enlaces: grupo('enlaces', v => typeof v === 'string', 'tiene que ir entre comillas'),
     usuarios: lista('usuarios', usuario, 'huella'),
     textos: grupo('textos', esTexto, 'está vacío'),
-    puntos: grupo('puntos', noNegativo, 'tiene que ser un número'),
     inicio: grupo('inicio', v => noNegativo(v) && v >= 1, 'tiene que ser un número, 1 o más'),
     calendario: calendario.trim(),
   };

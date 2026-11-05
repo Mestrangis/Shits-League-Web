@@ -16,6 +16,8 @@ const TEMPORADA_EN_CURSO_INICIAL = '24-26';
 const TEMPORADA_EN_CURSO_KEY = 'SL_TEMPORADA_EN_CURSO';
 
 const temporadaPorId = id => TEMPORADAS.find(t => t.id === id);
+// La puntuación de la temporada que se está viendo; null si no tiene
+const puntuacionVista = () => temporadaPorId(STATE.season)?.puntuacion ?? null;
 
 function leerEnCursoGuardada() {
   try {

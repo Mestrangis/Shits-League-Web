@@ -22,6 +22,10 @@ var AJUSTES = {
        jornadas: las previstas, para la barra de Inicio. null: sin decidir.
        hoja:     el ID de su hoja de cálculo. '': temporada vacía.
        rush:     true si Rush existe en esta temporada. Si no, no lo pongas.
+       puntuacion: cuánto suma cada partido en la clasificación de ESTA temporada.
+                 victoria, empate y derrota, y lo del capitán. Lo que no pongas: 0 (y el
+                 capitán, lo mismo que el resto). null: sin puntuación; la clasificación se
+                 ordena por partidos ganados y luego por goles, sin columna de puntos.
        imagenes: solo para las de antes de la web, en vez de hoja y jornadas.
      Ojo, una temporada nueva también hay que añadirla, con su hoja, a HOJAS en
      apps-script/votos.gs (y publicar el script), o no se podrá votar en ella.
@@ -29,8 +33,17 @@ var AJUSTES = {
      Modo pruebas de Rush.
      Ejemplo: { id: '27-28', nombre: 'Temporada 27/28', jornadas: 18, hoja: 'ID-de-la-hoja', rush: true },  */
   temporadas: [
-    { id: '26-27', nombre: 'Temporada 26/27', jornadas: null, hoja: '1UW3JRsjC8DHPsMwz9LjyRrqPo2SVTBUtiLkpL8LqCIg', rush: true },
-    { id: '24-26', nombre: 'Temporada 24/26', jornadas: 16, hoja: '1EHGrFt2Y3QDCOdSV3fVgWvspzXYcir4SmDxOezdSLRY' },
+    { id: '26-27', nombre: 'Temporada 26/27', jornadas: null, hoja: '1UW3JRsjC8DHPsMwz9LjyRrqPo2SVTBUtiLkpL8LqCIg', rush: true,
+      // Por definir. Puede ser una puntuación totalmente distinta (sin capitanes, sin empates…). Cuando se sepa, se programa aquí
+      puntuacion: null,
+    },
+    { id: '24-26', nombre: 'Temporada 24/26', jornadas: 16, hoja: '1EHGrFt2Y3QDCOdSV3fVgWvspzXYcir4SmDxOezdSLRY',
+      // Puntuación de la 24/26
+      puntuacion: {
+        victoria: 3, empate: 1, derrota: 0,
+        capitanVictoria: 7, capitanEmpate: 4, capitanDerrota: 2,
+      },
+    },
     { id: '23-24', nombre: 'Temporada 23/24', imagenes: [
       { src: 'assets/clasificación23-24.png', alt: 'Clasificación 23-24' },
       { src: 'assets/goles23-24.png',         alt: 'Goleadores 23-24' },
@@ -87,14 +100,6 @@ var AJUSTES = {
     eslogan: 'La liga que nunca debió existir —',                                 // encima de SHITS LEAGUE
     frase: 'Es una mierda! Es la mayor mierda que he visto en toda mi vida.',     // debajo de SHITS LEAGUE
     sinEmpezar: 'La temporada aún no ha empezado',                                // cuando una temporada no tiene partidos
-  },
-
-  /* ── PUNTOS DE LA CLASIFICACIÓN ──────────────────────────────────────────
-     Cuánto suma cada partido, al jugador normal y al capitán.
-     Ojo: se aplica a TODAS las temporadas, también a las ya jugadas.  */
-  puntos: {
-    victoria: 3, empate: 1, derrota: 0,
-    capitanVictoria: 7, capitanEmpate: 4, capitanDerrota: 2,
   },
 
   /* ── INICIO ──────────────────────────────────────────────────────────────  */

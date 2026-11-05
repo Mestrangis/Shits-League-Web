@@ -183,6 +183,7 @@ function calcularStats(jugadores, jornadas) {
     stats[j.nombre] = { pj: 0, victorias: 0, empates: 0, derrotas: 0, pts: 0, mvp: 0, goles: 0, asistencias: 0 };
   });
 
+  const p = puntuacionVista();
   function aplicarResultado(nombres, capitan, resultado) {
     nombres.forEach(nombreRaw => {
       const nombre = resolverNombre(nombreRaw);
@@ -191,13 +192,13 @@ function calcularStats(jugadores, jornadas) {
       const esCapitan = nombre === resolverNombre(capitan);
       if (resultado === 'win') {
         s.victorias++;
-        s.pts += esCapitan ? AJUSTES_LIGA.puntos.capitanVictoria : AJUSTES_LIGA.puntos.victoria;
+        if (p) s.pts += esCapitan ? p.capitanVictoria : p.victoria;
       } else if (resultado === 'draw') {
         s.empates++;
-        s.pts += esCapitan ? AJUSTES_LIGA.puntos.capitanEmpate : AJUSTES_LIGA.puntos.empate;
+        if (p) s.pts += esCapitan ? p.capitanEmpate : p.empate;
       } else {
         s.derrotas++;
-        s.pts += esCapitan ? AJUSTES_LIGA.puntos.capitanDerrota : AJUSTES_LIGA.puntos.derrota;
+        if (p) s.pts += esCapitan ? p.capitanDerrota : p.derrota;
       }
     });
   }

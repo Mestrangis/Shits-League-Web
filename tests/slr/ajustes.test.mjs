@@ -61,7 +61,7 @@ test('una coma de más no es un error', () => {
 test('un valor mal: solo ese vuelve al de por defecto, y lo avisa', () => {
   const a = cargar(`var AJUSTES = {
     textos: { eslogan: '', frase: 'Otra' },
-    puntos: { victoria: 'tres', empate: 2 },
+    temporadas: [{ id: '24-26', nombre: 'Temporada 24/26', hoja: 'h', jornadas: 16, puntuacion: { victoria: 'tres', empate: 2 } }, { id: '26-27', nombre: 'Temporada 26/27', hoja: '', jornadas: null }],
     inicio: { tusPartidosALaVista: 0 },
     enlaces: { spotify: 7, acta: '' },
     calendario: '',
@@ -70,8 +70,10 @@ test('un valor mal: solo ese vuelve al de por defecto, y lo avisa', () => {
   const d = defecto().ev('AJUSTES_LIGA'), l = a.ev('AJUSTES_LIGA');
   assert.equal(l.textos.eslogan, d.textos.eslogan);
   assert.equal(l.textos.frase, 'Otra');
-  assert.equal(l.puntos.victoria, 3);
-  assert.equal(l.puntos.empate, 2);
+  assert.equal(l.temporadas[0].puntuacion.victoria, 3, 'lo que está mal, el de por defecto');
+  assert.equal(l.temporadas[0].puntuacion.empate, 2);
+  assert.equal(l.temporadas[0].puntuacion.capitanEmpate, 2, 'sin capitán, lo mismo que los demás');
+  assert.equal(l.temporadas[1].puntuacion, null, 'sin puntuación');
   assert.equal(l.inicio.tusPartidosALaVista, 5);
   assert.equal(l.enlaces.spotify, d.enlaces.spotify);
   assert.equal(l.enlaces.acta, '', 'vacío es que no salga');
