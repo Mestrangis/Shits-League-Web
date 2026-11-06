@@ -2471,6 +2471,11 @@ Con `rendimiento-liga.mjs` (412×915, CPU ×4, «4G lenta», 3 pasadas), la vers
 - **`herramientas/precarga.mjs` incluye `ajustes.js`:** así entra en `version.json`, y cambiarlo es una versión nueva que llega sola a los móviles. No hace falta subir `CACHE_NAME`.
 - **Las temporadas nuevas también van en `HOJAS` de `apps-script/votos.gs`:** el script no puede leer `ajustes.js`.
 
+## Shits League: la barra de Inicio sigue al scroll con CSS
+
+- **No es `position: sticky`:** la barra es una sola para todas las páginas y flota sobre el carril. Pegada dentro de Inicio, se iría con la página al deslizar de lado, y las demás páginas necesitarían otra.
+- **Es `animation-timeline` con una línea de tiempo con nombre (`timeline-scope` en `.app-zona`):** con Inicio quieta, el scroll mueve la barra en su propio hilo, sin quedarse atrás. Al deslizar entre páginas o al asentarse, se quita la clase y manda el JavaScript de siempre, que también es el respaldo sin soporte.
+
 ## Shits League: partido nuevo, cambio de hora y cancelado
 
 - **Cada partido anunciado guarda su hora (`av:calfecha:<id>`).** Si cambia, se avisa con «Cambio de hora» y los recordatorios van con la hora nueva, sin los que ya han pasado. Si desaparece del calendario antes de jugarse, se avisa con «Partido cancelado». Sin calendario leído no se da nada por cancelado. Los anunciados antes de esto apuntan su hora en la primera pasada, sin avisar.

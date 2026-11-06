@@ -120,11 +120,25 @@ function centrarTab(name, suave = true) {
 
 // A qué altura va la barra en cada página: en Inicio, debajo de la cabecera hasta que esta se va
 const alturaTabs = name => (name === 'inicio' ? Math.max(0, heroAlto - paginaDe('inicio').scrollTop) : 0);
+// En Inicio, quieta, la mueve el propio scroll con CSS (.tabs--con-scroll): va en el hilo del
+// scroll y no se queda atrás en un deslizamiento rápido. Sin soporte, con JavaScript en cada scroll
+const TABS_CON_SCROLL = !!window.CSS?.supports?.('timeline-scope', '--x') && CSS.supports('animation-timeline', '--x');
 function pintarTabsEn(y) {
-  document.getElementById('tabs').style.transform = `translate3d(0,${y}px,0)`;
+  const nav = document.getElementById('tabs');
+  nav.classList.remove('tabs--con-scroll');
+  nav.style.transform = `translate3d(0,${y}px,0)`;
 }
 function pintarTabs() {
-  if (!gestoActivo) pintarTabsEn(alturaTabs(STATE.activeTab));
+  if (gestoActivo) return;
+  const y = alturaTabs(STATE.activeTab);
+  // Al pasar de página (asentando), aún con la transición: luego, el scroll
+  if (TABS_CON_SCROLL && STATE.activeTab === 'inicio' && !document.body.classList.contains('asentando')) {
+    const nav = document.getElementById('tabs');
+    nav.style.transform = `translate3d(0,${y}px,0)`;   // la misma: al quitar la clase no salta
+    nav.classList.add('tabs--con-scroll');
+    return;
+  }
+  pintarTabsEn(y);
 }
 
 /* ── Pasar de una página a otra ──────────────────────────────────────────── */
@@ -194,6 +208,7 @@ function esperarFin(pista, alAcabar) {
     document.body.classList.remove('asentando');
     terminarTransicion = () => {};
     alAcabar();
+    pintarTabs();
   };
   const alTerminar = e => { if (e.target === pista) fin(); };
   const reserva = setTimeout(fin, PAGINAS_MS + 120);   // por si transitionend no llega
@@ -345,6 +360,7 @@ function initPaginas() {
   // La altura de la cabecera y de la barra cambian con las cartas, los datos y las fuentes
   new ResizeObserver(() => {
     heroAlto = hero.offsetHeight;
+    document.documentElement.style.setProperty('--hero-alto', `${heroAlto}px`);
     pintarTabs();
   }).observe(hero);
   new ResizeObserver(() => {
@@ -353,7 +369,7 @@ function initPaginas() {
     centrarTab(STATE.activeTab, false);
   }).observe(nav);
   new ResizeObserver(() => pintarIndicador()).observe(document.querySelector('.tabs__inner'));
-  inicio.addEventListener('scroll', () => { if (STATE.activeTab === 'inicio') pintarTabs(); }, { passive: true });
+  if (!TABS_CON_SCROLL) inicio.addEventListener('scroll', () => { if (STATE.activeTab === 'inicio') pintarTabs(); }, { passive: true });
   initDeslizamiento();
   initTeclado();
   document.addEventListener('sl:cargada', prepararVecinas, { once: true });

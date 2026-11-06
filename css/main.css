@@ -373,6 +373,19 @@ button, [role="button"], .modal__backdrop, .tab, .result-row, .card-wrap, .voto-
   scrollbar-width: thin;
   scrollbar-color: rgba(31,224,101,.28) transparent;
 }
+/* En Inicio, quieta: la mueve el scroll de la página de Inicio (js/paginas.js, pintarTabs). Va de
+   debajo de la cabecera (--hero-alto) a arriba del todo en los primeros --hero-alto px de scroll */
+.app-zona { timeline-scope: --scroll-inicio; }
+.pagina--inicio { scroll-timeline: --scroll-inicio y; }
+.tabs.tabs--con-scroll {
+  animation: tabs-sigue-scroll linear both;
+  animation-timeline: --scroll-inicio;
+  animation-range: 0px var(--hero-alto, 0px);
+}
+@keyframes tabs-sigue-scroll {
+  from { transform: translate3d(0, var(--hero-alto, 0px), 0); }
+  to { transform: translate3d(0, 0, 0); }
+}
 .tabs::-webkit-scrollbar { height: 8px; }
 .tabs::-webkit-scrollbar-track { background: transparent; }
 .tabs::-webkit-scrollbar-thumb { background: rgba(31,224,101,.28); border-radius: 20px; }
