@@ -8,10 +8,10 @@
    USO
      import { mostrarAlarma } from './alarma.js';
      const r = await mostrarAlarma({
-       modo: 'notificaciones',          // 'notificaciones' | 'instalar' | 'iphone' | 'bloqueadas'
+       modo: 'notificaciones',          // 'notificaciones' | 'instalar' | 'iphone' | 'bloqueadas' | 'abrir'
        accion: async () => 'ok',        // lo que lanza la ventanita del navegador;
                                         // devuelve 'ok', 'mal' (denegado) o 'nada'
-       instrucciones: '<ol>…</ol>',     // HTML que se enseña si sale 'mal' (en 'bloqueadas', siempre)
+       instrucciones: '<ol>…</ol>',     // HTML que se enseña si sale 'mal' (en 'bloqueadas' y 'abrir', siempre)
        sonidos: { sirena, boom, ok },   // URLs de los MP3 (opcional; ok puede faltar)
                                         // cada toque en la alarma suena un «boom» (se solapan)
        silencio: false,                 // true = sin sonido
@@ -64,6 +64,12 @@ const TEXTOS = {
     sub: 'Tienes las notificaciones bloqueadas',
     orden: 'DESBLOQUÉALAS <b>A MANO</b>',
     aviso: 'El móvil ya no nos deja volver a preguntarte. O haces esto o no te enteras de los partidos, ni del MVP, ni de nada.',
+    boton: 'ENTENDIDO',
+  },
+  abrir: {
+    titulo: 'ALERTA MÁXIMA',
+    sub: 'Ya tienes la app instalada en este móvil',
+    orden: 'ÁBRELA DESDE <b>EL ICONO</b>',
     boton: 'ENTENDIDO',
   },
 };
@@ -206,12 +212,13 @@ export function mostrarAlarma({ modo = 'notificaciones', accion, instrucciones =
     };
 
     function pantallaAlarma() {
-      if (modo === 'bloqueadas') {
+      // Solo pasos y «Entendido», sin la ventanita del navegador
+      if (modo === 'bloqueadas' || modo === 'abrir') {
         el.innerHTML = marco(`
           <div class="al__tit">${T.titulo}</div>
           <p class="al__sub">${T.sub}</p>
           <div class="al__orden">${T.orden}</div>
-          <p class="al__aviso">${T.aviso}</p>
+          ${T.aviso ? `<p class="al__aviso">${T.aviso}</p>` : ''}
           <div class="al__pasos-html">${instrucciones}</div>
           <button class="al__btn" type="button" data-ok>${T.boton}</button>`);
         el.querySelector('[data-ok]').onclick = () => fin('nada');

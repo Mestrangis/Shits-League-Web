@@ -201,7 +201,6 @@ button, [role="button"], .modal__backdrop, .tab, .result-row, .card-wrap, .voto-
 .icono--mvp { -webkit-mask-image: url(../img/iconos/mvp.svg); mask-image: url(../img/iconos/mvp.svg); }
 .icono--si { -webkit-mask-image: url(../img/iconos/si.svg); mask-image: url(../img/iconos/si.svg); }
 .icono--no { -webkit-mask-image: url(../img/iconos/no.svg); mask-image: url(../img/iconos/no.svg); }
-.icono--movil { -webkit-mask-image: url(../img/iconos/movil.svg); mask-image: url(../img/iconos/movil.svg); }
 .icono--campana-no { -webkit-mask-image: url(../img/iconos/campana-no.svg); mask-image: url(../img/iconos/campana-no.svg); }
 .icono--gol, .icono--asistencia, .icono--mvp { color: var(--verde); }
 
@@ -2008,7 +2007,6 @@ details.mvp-fila[open] > summary .mvp-fila__puntos::after { content: ' ▴'; }
 .instalar-aviso { display: flex; align-self: stretch; align-items: stretch; flex: none; gap: 4px; border: 1px solid var(--verde); border-radius: 12px; background: rgba(31,224,101,.1); }
 .instalar-aviso[hidden] { display: none; }
 .instalar-aviso__toque { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; padding: 9px 12px; color: #E8FBEF; text-align: left; cursor: pointer; }
-div.instalar-aviso__toque { cursor: default; }
 .instalar-aviso__toque .icono { font-size: 18px; color: var(--verde); }
 .instalar-aviso__textos { display: block; min-width: 0; }
 .instalar-aviso__toque b { display: block; font-size: 14px; font-weight: 700; color: var(--verde); }

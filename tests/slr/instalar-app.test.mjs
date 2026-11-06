@@ -39,7 +39,7 @@ test('qué le toca a cada móvil, según su estado real', () => {
   assert.deepEqual(ve({ instalada: false, permiso: 'default', suscrito: false }), { alarmas: ['instalar'], aviso: 'instalar', suscribir: false });
   assert.deepEqual(ve({ instalada: false, permiso: 'denied', suscrito: false }), { alarmas: ['instalar'], aviso: 'instalar', suscribir: false });
   assert.deepEqual(ve({ instalada: false, suscrito: false }), { alarmas: ['instalar'], aviso: 'instalar', suscribir: true });
-  assert.deepEqual(ve({ instalada: false, yaInstalada: true, permiso: 'default', suscrito: false }), { alarmas: [], aviso: 'abrir', suscribir: false }, 'ya la tiene: que la abra');
+  assert.deepEqual(ve({ instalada: false, yaInstalada: true, permiso: 'default', suscrito: false }), { alarmas: ['abrir'], aviso: null, suscribir: false }, 'ya la tiene: que la abra');
   // Dentro de la app
   assert.deepEqual(ve({ permiso: 'default', suscrito: false }), { alarmas: ['notificaciones'], aviso: 'notificaciones', suscribir: false });
   assert.deepEqual(ve({ permiso: 'denied', suscrito: false }), { alarmas: ['bloqueadas'], aviso: 'bloqueadas', suscribir: false });
@@ -52,6 +52,7 @@ test('qué le toca a cada móvil, según su estado real', () => {
 test('cómo se abre cada alarma', () => {
   const plan = (tipo, d) => plano(planAlarma(tipo, d));
   assert.deepEqual(plan('iphone', { plataforma: 'iphone', instalada: false }), { modo: 'iphone', accion: 'nada' });
+  assert.deepEqual(plan('abrir', { plataforma: 'android', instalada: false }), { modo: 'abrir', accion: 'nada', caso: 'abrir' });
   assert.deepEqual(plan('instalar', { plataforma: 'android', instalada: false }), { modo: 'instalar', accion: 'instalar', caso: 'instalar' });
   assert.deepEqual(plan('notificaciones', { plataforma: 'android', instalada: true }), { modo: 'notificaciones', accion: 'permiso', caso: 'bloqueadas-android' });
   assert.deepEqual(plan('bloqueadas', { plataforma: 'android', instalada: true }), { modo: 'bloqueadas', accion: 'nada', caso: 'bloqueadas-android' });

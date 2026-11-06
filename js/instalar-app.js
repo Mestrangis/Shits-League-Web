@@ -26,8 +26,8 @@ function detectarDispositivo({ ua = '', plataforma = '', toques = 0 } = {}) {
 }
 
 // Qué le toca a este móvil, en cualquier momento:
-//   alarmas: las que salen solas al abrir, por orden ('iphone', 'instalar', 'notificaciones', 'bloqueadas')
-//   aviso: lo fijo de arriba ('iphone', 'instalar', 'notificaciones', 'bloqueadas', 'abrir' o null)
+//   alarmas: las que salen solas al abrir, por orden ('iphone', 'instalar', 'abrir', 'notificaciones', 'bloqueadas')
+//   aviso: lo fijo de arriba ('iphone', 'instalar', 'notificaciones', 'bloqueadas' o null)
 //   suscribir: tiene el permiso pero OneSignal no lo tiene suscrito (suscrito: null es que aún no se sabe)
 function situacionApp({ movil, plataforma, instalada, permiso, suscrito, yaInstalada }) {
   if (!movil) return { alarmas: [], aviso: null, suscribir: false };
@@ -35,7 +35,7 @@ function situacionApp({ movil, plataforma, instalada, permiso, suscrito, yaInsta
   if (plataforma === 'iphone' && !instalada) return { alarmas: ['iphone'], aviso: 'iphone', suscribir: false };
   const suscribir = permiso === 'granted' && suscrito === false;
   // Ya la tiene: que la abra. El permiso del navegador y el de la app son el mismo
-  if (!instalada && yaInstalada) return { alarmas: [], aviso: 'abrir', suscribir };
+  if (!instalada && yaInstalada) return { alarmas: ['abrir'], aviso: null, suscribir };
   // En el navegador solo se pide instalar: las notificaciones se piden dentro de la app
   if (!instalada) return { alarmas: ['instalar'], aviso: 'instalar', suscribir };
   if (permiso === 'default') return { alarmas: ['notificaciones'], aviso: 'notificaciones', suscribir };
@@ -47,6 +47,7 @@ function situacionApp({ movil, plataforma, instalada, permiso, suscrito, yaInsta
 function planAlarma(tipo, { plataforma }) {
   const bloqueadas = plataforma === 'iphone' ? 'bloqueadas-iphone' : 'bloqueadas-android';
   if (tipo === 'iphone') return { modo: 'iphone', accion: 'nada' };
+  if (tipo === 'abrir') return { modo: 'abrir', accion: 'nada', caso: 'abrir' };
   // Sin el evento del navegador (puede llegar mientras está abierta), lanzarInstalar enseña los pasos a mano
   if (tipo === 'instalar') return { modo: 'instalar', accion: 'instalar', caso: 'instalar' };
   if (tipo === 'notificaciones') return { modo: 'notificaciones', accion: 'permiso', caso: bloqueadas };
@@ -110,6 +111,8 @@ const pasosAlarma = lista => `<ol class="al__pasos">${lista.map((p, i) => `<li><
 const INSTRUCCIONES_APP = {
   instalar: pasosAlarma(['Toca el menú <b>⋮</b> del navegador, arriba a la derecha', 'Toca <b>Instalar app</b> o <b>Añadir a pantalla de inicio</b>', 'Abre la app desde el <b>icono nuevo</b>']),
   'bloqueadas-android': pasosAlarma(['Abre los <b>Ajustes</b> del móvil', 'Entra en <b>Aplicaciones</b> y luego en <b>Shits League</b>', 'Toca <b>Notificaciones</b> y <b>actívalas</b>']),
+  // Abrirla desde la web no es fiable (intents, enlaces): se explica cómo
+  abrir: pasosAlarma(['Abre el icono de <b>Shits League</b> en tu pantalla de inicio', 'O en Chrome: menú <b>⋮</b> → <b>Abrir en Shits League</b>']),
   'bloqueadas-iphone': pasosAlarma(['Abre los <b>Ajustes</b> del iPhone', 'Entra en <b>Notificaciones</b> y luego en <b>Shits League</b>', 'Activa <b>Permitir notificaciones</b>']),
 };
 
@@ -181,7 +184,6 @@ const AVISOS_APP = {
   instalar: INSTALA_LA_APP,
   notificaciones: { titulo: 'Activa las notificaciones', texto: 'Para enterarte de los partidos y del MVP' },
   bloqueadas: { titulo: 'Tienes las notificaciones bloqueadas', icono: 'campana-no', clase: ' instalar-aviso--mal' },
-  abrir: { titulo: 'Ya tienes la app: ábrela desde el icono', icono: 'movil', soloLeer: true },
 };
 
 function pintarAvisoApp() {
@@ -196,11 +198,8 @@ function pintarAvisoApp() {
   }
   const t = AVISOS_APP[aviso];
   const dentro = `${t.icono ? icono(t.icono) : ''}<span class="instalar-aviso__textos"><b>${t.titulo}</b>${t.texto ? `<span>${t.texto}</span>` : ''}</span>`;
-  if (t.soloLeer) el.innerHTML = `<div class="instalar-aviso__toque">${dentro}</div>`;
-  else {
-    cargarAlarma().catch(() => { alarmaModulo = null; });
-    el.innerHTML = `<button class="instalar-aviso__toque" type="button" data-app-paso="${aviso}">${dentro}</button>`;
-  }
+  cargarAlarma().catch(() => { alarmaModulo = null; });
+  el.innerHTML = `<button class="instalar-aviso__toque" type="button" data-app-paso="${aviso}">${dentro}</button>`;
   el.hidden = false;
 }
 
@@ -216,7 +215,7 @@ function pintarPerfilApp() {
     caja.innerHTML = `
       <p class="perfil-app__linea">App: <b>${e.instalada || e.yaInstalada ? 'instalada' : 'sin instalar'}</b></p>
       <p class="perfil-app__linea">Notificaciones: <b class="perfil-app__${notif}">${notif}</b></p>
-      ${aviso && !AVISOS_APP[aviso].soloLeer ? `<button class="dialog-box__btn" type="button" data-app-paso="${aviso}">${AVISOS_APP[aviso].titulo.toUpperCase()}</button>` : ''}`;
+      ${aviso ? `<button class="dialog-box__btn" type="button" data-app-paso="${aviso}">${AVISOS_APP[aviso].titulo.toUpperCase()}</button>` : ''}`;
   }
   pintarPerfilAdmin();
 }
