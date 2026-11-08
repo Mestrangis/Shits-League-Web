@@ -2471,6 +2471,10 @@ Con `rendimiento-liga.mjs` (412×915, CPU ×4, «4G lenta», 3 pasadas), la vers
 - **`herramientas/precarga.mjs` incluye `ajustes.js`:** así entra en `version.json`, y cambiarlo es una versión nueva que llega sola a los móviles. No hace falta subir `CACHE_NAME`.
 - **Las temporadas nuevas también van en `HOJAS` de `apps-script/votos.gs`:** el script no puede leer `ajustes.js`.
 
+## Shits League: el Apps Script se publica solo
+
+- **`.github/workflows/apps-script.yml`:** un push a `main` que toque `apps-script/` hace `clasp push` al proyecto de la 26/27 y `clasp deploy -i` en la implementación que usa la app, sin cambiar la URL. Si falla, sale en rojo en GitHub. El token va solo en el secreto `CLASPRC_JSON`, y tiene permisos sobre toda la cuenta de Apps Script. El proyecto antiguo de la 24/26 queda fuera. Google limita a unas 200 versiones por proyecto.
+
 ## Shits League: la barra de Inicio sigue al scroll con CSS
 
 - **No es `position: sticky`:** la barra es una sola para todas las páginas y flota sobre el carril. Pegada dentro de Inicio, se iría con la página al deslizar de lado, y las demás páginas necesitarían otra.
