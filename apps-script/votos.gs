@@ -45,11 +45,15 @@ function doPost(e) {
     if (body.action === 'votar') return json(votar(body));
     if (body.action === 'votarMVP') return json(votarMVP(body));
     if (body.action === 'estadoDispositivo') return json(estadoDispositivo(body));
-    if (['listaDispositivos', 'notificacionPrueba', 'simulacroAvisos'].includes(body.action)) {
+    if (body.action === 'votarAgujero') return json(votarAgujero(body));
+    if (body.action === 'agujeroEstado') return json(agujeroEstado(body));
+    if (['listaDispositivos', 'notificacionPrueba', 'simulacroAvisos', 'agujeroRecuento', 'avisarAgujero'].includes(body.action)) {
       const admin = adminDe(body);
       if (!admin) return json({ ok: false, error: 'Solo para el admin' });
       if (body.action === 'listaDispositivos') return json(listaDispositivos());
       if (body.action === 'notificacionPrueba') return json(notificacionPrueba(admin));
+      if (body.action === 'agujeroRecuento') return json({ ok: true, ...recuentoAgujero() });
+      if (body.action === 'avisarAgujero') return json(avisarAgujero());
       return json(ejecutarAvisos(Date.now(), true));
     }
     return json({ ok: false, error: 'Acción desconocida' });
@@ -263,14 +267,15 @@ function estadoDispositivo(body) {
   }
 }
 
-// { nombre del admin } si el código es de un admin; null si no
-function adminDe(body) {
+// La huella del código, como en el login; '' sin código
+function huellaDe(body) {
   const texto = String(body.codigo || '').trim().toLowerCase();
-  if (!texto) return null;
+  if (!texto) return '';
   const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, texto, Utilities.Charset.UTF_8);
-  const huella = bytes.map(b => ((b + 256) % 256).toString(16).padStart(2, '0')).join('');
-  return HUELLAS_ADMIN[huella] || null;
+  return bytes.map(b => ((b + 256) % 256).toString(16).padStart(2, '0')).join('');
 }
+// { nombre del admin } si el código es de un admin; null si no
+const adminDe = body => HUELLAS_ADMIN[huellaDe(body)] || null;
 
 // Cada usuario: instalada en algún móvil, las notificaciones de su mejor móvil y la última vez
 function listaDispositivos() {
@@ -342,6 +347,90 @@ function notificacionPrueba(admin) {
   const r = enviarNotificacion({ a: [admin], cuerpo: 'Notificación de prueba: te llegan bien.', url: '#inicio' });
   if (!r.ok) return { ok: false, error: r.error };
   return r.id ? { ok: true, mensaje: 'Enviada' } : { ok: false, error: 'OneSignal no conoce ningún móvil tuyo suscrito' };
+}
+
+/* ── La votación del agujero (temporada «???») ───────────────────────────────────────── */
+// La cuenta sale del código, no de un nombre que venga en el mensaje: así es un voto por cuenta y
+// nadie lee el de otro. Los votos, en las propiedades del script y no en una pestaña: las hojas se
+// pueden leer con la clave pública, y nadie debe ver el recuento hasta el cierre.
+const HUELLAS_JUGADORES = {
+  '52e617dd6d2f75cb3bd76ca2eced4c582d83b6198ceb13a2ba6f6239164e51d2': 'Marcos',
+  '6ad5b293d45a59fb605bb5555c2f1abb80463cacd7046dee9fbd161fa0c3eb9e': 'Alberto',
+  'a662bf96c60de6f68c3772bf36a5d922b2ff6d039d776fe1abafc65a8327785b': 'Puebla',
+  '0d0b9410216b3406881bddffcefd6babb1f96aa19719769e8ae63eed86e24444': 'Carlos',
+  '23c069f629c80803552eb3e0f10a5481b1a41d09ddb7199d010accd1905c4bca': 'David',
+  '26c0b5509c547b71161a295bbd759fcb6b2ec0fb776af9b2600943ceb163c82c': 'Enzo',
+  '43745fe52a3546971a01544920739623969434c9f9beaca11e8100d5ffd37f4c': 'Fernando',
+  '173cd8246dfac4269ee0e673f26756a03501ee2ccf7400bf7479f491c31b3111': 'Gonzalo',
+  '2b72d3756802cffd53fad1e07da805e541294bf4d03f35bea19ed1d4ac10d3d6': 'Hugo',
+  '38579e0cb7462626ac97dce05058c92b1533d77e0f28ae984d52917f4fb7b8e0': 'Nacho',
+  'a3d6d6994972d54c31de9c8e9a75b7412fbabd884ff93bfa17da4025f75c9644': 'Javier',
+  '45d09ae39c7cadf013dc1e6b8ec35cc61cae18c855110fbc04e724af62cdce8f': 'Jorge',
+  '85eb7d8e2ed8c2bef9c0fdd1834d8432ca86abe82f03bd170ed557a3503d4089': 'Luis',
+  '373286b822b86542cdb57ef5d2920e6988e6846f38bf733ac978ae4a730252f7': 'Mateo',
+  'e76a092c92cc697a7f9b0783f6f00f8ec845f1d284f72d6f28da44ad02102013': 'Nicolás',
+  '88180852b6a0cfcd3094d1794f63892b4d0918defac49b3f3f6e8ffb51d0dbd2': 'Pablo',
+  '7b3762adf5389fc70848e60c00208af6768bd03877bc199549aec5254737d753': 'Pelayo',
+  '327bef5f4505da8ef5b97fed057a33a6c4376efc9b07daee6086cbe69f202af7': 'Víctor',
+};
+const PREFIJO_VOTO_AGUJERO = 'agv:';
+const AVISO_AGUJERO = 'agujero:votacion';
+const TEXTO_AVISO_AGUJERO = 'Algo se mueve en el vacío…';
+
+// { fase, pregunta } del ajuste de Supabase; null si no se ha podido saber
+function ajusteAgujero() {
+  try {
+    const r = UrlFetchApp.fetch(`${SUPABASE_URL}/rest/v1/ajustes?clave=eq.agujero&select=valor`, {
+      headers: { apikey: SUPABASE_KEY }, muteHttpExceptions: true,
+    });
+    if (r.getResponseCode() !== 200) return null;
+    return JSON.parse(r.getContentText())[0]?.valor || null;
+  } catch (err) {
+    return null;
+  }
+}
+
+function recuentoAgujero() {
+  const todas = PropertiesService.getScriptProperties().getProperties();
+  const votos = Object.keys(todas).filter(k => k.startsWith(PREFIJO_VOTO_AGUJERO)).map(k => todas[k]);
+  return { si: votos.filter(v => v === 'si').length, no: votos.filter(v => v === 'no').length };
+}
+
+function votarAgujero(body) {
+  const jugador = HUELLAS_JUGADORES[huellaDe(body)];
+  if (!jugador) return { ok: false, error: 'Inicia sesión para votar' };
+  if (typeof body.voto !== 'boolean') return { ok: false, error: 'Voto inválido' };
+  if (ajusteAgujero()?.fase !== 'votacion') return { ok: false, error: 'La votación no está abierta' };
+  PropertiesService.getScriptProperties().setProperty(PREFIJO_VOTO_AGUJERO + jugador, body.voto ? 'si' : 'no');
+  return { ok: true };
+}
+
+// Tu voto, y el recuento solo con la votación cerrada
+function agujeroEstado(body) {
+  const jugador = HUELLAS_JUGADORES[huellaDe(body)];
+  const guardado = jugador ? PropertiesService.getScriptProperties().getProperty(PREFIJO_VOTO_AGUJERO + jugador) : null;
+  return {
+    ok: true,
+    voto: guardado === null ? null : guardado === 'si',
+    resultado: ajusteAgujero()?.fase === 'cerrada' ? recuentoAgujero() : null,
+  };
+}
+
+// Al abrir la votación, desde el panel. Si no se puede, lo envía la siguiente pasada (calcularAvisos)
+function avisarAgujero() {
+  if (ajusteAgujero()?.fase !== 'votacion') return { ok: true, enviado: false };
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const props = PropertiesService.getScriptProperties();
+    if (props.getProperty(PREFIJO_AVISO + AVISO_AGUJERO)) return { ok: true, enviado: false };
+    const r = enviarNotificacion({ a: 'todos', url: '#agujero', cuerpo: TEXTO_AVISO_AGUJERO });
+    if (!r.ok) return { ok: false, error: r.error };
+    props.setProperty(PREFIJO_AVISO + AVISO_AGUJERO, String(Date.now()));
+    return { ok: true, enviado: true };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /* ── Qué toca avisar ─────────────────────────────────────────────────────────────────── */
@@ -453,6 +542,7 @@ function leerDatosAvisos(ahora) {
     votaciones: filas('Votaciones').map(x => ({ ...x, fecha: normalizarFecha(x.fecha) })).filter(x => x.fecha),
     mvps: filas('MVPs'),
     eventos: leerCalendario(ahora),
+    agujero: ajusteAgujero(),
   };
 }
 
@@ -531,6 +621,9 @@ function calcularAvisos(ahora, datos, enviados) {
         titulo: 'Partido cancelado', cuerpo: textoPartido(cuando, relojMadrid(cuando).hora === '00:00', '') });
     });
   }
+
+  /* El agujero */
+  if (datos.agujero?.fase === 'votacion') nuevo(AVISO_AGUJERO, { a: 'todos', url: '#agujero', cuerpo: TEXTO_AVISO_AGUJERO });
 
   /* Votaciones de asistencia */
   votaciones.filter(v => v.fecha >= hoy && v.id).forEach(v => {

@@ -2471,6 +2471,12 @@ Con `rendimiento-liga.mjs` (412×915, CPU ×4, «4G lenta», 3 pasadas), la vers
 - **`herramientas/precarga.mjs` incluye `ajustes.js`:** así entra en `version.json`, y cambiarlo es una versión nueva que llega sola a los móviles. No hace falta subir `CACHE_NAME`.
 - **Las temporadas nuevas también van en `HOJAS` de `apps-script/votos.gs`:** el script no puede leer `ajustes.js`.
 
+## Shits League: el agujero de la temporada «???»
+
+- **Es una capa encima de la app, no una temporada que se carga** (`js/agujero-app.js`): quien no es beta sigue en su temporada debajo, y al salir todo sigue igual. Solo existe mientras la 26/27 es la próxima: tras el pistoletazo, desaparece. Se entra por `#agujero`, por el botón atrás y las notificaciones; un selector discreto arriba sirve para volver, porque en iPhone instalada no hay botón atrás.
+- **Los votos van por el Apps Script, como los del MVP, pero en sus propiedades (`agv:<nombre>`) y no en una pestaña:** las hojas se pueden leer con la clave pública, y nadie debe ver el recuento hasta el cierre. La cuenta sale del código (`HUELLAS_JUGADORES`), no de un nombre que venga en el mensaje: un voto por cuenta, y nadie lee el de otro.
+- **La notificación se envía una sola vez** (`av:agujero:votacion`): al abrir la votación desde el panel o, si falla, en la siguiente pasada de los avisos. Si se vuelve a abrir, no se repite, y los votos siguen ahí.
+
 ## Shits League: el Apps Script se publica solo
 
 - **`.github/workflows/apps-script.yml`:** un push a `main` que toque `apps-script/` hace `clasp push` al proyecto de la 26/27 y `clasp deploy -i` en la implementación que usa la app, sin cambiar la URL. Si falla, sale en rojo en GitHub. El token va solo en el secreto `CLASPRC_JSON`, y tiene permisos sobre toda la cuenta de Apps Script. El proyecto antiguo de la 24/26 queda fuera. Google limita a unas 200 versiones por proyecto.

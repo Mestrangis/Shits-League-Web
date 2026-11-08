@@ -230,6 +230,8 @@ function pintarPerfilAdmin() {
   if (!caja) return;
   caja.hidden = !esAdminLiga();
   if (caja.hidden) return;
+  // Sin borrar lo que se está escribiendo
+  if (caja.contains(document.activeElement) && document.activeElement.matches('input, select')) return;
   caja.innerHTML = `
     <h3 class="perfil-admin__titulo">Admin</h3>
     <button class="dialog-box__btn dialog-box__btn--ghost" type="button" data-admin-accion="lista">QUIÉN LO TIENE ACTIVADO</button>
@@ -239,8 +241,60 @@ function pintarPerfilAdmin() {
     <button class="dialog-box__btn dialog-box__btn--ghost" type="button" data-admin-accion="simulacro">SIMULACRO DE AVISOS</button>
     ${temporadaProxima() ? `<button class="dialog-box__btn" type="button" data-admin-temporada="empezar">EMPEZAR LA ${nombreTemporadaAdmin(temporadaProxima()).toUpperCase()}</button>` : ''}
     ${temporadaAnteriorAlCurso() && !temporadaAnteriorAlCurso().imagenes ? `<button class="dialog-box__btn dialog-box__btn--ghost" type="button" data-admin-temporada="deshacer">DESHACER: VOLVER A LA ${nombreTemporadaAdmin(temporadaAnteriorAlCurso()).toUpperCase()}</button>` : ''}
+    ${temporadaAgujero() ? htmlAgujeroAdmin() : ''}
     <div class="perfil-admin__salida" data-admin-salida></div>`;
   pintarDiagnostico();
+  leerAgujeroAdmin();
+}
+
+/* ── Las fases de la temporada «???» ─────────────────────────────────────── */
+function htmlAgujeroAdmin() {
+  const { fase, pregunta } = agujeroAjuste;
+  const opcion = (valor, texto) => `<option value="${valor}"${valor === fase ? ' selected' : ''}>${texto}</option>`;
+  return `<h4 class="perfil-admin__subtitulo perfil-admin__subtitulo--aparte">Temporada ???</h4>
+    <select class="dialog-box__input" data-admin-agujero-fase aria-label="Fase">
+      ${opcion('agujero', 'Solo el agujero')}${opcion('votacion', 'Votación abierta')}${opcion('cerrada', 'Votación cerrada: resultado')}
+    </select>
+    <input class="dialog-box__input" type="text" maxlength="120" data-admin-agujero-pregunta value="${escaparApp(pregunta)}" aria-label="Pregunta">
+    <button class="dialog-box__btn" type="button" data-admin-agujero-guardar>GUARDAR LA FASE</button>
+    <button class="dialog-box__btn dialog-box__btn--ghost" type="button" data-admin-accion="recuento">VER EL RECUENTO</button>`;
+}
+
+// La guardada se pinta ya; la del servidor, una vez, al abrir el panel por primera vez
+let agujeroAdminLeido = false;
+async function leerAgujeroAdmin() {
+  if (agujeroAdminLeido || !temporadaAgujero()) return;
+  agujeroAdminLeido = true;
+  if (await pedirAjusteAgujero()) pintarPerfilAdmin();
+}
+
+// Quien comprueba que eres admin es el servidor, con tu sesión de Rush, como el pistoletazo
+async function guardarAgujeroAdmin(salida) {
+  const fase = document.querySelector('[data-admin-agujero-fase]').value;
+  const pregunta = document.querySelector('[data-admin-agujero-pregunta]').value.trim();
+  salida.textContent = 'Un momento…';
+  try {
+    if (await rushReautenticar() !== 'ok') throw new Error('No se ha podido abrir tu sesión de Rush. Vuelve a entrar con tu código.');
+    const token = rushToken();
+    const yo = await rushRpc('slr_yo', { token });
+    const liga = (RUSH_ES_LOCAL && yo.ligas?.find(l => l.es_prueba)) || yo.liga_principal;
+    if (!liga) throw new Error('No hay liga');
+    await rushRpc('slr_admin_agujero', { token, liga_id: liga.id, fase, pregunta });
+    agujeroAjuste = { ...agujeroAjuste, fase, pregunta };
+    guardarAgujero();
+    actualizarAgujero();
+    salida.textContent = 'Fase guardada.';
+    if (fase !== 'votacion') return;
+    // La envía el script, una sola vez. Si ahora no puede, la siguiente pasada de los avisos
+    try {
+      const r = await postScript({ action: 'avisarAgujero', codigo: getSessionCode() });
+      salida.textContent = r.enviado ? 'Fase guardada. Notificación enviada a todos.' : 'Fase guardada. La notificación ya se había enviado.';
+    } catch {
+      salida.textContent = 'Fase guardada. La notificación saldrá con la siguiente pasada de los avisos.';
+    }
+  } catch (e) {
+    salida.textContent = e.message;
+  }
 }
 
 // Las notificaciones de ESTE dispositivo
@@ -343,6 +397,9 @@ async function accionAdmin(accion, salida) {
     const codigo = getSessionCode();
     if (accion === 'lista') {
       salida.innerHTML = htmlListaAdmin((await postScript({ action: 'listaDispositivos', codigo })).usuarios);
+    } else if (accion === 'recuento') {
+      const r = await postScript({ action: 'agujeroRecuento', codigo });
+      salida.textContent = `SÍ ${r.si} – NO ${r.no}`;
     } else if (accion === 'prueba') {
       salida.textContent = (await postScript({ action: 'notificacionPrueba', codigo })).mensaje;
     } else {
@@ -405,6 +462,7 @@ function initInstalarApp() {
     const paso = e.target.closest('[data-app-paso]');
     if (paso) { abrirAlarma(paso.dataset.appPaso); return; }
     const salidaAdmin = () => document.querySelector('[data-admin-salida]');
+    if (e.target.closest('[data-admin-agujero-guardar]')) { guardarAgujeroAdmin(salidaAdmin()); return; }
     const temporada = e.target.closest('[data-admin-temporada]');
     if (temporada) { pedirConfirmarTemporada(temporada.dataset.adminTemporada, salidaAdmin()); return; }
     const si = e.target.closest('[data-admin-si]');

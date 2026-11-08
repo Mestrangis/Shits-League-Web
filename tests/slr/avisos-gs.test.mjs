@@ -293,7 +293,10 @@ test('script y web dicen lo mismo: calendario, usuarios y admins', () => {
   assert.ok(gs.includes(`CALENDARIO_ID = '${id}'`));
   const nombres = [...ajustes.matchAll(/\{ nombre: '([^']+)',\s+huella: '([0-9a-f]{64})'/g)].map(m => ({ nombre: m[1], huella: m[2] }));
   assert.equal(nombres.length, 18);
-  for (const { nombre } of nombres) assert.ok(gs.includes(`'${nombre}'`), nombre);
+  for (const { nombre, huella } of nombres) {
+    assert.ok(gs.includes(`'${nombre}'`), nombre);
+    assert.ok(gs.includes(`'${huella}': '${nombre}'`), `${nombre} en HUELLAS_JUGADORES`);
+  }
   const admins = ajustes.match(/admins: \[([^\]]*)\]/)[1].match(/'[^']+'/g).map(s => s.slice(1, -1));
   for (const a of admins) {
     const { huella } = nombres.find(n => n.nombre === a);

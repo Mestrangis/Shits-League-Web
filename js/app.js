@@ -368,7 +368,7 @@ function initPullToRefresh() {
       && enLoAlto()                               // ya en lo alto de la página
       && !document.body.classList.contains('archivo')
       && !document.querySelector('.modal.open')
-      && !e.target.closest('.slr');               // el modo Rush no recarga la app
+      && !e.target.closest('.slr, .agujero-capa');   // ni el modo Rush ni el agujero recargan la app
     if (!activo) return;
     x0 = e.touches[0].clientX;
     y0 = e.touches[0].clientY;
@@ -625,6 +625,8 @@ function initSeasonSelector() {
 
 function elegirTemporada(id) {
   const t = temporadaPorId(id);
+  // También desde dentro de la temporada: así vuelven al agujero los beta
+  if (esAgujero(t)) { abrirAgujero(); return; }
   if (puedeAbrirTemporada(t)) { switchSeason(id); return; }
   // Sin sesión: hace falta el código para saber si es beta
   if (!getSessionPlayer()) { temporadaTrasLogin = id; openSessionModal(); }
@@ -804,6 +806,7 @@ async function init() {
   actualizarRefrescoVotaciones();
   initPush();
   initInstalarApp();
+  initAgujero();
   // Recargada para aplicar una versión nueva al pulsar JUGAR: se entra en Rush sola
   if (typeof rushTrasRecarga === 'function') rushTrasRecarga();
 }
@@ -822,6 +825,7 @@ async function onSessionChange() {
   pintarSelector();
   if (typeof rushVerificarAcceso === 'function') await rushVerificarAcceso();
   revisarTemporadaVista();
+  actualizarAgujero();   // con sesión ya se puede votar; y si es beta, entrar
   if (!pedida) return;
   if (puedeAbrirTemporada(temporadaPorId(pedida))) switchSeason(pedida);
   else if (getSessionPlayer()) avisoApp('Esa temporada aún no está disponible.');

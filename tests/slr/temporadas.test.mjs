@@ -52,8 +52,9 @@ test('una temporada guardada que no existe no vale', () => {
 test('quién ve la próxima', () => {
   assert.equal(selector(cargar()), '26-27,24-26,23-24', 'sin sesión sale, y al elegirla se pide el código');
   assert.equal(cargar().ev(`puedeAbrirTemporada(temporadaPorId('26-27'))`), false, 'pero no se abre');
-  assert.equal(selector(cargar({ sesion: 'Hugo', acceso: false })), '24-26,23-24', 'sin beta no existe');
-  assert.equal(selector(cargar({ sesion: 'Hugo', acceso: null })), '24-26,23-24', 'sin saberlo aún, tampoco');
+  assert.equal(selector(cargar({ sesion: 'Hugo', acceso: false })), '26-27,24-26,23-24', 'sin beta sale, con el agujero');
+  assert.equal(cargar({ sesion: 'Hugo', acceso: false }).ev(`puedeAbrirTemporada(temporadaPorId('26-27'))`), false, 'pero no se abre');
+  assert.equal(cargar({ enCurso: '26-27' }).ev('temporadaAgujero()'), null, 'tras el pistoletazo ya no hay agujero');
   assert.equal(selector(cargar({ sesion: 'Marcos', acceso: true })), '26-27,24-26,23-24');
   assert.equal(cargar({ sesion: 'Marcos', acceso: true }).ev(`temporadaConRush().id`), '26-27');
   assert.equal(cargar({ sesion: 'Hugo', acceso: false }).ev(`temporadaConRush()`), null);

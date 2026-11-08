@@ -6,6 +6,7 @@
    temporada» del panel de admin, en el perfil):
      · la en curso: la de por defecto, con todas las pestañas;
      · las más nuevas: próximas, igual que una en curso pero solo para los usuarios beta;
+       la «???» sale para todos en el selector, con el agujero (js/agujero-app.js);
      · las más viejas: archivo, solo el historial, sin votar.
 ═══════════════════════════════════════════════ */
 
@@ -56,12 +57,17 @@ function modoTemporada(t) {
 const temporadaProxima = () => TEMPORADAS[TEMPORADAS.findIndex(t => t.id === temporadaEnCursoId) - 1] ?? null;
 const temporadaAnteriorAlCurso = () => TEMPORADAS[TEMPORADAS.findIndex(t => t.id === temporadaEnCursoId) + 1] ?? null;
 
+// La temporada «???» mientras no haya empezado: el selector abre el agujero, sea quien sea
+const TEMPORADA_AGUJERO = '26-27';
+const esAgujero = t => t.id === TEMPORADA_AGUJERO && modoTemporada(t) === 'proxima';
+const temporadaAgujero = () => TEMPORADAS.find(esAgujero) ?? null;
+
 // ¿Esta sesión puede abrir la temporada? Las próximas, solo los usuarios beta
 function puedeAbrirTemporada(t) {
   return modoTemporada(t) !== 'proxima' || (!!getSessionPlayer() && rushAccesoGuardado() === true);
 }
 // ¿Sale en el selector? Sin sesión aún no se sabe si es beta: sale, y al elegirla se pide el código
-const temporadaEnSelector = t => puedeAbrirTemporada(t) || (modoTemporada(t) === 'proxima' && !getSessionPlayer());
+const temporadaEnSelector = t => esAgujero(t) || puedeAbrirTemporada(t) || (modoTemporada(t) === 'proxima' && !getSessionPlayer());
 
 // La temporada con Rush que puede abrir esta sesión
 const temporadaConRush = () => TEMPORADAS.find(t => t.rush && puedeAbrirTemporada(t)) ?? null;
