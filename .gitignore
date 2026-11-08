@@ -10,3 +10,6 @@ tests/slr/banco/node_modules/
 
 # La etiqueta de versión: la genera el despliegue (herramientas/precarga.mjs)
 version.json
+
+# El token de clasp: solo como secreto de GitHub (CLASPRC_JSON)
+.clasprc.json

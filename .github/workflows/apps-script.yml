@@ -1,0 +1,74 @@
+# Publica apps-script/ en el proyecto de Apps Script de la 26/27, sin cambiar la URL de la web app.
+# Credenciales: el secreto CLASPRC_JSON, nunca en el repo. Solo corre con un push a main o a mano:
+# los pull requests no lo lanzan, ni los de forks.
+name: Publicar Apps Script
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "apps-script/**"
+      - ".github/workflows/apps-script.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Una publicación detrás de otra, y sin cortar la que está en marcha
+concurrency:
+  group: "apps-script"
+  cancel-in-progress: false
+
+env:
+  # La implementación que usa la app (js/sheets.js): redesplegarla no cambia la URL
+  DEPLOYMENT_ID: AKfycbzt5vjAG01F8_rYXtWqpXg6pfkzWSzTeC8hKhAIX2JHEHHzXold1nghD1ZtHJBV0j6dzw
+  CLASP: npx --yes @google/clasp@3.4.1
+
+jobs:
+  publicar:
+    if: github.repository == 'Mestrangis/Shits-League-Web'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: apps-script
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Comprobar la sintaxis antes de publicar
+        run: |
+          cp votos.gs "$RUNNER_TEMP/votos.js"
+          node --check "$RUNNER_TEMP/votos.js"
+
+      - name: Poner las credenciales de clasp
+        env:
+          CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
+        run: |
+          if [ -z "$CLASPRC_JSON" ]; then echo "::error::Falta el secreto CLASPRC_JSON"; exit 1; fi
+          umask 077
+          printf '%s' "$CLASPRC_JSON" > "$HOME/.clasprc.json"
+
+      - name: Subir el código (clasp push)
+        run: $CLASP push --force
+
+      - name: Crear una versión nueva en la misma implementación (clasp deploy)
+        run: $CLASP deploy -i "$DEPLOYMENT_ID" -d "${GITHUB_SHA::7}"
+
+      # Sin secreto, el script responde «Unauthorized» y no hace nada más. Si no lo dice, la web app no está bien
+      - name: Comprobar que la web app responde
+        run: |
+          respuesta=$(curl -sSL --max-time 60 -H 'Content-Type: text/plain' -d '{}' "https://script.google.com/macros/s/$DEPLOYMENT_ID/exec")
+          if ! printf '%s' "$respuesta" | grep -q 'Unauthorized'; then
+            echo "::error::La web app no responde como debe tras publicar"
+            printf '%s\n' "$respuesta" | head -c 500
+            exit 1
+          fi
+
+      - name: Quitar las credenciales
+        if: always()
+        run: rm -f "$HOME/.clasprc.json"
