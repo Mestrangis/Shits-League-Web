@@ -20,9 +20,17 @@
 .ag-botones button:not(.elegido){opacity:.92}
 .ag-nota{margin-top:14px;font:400 12px/1.4 Sora,sans-serif;color:rgba(242,245,243,.55)}
 .ag-beta{position:absolute;bottom:calc(env(safe-area-inset-bottom,0px) + 70px);background:rgba(18,22,20,.8);color:#1FE065;border:1px solid rgba(31,224,101,.4);border-radius:99px;padding:9px 16px;font:700 12px Sora,sans-serif;letter-spacing:.04em;cursor:pointer}
+/* El resultado: el recuento y debajo los nombres de cada lado. Cabe con 18, y si no, se desplaza */
+.ag-resultado{top:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 62px);overflow-y:auto;pointer-events:auto}
+.ag-resultado.con-beta{bottom:calc(env(safe-area-inset-bottom,0px) + 112px)}
+.ag-lados{display:flex;gap:14px;width:100%;max-width:360px;margin-top:12px;text-align:left}
+.ag-lado{flex:1;min-width:0}
+.ag-lado b{display:block;font:400 22px/1 Anton,sans-serif;letter-spacing:.06em}
+.ag-lado span{display:block;margin-top:5px;font:400 12px/1.45 Sora,sans-serif;color:rgba(242,245,243,.75);overflow-wrap:anywhere}
+.ag-lado-si b{color:#1FE065}
 @media (prefers-reduced-motion:reduce){.ag-marca,.ag-pista{animation:none}}
 
 /* La integración en la app: por encima de la cabecera y por debajo de los modales (500) */
 .agujero-capa{position:fixed;inset:0;z-index:450}
-.agujero-selector{position:absolute;z-index:31;top:calc(env(safe-area-inset-top,0px) + 22px);right:16px;max-width:42vw;padding:4px 6px;border:0;border-radius:8px;background:transparent;color:rgba(242,245,243,.5);font:400 12px Sora,sans-serif}
-.agujero-selector option{background:#0A0C0B;color:#F2F5F3}
+.agujero-volver{position:absolute;z-index:31;top:calc(env(safe-area-inset-top,0px) + 12px);left:8px;width:44px;height:44px;display:grid;place-items:center;padding:0;border:0;background:none;color:rgba(242,245,243,.55);cursor:pointer;-webkit-tap-highlight-color:transparent}
+.agujero-volver .icono{font-size:20px;-webkit-mask-image:url(../img/iconos/volver.svg);mask-image:url(../img/iconos/volver.svg)}

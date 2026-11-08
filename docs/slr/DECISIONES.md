@@ -2473,8 +2473,8 @@ Con `rendimiento-liga.mjs` (412×915, CPU ×4, «4G lenta», 3 pasadas), la vers
 
 ## Shits League: el agujero de la temporada «???»
 
-- **Es una capa encima de la app, no una temporada que se carga** (`js/agujero-app.js`): quien no es beta sigue en su temporada debajo, y al salir todo sigue igual. Solo existe mientras la 26/27 es la próxima: tras el pistoletazo, desaparece. Se entra por `#agujero`, por el botón atrás y las notificaciones; un selector discreto arriba sirve para volver, porque en iPhone instalada no hay botón atrás.
-- **Los votos van por el Apps Script, como los del MVP, pero en sus propiedades (`agv:<nombre>`) y no en una pestaña:** las hojas se pueden leer con la clave pública, y nadie debe ver el recuento hasta el cierre. La cuenta sale del código (`HUELLAS_JUGADORES`), no de un nombre que venga en el mensaje: un voto por cuenta, y nadie lee el de otro.
+- **Es una capa encima de la app, no una temporada que se carga** (`js/agujero-app.js`): quien no es beta sigue en su temporada debajo, y al salir todo sigue igual. Solo existe mientras la 26/27 es la próxima: tras el pistoletazo, desaparece. Se entra por `#agujero`, por el botón atrás y las notificaciones; una flecha arriba a la izquierda hace lo mismo que el botón atrás, que en iPhone instalada no existe.
+- **Los votos van por el Apps Script, como los del MVP, pero en sus propiedades (`agv:<nombre>`) y no en una pestaña:** las hojas se pueden leer con la clave pública. La votación no es anónima: mientras está abierta solo el admin ve quién ha votado qué (panel), y al cierre lo ven todos. La cuenta sale del código (`HUELLAS_JUGADORES`), no de un nombre que venga en el mensaje: un voto por cuenta, y nadie lee el de otro.
 - **La notificación se envía una sola vez** (`av:agujero:votacion`): al abrir la votación desde el panel o, si falla, en la siguiente pasada de los avisos. Si se vuelve a abrir, no se repite, y los votos siguen ahí.
 
 ## Shits League: el Apps Script se publica solo

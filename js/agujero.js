@@ -1,5 +1,5 @@
 // Agujero negro de la temporada «???».
-// montarAgujero(contenedor, {fase:'agujero'|'votacion'|'cerrada', pregunta, onVoto(si), voto, sesion, onLogin, beta, onEntrar, resultado:{si,no}})
+// montarAgujero(contenedor, {fase:'agujero'|'votacion'|'cerrada', pregunta, onVoto(si), voto, sesion, onLogin, beta, onEntrar, resultado:{si:[nombres],no:[nombres]}})
 // Devuelve {destruir()}. Todo procedural: canvas 2D + Web Audio (sin archivos).
 export function montarAgujero(raiz, op = {}) {
   const VERDE = [31, 224, 101];
@@ -185,12 +185,17 @@ export function montarAgujero(raiz, op = {}) {
         <div class="ag-botones"></div>
         <div class="ag-nota"></div>
       </div>` : ''}
-    ${op.resultado ? `<div class="ag-voto">
-        <div class="ag-preg">SÍ ${op.resultado.si} – NO ${op.resultado.no}</div>
-        <div class="ag-nota">${op.resultado.si === op.resultado.no ? 'Empate' : `Gana el ${op.resultado.si > op.resultado.no ? 'SÍ' : 'NO'}`}</div>
-      </div>` : ''}
+    ${op.resultado ? htmlResultado(op.resultado) : ''}
     <div class="ag-pista">Toca el vacío</div>
     ${op.beta ? '<button class="ag-beta">Entrar a la temporada</button>' : ''}`;
+  function htmlResultado({ si, no }) {
+    const lado = (titulo, clase, nombres) => `<div class="ag-lado ${clase}"><b>${titulo}</b><span>${nombres.join(', ') || '—'}</span></div>`;
+    return `<div class="ag-voto ag-resultado${op.beta ? ' con-beta' : ''}">
+        <div class="ag-preg">SÍ ${si.length} – NO ${no.length}</div>
+        <div class="ag-nota">${si.length === no.length ? 'Empate' : `Gana el ${si.length > no.length ? 'SÍ' : 'NO'}`}</div>
+        <div class="ag-lados">${lado('SÍ', 'ag-lado-si', si)}${lado('NO', 'ag-lado-no', no)}</div>
+      </div>`;
+  }
   const pista = ui.querySelector('.ag-pista');
   if (op.beta) ui.querySelector('.ag-beta').onclick = () => op.onEntrar && op.onEntrar();
   if (op.fase === 'votacion') pintarVoto(op.voto);
@@ -201,7 +206,7 @@ export function montarAgujero(raiz, op = {}) {
       b.firstChild.onclick = () => op.onLogin && op.onLogin(); nota.textContent = ''; return;
     }
     b.innerHTML = `<button class="ag-si ${voto === true ? 'elegido' : ''}">SÍ</button><button class="ag-no ${voto === false ? 'elegido' : ''}">NO</button>`;
-    nota.textContent = voto == null ? 'Tu voto es secreto hasta que se cierre la votación.' : `Has votado ${voto ? 'SÍ' : 'NO'}. Puedes cambiarlo hasta que se cierre.`;
+    nota.textContent = voto == null ? 'El resultado se verá al cerrar la votación, con lo que votó cada uno.' : `Has votado ${voto ? 'SÍ' : 'NO'}. Puedes cambiarlo hasta que se cierre.`;
     const [si, no] = b.children;
     si.onclick = () => { golpe(); op.onVoto && op.onVoto(true); pintarVoto(true); };
     no.onclick = () => { golpe(); op.onVoto && op.onVoto(false); pintarVoto(false); };

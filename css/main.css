@@ -2035,8 +2035,22 @@ details.mvp-fila[open] > summary .mvp-fila__puntos::after { content: ' ▴'; }
 .perfil-app .dialog-box__btn { margin-top: .6rem; }
 .perfil-admin { margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid rgba(31,224,101,.2); text-align: left; }
 .perfil-admin .dialog-box__btn { margin-top: .5rem; }
-.perfil-admin__titulo { margin: 0; font-family: 'Anton', sans-serif; font-weight: 400; font-size: 1rem; letter-spacing: .08em; color: #fff; }
-.perfil-admin__salida { margin-top: .75rem; font-size: 13px; color: #9DC4AD; }
+.perfil-admin__titulo { margin: 0 0 .6rem; font-family: 'Anton', sans-serif; font-weight: 400; font-size: 1rem; letter-spacing: .08em; color: #fff; }
+.perfil-admin__seccion { margin-top: .5rem; border: 1px solid rgba(31,224,101,.2); border-radius: 12px; background: rgba(14,32,22,.45); }
+.perfil-admin__seccion[open] { border-color: rgba(31,224,101,.45); }
+.perfil-admin__seccion summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px; font-size: 14px; font-weight: 700; color: #E8FBEF; cursor: pointer; list-style: none; -webkit-tap-highlight-color: transparent; }
+.perfil-admin__seccion summary::-webkit-details-marker { display: none; }
+.perfil-admin__seccion summary::after { content: ''; flex: none; width: 8px; height: 8px; margin-right: 2px; border-right: 2px solid var(--verde); border-bottom: 2px solid var(--verde); transform: translateY(-2px) rotate(45deg); transition: transform .15s; }
+.perfil-admin__seccion[open] summary::after { transform: translateY(2px) rotate(-135deg); }
+.perfil-admin__cuerpo { padding: 0 14px 14px; }
+.perfil-admin__cuerpo > .dialog-box__btn:first-child { margin-top: 0; }
+.perfil-admin__nota { margin: .4rem 0 0; font-size: 12px; line-height: 1.4; color: #9DC4AD; }
+.perfil-admin select option { background: #06140D; color: #E8FBEF; }
+.perfil-admin .dialog-box__input { margin-top: .5rem; }
+.perfil-admin__lista li.es-si b { color: var(--verde); }
+.perfil-admin__lista li.es-falta b, .perfil-admin__lista li.es-falta span { color: #7b8a81; }
+.perfil-admin__salida { font-size: 13px; color: #9DC4AD; }
+.perfil-admin__salida:not(:empty) { margin-top: .6rem; }
 .perfil-admin__salida p { margin: 0 0 .5rem; }
 .perfil-admin__lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .perfil-admin__lista li { padding: 7px 10px; border-radius: 8px; background: rgba(14,32,22,.8); }

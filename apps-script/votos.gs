@@ -352,7 +352,7 @@ function notificacionPrueba(admin) {
 /* ── La votación del agujero (temporada «???») ───────────────────────────────────────── */
 // La cuenta sale del código, no de un nombre que venga en el mensaje: así es un voto por cuenta y
 // nadie lee el de otro. Los votos, en las propiedades del script y no en una pestaña: las hojas se
-// pueden leer con la clave pública, y nadie debe ver el recuento hasta el cierre.
+// pueden leer con la clave pública, y hasta el cierre solo el admin debe verlos. Al cierre, con nombres.
 const HUELLAS_JUGADORES = {
   '52e617dd6d2f75cb3bd76ca2eced4c582d83b6198ceb13a2ba6f6239164e51d2': 'Marcos',
   '6ad5b293d45a59fb605bb5555c2f1abb80463cacd7046dee9fbd161fa0c3eb9e': 'Alberto',
@@ -390,10 +390,15 @@ function ajusteAgujero() {
   }
 }
 
+// Los nombres de cada lado, en el orden de la lista. Solo lo ven el admin y, al cierre, todos
 function recuentoAgujero() {
   const todas = PropertiesService.getScriptProperties().getProperties();
-  const votos = Object.keys(todas).filter(k => k.startsWith(PREFIJO_VOTO_AGUJERO)).map(k => todas[k]);
-  return { si: votos.filter(v => v === 'si').length, no: votos.filter(v => v === 'no').length };
+  const voto = n => todas[PREFIJO_VOTO_AGUJERO + n];
+  return {
+    si: TODOS_LOS_JUGADORES.filter(n => voto(n) === 'si'),
+    no: TODOS_LOS_JUGADORES.filter(n => voto(n) === 'no'),
+    faltan: TODOS_LOS_JUGADORES.filter(n => !voto(n)),
+  };
 }
 
 function votarAgujero(body) {
@@ -409,10 +414,11 @@ function votarAgujero(body) {
 function agujeroEstado(body) {
   const jugador = HUELLAS_JUGADORES[huellaDe(body)];
   const guardado = jugador ? PropertiesService.getScriptProperties().getProperty(PREFIJO_VOTO_AGUJERO + jugador) : null;
+  const { si, no } = recuentoAgujero();
   return {
     ok: true,
     voto: guardado === null ? null : guardado === 'si',
-    resultado: ajusteAgujero()?.fase === 'cerrada' ? recuentoAgujero() : null,
+    resultado: ajusteAgujero()?.fase === 'cerrada' ? { si, no } : null,
   };
 }
 

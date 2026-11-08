@@ -5,7 +5,8 @@
    temporada que se está viendo: al salir, todo sigue donde estaba.
    La fase la dice el ajuste «agujero» de Supabase (panel de admin). Los votos están
    en el Apps Script, que es quien sabe el recuento.
-   Se entra por #agujero: así vuelve el botón atrás y abren las notificaciones.
+   Se entra por #agujero, con su entrada en el historial: la flecha y el botón atrás hacen lo
+   mismo, y abren las notificaciones.
 ═══════════════════════════════════════════════ */
 
 const AGUJERO_KEY = 'SL_AGUJERO';
@@ -21,6 +22,7 @@ let agujeroEnviando = 0;      // con un voto en camino, lo que se lea del servid
 let agujeroVista = null;      // { capa, raiz, control, firma }
 let agujeroPedido = false;
 let moduloAgujero = null;
+let agujeroTrasSalir = null;  // lo que queda por hacer cuando el historial haya vuelto atrás
 
 function guardarAgujero() {
   try { localStorage.setItem(AGUJERO_KEY, JSON.stringify(agujeroAjuste)); } catch { /* la próxima vez, del servidor */ }
@@ -50,10 +52,10 @@ function opcionesAgujero() {
     pregunta: escaparApp(pregunta),
     voto: agujeroVoto,
     sesion: !!getSessionPlayer(),
-    resultado: fase === 'cerrada' ? resultado : null,
+    resultado: fase === 'cerrada' && Array.isArray(resultado?.si) ? resultado : null,
     beta: !!t && puedeAbrirTemporada(t),
     onLogin: () => openSessionModal(),
-    onEntrar: () => { const id = temporadaAgujero()?.id; cerrarAgujero(); if (id) switchSeason(id); },
+    onEntrar: () => { const id = temporadaAgujero()?.id; volverDelAgujero(() => { if (id) switchSeason(id); }); },
     onVoto: votarAgujero,
   };
 }
@@ -113,15 +115,9 @@ function mostrarAgujero() {
   const capa = document.createElement('div');
   capa.className = 'agujero-capa';
   capa.innerHTML = `<div class="agujero-raiz"></div>
-    <select class="agujero-selector" aria-label="Temporada">${TEMPORADAS.filter(temporadaEnSelector).map(t => `
-      <option value="${t.id}"${esAgujero(t) ? ' selected' : ''}>${t.etiqueta}</option>`).join('')}
-    </select>`;
+    <button class="agujero-volver" type="button" aria-label="Volver">${icono('volver')}</button>`;
   document.body.appendChild(capa);
-  capa.querySelector('select').addEventListener('change', e => {
-    const id = e.target.value;
-    cerrarAgujero();
-    elegirTemporada(id);
-  });
+  capa.querySelector('.agujero-volver').addEventListener('click', () => volverDelAgujero());
   agujeroVista = { capa, raiz: capa.querySelector('.agujero-raiz'), control: null, firma: '' };
   pintarAgujero().catch(e => console.warn('[agujero] No se ha podido montar:', e.message));
   actualizarAgujero();
@@ -138,15 +134,29 @@ function cerrarAgujero() {
 
 // Desde el selector: con entrada en el historial, para que el botón atrás vuelva
 function abrirAgujero() {
-  if (location.hash === '#agujero') mostrarAgujero();
-  else location.hash = 'agujero';
+  if (location.hash !== '#agujero') history.pushState(history.state, '', '#agujero');
+  mostrarAgujero();
+}
+
+// La flecha, y entrar en la temporada: como el botón atrás. Cierra hashchange, abajo
+function volverDelAgujero(despues = null) {
+  agujeroTrasSalir = despues;
+  history.back();
 }
 
 function initAgujero() {
   window.addEventListener('hashchange', () => {
-    if (location.hash === '#agujero') mostrarAgujero();
-    else if (agujeroPedido) cerrarAgujero();
+    if (location.hash === '#agujero') { mostrarAgujero(); return; }
+    if (!agujeroPedido) return;
+    const despues = agujeroTrasSalir;
+    agujeroTrasSalir = null;
+    cerrarAgujero();
+    despues?.();
   });
   document.addEventListener('visibilitychange', () => { if (!document.hidden) actualizarAgujero(); });
-  if (location.hash === '#agujero') mostrarAgujero();
+  // Abierta directamente en el agujero (una notificación): debajo, la app, para poder volver
+  if (location.hash === '#agujero') {
+    history.replaceState(history.state, '', `#${STATE.activeTab}`);
+    abrirAgujero();
+  }
 }

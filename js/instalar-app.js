@@ -225,39 +225,99 @@ function pintarPerfilApp() {
 const esAdminLiga = () => AJUSTES_LIGA.admins.includes(getSessionPlayer());
 const escaparApp = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
+/* Secciones desplegables, cerradas por defecto; se recuerda cuáles quedaron abiertas. El esqueleto se
+   pinta una vez: lo que hay dentro de cada sección (una lista abierta, lo que se está escribiendo)
+   sobrevive a los refrescos del estado del móvil, y cada resultado sale debajo de su botón. */
+const ADMIN_SECCIONES_KEY = 'SL_ADMIN_SECCIONES';
+function seccionesAdminAbiertas() {
+  try { return JSON.parse(localStorage.getItem(ADMIN_SECCIONES_KEY) || '[]'); } catch { return []; }
+}
+const seccionAdmin = (id, titulo, cuerpo) => `
+  <details class="perfil-admin__seccion" data-admin-seccion="${id}"${seccionesAdminAbiertas().includes(id) ? ' open' : ''}>
+    <summary>${titulo}</summary>
+    <div class="perfil-admin__cuerpo">${cuerpo}</div>
+  </details>`;
+const botonAdmin = (accion, texto) => `
+  <button class="dialog-box__btn dialog-box__btn--ghost" type="button" data-admin-accion="${accion}">${texto}</button>`;
+const salidaDe = accion => `<div class="perfil-admin__salida" data-salida-de="${accion}"></div>`;
+const seccionAdminAbierta = id => !!document.querySelector(`[data-admin-seccion="${id}"]`)?.open;
+
+function alCambiarSeccionAdmin(e) {
+  const id = e.target.dataset?.adminSeccion;
+  if (!id) return;
+  const abiertas = [...document.querySelectorAll('[data-admin-seccion]')].filter(d => d.open).map(d => d.dataset.adminSeccion);
+  try { localStorage.setItem(ADMIN_SECCIONES_KEY, JSON.stringify(abiertas)); } catch { /* sin persistencia */ }
+  if (!e.target.open) return;
+  if (id === 'dispositivo') pintarDiagnostico();
+  if (id === 'temporada') leerRecuentoAdmin();
+}
+
 function pintarPerfilAdmin() {
   const caja = document.getElementById('sessionAdmin');
   if (!caja) return;
   caja.hidden = !esAdminLiga();
   if (caja.hidden) return;
-  // Sin borrar lo que se está escribiendo
-  if (caja.contains(document.activeElement) && document.activeElement.matches('input, select')) return;
-  caja.innerHTML = `
-    <h3 class="perfil-admin__titulo">Admin</h3>
-    <button class="dialog-box__btn dialog-box__btn--ghost" type="button" data-admin-accion="lista">QUIÉN LO TIENE ACTIVADO</button>
-    <button class="dialog-box__btn dialog-box__btn--ghost" type="button" data-admin-accion="prueba">ENVIARME UNA NOTIFICACIÓN DE PRUEBA</button>
-    <button class="dialog-box__btn dialog-box__btn--ghost" type="button" data-admin-accion="reparar">REPARAR NOTIFICACIONES</button>
-    <div class="perfil-admin__diagnostico" data-admin-diagnostico>Mirando este dispositivo…</div>
-    <button class="dialog-box__btn dialog-box__btn--ghost" type="button" data-admin-accion="simulacro">SIMULACRO DE AVISOS</button>
-    ${temporadaProxima() ? `<button class="dialog-box__btn" type="button" data-admin-temporada="empezar">EMPEZAR LA ${nombreTemporadaAdmin(temporadaProxima()).toUpperCase()}</button>` : ''}
-    ${temporadaAnteriorAlCurso() && !temporadaAnteriorAlCurso().imagenes ? `<button class="dialog-box__btn dialog-box__btn--ghost" type="button" data-admin-temporada="deshacer">DESHACER: VOLVER A LA ${nombreTemporadaAdmin(temporadaAnteriorAlCurso()).toUpperCase()}</button>` : ''}
-    ${temporadaAgujero() ? htmlAgujeroAdmin() : ''}
-    <div class="perfil-admin__salida" data-admin-salida></div>`;
-  pintarDiagnostico();
+  if (!caja.dataset.pintado) {
+    caja.dataset.pintado = '1';
+    caja.addEventListener('toggle', alCambiarSeccionAdmin, true);   // toggle no burbujea
+    caja.innerHTML = `
+      <h3 class="perfil-admin__titulo">Admin</h3>
+      ${seccionAdmin('temporada', 'Temporada', `
+        <div data-admin-agujero-caja></div>
+        ${salidaDe('agujero')}
+        <div data-admin-recuento></div>
+        <div data-admin-pistoletazo-caja></div>
+        <div class="perfil-admin__salida" data-admin-salida></div>`)}
+      ${seccionAdmin('notificaciones', 'Notificaciones', `
+        ${botonAdmin('prueba', 'ENVIARME UNA NOTIFICACIÓN DE PRUEBA')}
+        ${salidaDe('prueba')}
+        ${botonAdmin('simulacro', 'SIMULACRO DE AVISOS')}
+        <p class="perfil-admin__nota">Muestra qué avisos automáticos del calendario se enviarían ahora, sin enviar ninguno</p>
+        ${salidaDe('simulacro')}
+        ${botonAdmin('lista', 'QUIÉN TIENE LA APP Y LAS NOTIFICACIONES')}
+        ${salidaDe('lista')}`)}
+      ${seccionAdmin('dispositivo', 'Este dispositivo', `
+        ${botonAdmin('reparar', 'REPARAR NOTIFICACIONES')}
+        ${salidaDe('reparar')}
+        <div class="perfil-admin__diagnostico" data-admin-diagnostico>Mirando este dispositivo…</div>`)}`;
+    firmaTemporadaAdmin = '';
+    setInterval(() => {
+      const abierto = document.getElementById('sessionModal')?.classList.contains('open');
+      if (abierto && !document.hidden && seccionAdminAbierta('temporada')) leerRecuentoAdmin();
+    }, RECUENTO_CADA_MS);
+  }
+  pintarTemporadaAdmin();
+  if (seccionAdminAbierta('dispositivo')) pintarDiagnostico();
+  if (seccionAdminAbierta('temporada')) leerRecuentoAdmin();
   leerAgujeroAdmin();
 }
 
-/* ── Las fases de la temporada «???» ─────────────────────────────────────── */
+/* ── La sección Temporada ────────────────────────────────────────────────── */
+// Se vuelve a pintar solo si cambia algo, y nunca lo que se está escribiendo
+let firmaTemporadaAdmin = '';
+function pintarTemporadaAdmin() {
+  const agujero = document.querySelector('[data-admin-agujero-caja]');
+  if (!agujero) return;
+  const proxima = temporadaProxima(), anterior = temporadaAnteriorAlCurso();
+  const firma = JSON.stringify([proxima?.id, anterior?.id, temporadaAgujero()?.id, agujeroAjuste.fase, agujeroAjuste.pregunta]);
+  if (firma === firmaTemporadaAdmin || agujero.contains(document.activeElement)) return;
+  firmaTemporadaAdmin = firma;
+  agujero.innerHTML = temporadaAgujero() ? htmlAgujeroAdmin() : '';
+  document.querySelector('[data-admin-pistoletazo-caja]').innerHTML = `
+    ${proxima || (anterior && !anterior.imagenes) ? '<h4 class="perfil-admin__subtitulo perfil-admin__subtitulo--aparte">Pistoletazo</h4>' : ''}
+    ${proxima ? `<button class="dialog-box__btn" type="button" data-admin-temporada="empezar">EMPEZAR LA ${nombreTemporadaAdmin(proxima).toUpperCase()}</button>` : ''}
+    ${anterior && !anterior.imagenes ? `<button class="dialog-box__btn dialog-box__btn--ghost" type="button" data-admin-temporada="deshacer">DESHACER: VOLVER A LA ${nombreTemporadaAdmin(anterior).toUpperCase()}</button>` : ''}`;
+}
+
 function htmlAgujeroAdmin() {
   const { fase, pregunta } = agujeroAjuste;
   const opcion = (valor, texto) => `<option value="${valor}"${valor === fase ? ' selected' : ''}>${texto}</option>`;
-  return `<h4 class="perfil-admin__subtitulo perfil-admin__subtitulo--aparte">Temporada ???</h4>
+  return `<h4 class="perfil-admin__subtitulo">Temporada ???</h4>
     <select class="dialog-box__input" data-admin-agujero-fase aria-label="Fase">
-      ${opcion('agujero', 'Solo el agujero')}${opcion('votacion', 'Votación abierta')}${opcion('cerrada', 'Votación cerrada: resultado')}
+      ${opcion('agujero', 'Agujero')}${opcion('votacion', 'Votación')}${opcion('cerrada', 'Cerrada')}
     </select>
     <input class="dialog-box__input" type="text" maxlength="120" data-admin-agujero-pregunta value="${escaparApp(pregunta)}" aria-label="Pregunta">
-    <button class="dialog-box__btn" type="button" data-admin-agujero-guardar>GUARDAR LA FASE</button>
-    <button class="dialog-box__btn dialog-box__btn--ghost" type="button" data-admin-accion="recuento">VER EL RECUENTO</button>`;
+    <button class="dialog-box__btn" type="button" data-admin-agujero-guardar>GUARDAR LA FASE</button>`;
 }
 
 // La guardada se pinta ya; la del servidor, una vez, al abrir el panel por primera vez
@@ -265,7 +325,28 @@ let agujeroAdminLeido = false;
 async function leerAgujeroAdmin() {
   if (agujeroAdminLeido || !temporadaAgujero()) return;
   agujeroAdminLeido = true;
-  if (await pedirAjusteAgujero()) pintarPerfilAdmin();
+  if (await pedirAjusteAgujero()) pintarTemporadaAdmin();
+}
+
+// El recuento en vivo, con los nombres: mientras se ve la sección, cada poco
+const RECUENTO_CADA_MS = 15000;
+let recuentoLeidoEn = 0;
+async function leerRecuentoAdmin({ ya = false } = {}) {
+  const caja = document.querySelector('[data-admin-recuento]');
+  if (!caja) return;
+  if (!temporadaAgujero()) { caja.innerHTML = ''; return; }
+  if (!ya && Date.now() - recuentoLeidoEn < 5000) return;
+  recuentoLeidoEn = Date.now();
+  try {
+    const r = await postScript({ action: 'agujeroRecuento', codigo: getSessionCode() });
+    const fila = (clase, titulo, nombres) => `<li class="${clase}"><b>${titulo} · ${nombres.length}</b><span>${nombres.map(escaparApp).join(', ') || 'Nadie'}</span></li>`;
+    caja.innerHTML = `<h4 class="perfil-admin__subtitulo perfil-admin__subtitulo--aparte">Recuento en vivo</h4>
+      <ul class="perfil-admin__lista">
+        ${fila('es-si', 'SÍ', r.si)}${fila('es-no', 'NO', r.no)}${fila('es-falta', 'Faltan por votar', r.faltan)}
+      </ul>`;
+  } catch (e) {
+    caja.textContent = e.message;
+  }
 }
 
 // Quien comprueba que eres admin es el servidor, con tu sesión de Rush, como el pistoletazo
@@ -283,6 +364,8 @@ async function guardarAgujeroAdmin(salida) {
     agujeroAjuste = { ...agujeroAjuste, fase, pregunta };
     guardarAgujero();
     actualizarAgujero();
+    pintarTemporadaAdmin();
+    leerRecuentoAdmin({ ya: true });
     salida.textContent = 'Fase guardada.';
     if (fase !== 'votacion') return;
     // La envía el script, una sola vez. Si ahora no puede, la siguiente pasada de los avisos
@@ -303,7 +386,7 @@ async function pintarDiagnostico() {
   const caja = document.querySelector('[data-admin-diagnostico]');
   if (!caja) return;
   const fila = (nombre, valor) => `<li><b>${nombre}</b><span>${escaparApp(valor)}</span></li>`;
-  caja.innerHTML = `<h4 class="perfil-admin__subtitulo">Este dispositivo</h4><ul class="perfil-admin__lista">
+  caja.innerHTML = `<ul class="perfil-admin__lista">
     ${fila('Notification.permission', d.permiso)}
     ${fila('Standalone (app instalada)', d.standalone ? 'sí' : 'no')}
     ${fila('OneSignal cargado', d.onesignal ? 'sí' : 'no')}
@@ -397,9 +480,6 @@ async function accionAdmin(accion, salida) {
     const codigo = getSessionCode();
     if (accion === 'lista') {
       salida.innerHTML = htmlListaAdmin((await postScript({ action: 'listaDispositivos', codigo })).usuarios);
-    } else if (accion === 'recuento') {
-      const r = await postScript({ action: 'agujeroRecuento', codigo });
-      salida.textContent = `SÍ ${r.si} – NO ${r.no}`;
     } else if (accion === 'prueba') {
       salida.textContent = (await postScript({ action: 'notificacionPrueba', codigo })).mensaje;
     } else {
@@ -462,14 +542,14 @@ function initInstalarApp() {
     const paso = e.target.closest('[data-app-paso]');
     if (paso) { abrirAlarma(paso.dataset.appPaso); return; }
     const salidaAdmin = () => document.querySelector('[data-admin-salida]');
-    if (e.target.closest('[data-admin-agujero-guardar]')) { guardarAgujeroAdmin(salidaAdmin()); return; }
+    if (e.target.closest('[data-admin-agujero-guardar]')) { guardarAgujeroAdmin(document.querySelector('[data-salida-de="agujero"]')); return; }
     const temporada = e.target.closest('[data-admin-temporada]');
     if (temporada) { pedirConfirmarTemporada(temporada.dataset.adminTemporada, salidaAdmin()); return; }
     const si = e.target.closest('[data-admin-si]');
     if (si) { cambiarTemporadaAdmin(si.dataset.adminSi, salidaAdmin()); return; }
     if (e.target.closest('[data-admin-no]')) { salidaAdmin().innerHTML = ''; return; }
     const admin = e.target.closest('[data-admin-accion]');
-    if (admin) accionAdmin(admin.dataset.adminAccion, admin.parentElement.querySelector('[data-admin-salida]'));
+    if (admin) accionAdmin(admin.dataset.adminAccion, document.querySelector(`[data-salida-de="${admin.dataset.adminAccion}"]`));
   });
   window.addEventListener('appinstalled', () => { eventoInstalar = null; yaInstalada = true; refrescarEstadoApp(); });
   let ocultaDesde = 0;
